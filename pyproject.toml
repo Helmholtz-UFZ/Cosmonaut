@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "ufz-flask"
+version = "0.1.0"
+description = "First poetry Try"
+authors = ["Louis Ferdinand Trinkle <louis-ferdinand.trinkle@ufz.de>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.10.12"
+blinker = "1.6.2"
+click = "8.1.7"
+flask = "2.3.3"
+flask-wtf = "1.1.1"
+itsdangerous = "2.1.2"
+jinja2 = "3.1.2"
+markupsafe = "2.1.3"
+Werkzeug = "2.3.7"
+WTForms = "3.0.1"
+flask-bootstrap = "^3.3.7.1"
+bootstrap-flask = "^2.3.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
