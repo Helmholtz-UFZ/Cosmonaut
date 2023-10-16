@@ -2,3 +2,7 @@ __pycache__
 flask
 .python-version
 upload/*
+bin/*
+lib/*
+lib64/*
+pyvenv.cfg
