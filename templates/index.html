@@ -1,0 +1,28 @@
+{% extends 'base_layout.html' %}
+
+{% block title %}Hello World! Form{% endblock %}
+
+{% block content %}
+<h1>Hello World!</h1>
+<form method="POST" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+    <div>
+        {{ form.message.label }}
+        {{ form.message() }}
+    </div>
+    <div>
+        {{ form.file.label }}
+        {{ form.file() }}
+        {% if form.file.errors %}
+        <ul class="errors">
+            {% for error in form.file.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    <div>
+        <button type="submit">Answer</button>
+    </div>
+</form>
+{% endblock %}

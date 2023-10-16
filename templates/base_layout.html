@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" style="min-height: 100%">
+
+<head>
+    {% block head %}
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    {% block styles %}
+    <!-- Bootstrap CSS -->
+    {{ bootstrap.load_css() }}
+    {% endblock %}
+
+    <title>{% block title %}{% endblock %}</title>
+    {% endblock %}
+</head>
+
+<body>
+    {% block content %}
+    {% from 'bootstrap5/nav.html' import render_nav_item %}
+
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="navbar-nav mr-auto">
+            {{ render_nav_item('index', 'Home') }}
+            {{ render_nav_item('explore', 'Explore') }}
+            {{ render_nav_item('about', 'About') }}
+        </div>
+    </nav>
+    {% endblock %}
+    {% block scripts %}
+    {{ bootstrap.load_js() }}
+    {% endblock %}
+</body>
+
+</html>
