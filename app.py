@@ -1,20 +1,26 @@
 import os
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 from wtforms import StringField, ValidationError
 from werkzeug.utils import secure_filename
 import csv
 from flask_bootstrap import Bootstrap5
+from transformation import process_csv_file
+import geojson
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret_key"
 app.config["UPLOAD_FOLDER"] = "upload"
+app.config["DOWNLOAD_FOLDER"] = "download"
 
 bootstrap = Bootstrap5(app)
 
 if not os.path.exists(app.config["UPLOAD_FOLDER"]):
     os.makedirs(app.config["UPLOAD_FOLDER"])
+
+if not os.path.exists(app.config["DOWNLOAD_FOLDER"]):
+    os.makedirs(app.config["DOWNLOAD_FOLDER"])
 
 
 class CsvValidator(object):
@@ -62,14 +68,15 @@ def index():
 
     Returns:
         If the form is submitted and valid, returns a success message with the file path.
-        Otherwise, returns the rendered index.html template with an UploadForm instance.
+        Otherwise, returns the rendered index.html template with an UploadForm instance and form errors.
     """
+    # TODO fix the csv upload
     form = UploadForm()
     if form.validate_on_submit():
         file = form.file.data
         filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-        file.save(file_path)
+        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+        return redirect(url_for('index', filename=filename))
         return f"File uploaded successfully! Path: {file_path}"
     return render_template("index.html", form=form)
 
