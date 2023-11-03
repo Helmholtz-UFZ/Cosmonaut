@@ -18,6 +18,12 @@ Werkzeug = "2.3.7"
 WTForms = "3.0.1"
 flask-bootstrap = "^3.3.7.1"
 bootstrap-flask = "^2.3.2"
+pyproj = "^3.6.1"
+numpy = "^1.26.1"
+shapely = "^2.0.2"
+geojson = "^3.0.1"
+overpass = "^0.7"
+pandas = "^2.1.2"
 
 [tool.poetry.group.dev.dependencies]
 blinker = "1.6.2"
