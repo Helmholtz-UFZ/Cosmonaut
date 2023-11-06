@@ -3,8 +3,8 @@
 {% block title %}Hello World! Form{% endblock %}
 
 {% block content %}
-<h1>Hello World!</h1>
-<form method="POST" enctype="multipart/form-data">
+<h1>Upload File</h1>
+<form method="POST" action="" enctype="multipart/form-data">
     {{ form.hidden_tag() }}
     <div>
         {{ form.message.label }}
@@ -22,7 +22,12 @@
         {% endif %}
     </div>
     <div>
-        <button type="submit">Answer</button>
+        <button type="submit">Submit</button>
     </div>
 </form>
+
+{% if download_link %}
+    <p>Transformation and data fetching successful. <a href="{{ download_link }}">Download OSM Data</a></p>
+{% endif %}
+
 {% endblock %}
