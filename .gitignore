@@ -7,3 +7,5 @@ lib/*
 lib64/*
 pyvenv.cfg
 pyproject.toml
+download/*
+```
