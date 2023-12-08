@@ -13,7 +13,7 @@ import geopandas as gpd
 import json
 import os
 
-csv = 'upload_data/8-col-31468.csv'
+csv = 'upload_data/8-col-31468_short.csv'
 epsg_input = 31468
 epsg_output = 4326
 
