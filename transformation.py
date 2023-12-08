@@ -23,6 +23,8 @@ import time
 from shapely.geometry import Polygon
 from pyproj import CRS, Transformer
 
+# TODO use classes instead of functions
+# TODO make functions for each step of the process
 
 def transfrom_csv(input_file, epsg_input, epsg_output):
     """
@@ -103,6 +105,8 @@ def process_csv_file(input_file):
     buffered_max_lat = np.max(polygon_buffer_coords[:, 1])
 
     # Query the Overpass API
+    # TODO: use OSMNX instead of Overpass API
+    # TODO make it so the user can choose the type of road network to download
     api = overpass.API(timeout=500)
     query = f"""
             // query part for: “highway=*”
