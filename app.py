@@ -6,8 +6,7 @@ from dash.exceptions import PreventUpdate
 from werkzeug.utils import secure_filename
 import base64
 import csv
-import geojson
-from transformation import process_csv_file, transfrom_csv
+from transformation import OsmRoads, transform_csv, get_convex_hull
 from flask import Flask, send_from_directory
 from urllib.parse import quote as urlquote
 import time
@@ -17,7 +16,6 @@ import geopandas as gpd
 import shapely.geometry
 import numpy as np
 import dash_leaflet as dl
-import random
 from dash_leaflet import express as dlx
 
 UPLOAD_FOLDER = "upload"
@@ -111,7 +109,6 @@ def update_output(uploaded_filenames, uploaded_file_contents):
     else:
         return [html.Li(file_download_link(filename)) for filename in files]
 
-# Upload the file and check if it is a csv file and has 8 columns
 @app.callback(Output('output-data-upload', 'children'),
               Output('file-path', 'children'),
               Input('upload-data', 'contents'),
@@ -142,7 +139,6 @@ def upload_file(contents, filename):
         html.H5('File uploaded successfully')
     ]), file_path
 
-# run the transformation on the uploaded csv file and query the osm api
 @app.callback(Output('output-osm-query', 'children'),
               Output('osm-file-path', 'children'),
               Input('output-data-upload', 'children'),
@@ -152,10 +148,12 @@ def run_osm_query(upload_status, file_path):
         raise PreventUpdate
     try:
         with open(file_path, 'r') as file:
-            osm_data = process_csv_file(file)
-        osm_file_path = os.path.join(DOWNLOAD_FOLDER, "osm_data.geojson")
-        with open(osm_file_path, "w") as osm_file:
-            geojson.dump(osm_data, osm_file)
+            data = transform_csv(file_path, 31468, 4326)
+            convex_hull = get_convex_hull(data)
+            osm = OsmRoads(convex_hull)
+            osm_data = osm._get_roads()
+        osm_file_path = osm.save_roads(DOWNLOAD_FOLDER, 4326)
+        osm_file_path
         return html.Div([
             html.H5('OSM query run successfully')
         ]), osm_file_path
@@ -165,18 +163,13 @@ def run_osm_query(upload_status, file_path):
             html.H5('OSM query failed')
         ]), None
 
-# now lets add the points out of the csv file which is uploaded into the file list.
-# the points are as Easting (m),Northing (m) in the csv file.
-# they are in epsg 31468 and need to be converted to 4326 first for the map.
-# add the points to the map as a layer and add a marker to each point. but group them in a layer group.
-# add a layer control to the map to switch the points on and off.
 @app.callback(Output('points', 'children'),
               Input('output-data-upload', 'children'),
               State('file-path', 'children'))
 def show_points(upload_status, file_path):
     if upload_status is None:
         raise PreventUpdate
-    df = transfrom_csv(file_path, 31468, 4326)
+    df = transform_csv(file_path, 31468, 4326)
     
     if len(df) > 200:
         df = df.sample(n=200, random_state=42)  # Select 200 random points
@@ -184,8 +177,6 @@ def show_points(upload_status, file_path):
     points = []
     for index, row in df.iterrows():
         points.append(dl.Marker(position=[row['Latitude'], row['Longitude']]))
-    
-    print(points)
     
     group = dl.LayerGroup(children=points)
     
@@ -198,14 +189,6 @@ def show_points(upload_status, file_path):
         return group
     
 # TODO Make a display of the classes in the csv with polygons for each class where it is the highest compared to the other classes
-# I want to have polygons for each class in the csv. The edges of the polygons are defined by the points of the class.
-# The polygons should be displayed on the map and be grouped in a layer group for each class.
-# The layer groups should be added to the layer control of the map.
-# The polygons should be colored in different colors.
-# The polygons should be transparent.
-# The polygons should be labeled with the class name.
-# The polygons should be clickable and show the class name.
-
 
 @app.callback(Output('classes', 'children'),
               Input('output-data-upload', 'children'),
@@ -214,7 +197,7 @@ def show_classes(upload_status, file_path):
     if upload_status is None:
         raise PreventUpdate
 
-    df = transfrom_csv(file_path, 31468, 4326)
+    df = transform_csv(file_path, 31468, 4326)
 
     class_columns = [col for col in df.columns if col.startswith('Class')]
     df['highest_class'] = df[class_columns].apply(lambda row: row.idxmax() if row.max() > 0 else 'NoClass', axis=1)
