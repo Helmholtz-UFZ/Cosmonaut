@@ -1,100 +1,30 @@
-"""
-This script reads a csv file with coordinates in EPSG:31468 projection.
-Then converts them to EPSG:4326 projection and calculates the bounding box of the projected csv file.
-Out of this it creates a polygon from the bounding box, buffers the polygon, and queries the Overpass API to get the road network data of OSM inside the buffered polygon.
-"""
-import overpass
 import time
 import pandas as pd
 import numpy as np
-import pyproj
-import overpass
 import time
 from shapely.geometry import Polygon
 from pyproj import CRS, Transformer
 import osmnx as ox
-import osmnx as ox
+import time
+import os
+import geojson
+from pyproj import CRS, Transformer
 
-# TODO use classes instead of functions
-# TODO make functions for each step of the process
 
-class CsvFile:
-    def __init__(self, file_path, epsg_input, epsg_output):
-        self.file_path = file_path
-        self.epsg_input = epsg_input
-        self.epsg_output = epsg_output
-        self.df = self._transform_csv(epsg_input, epsg_output)
-
-    def _transform_csv(self, crs_input, crs_output):
-        """
-        This function takes a CSV file as input, processes it and returns the result of a query to the Overpass API.
-
-        Args:
-            crs_input (str): The input CRS.
-            crs_output (str): The output CRS.
-
-        Returns:
-            dict: A dictionary containing the result of the query to the Overpass API.
-
-        """
-        # crs_output = CRS.from_string(crs_output)
-        # crs_input = CRS.from_string(crs_input)
-        transformer = Transformer.from_crs(crs_input, crs_output)
-
-        df = pd.read_csv(self.file_path)
-
-        df["Latitude"], df["Longitude"] = transformer.transform(
-            df["Easting (m)"].values, df["Northing (m)"].values
-        )
-
-        df.drop(
-            ["Easting (m)", "Northing (m)"], axis=1, inplace=True
-        )
-
-        return df
-
-    def get_convex_hull(self):
-        points = self.df["Longitude", "Latitude"]
-        hull = points.convex_hull
-        hull_buffer = hull.buffer(0.005, cap_style="square", join_style=2)
-
-        return hull_buffer
-        
-class OverpassQuery:
-    def __init__(self, polygon):
-        self.polygon = polygon
-        self.query = self.get_query()
-        self.result = self.get_result()
-    
-    # Query the Overpass API with the polygon and osmnx (features_from_polygon) amd make it so the user can choose the type of road network to download
-    def get_query(self):
-        ox.config(use_cache=True, log_console=True)
-        tags = {
-            'highway': ['primary', 'secondary', 'tertiary', 'unclassified', 'residential', 'primary_link', 'secondary_link', 'tertiary_link', 'living_street', 'track', 'road']
-        }
-        osm_data = ox.geometries_from_polygon(self.polygon, tags=tags)
-        return osm_data
-    
-    # Transform OSM data to csv EPSG
-    def osm_transform(self):
-        # Define EPSG.
-        epsg_input = 4326
-        epsg_output = 31468
-        osm_data = self.osm_data
-
-        
-def transfrom_csv(input_file, epsg_input, epsg_output):
+def transform_csv(input_file, epsg_input, epsg_output):
     """
-    This function takes a CSV file as input, processes it and returns the result of a query to the Overpass API.
+    Transforms the coordinates in a CSV file from one coordinate reference system (CRS) to another.
 
     Args:
-        input_file (str): The path to the input CSV file.
+        input_file (str): Path to the input CSV file.
+        epsg_input (int): EPSG code of the input CRS.
+        epsg_output (int): EPSG code of the output CRS.
 
     Returns:
-        dict: A dictionary containing the result of the query to the Overpass API.
-
+        pandas.DataFrame: DataFrame with transformed coordinates.
     """
-    # Define EPSG.
+    if not input_file.endswith(".csv"):
+        raise ValueError("Input file must be a CSV file.")
 
     crs_output = CRS.from_epsg(epsg_output)
     crs_input = CRS.from_epsg(epsg_input)
@@ -106,107 +36,89 @@ def transfrom_csv(input_file, epsg_input, epsg_output):
         df["Easting (m)"].values, df["Northing (m)"].values
     )
 
-    df.drop(
-        ["Easting (m)", "Northing (m)"], axis=1, inplace=True
-    )
+    df.drop(["Easting (m)", "Northing (m)"], axis=1, inplace=True)
 
     return df
 
-def process_csv_file(input_file):
-    """
-    This function takes a CSV file as input, processes it and returns the result of a query to the Overpass API.
 
-    Args:
-        input_file (str): The path to the input CSV file.
+def get_convex_hull(self):
+    """
+    Calculate the convex hull of the given points and return a buffered polygon.
 
     Returns:
-        dict: A dictionary containing the result of the query to the Overpass API.
-
+        A buffered polygon representing the convex hull of the points.
     """
-    # Define EPSG.
-    # TODO: Make the epsg customizable by the user
-    crs_output = CRS.from_epsg(4326)
-    crs_input = CRS.from_epsg(31468)
-    transformer = Transformer.from_crs(crs_input, crs_output)
+    lon = self.Longitude
+    lat = self.Latitude
 
-    df = pd.read_csv(input_file)
+    points = np.array([lon, lat]).T
+    points = Polygon(points)
+    hull = points.convex_hull
+    hull_buffer = hull.buffer(0.005, cap_style="square", join_style=2)
 
-    df["Latitude"], df["Longitude"] = transformer.transform(
-        df["Easting (m)"].values, df["Northing (m)"].values
-    )
+    return hull_buffer
 
-    df.drop(
-        ["Easting (m)", "Northing (m)"], axis=1, inplace=True
-    )  # axis=1 means columns, inplace=True means the changes are done in place and df is modified immediately
 
-    min_lon = np.min(df["Longitude"])
-    max_lon = np.max(df["Longitude"])
-    min_lat = np.min(df["Latitude"])
-    max_lat = np.max(df["Latitude"])
+class OsmRoads:
+    """
+    A class for handling OpenStreetMap road data transformation.
 
-    # TODO: Make the polygon not as rectangle but as a polygon with the boundary of the coordinates
-    polygon = Polygon(
-        [(min_lon, min_lat), (min_lon, max_lat), (max_lon, max_lat), (max_lon, min_lat)]
-    )
+    Args:
+        polygon (shapely.geometry.Polygon): The polygon representing the area of interest.
+        epsg_input (int, optional): The EPSG code of the input coordinate system. Defaults to 4326.
+        epsg_output (int, optional): The EPSG code of the output coordinate system. Defaults to 31468.
+    """
 
-    polygon_buffer = polygon.buffer(0.005, cap_style="square", join_style=2)
+    def __init__(self, polygon, epsg_input=4326, epsg_output=31468):
+        self.polygon = polygon
+        self.roads = self._get_roads()
+        self.epsg_input = epsg_input
+        self.epsg_output = epsg_output
 
-    # extract the coordinates from the buffer and put them into a list
-
-    polygon_buffer_coords = list(polygon_buffer.exterior.coords)
-    polygon_buffer_coords = np.array(polygon_buffer_coords)
-
-    buffered_min_lon = np.min(polygon_buffer_coords[:, 0])
-    buffered_max_lon = np.max(polygon_buffer_coords[:, 0])
-    buffered_min_lat = np.min(polygon_buffer_coords[:, 1])
-    buffered_max_lat = np.max(polygon_buffer_coords[:, 1])
-
-    # Query the Overpass API
-    # TODO: use OSMNX instead of Overpass API
-    # TODO make it so the user can choose the type of road network to download
-    api = overpass.API(timeout=500)
-    query = f"""
-            // query part for: “highway=*”
-            (way["highway"]({buffered_min_lat},{buffered_min_lon},{buffered_max_lat},{buffered_max_lon});
-            );
+    # FIXME: additional tags is not working yet
+    def _get_roads(self, additional_tags=None):
         """
+        Get road data from OpenStreetMap based on the specified tags.
 
-    for _ in range(5):  # Retry up to 5 times
-        try:
-            res = api.get(query, verbosity="geom", responseformat="geojson")
-            print("Query run succesfuly")
-            break
-        except overpass.errors.ServerLoadError:
-            print("Query failed, redoing it")
-            time.sleep(1)  # Wait for 1 seconds before retrying
+        Args:
+            additional_tags (dict, optional): Additional tags to filter the road data. Defaults to None.
 
-    # Transform OSM data to csv EPSG
-    transformer = pyproj.Transformer.from_crs(crs_output, crs_input, always_xy=True)
-    for feature in res["features"]:
-        geometry = feature["geometry"]
-        if geometry["type"] == "Point":
-            x, y = transformer.transform(
-                geometry["coordinates"][0], geometry["coordinates"][1]
-            )
-            geometry["coordinates"] = [x, y]
-        elif geometry["type"] == "LineString" or geometry["type"] == "MultiPoint":
-            coords = geometry["coordinates"]
-            geometry["coordinates"] = [transformer.transform(x, y) for x, y in coords]
-        elif geometry["type"] == "Polygon" or geometry["type"] == "MultiLineString":
-            rings = geometry["coordinates"]
-            geometry["coordinates"] = [
-                [transformer.transform(x, y) for x, y in ring] for ring in rings
+        Returns:
+            geopandas.GeoDataFrame: The road data as a GeoDataFrame.
+        """
+        ox.config(use_cache=True, log_console=True)
+        tags = {
+            "highway": [
+                "primary",
+                "secondary",
+                "tertiary",
+                "unclassified",
+                "residential",
+                "primary_link",
+                "secondary_link",
+                "tertiary_link",
+                "living_street",
+                "track",
+                "road",
             ]
-        elif geometry["type"] == "MultiPolygon":
-            polygons = geometry["coordinates"]
-            geometry["coordinates"] = [
-                [[transformer.transform(x, y) for x, y in ring] for ring in polygon]
-                for polygon in polygons
-            ]
+        }
+        if additional_tags:
+            tags.update(additional_tags)
+        print(f"tags: {tags}")
+        osm_data = ox.geometries_from_polygon(self.polygon, tags=tags)
+        return osm_data
 
-    return res
+    def save_roads(self, DOWNLOAD_FOLDER, epsg_code):
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        file_name = f"{timestamp}_osm_data_{epsg_code}.geojson"
+        file_path = os.path.join(DOWNLOAD_FOLDER, file_name)
+        with open(file_path, "w") as osm_file:
+            geojson.dump(self.roads, osm_file)
+        return file_path
 
-    # roadata = process_csv_file(file_path)
-    # with open("./download/test_31468.geojson", mode="w") as f:
-    #     geojson.dump(roadata, f)
-    #     print("OSM geojson file written")
+    def _osm_transform(self):
+        osm_data = self.roads
+        epsg_output = self.epsg_output
+        epsg_input = self.epsg_input
+        osm_data = osm_data.to_crs(epsg=epsg_output)
+        return osm_data
