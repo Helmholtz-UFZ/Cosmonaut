@@ -71,23 +71,7 @@ class OsmRoads:
 
     def __init__(self, polygon, epsg_input=4326, epsg_output=31468):
         self.polygon = polygon
-        self.roads = self._get_roads()
-        self.epsg_input = epsg_input
-        self.epsg_output = epsg_output
-
-    # FIXME: additional tags is not working yet
-    def _get_roads(self, additional_tags=None):
-        """
-        Get road data from OpenStreetMap based on the specified tags.
-
-        Args:
-            additional_tags (dict, optional): Additional tags to filter the road data. Defaults to None.
-
-        Returns:
-            geopandas.GeoDataFrame: The road data as a GeoDataFrame.
-        """
-        ox.config(use_cache=True, log_console=True)
-        tags = {
+        self.tags = {
             "highway": [
                 "primary",
                 "secondary",
@@ -102,10 +86,26 @@ class OsmRoads:
                 "road",
             ]
         }
-        if additional_tags:
-            tags.update(additional_tags)
-        print(f"tags: {tags}")
-        osm_data = ox.geometries_from_polygon(self.polygon, tags=tags)
+        self.roads = self._get_roads()
+        self.epsg_input = epsg_input
+        self.epsg_output = epsg_output
+
+    def _get_roads(self, additional_tags: dict=None):
+        """
+        Get road data from OpenStreetMap based on the specified tags.
+
+        Args:
+            additional_tags (dict, optional): Additional tags to filter the road data. Defaults to None.
+
+        Returns:
+            geopandas.GeoDataFrame: The road data as a GeoDataFrame.
+        """
+        if additional_tags is not None:
+            self.tags = additional_tags
+        # FIXME: ox.config is deprecated. Use ox.settings instead
+        ox.config(use_cache=True, log_console=True)
+        print(f"tags: {self.tags}")
+        osm_data = ox.geometries_from_polygon(self.polygon, tags=self.tags)
         return osm_data
 
     def save_roads(self, DOWNLOAD_FOLDER, epsg_code):
