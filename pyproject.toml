@@ -28,6 +28,7 @@ plotly = "^5.18.0"
 dash = "^2.14.1"
 geopandas = "^0.14.1"
 dash-leaflet = "^1.0.11"
+pydantic = "^2.5.3"
 
 [tool.poetry.group.dev.dependencies]
 blinker = "1.6.2"

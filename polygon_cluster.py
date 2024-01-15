@@ -2,6 +2,8 @@ import logging
 
 from pydantic import BaseModel
 import math
+import geojson
+import uuid
 
 
 logging.basicConfig(
@@ -57,7 +59,7 @@ def cluster_points(points):
             for other_point in points:
                 if other_point in classified_points:
                     continue
-                logging.debug(f"Is {other_point} in cluster?")
+                # logging.debug(f"Is {other_point} in cluster?")
                 distance_cluster = min(
                     [
                         other_point.distance_to(cluster_point)
@@ -68,9 +70,9 @@ def cluster_points(points):
                     distance_cluster > neighbour_dist
                     or point.classification != other_point.classification
                 ):
-                    logging.debug("No")
+                    # logging.debug("No")
                     continue
-                logging.debug("Yes")
+                # logging.debug("Yes")
                 more_neighbours = True
                 cluster.append(other_point)
                 classified_points.append(other_point)
@@ -80,7 +82,7 @@ def cluster_points(points):
 
 
 def main():
-    csv_path = "upload_data/8-col-31468_short.csv"
+    csv_path = "upload_data/8-col-31468.csv"
     # epsg_input = 31468
     # epsg_output = 4326
 
@@ -95,12 +97,29 @@ def main():
             y = float(fields[1])
             classification = find_classification([float(e) for e in fields[2:]])
             points.append(Point(x=x, y=y, classification=classification))
-            logging.debug(points[-1])
+            # logging.debug(points[-1])
 
     cluster_list = cluster_points(points)
 
     for cluster in cluster_list:
         print(cluster)
+        filename = f"upload_data/cluster_{uuid.uuid4()}.geojson"
+
+        features = []
+        for point in cluster:
+            features.append(
+                geojson.Feature(
+                    geometry=geojson.Point((point.x, point.y)),
+                    properties={"classification": point.classification},
+                )
+            )
+
+        feature_collection = geojson.FeatureCollection(features)
+
+        with open(filename, "w") as f:
+            geojson.dump(feature_collection, f)
+
+        
 
 
 if __name__ == "__main__":
