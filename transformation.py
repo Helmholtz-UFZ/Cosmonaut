@@ -90,7 +90,7 @@ class OsmRoads:
         self.epsg_input = epsg_input
         self.epsg_output = epsg_output
 
-    def _get_roads(self, additional_tags: dict=None):
+    def _get_roads(self, additional_tags: dict = None):
         """
         Get road data from OpenStreetMap based on the specified tags.
 
