@@ -9,4 +9,5 @@ pyvenv.cfg
 pyproject.toml
 download/*
 test.py
+cache/*
 ```
