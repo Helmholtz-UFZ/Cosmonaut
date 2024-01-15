@@ -77,7 +77,15 @@ app.layout = html.Div([
         dl.LocateControl(locateOptions={'enableHighAccuracy': True}),
         dl.ScaleControl(position="bottomleft"),
     ], center=[52.5, 13.4], zoom=8, style={'height': '50vh'}, id='map'),
-    html.Button("Generate markers", id="btn")
+    html.Button("Generic Button", id="btn"), # not used for now but might be useful later
+    html.Div([
+        html.H4("OSM Tags Selection"),
+        dcc.Dropdown(id='tags-dropdown', 
+                     options=[{"label": tag, "value": tag} for tag in ["primary", "secondary", "tertiary", "unclassified", "residential", "primary_link", "secondary_link", "tertiary_link", "living_street", "track", "road"]],
+                     value=["primary", "secondary", "tertiary", "unclassified", "residential", "primary_link", "secondary_link", "tertiary_link", "living_street", "track", "road"],
+                     multi=True),
+        html.Div(id='tags-points')
+    ])
 ])
 
 def uploaded_files():
@@ -142,16 +150,16 @@ def upload_file(contents, filename):
 @app.callback(Output('output-osm-query', 'children'),
               Output('osm-file-path', 'children'),
               Input('output-data-upload', 'children'),
+              Input('tags-dropdown', 'value'),
               State('file-path', 'children'))
-def run_osm_query(upload_status, file_path):
+def run_osm_query(upload_status, selected_tags, file_path):
     if upload_status is None:
         raise PreventUpdate
     try:
-        with open(file_path, 'r') as file:
-            data = transform_csv(file_path, 31468, 4326)
-            convex_hull = get_convex_hull(data)
-            osm = OsmRoads(convex_hull)
-            osm_data = osm._get_roads()
+        data = transform_csv(file_path, 31468, 4326)
+        convex_hull = get_convex_hull(data)
+        osm = OsmRoads(convex_hull)
+        osm._get_roads(additional_tags={"highway": selected_tags})
         osm_file_path = osm.save_roads(DOWNLOAD_FOLDER, 4326)
         osm_file_path
         return html.Div([
@@ -172,7 +180,8 @@ def show_points(upload_status, file_path):
     df = transform_csv(file_path, 31468, 4326)
     
     if len(df) > 200:
-        df = df.sample(n=200, random_state=42)  # Select 200 random points
+        # Select 200 random points, otherwise the website will freeze for a some time
+        df = df.sample(n=200, random_state=42)
     
     points = []
     for index, row in df.iterrows():
@@ -188,39 +197,8 @@ def show_points(upload_status, file_path):
     else:
         return group
     
-# TODO Make a display of the classes in the csv with polygons for each class where it is the highest compared to the other classes
 
-@app.callback(Output('classes', 'children'),
-              Input('output-data-upload', 'children'),
-              State('file-path', 'children'))
-def show_classes(upload_status, file_path):
-    if upload_status is None:
-        raise PreventUpdate
-
-    df = transform_csv(file_path, 31468, 4326)
-
-    class_columns = [col for col in df.columns if col.startswith('Class')]
-    df['highest_class'] = df[class_columns].apply(lambda row: row.idxmax() if row.max() > 0 else 'NoClass', axis=1)
-    df.drop(class_columns, axis=1, inplace=True)
-
-    geometry = [
-        shapely.geometry.Point(row['Longitude'], row['Latitude'])
-        if not pd.isna(row['Latitude']) and not pd.isna(row['Longitude'])
-        else None
-        for _, row in df.iterrows()
-    ]
-    gdf = gpd.GeoDataFrame(df, geometry=geometry, crs='EPSG:4326')
-    gdf.drop(['Latitude', 'Longitude'], axis=1, inplace=True)
-    gdf = gdf.dissolve(by='highest_class', aggfunc='sum')
-    gdf.reset_index(inplace=True)
-
-    classes = []
-    for index, row in gdf.iterrows():
-        classes.append(dl.GeoJSON(data=json.dumps(row.geometry.__geo_interface__)))
-
-    return classes
-
-# not used for now
+# not used for now but might be useful later
 # @app.callback(Output("markers", "children"), Input("btn", "n_clicks"))
 # def generate_markers(_):
 #     return [dl.Marker(position=[51 + random.random(), 11 + random.random()]) for i in range(5)]
