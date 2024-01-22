@@ -10,4 +10,5 @@ pyproject.toml
 download/*
 test.py
 cache/*
+assets/*
 ```
