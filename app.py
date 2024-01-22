@@ -1,6 +1,6 @@
 import os
 import dash
-from dash import dcc, html, callback_context
+from dash import dcc, html
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from werkzeug.utils import secure_filename
@@ -11,27 +11,17 @@ from flask import Flask, send_from_directory
 from urllib.parse import quote as urlquote
 import time
 import json
-import pandas as pd
-import geopandas as gpd
-import shapely.geometry
-import numpy as np
 import dash_leaflet as dl
-from dash_leaflet import express as dlx
 from csv_plot import Plotter
-import random
 
 UPLOAD_FOLDER = "upload"
 DOWNLOAD_FOLDER = "download"
-IMAGE_FOLDER = "images"
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 if not os.path.exists(DOWNLOAD_FOLDER):
     os.makedirs(DOWNLOAD_FOLDER)
-
-if not os.path.exists(IMAGE_FOLDER):
-    os.makedirs(IMAGE_FOLDER)
 
 # Mapbox token
 # mb_token = "pk.eyJ1IjoibG91aXN0cmkiLCJhIjoiY2xvbjF4M2h3MDlvZjJ2cXNldThlaG8xdiJ9.mU8urLdPCQo-DyiYhwqtLQ"
@@ -46,12 +36,6 @@ app = dash.Dash(external_stylesheets=external_stylesheets, server=server)
 def download(path):
     """Serve a file from the upload directory."""
     return send_from_directory(UPLOAD_FOLDER, path, as_attachment=True)
-
-
-@app.server.route("/images/<path:path>")
-def serve_image(image_path):
-    return send_from_directory(IMAGE_FOLDER, image_path)
-
 
 # TODO: Remove the geojson layers when the image overlay is working
 with open("upload_data/Class3.geojson") as f:
@@ -133,7 +117,7 @@ app.layout = html.Div(
         ),
         html.Button(
             "Load new Map", id="btn"
-        ),  # not used for now but might be useful later
+        ),
         html.Div(
             [
                 html.H4("OSM Tags Selection"),
