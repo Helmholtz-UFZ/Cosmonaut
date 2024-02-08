@@ -38,7 +38,7 @@ def download(path):
     return send_from_directory(UPLOAD_FOLDER, path, as_attachment=True)
 
 # TODO: Remove the geojson layers when the image overlay is working
-with open("upload_data/Class3.geojson") as f:
+with open("upload_data/short_4326.geojson") as f:
     Class3 = json.load(f)
 
 with open("upload_data/Class4.geojson") as f:
@@ -91,10 +91,10 @@ app.layout = html.Div(
                         dl.Overlay(
                             dl.LayerGroup(
                                 dl.ImageOverlay(
-                                    url="/assets/test.png",
+                                    url="/assets/test_1.png",
                                     bounds=[
-                                        [51.58503255, 10.89955432],
-                                        [51.88928492, 11.51882844],
+                                        [51.585032547449714, 11.518828435546714],
+                                        [51.889284921667524, 10.899554323779789],
                                     ],
                                     opacity=0.75,
                                     id="image-overlay",
@@ -110,7 +110,7 @@ app.layout = html.Div(
                 dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
                 dl.ScaleControl(position="bottomleft"),
             ],
-            center=[51.80, 11.32],
+            center=[51.70, 11.20],
             zoom=10,
             style={"height": "50vh"},
             id="map",
