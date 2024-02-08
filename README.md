@@ -3,6 +3,10 @@
 This project is a web application built with Dash and Dash Leaflet for transforming and visualizing CSV data for the COSMOPOLITAN Project at UFZ. 
 It allows users to upload a CSV file, transforms the data, queries OpenStreetMap for a planed navigation feature, and visualizes the csv-data on a map (NOTE: Visualization doesn't work for bigger files)
 
+## NOTE (to me and John [and all others])
+
+The image overlay is not the best solution. We need to think about using a WNSTileServer (eg. Terracotta)
+
 ## Features
 
 - File upload: Users can upload a CSV file to the application.
