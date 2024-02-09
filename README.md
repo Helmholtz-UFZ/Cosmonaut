@@ -1,4 +1,5 @@
-# UFZ Flask Frontend Dev Repo
+# COSMONAUT
+# COSmic ray based soil MOisture prediction NAvigation and UTility Tool
 
 This project is a web application built with Dash and Dash Leaflet for transforming and visualizing CSV data for the COSMOPOLITAN Project at UFZ. 
 It allows users to upload a CSV file, transforms the data, queries OpenStreetMap for a planed navigation feature, and visualizes the csv-data on a map (NOTE: Visualization doesn't work for bigger files)
