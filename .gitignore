@@ -11,4 +11,5 @@ download/*
 test.py
 cache/*
 assets/*
-```
+qgis/*
+*.tif
