@@ -785,6 +785,19 @@ unicode = ["unicodedata2 (>=15.1.0)"]
 woff = ["brotli (>=1.0.1)", "brotlicffi (>=0.8.0)", "zopfli (>=0.1.4)"]
 
 [[package]]
+name = "gdal"
+version = "3.8.3"
+description = "GDAL: Geospatial Data Abstraction Library"
+optional = false
+python-versions = ">=3.6.0"
+files = [
+    {file = "GDAL-3.8.3.tar.gz", hash = "sha256:eae2587c581d6609289e44f30afe30edcc25fbc640b5d6aba2f3c3e81def55be"},
+]
+
+[package.extras]
+numpy = ["numpy (>1.0.0)"]
+
+[[package]]
 name = "geojson"
 version = "3.0.1"
 description = "Python bindings and utilities for GeoJSON"
@@ -2668,4 +2681,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "3.10.12"
-content-hash = "4d02f076a795b3a4ffe2257de3cf7c088b3bba0684ab9903d894eab2bd2bc514"
+content-hash = "7296d3922ae8746acdaf54092915d3a6cb6f9c17a81eadae73e755b6b26a1521"
