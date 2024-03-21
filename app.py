@@ -126,31 +126,37 @@ app.layout = html.Div(
                     options=[
                         {"label": tag, "value": tag}
                         for tag in [
+                            "motorway",
+                            "trunk",
                             "primary",
                             "secondary",
                             "tertiary",
-                            "unclassified",
-                            "residential",
+                            "motorway_link",
+                            "trunk_link",
                             "primary_link",
                             "secondary_link",
                             "tertiary_link",
+                            "unclassified",
+                            "residential",
                             "living_street",
-                            "track",
-                            "road",
+                            "track"
                         ]
                     ],
                     value=[
+                        "motorway",
+                        "trunk",
                         "primary",
                         "secondary",
                         "tertiary",
-                        "unclassified",
-                        "residential",
+                        "motorway_link",
+                        "trunk_link",
                         "primary_link",
                         "secondary_link",
                         "tertiary_link",
+                        "unclassified",
+                        "residential",
                         "living_street",
-                        "track",
-                        "road",
+                        "track"
                     ],
                     multi=True,
                 ),
@@ -236,7 +242,10 @@ def run_osm_query(upload_status, selected_tags, file_path):
         osm = OsmRoads(convex_hull)
         osm._get_roads(additional_tags={"highway": selected_tags})
         osm_file_path = osm.save_roads(DOWNLOAD_FOLDER, 4326)
-        osm_file_path
+        # transform osm data back to 31468 and save it
+        osm_data = osm._osm_transform()
+        osm_file_path = osm_file_path.replace("4326", "31468")
+        osm_data.to_file(osm_file_path, driver="GeoJSON")
         return html.Div([html.H5("OSM query run successfully")]), osm_file_path
     except Exception as e:
         os.remove(file_path)
