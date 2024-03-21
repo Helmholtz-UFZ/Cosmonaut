@@ -37,12 +37,12 @@ def download(path):
     """Serve a file from the upload directory."""
     return send_from_directory(UPLOAD_FOLDER, path, as_attachment=True)
 
-# TODO: Remove the geojson layers when the image overlay is working
-with open("upload_data/short_4326.geojson") as f:
-    Class3 = json.load(f)
+# # TODO: Remove the geojson layers when the image overlay is working
+# with open("test_data/short_4326.geojson") as f:
+#     Class3 = json.load(f)
 
-with open("upload_data/Class4.geojson") as f:
-    Class4 = json.load(f)
+# with open("test_data/Class4.geojson") as f:
+#     Class4 = json.load(f)
 
 app.layout = html.Div(
     [
@@ -72,21 +72,6 @@ app.layout = html.Div(
                         ),
                         dl.Overlay(
                             dl.LayerGroup(), name="markers", checked=False, id="markers"
-                        ),
-                        # add the class3 & 4 geojson layers to the layer control
-                        dl.Overlay(
-                            dl.LayerGroup(
-                                dl.GeoJSON(data=Class3, style={"color": "red"})
-                            ),
-                            name="Class3",
-                            checked=True,
-                            id="class3",
-                        ),
-                        dl.Overlay(
-                            dl.LayerGroup(dl.GeoJSON(data=Class4)),
-                            name="Class4",
-                            checked=True,
-                            id="class4",
                         ),
                         dl.Overlay(
                             dl.LayerGroup(

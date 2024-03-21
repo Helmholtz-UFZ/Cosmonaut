@@ -13,3 +13,4 @@ cache/*
 assets/*
 qgis/*
 *.tif
+credentials.json
