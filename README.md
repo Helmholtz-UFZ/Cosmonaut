@@ -34,3 +34,28 @@ The image overlay is not the best solution. We need to think about using a WNSTi
 - Dash Leaflet: An open-source JavaScript library for mobile-friendly interactive maps.
 - GeoPandas: A Python library for working with geospatial data.
 - PyProj: A Python interface to PROJ (cartographic projections and coordinate transformations library).
+
+
+## TODO's
+
+# Geoserver
+
+aws bucket mit miniIoServer
+GeoServer
+mockups machen <- für tests gut (Dockerimage)
+laufen auf ufz infrastruktur
+und dann mit dockers
+dockercontainer von dennen
+
+2 funktionen safe und delete für minioapi file class
+.env file
+developer env und set up für server zu machen
+
+
+
+# CAN
+
+small discreption for list of road types - not super important
+feedback implementation for the agents (ticketsystem?) - not super important
+unify the .json - important
+
