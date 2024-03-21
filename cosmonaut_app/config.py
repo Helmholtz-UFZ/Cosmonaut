@@ -21,4 +21,7 @@ def getenv(name):
 
 load_dotenv()
 
-# Define 
+WEB_WORK_DIR = getenv("WEB_WORK_DIR")
+PORT = getenv("FLASK_PORT")
+MINIO_ACCESS_KEY = getenv("MINIO_ACCESS_KEY")
+MINIO_SECRET_KEY = getenv("MINIO_SECRET_KEY")
