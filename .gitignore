@@ -14,3 +14,4 @@ assets/*
 qgis/*
 *.tif
 credentials.json
+.env_test_priv
