@@ -73,17 +73,20 @@ class OsmRoads:
         self.polygon = polygon
         self.tags = {
             "highway": [
+                "motorway",
+                "trunk",
                 "primary",
                 "secondary",
                 "tertiary",
-                "unclassified",
-                "residential",
+                "motorway_link",
+                "trunk_link",
                 "primary_link",
                 "secondary_link",
                 "tertiary_link",
+                "unclassified",
+                "residential",
                 "living_street",
-                "track",
-                "road",
+                "track"
             ]
         }
         self.roads = self._get_roads()
