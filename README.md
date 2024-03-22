@@ -40,8 +40,8 @@ The image overlay is not the best solution. We need to think about using a WNSTi
 
 # Geoserver
 
-aws bucket mit miniIoServer
-GeoServer
+aws bucket mit miniIoServer connecten
+GeoServer connecten
 mockups machen <- für tests gut (Dockerimage)
 laufen auf ufz infrastruktur
 und dann mit dockers
@@ -59,3 +59,6 @@ small discreption for list of road types - not super important
 feedback implementation for the agents (ticketsystem?) - not super important
 unify the .json - important
 
+# QR CODE für Gmaps navigation
+
+# Germany OSM Download
