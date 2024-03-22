@@ -108,6 +108,7 @@ class OsmRoads:
         # FIXME: ox.config is deprecated. Use ox.settings instead
         ox.config(use_cache=True, log_console=True)
         print(f"tags: {self.tags}")
+        # TODO: Abfrage verbessern, sodass nicht alle Tags übergeben werden
         osm_data = ox.geometries_from_polygon(self.polygon, tags=self.tags)
         return osm_data
 
