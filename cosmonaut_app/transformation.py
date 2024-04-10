@@ -105,11 +105,11 @@ class OsmRoads:
         """
         if additional_tags is not None:
             self.tags = additional_tags
-        # FIXME: ox.config is deprecated. Use ox.settings instead
-        ox.config(use_cache=True, log_console=True)
+        # ox.settings(log_console=True, use_cache=True)
         print(f"tags: {self.tags}")
-        # TODO: Abfrage verbessern, sodass nicht alle Tags übergeben werden
-        osm_data = ox.geometries_from_polygon(self.polygon, tags=self.tags)
+        osm_data = ox.features_from_polygon(self.polygon, tags=self.tags)
+        columns_to_keep = ['geometry', 'name', 'highway', 'nodes', 'bicycle', 'smoothness', 'surface', 'tracktype', 'maxspeed', 'sidewalk', 'lanes', 'lit', 'motor_vehicle', 'ref', 'source:maxspeed', 'lanes:backward', 'traffic_calming']
+        osm_data = osm_data[columns_to_keep]
         return osm_data
 
     def save_roads(self, DOWNLOAD_FOLDER, epsg_code):
