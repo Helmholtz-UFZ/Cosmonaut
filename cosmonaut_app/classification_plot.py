@@ -20,6 +20,7 @@ def temporary_file(suffix):
         os.remove(temp.name)
 
 # TODO: Use the Download directory for the output files
+# TODO: Make the Coloring of the classes more flexible (dont let the user define the colormaps)
 
 class ClassificationPlot:
     """
@@ -41,6 +42,7 @@ class ClassificationPlot:
         self.image = None
         self.crs = None
         self.transform = None
+        self.saved_files = []
 
     def _process_data(self):
         """Read the data from the CSV file and preprocess it."""
@@ -103,8 +105,9 @@ class ClassificationPlot:
 
     def _save_plots(self, cmaps):
         """Create and save a plot for each colormap."""
-        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d")
         base_name = os.path.splitext(os.path.basename(self.csv_path))[0]
+        base_name = base_name.replace("31468", "4326")
         for i, cmap in enumerate(cmaps):
             self.image = np.moveaxis(self.image, 0, -1)
             mask = self.grid_max_class == i
@@ -118,7 +121,7 @@ class ClassificationPlot:
             dtype = self.image.dtype
             height = self.image.shape[1]
             width = self.image.shape[2]
-            filename = f"{timestamp}_{base_name}_class{i+1}"
+            filename = f"{timestamp}_{base_name}_class-{i+1}"
             output = f"{filename}.tif"
             with temporary_file(".tif") as temp_filename:
                 with rasterio.open(
@@ -150,6 +153,7 @@ class ClassificationPlot:
                 )
                 if not os.path.exists(output):
                     raise IOError(f"Failed to create output file: {output}")
+                self.saved_files.append(output)
 
     def generate_plots(self, cmaps):
         """Combine the steps to generate the plots."""
