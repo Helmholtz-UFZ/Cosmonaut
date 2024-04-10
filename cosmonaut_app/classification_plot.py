@@ -8,6 +8,7 @@ import datetime
 import os
 from contextlib import contextmanager
 
+gdal.DontUseExceptions()
 
 @contextmanager
 def temporary_file(suffix):
