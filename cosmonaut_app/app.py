@@ -35,75 +35,79 @@ def download(path):
     """Serve a file from the upload directory."""
     return send_from_directory(UPLOAD_FOLDER, path, as_attachment=True)
 
-# # TODO: Remove the geojson layers when the image overlay is working
-# with open("test_data/short_4326.geojson") as f:
-#     Class3 = json.load(f)
-
-# with open("test_data/Class4.geojson") as f:
-#     Class4 = json.load(f)
-
 app.layout = html.Div(
     [
-        html.H1("Upload, Transformation, OSM-Request and Display of CSV-data"),
-        html.H2("Upload"),
-        dcc.Upload(
-            id="upload-data",
-            accept=".csv",
-            children=html.Div(["Drag and drop or click to select a file to upload."]),
-            multiple=False,
-        ),
-        html.H2("File List"),
-        html.Ul(id="file-list"),
-        html.Div(id="output-data-upload"),
-        html.Div(id="output-osm-query"),
-        html.Div(id="file-path", style={"display": "none"}),
-        html.Div(id="osm-file-path", style={"display": "none"}),
-        dl.Map(
+        html.Div(
             [
-                dl.LayersControl(
-                    [
-                        dl.BaseLayer(
-                            dl.TileLayer(), name="OpenStreetMap", checked=True
-                        ),
-                        dl.Overlay(
-                            dl.LayerGroup(), name="points", checked=False, id="points"
-                        ),
-                        dl.Overlay(
-                            dl.LayerGroup(), name="markers", checked=False, id="markers"
-                        ),
-                        dl.Overlay(
-                            dl.LayerGroup(
-                                dl.ImageOverlay(
-                                    url="/assets/test_1.png",
-                                    bounds=[
-                                        [51.585032547449714, 11.518828435546714],
-                                        [51.889284921667524, 10.899554323779789],
-                                    ],
-                                    opacity=0.75,
-                                    id="image-overlay",
-                                )
-                            ),
-                            name="image-overlay",
-                            checked=True,
-                        ),
-                    ],
-                    id="lc",
-                ),
-                dl.FullScreenControl(),
-                dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
-                dl.ScaleControl(position="bottomleft"),
+                html.H1("COSmic ray based soil MOisture prediction NAvigation Utility Tool"),
+                html.H3("or short"),
+                html.H1("COSMONAUT"),
             ],
-            center=[51.70, 11.20],
-            zoom=10,
-            style={"height": "50vh"},
-            id="map",
-        ),
-        html.Button(
-            "Load new Map", id="btn"
+            style={"text-align": "center", "padding-bottom": "20px"},
         ),
         html.Div(
             [
-                html.H4("OSM Tags Selection"),
+                html.Div(
+                    [
+                        html.H2("Upload"),
+                        dcc.Upload(
+                            id="upload-data",
+                            accept=".csv",
+                            children=html.Div(
+                                ["Drag and drop or click to select a file to upload."]
+                            ),
+                            multiple=False,
+                        ),
+                        html.H2("File List"),
+                        html.Ul(id="file-list"),
+                        html.Div(id="output-data-upload"),
+                        html.Div(id="output-osm-query"),
+                        html.Div(id="file-path", style={"display": "none"}),
+                        html.Div(id="osm-file-path", style={"display": "none"}),
+                    ],
+                    style={"flex": "1 1 20%", "padding-right": "20px"},
+                ),
+                html.Div(
+                    [
+                        dl.Map(
+                            [
+                                dl.LayersControl(
+                                    [
+                                        dl.BaseLayer(
+                                            dl.TileLayer(),
+                                            name="OpenStreetMap",
+                                            checked=True,
+                                        ),
+                                        dl.Overlay(
+                                            dl.LayerGroup(),
+                                            name="points",
+                                            checked=False,
+                                            id="points",
+                                        ),
+                                    ],
+                                    id="lc",
+                                ),
+                                dl.FullScreenControl(),
+                                dl.LocateControl(
+                                    locateOptions={"enableHighAccuracy": True}
+                                ),
+                                dl.ScaleControl(position="bottomleft"),
+                            ],
+                            center=[51.70, 11.20],
+                            zoom=10,
+                            style={"height": "50vh"},
+                            id="map",
+                        ),
+                        html.Button("Load new Map", id="btn"),
+                    ],
+                    style={"flex": "1 1 80%"},
+                ),
+            ],
+            style={"display": "flex", "justify-content": "center"},
+        ),
+        html.Div(
+            [
+                html.H4("OSM Highway tag selection"),
                 dcc.Dropdown(
                     id="tags-dropdown",
                     options=[
@@ -122,7 +126,7 @@ app.layout = html.Div(
                             "unclassified",
                             "residential",
                             "living_street",
-                            "track"
+                            "track",
                         ]
                     ],
                     value=[
@@ -139,14 +143,15 @@ app.layout = html.Div(
                         "unclassified",
                         "residential",
                         "living_street",
-                        "track"
+                        "track",
                     ],
                     multi=True,
                 ),
-                html.Div(id="tags-points"),
-            ]
+            ],
+            style={"text-align": "center", "padding-top": "20px"},
         ),
-    ]
+    ],
+    style={"padding": "20px"},
 )
 
 
@@ -208,16 +213,7 @@ def upload_file(contents, filename):
 
     return html.Div([html.H5("File uploaded successfully")]), file_path
 
-# FIXME: The update of Tags is not working at all
-
-@app.callback(
-    Output("tags-points", "children"),
-    [Input("tags-dropdown", "value")]
-)
-def update_tags_points(value):
-    # Update the tags-points div based on the dropdown value
-    # This function will be called whenever the dropdown value changes
-    return 'You have selected "{}"'.format(', '.join(value))
+# FIXME: every update of the tags will trigger the OSM query, which should only triggered by uploading a file
 
 @app.callback(
     Output("output-osm-query", "children"),
@@ -311,12 +307,6 @@ def update_image(n_clicks, upload_status, file_path):
     return image_url, bounds
 
 # TODO: use the ClassificationPlot class to create a image which (later) can be overlayed on the map with a TileLayer when a csv file is uploaded correctly
-
-# not used for now but might be useful later
-# @app.callback(Output("markers", "children"), Input("btn", "n_clicks"))
-# def generate_markers(_):
-#     return [dl.Marker(position=[51 + random.random(), 11 + random.random()]) for i in range(5)]
-
 
 if __name__ == "__main__":
     app.run_server(debug=True)
