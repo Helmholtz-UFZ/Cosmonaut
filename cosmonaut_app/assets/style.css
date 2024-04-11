@@ -1,0 +1,10 @@
+/* CSS file (assets/style.css) */
+
+.fade-out {
+    animation: fadeOut 5s ease-in-out forwards; /* Change 5s to the duration you want */
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
