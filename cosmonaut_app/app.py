@@ -15,6 +15,9 @@ import dash_leaflet as dl
 from csv_plot import Plotter
 from classification_plot import ClassificationPlot
 
+# TODO: Add a callback to show the classification plot when the csv file is uploaded correctly
+# TODO: When 1 file is processed, and a second file is uploaded, the webpage stops responding
+
 UPLOAD_FOLDER = "upload"
 DOWNLOAD_FOLDER = "download"
 
@@ -24,10 +27,10 @@ if not os.path.exists(UPLOAD_FOLDER):
 if not os.path.exists(DOWNLOAD_FOLDER):
     os.makedirs(DOWNLOAD_FOLDER)
 
-external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
+# external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
 server = Flask(__name__)
-app = dash.Dash(external_stylesheets=external_stylesheets, server=server)
+app = dash.Dash(server=server)      # external_stylesheets=external_stylesheets, server=server)
 
 
 @server.route("/download/<path:path>")
@@ -95,12 +98,13 @@ app.layout = html.Div(
                             ],
                             center=[51.70, 11.20],
                             zoom=10,
-                            style={"height": "50vh"},
+                            style={"height": "50vh", "border": "2px solid black"},
                             id="map",
                         ),
-                        html.Button("Load new Map", id="btn"),
+                        html.Button("Load new Map", id="btn",
+                                    style={"margin-top": "10px"}),
                     ],
-                    style={"flex": "1 1 80%"},
+                    style={"flex": "1 1 80%", "margin-top": "10px"},
                 ),
             ],
             style={"display": "flex", "justify-content": "center"},
@@ -165,11 +169,9 @@ def uploaded_files():
     return files
 
 
-def file_download_link(filename):
-    """Create a Plotly Dash 'A' element that downloads a file from the app."""
-    location = "/download/{}".format(urlquote(filename))
-    return html.A(filename, href=location)
-
+def file_link(filename):
+    """Create a Plotly Dash 'A' element that just shows the fils uploaded."""
+    return html.A(filename, href="#", id=filename)
 
 @app.callback(
     Output("file-list", "children"),
@@ -182,7 +184,7 @@ def update_output(uploaded_filenames, uploaded_file_contents):
     if len(files) == 0:
         return [html.Li("No files yet!")]
     else:
-        return [html.Li(file_download_link(filename)) for filename in files]
+        return [html.Li(file_link(filename)) for filename in files]
 
 
 @app.callback(
@@ -209,19 +211,17 @@ def upload_file(contents, filename):
         for row in csv_reader:
             if len(row) != 8:
                 os.remove(file_path)
-                return html.Div([html.H5("CSV must have 8 columns")]), None
+                return html.Div([html.H5("CSV must have 8 columns")], className="fade-out"), None
 
-    return html.Div([html.H5("File uploaded successfully")]), file_path
-
-# FIXME: every update of the tags will trigger the OSM query, which should only triggered by uploading a file
+    return html.Div([html.H5("File uploaded successfully")], className="fade-out"), file_path
 
 @app.callback(
     Output("output-osm-query", "children"),
     Output("osm-file-path", "children"),
-    [Input("output-data-upload", "children"), Input("tags-dropdown", "value")],
-    [State("file-path", "children")],
+    [Input("output-data-upload", "children")],
+    [State("file-path", "children"), State("tags-dropdown", "value")],
 )
-def run_osm_query(upload_status, selected_tags, file_path):
+def run_osm_query(upload_status, file_path, selected_tags):
     if upload_status is None or not selected_tags or file_path is None:
         raise PreventUpdate
     try:
@@ -243,14 +243,12 @@ def run_osm_query(upload_status, selected_tags, file_path):
         osm_data['nodes'] = osm_data['nodes'].apply(str)
         osm_data.to_file(osm_file_path, driver="GeoJSON")
         
-        return html.Div([html.H5("OSM query run successfully")]), osm_file_path
+        return html.Div([html.H5("OSM query run successfully")], className="fade-out"), osm_file_path
     except Exception as e:
         if file_path is not None:
             os.remove(file_path)
-        return html.Div([html.H5("OSM query failed"), html.P(str(e))]), None
-
-
-
+        return html.Div([html.H5("OSM query failed"), html.P(str(e))], className="fade-out"), None
+    
 
 @app.callback(
     Output("points", "children"),
@@ -279,32 +277,6 @@ def show_points(upload_status, file_path):
     else:
         return group
 
-
-@app.callback(
-    Output("image-overlay", "url"),
-    Output("image-overlay", "bounds"),
-    Input("btn", "n_clicks"),
-    State("output-data-upload", "children"),
-    State("file-path", "children"),
-)
-def update_image(n_clicks, upload_status, file_path):
-    if n_clicks is None:
-        raise PreventUpdate
-
-    if upload_status is None:
-        raise PreventUpdate
-
-    plotter = Plotter(file_path, 31468, 4326)
-    plotter.assign_classes()
-    image_base64 = plotter.plot_data()
-    image_url = "data:image/png;base64,{}".format(image_base64)
-    bounds = plotter.gdf.total_bounds
-    bounds = [
-        [bounds[1], bounds[0]],
-        [bounds[3], bounds[2]],
-    ]  # Format: [[south, west], [north, east]]
-
-    return image_url, bounds
 
 # TODO: use the ClassificationPlot class to create a image which (later) can be overlayed on the map with a TileLayer when a csv file is uploaded correctly
 
