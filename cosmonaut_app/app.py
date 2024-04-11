@@ -13,6 +13,7 @@ import time
 import json
 import dash_leaflet as dl
 from csv_plot import Plotter
+from classification_plot import ClassificationPlot
 
 UPLOAD_FOLDER = "upload"
 DOWNLOAD_FOLDER = "download"
@@ -22,9 +23,6 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 if not os.path.exists(DOWNLOAD_FOLDER):
     os.makedirs(DOWNLOAD_FOLDER)
-
-# Mapbox token
-# mb_token = "pk.eyJ1IjoibG91aXN0cmkiLCJhIjoiY2xvbjF4M2h3MDlvZjJ2cXNldThlaG8xdiJ9.mU8urLdPCQo-DyiYhwqtLQ"
 
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
@@ -210,31 +208,52 @@ def upload_file(contents, filename):
 
     return html.Div([html.H5("File uploaded successfully")]), file_path
 
+# FIXME: The update of Tags is not working at all
+
+@app.callback(
+    Output("tags-points", "children"),
+    [Input("tags-dropdown", "value")]
+)
+def update_tags_points(value):
+    # Update the tags-points div based on the dropdown value
+    # This function will be called whenever the dropdown value changes
+    return 'You have selected "{}"'.format(', '.join(value))
 
 @app.callback(
     Output("output-osm-query", "children"),
     Output("osm-file-path", "children"),
-    Input("output-data-upload", "children"),
-    Input("tags-dropdown", "value"),
-    State("file-path", "children"),
+    [Input("output-data-upload", "children"), Input("tags-dropdown", "value")],
+    [State("file-path", "children")],
 )
 def run_osm_query(upload_status, selected_tags, file_path):
-    if upload_status is None:
+    if upload_status is None or not selected_tags or file_path is None:
         raise PreventUpdate
     try:
         data = transform_csv(file_path, 31468, 4326)
         convex_hull = get_convex_hull(data)
+        
+        # Modify the tags based on the selected tags dropdown
+        additional_tags = {"highway": selected_tags}
+        
+        # Query OSM data with the modified tags
         osm = OsmRoads(convex_hull)
-        osm._get_roads(additional_tags={"highway": selected_tags})
+        osm.tags.update(additional_tags)
+        osm._get_roads(additional_tags=additional_tags)
+        
+        # Save and transform OSM data
         osm_file_path = osm.save_roads(DOWNLOAD_FOLDER, 4326)
-        # transform osm data back to 31468 and save it
         osm_data = osm._osm_transform()
         osm_file_path = osm_file_path.replace("4326", "31468")
+        osm_data['nodes'] = osm_data['nodes'].apply(str)
         osm_data.to_file(osm_file_path, driver="GeoJSON")
+        
         return html.Div([html.H5("OSM query run successfully")]), osm_file_path
     except Exception as e:
-        os.remove(file_path)
-        return html.Div([html.H5("OSM query failed")]), None
+        if file_path is not None:
+            os.remove(file_path)
+        return html.Div([html.H5("OSM query failed"), html.P(str(e))]), None
+
+
 
 
 @app.callback(
@@ -291,6 +310,7 @@ def update_image(n_clicks, upload_status, file_path):
 
     return image_url, bounds
 
+# TODO: use the ClassificationPlot class to create a image which (later) can be overlayed on the map with a TileLayer when a csv file is uploaded correctly
 
 # not used for now but might be useful later
 # @app.callback(Output("markers", "children"), Input("btn", "n_clicks"))
