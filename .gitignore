@@ -5,7 +5,6 @@ cosmonaut_app/upload/*
 pyvenv.cfg
 cosmonaut_app/download/*
 cosmonaut_app/cache/*
-cosmonaut_app/assets/*
 *.tif
 credentials.json
 .env_test_priv
