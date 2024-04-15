@@ -7,6 +7,8 @@ from osgeo import gdal
 import datetime
 import os
 from contextlib import contextmanager
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 
 gdal.DontUseExceptions()
 
