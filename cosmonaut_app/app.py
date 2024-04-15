@@ -8,12 +8,13 @@ import base64
 import csv
 from transformation import OsmRoads, transform_csv, get_convex_hull
 from flask import Flask, send_from_directory
-from urllib.parse import quote as urlquote
 import time
-import json
 import dash_leaflet as dl
-from csv_plot import Plotter
+from matplotlib import pyplot as plt
 from classification_plot import ClassificationPlot
+from minio_manager import MiniIOManager
+import matplotlib
+matplotlib.use('Agg')
 
 # TODO: Add a callback to show the classification plot when the csv file is uploaded correctly
 
@@ -41,9 +42,9 @@ app.layout = html.Div(
     [
         html.Div(
             [
-                html.H1("COSmic ray based soil MOisture prediction NAvigation Utility Tool"),
-                html.H3("or short"),
-                html.H1("COSMONAUT"),
+                html.H1("COSmic ray based soil MOisture prediction NAvigation Utility Tool")#,
+                # html.H3("or short"),
+                # html.H2("COSMONAUT"),
             ],
             style={"text-align": "center", "padding-bottom": "20px"},
         ),
@@ -153,6 +154,7 @@ app.layout = html.Div(
             ],
             style={"text-align": "center", "padding-top": "20px"},
         ),
+        html.Div(id="plot-generation-status", style={"display": "none"}),
     ],
     style={"padding": "20px"},
 )
@@ -278,10 +280,33 @@ def show_points(upload_status, file_path):
     else:
         return group
     
+@app.callback(
+    Output("plot-generation-status", "children"),
+    Input("output-data-upload", "children"),
+    State("file-path", "children"),
+)
+def generate_classification_plot(upload_status, file_path):
+    if upload_status is None:
+        raise PreventUpdate
 
+    try:
+        plot = ClassificationPlot(file_path)
+        plot.generate_plots([plt.cm.Blues, plt.cm.Oranges, plt.cm.Greens, plt.cm.Purples, plt.cm.Reds, plt.cm.Greys])
+        # TODO: FUTURE, plot the returned TileLayer on the map
 
+        # commented out for now, as for testing purposes the files dont need to be uploaded every time
 
-# TODO: use the ClassificationPlot class to create a image which (later) can be overlayed on the map with a TileLayer when a csv file is uploaded correctly
+        # bucket_name = "cosmic-routing"
+        # manager = MiniIOManager(bucket_name)
+        # for file in plot.saved_files:
+        #     manager.upload_file(file, file)  
+                        
+        for file in plot.saved_files:
+            os.remove(file)
+        
+        return html.Div([html.H5("Plot generated successfully")], className="fade-out", key=str(time.time()))
+    except Exception as e:
+        return html.Div([html.H5("Plot generation failed"), html.P(str(e))], className="fade-out", key=str(time.time()))
 
 if __name__ == "__main__":
     app.run_server(debug=True)
