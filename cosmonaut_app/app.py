@@ -13,11 +13,10 @@ import dash_leaflet as dl
 from matplotlib import pyplot as plt
 from classification_plot import ClassificationPlot
 from minio_manager import MiniIOManager
+from config import osm_tags_mapping
 import matplotlib
 
 matplotlib.use("Agg")
-
-# TODO: Add a callback to show the classification plot when the csv file is uploaded correctly
 
 UPLOAD_FOLDER = "upload"
 DOWNLOAD_FOLDER = "download"
@@ -121,42 +120,10 @@ app.layout = html.Div(
                 html.H4("OSM Highway tag selection"),
                 dcc.Dropdown(
                     id="tags-dropdown",
-                    options=[
-                        {"label": tag, "value": tag}
-                        for tag in [
-                            "motorway",
-                            "trunk",
-                            "primary",
-                            "secondary",
-                            "tertiary",
-                            "motorway_link",
-                            "trunk_link",
-                            "primary_link",
-                            "secondary_link",
-                            "tertiary_link",
-                            "unclassified",
-                            "residential",
-                            "living_street",
-                            "track",
-                        ]
-                    ],
-                    value=[
-                        "motorway",
-                        "trunk",
-                        "primary",
-                        "secondary",
-                        "tertiary",
-                        "motorway_link",
-                        "trunk_link",
-                        "primary_link",
-                        "secondary_link",
-                        "tertiary_link",
-                        "unclassified",
-                        "residential",
-                        "living_street",
-                        "track",
-                    ],
+                    options=[{"label": tag, "value": tag} for tag in osm_tags_mapping.keys()],
+                    value=list(osm_tags_mapping.keys()),
                     multi=True,
+                    style={"width": "50%", "margin": "0 auto"},
                 ),
             ],
             style={"text-align": "center", "padding-top": "20px"},
@@ -249,6 +216,8 @@ def upload_file(contents, filename):
     [State("file-path", "children"), State("tags-dropdown", "value")],
 )
 def run_osm_query(upload_status, file_path, selected_tags):
+    osm_values = [osm_tags_mapping[value] for value in selected_tags]
+    osm_values = [item for sublist in osm_values for item in sublist]
     if upload_status is None or not selected_tags or file_path is None:
         raise PreventUpdate
     try:
@@ -256,7 +225,7 @@ def run_osm_query(upload_status, file_path, selected_tags):
         convex_hull = get_convex_hull(data)
 
         # Modify the tags based on the selected tags dropdown
-        additional_tags = {"highway": selected_tags}
+        additional_tags = {"highway": osm_values}
 
         # Query OSM data with the modified tags
         osm = OsmRoads(convex_hull)
