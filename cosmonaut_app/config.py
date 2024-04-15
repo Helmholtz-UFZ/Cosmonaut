@@ -4,6 +4,7 @@ import os
 
 from dotenv import load_dotenv
 
+
 def getenv(name):
     """
     Retrieve the value of an environment variable.
@@ -19,7 +20,7 @@ def getenv(name):
     return value
 
 
-load_dotenv()
+load_dotenv(".env_test_priv")
 
 WEB_WORK_DIR = getenv("WEB_WORK_DIR")
 PORT = getenv("FLASK_PORT")
