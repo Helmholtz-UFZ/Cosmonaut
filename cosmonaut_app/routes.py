@@ -1,5 +1,4 @@
-# routes.py
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, redirect
 from werkzeug.utils import secure_filename
 import os
 import dash

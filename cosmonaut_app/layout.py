@@ -1,5 +1,3 @@
-# layout.py
-import dash
 from dash import dcc, html
 import dash_leaflet as dl
 from config import osm_tags_mapping
@@ -74,8 +72,10 @@ app.layout = html.Div(
                             style={"height": "50vh", "border": "2px solid black"},
                             id="map",
                         ),
-                        html.Button(
-                            "Nutzloser Knopf", id="btn", style={"margin-top": "10px"}
+                        dcc.Link(
+                            html.Button("Nutzloser Knopf", id="btn", style={"margin-top": "10px"}),
+                            href="https://i.gifer.com/7bTq.gif",
+                            target="_blank"
                         ),
                     ],
                     style={"flex": "1 1 80%", "margin-top": "10px"},
