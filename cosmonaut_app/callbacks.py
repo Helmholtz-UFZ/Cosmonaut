@@ -16,6 +16,9 @@ from minio_manager import MiniIOManager
 from config import osm_tags_mapping
 import matplotlib
 from routes import UPLOAD_FOLDER, DOWNLOAD_FOLDER, uploaded_files, file_link, app
+import logging
+
+logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.ERROR)
 
 matplotlib.use("Agg")
 
@@ -123,6 +126,8 @@ def run_osm_query(upload_status, file_path, selected_tags):
     except Exception as e:
         if file_path is not None:
             os.remove(file_path)
+        error_message = f"OSM query failed: {str(e)}"
+        logging.error(error_message) 
         return (
             html.Div(
                 [html.H5("OSM query failed"), html.P(str(e))],
@@ -202,6 +207,8 @@ def generate_classification_plot(upload_status, file_path):
             key=str(time.time()),
         )
     except Exception as e:
+        error_message = f"Generating Plots failed: {str(e)}"
+        logging.error(error_message) 
         return html.Div(
             [html.H5("Plot generation failed"), html.P(str(e))],
             className="fade-out",
