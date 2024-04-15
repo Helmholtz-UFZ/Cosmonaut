@@ -16,7 +16,6 @@ from csv_plot import Plotter
 from classification_plot import ClassificationPlot
 
 # TODO: Add a callback to show the classification plot when the csv file is uploaded correctly
-# TODO: When 1 file is processed, and a second file is uploaded, the webpage stops responding
 
 UPLOAD_FOLDER = "upload"
 DOWNLOAD_FOLDER = "download"
@@ -188,6 +187,7 @@ def update_output(uploaded_filenames, uploaded_file_contents):
 
 
 @app.callback(
+    Output("upload-data", "contents"),
     Output("output-data-upload", "children"),
     Output("file-path", "children"),
     Input("upload-data", "contents"),
@@ -211,9 +211,10 @@ def upload_file(contents, filename):
         for row in csv_reader:
             if len(row) != 8:
                 os.remove(file_path)
-                return html.Div([html.H5("CSV must have 8 columns")], className="fade-out"), None
+                return None, html.Div([html.H5("CSV must have 8 columns")], className="fade-out", key=str(time.time())), None
 
-    return html.Div([html.H5("File uploaded successfully")], className="fade-out"), file_path
+    return None, html.Div([html.H5("File uploaded successfully")], className="fade-out", key=str(time.time())), file_path
+
 
 @app.callback(
     Output("output-osm-query", "children"),
@@ -243,11 +244,11 @@ def run_osm_query(upload_status, file_path, selected_tags):
         osm_data['nodes'] = osm_data['nodes'].apply(str)
         osm_data.to_file(osm_file_path, driver="GeoJSON")
         
-        return html.Div([html.H5("OSM query run successfully")], className="fade-out"), osm_file_path
+        return html.Div([html.H5("OSM query run successfully")], className="fade-out", key=str(time.time())), osm_file_path
     except Exception as e:
         if file_path is not None:
             os.remove(file_path)
-        return html.Div([html.H5("OSM query failed"), html.P(str(e))], className="fade-out"), None
+        return html.Div([html.H5("OSM query failed"), html.P(str(e))], className="fade-out", key=str(time.time())), None
     
 
 @app.callback(
@@ -276,6 +277,8 @@ def show_points(upload_status, file_path):
         )
     else:
         return group
+    
+
 
 
 # TODO: use the ClassificationPlot class to create a image which (later) can be overlayed on the map with a TileLayer when a csv file is uploaded correctly
