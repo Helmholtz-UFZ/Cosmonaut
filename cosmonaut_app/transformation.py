@@ -86,7 +86,7 @@ class OsmRoads:
                 "unclassified",
                 "residential",
                 "living_street",
-                "track"
+                "track",
             ]
         }
         self.epsg_input = epsg_input
@@ -105,7 +105,25 @@ class OsmRoads:
         if additional_tags is not None:
             self.tags = additional_tags
         osm_data = ox.features_from_polygon(self.polygon, tags=self.tags)
-        columns_to_keep = ['geometry', 'name', 'highway', 'nodes', 'bicycle', 'smoothness', 'surface', 'tracktype', 'maxspeed', 'sidewalk', 'lanes', 'lit', 'motor_vehicle', 'ref', 'source:maxspeed', 'lanes:backward', 'traffic_calming']
+        columns_to_keep = [
+            "geometry",
+            "name",
+            "highway",
+            "nodes",
+            "bicycle",
+            "smoothness",
+            "surface",
+            "tracktype",
+            "maxspeed",
+            "sidewalk",
+            "lanes",
+            "lit",
+            "motor_vehicle",
+            "ref",
+            "source:maxspeed",
+            "lanes:backward",
+            "traffic_calming",
+        ]
         columns_to_keep = [col for col in columns_to_keep if col in osm_data.columns]
         osm_data = osm_data[columns_to_keep]
         return osm_data
@@ -115,8 +133,8 @@ class OsmRoads:
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         file_name = f"{timestamp}_osm_data_{epsg_code}.geojson"
         file_path = os.path.join(DOWNLOAD_FOLDER, file_name)
-        with open(file_path, "w") as osm_file:
-            # geojson.dump(self.roads, osm_file)
+        with open(file_path, "w") as osm_file: # TODO Is it necessary to write the file here?
+        #     # geojson.dump(self.roads, osm_file)
             print(f"tags of roads 2: {self.roads['highway'].unique()}")
         return file_path
 

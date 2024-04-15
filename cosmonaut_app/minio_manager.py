@@ -4,12 +4,11 @@ import datetime
 
 # TODO: Temporary loading of environment variables, later should be automatically loaded for Docker
 from dotenv import load_dotenv
-load_dotenv('.env_test_priv')
 
-from config import (
-    MINIO_ACCESS_KEY,
-    MINIO_SECRET_KEY
-)
+load_dotenv(".env_test_priv")
+
+from config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+
 
 class MiniIOManager:
     """
@@ -26,10 +25,12 @@ class MiniIOManager:
 
     def __init__(self, bucket_name):
         self.bucket_name = bucket_name
-        self.minio_client = Minio('minio.ufz.de',
-                                  access_key=MINIO_ACCESS_KEY,
-                                  secret_key=MINIO_SECRET_KEY,
-                                  secure=True)
+        self.minio_client = Minio(
+            "minio.ufz.de",
+            access_key=MINIO_ACCESS_KEY,
+            secret_key=MINIO_SECRET_KEY,
+            secure=True,
+        )
 
     def upload_file(self, file_path, object_key):
         """
@@ -40,10 +41,10 @@ class MiniIOManager:
             object_key (str): The key to assign to the uploaded file in the MinIO bucket.
         """
         _, file_extension = os.path.splitext(file_path)
-        if file_extension != '.tif':
+        if file_extension != ".tif":
             print(f"Failed to upload file {file_path}: Only .tif files are allowed.")
             return
-        
+
         try:
             self.minio_client.fput_object(self.bucket_name, object_key, file_path)
             print(f"File {file_path} uploaded successfully as {object_key}")
@@ -63,6 +64,7 @@ class MiniIOManager:
         except Exception as e:
             print(f"Failed to delete file {object_key}: {str(e)}")
 
+
 if __name__ == "__main__":
     bucket_name = "cosmic-routing"
     manager = MiniIOManager(bucket_name)
@@ -72,4 +74,3 @@ if __name__ == "__main__":
         manager.delete_file("no_csv.txt")
     except Exception as e:
         print(f"Bucket {bucket_name} does not exist: {str(e)}")
-        
