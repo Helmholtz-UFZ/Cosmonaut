@@ -14,7 +14,8 @@ from matplotlib import pyplot as plt
 from classification_plot import ClassificationPlot
 from minio_manager import MiniIOManager
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 
 # TODO: Add a callback to show the classification plot when the csv file is uploaded correctly
 
@@ -30,7 +31,9 @@ if not os.path.exists(DOWNLOAD_FOLDER):
 # external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
 server = Flask(__name__)
-app = dash.Dash(server=server)      # external_stylesheets=external_stylesheets, server=server)
+app = dash.Dash(
+    server=server
+)  # external_stylesheets=external_stylesheets, server=server)
 
 
 @server.route("/download/<path:path>")
@@ -38,11 +41,14 @@ def download(path):
     """Serve a file from the upload directory."""
     return send_from_directory(UPLOAD_FOLDER, path, as_attachment=True)
 
+
 app.layout = html.Div(
     [
         html.Div(
             [
-                html.H1("COSmic ray based soil MOisture prediction NAvigation Utility Tool")#,
+                html.H1(
+                    "COSmic ray based soil MOisture prediction NAvigation Utility Tool"
+                )  # ,
                 # html.H3("or short"),
                 # html.H2("COSMONAUT"),
             ],
@@ -101,8 +107,9 @@ app.layout = html.Div(
                             style={"height": "50vh", "border": "2px solid black"},
                             id="map",
                         ),
-                        html.Button("Load new Map", id="btn",
-                                    style={"margin-top": "10px"}),
+                        html.Button(
+                            "Load new Map", id="btn", style={"margin-top": "10px"}
+                        ),
                     ],
                     style={"flex": "1 1 80%", "margin-top": "10px"},
                 ),
@@ -174,6 +181,7 @@ def file_link(filename):
     """Create a Plotly Dash 'A' element that just shows the fils uploaded."""
     return html.A(filename, href="#", id=filename)
 
+
 @app.callback(
     Output("file-list", "children"),
     [Input("upload-data", "filename"), Input("upload-data", "contents")],
@@ -213,9 +221,25 @@ def upload_file(contents, filename):
         for row in csv_reader:
             if len(row) != 8:
                 os.remove(file_path)
-                return None, html.Div([html.H5("CSV must have 8 columns")], className="fade-out", key=str(time.time())), None
+                return (
+                    None,
+                    html.Div(
+                        [html.H5("CSV must have 8 columns")],
+                        className="fade-out",
+                        key=str(time.time()),
+                    ),
+                    None,
+                )
 
-    return None, html.Div([html.H5("File uploaded successfully")], className="fade-out", key=str(time.time())), file_path
+    return (
+        None,
+        html.Div(
+            [html.H5("File uploaded successfully")],
+            className="fade-out",
+            key=str(time.time()),
+        ),
+        file_path,
+    )
 
 
 @app.callback(
@@ -230,28 +254,42 @@ def run_osm_query(upload_status, file_path, selected_tags):
     try:
         data = transform_csv(file_path, 31468, 4326)
         convex_hull = get_convex_hull(data)
-        
+
         # Modify the tags based on the selected tags dropdown
         additional_tags = {"highway": selected_tags}
-        
+
         # Query OSM data with the modified tags
         osm = OsmRoads(convex_hull)
         osm.tags.update(additional_tags)
         osm._get_roads(additional_tags=additional_tags)
-        
+
         # Save and transform OSM data
         osm_file_path = osm.save_roads(DOWNLOAD_FOLDER, 4326)
         osm_data = osm._osm_transform()
         osm_file_path = osm_file_path.replace("4326", "31468")
-        osm_data['nodes'] = osm_data['nodes'].apply(str)
+        osm_data["nodes"] = osm_data["nodes"].apply(str)
         osm_data.to_file(osm_file_path, driver="GeoJSON")
-        
-        return html.Div([html.H5("OSM query run successfully")], className="fade-out", key=str(time.time())), osm_file_path
+
+        return (
+            html.Div(
+                [html.H5("OSM query run successfully")],
+                className="fade-out",
+                key=str(time.time()),
+            ),
+            osm_file_path,
+        )
     except Exception as e:
         if file_path is not None:
             os.remove(file_path)
-        return html.Div([html.H5("OSM query failed"), html.P(str(e))], className="fade-out", key=str(time.time())), None
-    
+        return (
+            html.Div(
+                [html.H5("OSM query failed"), html.P(str(e))],
+                className="fade-out",
+                key=str(time.time()),
+            ),
+            None,
+        )
+
 
 @app.callback(
     Output("points", "children"),
@@ -279,7 +317,8 @@ def show_points(upload_status, file_path):
         )
     else:
         return group
-    
+
+
 @app.callback(
     Output("plot-generation-status", "children"),
     Input("output-data-upload", "children"),
@@ -291,7 +330,16 @@ def generate_classification_plot(upload_status, file_path):
 
     try:
         plot = ClassificationPlot(file_path)
-        plot.generate_plots([plt.cm.Blues, plt.cm.Oranges, plt.cm.Greens, plt.cm.Purples, plt.cm.Reds, plt.cm.Greys])
+        plot.generate_plots(
+            [
+                plt.cm.Blues,
+                plt.cm.Oranges,
+                plt.cm.Greens,
+                plt.cm.Purples,
+                plt.cm.Reds,
+                plt.cm.Greys,
+            ]
+        )
         # TODO: FUTURE, plot the returned TileLayer on the map
 
         # commented out for now, as for testing purposes the files dont need to be uploaded every time
@@ -299,14 +347,23 @@ def generate_classification_plot(upload_status, file_path):
         # bucket_name = "cosmic-routing"
         # manager = MiniIOManager(bucket_name)
         # for file in plot.saved_files:
-        #     manager.upload_file(file, file)  
-                        
+        #     manager.upload_file(file, file)
+
         for file in plot.saved_files:
             os.remove(file)
-        
-        return html.Div([html.H5("Plot generated successfully")], className="fade-out", key=str(time.time()))
+
+        return html.Div(
+            [html.H5("Plot generated successfully")],
+            className="fade-out",
+            key=str(time.time()),
+        )
     except Exception as e:
-        return html.Div([html.H5("Plot generation failed"), html.P(str(e))], className="fade-out", key=str(time.time()))
+        return html.Div(
+            [html.H5("Plot generation failed"), html.P(str(e))],
+            className="fade-out",
+            key=str(time.time()),
+        )
+
 
 if __name__ == "__main__":
     app.run_server(debug=True)
