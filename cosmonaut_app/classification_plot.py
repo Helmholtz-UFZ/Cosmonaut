@@ -8,9 +8,11 @@ import datetime
 import os
 from contextlib import contextmanager
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 
 gdal.DontUseExceptions()
+
 
 @contextmanager
 def temporary_file(suffix):
@@ -22,8 +24,10 @@ def temporary_file(suffix):
     finally:
         os.remove(temp.name)
 
+
 # TODO: Use the Download directory for the output files
 # TODO: Make the Coloring of the classes more flexible (dont let the user define the colormaps)
+
 
 class ClassificationPlot:
     """
@@ -168,7 +172,7 @@ class ClassificationPlot:
 
 
 # EXAMPLE USAGE:
-        
+
 # from classification_plot import ClassificationPlot
 # from matplotlib import pyplot as plt
 
