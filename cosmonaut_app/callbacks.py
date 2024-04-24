@@ -17,8 +17,14 @@ from config import osm_tags_mapping
 import matplotlib
 from routes import UPLOAD_FOLDER, DOWNLOAD_FOLDER, uploaded_files, file_link, app
 import logging
+from routing import create_line_layer
 
-logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.ERROR)
+logging.basicConfig(
+    filename="app.log",
+    filemode="w",
+    format="%(name)s - %(levelname)s - %(message)s",
+    level=logging.ERROR,
+)
 
 matplotlib.use("Agg")
 
@@ -127,7 +133,7 @@ def run_osm_query(upload_status, file_path, selected_tags):
         if file_path is not None:
             os.remove(file_path)
         error_message = f"OSM query failed: {str(e)}"
-        logging.error(error_message) 
+        logging.error(error_message)
         return (
             html.Div(
                 [html.H5("OSM query failed"), html.P(str(e))],
@@ -208,9 +214,32 @@ def generate_classification_plot(upload_status, file_path):
         )
     except Exception as e:
         error_message = f"Generating Plots failed: {str(e)}"
-        logging.error(error_message) 
+        logging.error(error_message)
         return html.Div(
             [html.H5("Plot generation failed"), html.P(str(e))],
             className="fade-out",
             key=str(time.time()),
         )
+
+
+@app.callback(
+    Output("route-layer", "children"),
+    [Input("btn-route", "n_clicks")],
+    [State("route-layer", "children")],
+)
+def update_map(n_clicks, current_layer):
+    if n_clicks is None:
+        return current_layer
+
+    # Define the routes for the example test
+    routes = [
+        {"way": "('way', 91403181)", "start_node": 1061793565, "end_node": 1036593570},
+        {"way": "('way', 922732272)", "start_node": 1036593570, "end_node": 845193413},
+        {"way": "('way', 70909551)", "start_node": 845193413, "end_node": 845197359},
+        {"way": "('way', 70909733)", "start_node": 845197359, "end_node": 845197431},
+        {"way": "('way', 70909838)", "start_node": 845197431, "end_node": 845190677},
+    ]
+
+    line_layer = create_line_layer(routes)
+
+    return line_layer

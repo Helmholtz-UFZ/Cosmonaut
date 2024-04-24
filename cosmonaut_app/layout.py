@@ -50,7 +50,7 @@ app.layout = html.Div(
                                         dl.BaseLayer(
                                             dl.TileLayer(),
                                             name="OpenStreetMap",
-                                            checked=False,
+                                            checked=True,
                                         ),
                                         dl.Overlay(
                                             dl.LayerGroup(),
@@ -73,6 +73,12 @@ app.layout = html.Div(
                                             checked=True,
                                             id="wms-layer",
                                         ),
+                                        dl.Overlay(
+                                            dl.LayerGroup(id="route-layer"),
+                                            name="Route Layer",
+                                            checked=True,
+                                            id="route",
+                                        ),
                                     ],
                                     id="lc",
                                 ),
@@ -88,9 +94,18 @@ app.layout = html.Div(
                             id="map",
                         ),
                         dcc.Link(
-                            html.Button("Nutzloser Knopf", id="btn", style={"margin-top": "10px"}),
+                            html.Button(
+                                "Nutzloser Knopf",
+                                id="btn",
+                                style={"margin-top": "10px"},
+                            ),
                             href="https://i.gifer.com/7bTq.gif",
-                            target="_blank"
+                            target="_blank",
+                        ),
+                        html.Button(
+                            "Test Routing Knopf",
+                            id="btn-route",
+                            style={"margin-top": "10px"},
                         ),
                     ],
                     style={"flex": "1 1 80%", "margin-top": "10px"},
