@@ -38,6 +38,17 @@ app.layout = html.Div(
                         html.Div(id="output-osm-query"),
                         html.Div(id="file-path", style={"display": "none"}),
                         html.Div(id="osm-file-path", style={"display": "none"}),
+                        html.H3("QR-Code zum Downloaden der Route als GPX-Datei"),
+                        html.Div(
+                            [
+                                html.Img(id="qr-code"),
+                                dcc.Store(id="qr-code-data"),
+                            ],
+                            style={"padding": "20px"},
+                        ),
+                        html.Div(
+                            "Die heruntergeladene GPX-Datei enthält die Route, welche mit OsmAnd oder einer anderen Navigations-App geöffnet werden kann."
+                        ),
                     ],
                     style={"flex": "1 1 20%", "padding-right": "20px"},
                 ),

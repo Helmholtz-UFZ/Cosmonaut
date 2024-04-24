@@ -17,7 +17,7 @@ from config import osm_tags_mapping
 import matplotlib
 from routes import UPLOAD_FOLDER, DOWNLOAD_FOLDER, uploaded_files, file_link, app
 import logging
-from routing import create_line_layer
+from routing import RouteCreator
 
 logging.basicConfig(
     filename="app.log",
@@ -227,7 +227,7 @@ def generate_classification_plot(upload_status, file_path):
     [Input("btn-route", "n_clicks")],
     [State("route-layer", "children")],
 )
-def update_map(n_clicks, current_layer):
+def routing_callback(n_clicks, current_layer):
     if n_clicks is None:
         return current_layer
 
@@ -238,8 +238,50 @@ def update_map(n_clicks, current_layer):
         {"way": "('way', 70909551)", "start_node": 845193413, "end_node": 845197359},
         {"way": "('way', 70909733)", "start_node": 845197359, "end_node": 845197431},
         {"way": "('way', 70909838)", "start_node": 845197431, "end_node": 845190677},
+        {"way": "('way), 70909517)", "start_node": 845190677, "end_node": 845190684},
+        {"way": "('way', 70909551)", "start_node": 845190684, "end_node": 9232344563},
+        {"way": "('way', 1000189951)", "start_node": 9232344563, "end_node": 845189629},
+        {"way": "('way', 54234166)", "start_node": 845189629, "end_node": 683872135},
+        {"way": "('way', 89369683)", "start_node": 683872135, "end_node": 1036584699},
     ]
 
-    line_layer = create_line_layer(routes)
+    route_creator = RouteCreator(
+        "/home/trinkle/git/UFZ-Flask/UFZ-Flask/cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
+    )
+    route_layer = route_creator.create_routes_layer(routes)
 
-    return line_layer
+    return route_layer
+
+
+@app.callback(
+    Output("qr-code", "src"),
+    Input("btn-route", "n_clicks"),
+    [State("route-layer", "children")],
+)
+def update_qr_code(n_clicks, current_layer):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    # Define the routes for the example test
+    routes = [
+        {"way": "('way', 91403181)", "start_node": 1061793565, "end_node": 1036593570},
+        {"way": "('way', 922732272)", "start_node": 1036593570, "end_node": 845193413},
+        {"way": "('way', 70909551)", "start_node": 845193413, "end_node": 845197359},
+        {"way": "('way', 70909733)", "start_node": 845197359, "end_node": 845197431},
+        {"way": "('way', 70909838)", "start_node": 845197431, "end_node": 845190677},
+        {"way": "('way), 70909517)", "start_node": 845190677, "end_node": 845190684},
+        {"way": "('way', 70909551)", "start_node": 845190684, "end_node": 9232344563},
+        {"way": "('way', 1000189951)", "start_node": 9232344563, "end_node": 845189629},
+        {"way": "('way', 54234166)", "start_node": 845189629, "end_node": 683872135},
+        {"way": "('way', 89369683)", "start_node": 683872135, "end_node": 1036584699},
+    ]
+
+    route_creator = RouteCreator(
+        "/home/trinkle/git/UFZ-Flask/UFZ-Flask/cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
+    )
+    route_creator.create_gpx(routes)
+    gpx_url = route_creator.upload_gpx()
+    qr_data_url = route_creator.create_qr_code(gpx_url)
+    route_creator.delete_gpx()
+
+    return qr_data_url
