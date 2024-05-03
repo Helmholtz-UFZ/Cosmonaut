@@ -15,9 +15,9 @@ from classification_plot import ClassificationPlot
 from minio_manager import MiniIOManager
 from config import osm_tags_mapping
 import matplotlib
-from routes import UPLOAD_FOLDER, DOWNLOAD_FOLDER, uploaded_files, file_link, app
+from flask_routes import UPLOAD_FOLDER, DOWNLOAD_FOLDER, uploaded_files, file_link, app
 import logging
-from routing import RouteCreator
+from navigation_routing import RouteCreator
 
 logging.basicConfig(
     filename="app.log",

@@ -1,7 +1,7 @@
 from dash import dcc, html
 import dash_leaflet as dl
 from config import osm_tags_mapping
-from routes import app
+from flask_routes import app
 
 
 # Generate the layout of the app
