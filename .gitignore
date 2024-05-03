@@ -8,4 +8,4 @@ cosmonaut_app/cache/*
 *.tif
 credentials.json
 .env_test_priv
-.log
+*.log
