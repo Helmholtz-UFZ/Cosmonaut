@@ -78,20 +78,18 @@ def upload_file(contents, filename):
 
 
 @app.callback(
-    Output("map", "viewport"),
-    Input("file-path", "children"),
-    prevent_initial_call=True
+    Output("map", "viewport"), Input("file-path", "children"), prevent_initial_call=True
 )
 def update_map_center(file_path):
     if file_path is None:
         raise PreventUpdate
-    
+
     # Get the bounds of the uploaded data
     data = transform_csv(file_path, 31468, 4326)
     bounds = _get_bounds(data)
 
     return dict(bounds=bounds, transition="flyTo")
-    
+
 
 @app.callback(
     Output("output-osm-query", "children"),
@@ -115,7 +113,7 @@ def run_osm_query(upload_status, file_path, selected_tags):
         # Query OSM data with the modified tags
         osm = OsmRoads(convex_hull)
         osm.tags.update(additional_tags)
-        osm._get_roads() # additional_tags=additional_tags)
+        osm._get_roads()  # additional_tags=additional_tags)
 
         # Save and transform OSM data
         osm_file_path = osm.save_roads(DOWNLOAD_FOLDER, 4326)
@@ -146,29 +144,40 @@ def run_osm_query(upload_status, file_path, selected_tags):
             None,
         )
 
+
 @app.callback(
-    Output('map', 'children'),
-    [Input('tags-dropdown', 'value')],
-    [State('map', 'children')],
-    prevent_initial_call=True
+    Output("map", "children"),
+    [Input("tags-dropdown", "value")],
+    [State("map", "children")],
+    prevent_initial_call=True,
 )
 def update_map(selected_roads, current_children):
     osm_values = [osm_tags_mapping[value] for value in selected_roads]
     osm_values = [item for sublist in osm_values for item in sublist]
 
     # Remove any existing GeoJSON layers
-    current_children = [child for child in current_children if not (isinstance(child, dict) and child.get('type') == 'GeoJSON')]
+    current_children = [
+        child
+        for child in current_children
+        if not (isinstance(child, dict) and child.get("type") == "GeoJSON")
+    ]
 
     # Load the GeoJSON data, TODO: FUTURE, load the data from the OSM file which was saved in the previous step
-    with open('download/20240424-105506_osm_data_4326.geojson') as f:
+    with open("download/20240424-105506_osm_data_4326.geojson") as f:
         data = json.load(f)
 
     filtered_data = {
-        'type': 'FeatureCollection',
-        'features': [feature for feature in data['features'] if feature['properties']['highway'] in osm_values]
+        "type": "FeatureCollection",
+        "features": [
+            feature
+            for feature in data["features"]
+            if feature["properties"]["highway"] in osm_values
+        ],
     }
 
-    geojson_layer = dl.GeoJSON(data=filtered_data, options={'style': {'color': 'red', 'weight': 5}})
+    geojson_layer = dl.GeoJSON(
+        data=filtered_data, options={"style": {"color": "red", "weight": 5}}
+    )
 
     current_children.extend([geojson_layer])
 
@@ -289,6 +298,7 @@ def update_qr_code(n_clicks, current_layer):
     route_creator.delete_gpx()
 
     return qr_data_url
+
 
 @app.callback(
     Output("offcanvas", "is_open"),

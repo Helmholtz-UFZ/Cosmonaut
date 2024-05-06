@@ -46,13 +46,9 @@ main_map = html.Div(
                 id="lc",
             ),
             dl.FullScreenControl(),
-            dl.LocateControl(
-                locateOptions={"enableHighAccuracy": True}
-            ),
+            dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
             dl.ScaleControl(position="bottomleft"),
-            dl.EasyButton(
-                icon="fa-globe", title="So easy", id="open-offcanvas"
-            ),
+            dl.EasyButton(icon="fa-globe", title="So easy", id="open-offcanvas"),
         ],
         center=[51.70, 11.20],
         zoom=10,
@@ -67,7 +63,9 @@ side_bar = dbc.Offcanvas(
     [
         dbc.Label(
             [
-                html.H2("COSmic ray based soil MOisture prediction NAvigation Utility Tool"),
+                html.H2(
+                    "COSmic ray based soil MOisture prediction NAvigation Utility Tool"
+                ),
                 html.H4("Upload a CSV file with coordinates to start routing."),
             ]
         ),
@@ -88,15 +86,16 @@ side_bar = dbc.Offcanvas(
                         ),
                         html.Div(id="output-data-upload"),
                         html.Div(id="output-osm-query"),
-                        html.Div(id="file-path"),# style={"display": "none"}),
-                        html.Div(id="osm-file-path"),# style={"display": "none"}),
+                        html.Div(id="file-path"),  # style={"display": "none"}),
+                        html.Div(id="osm-file-path"),  # style={"display": "none"}),
                         html.Div(
                             [
                                 html.H4("Straßenauswahl"),
                                 dbc.Checklist(
                                     id="tags-dropdown",
                                     options=[
-                                        {"label": tag, "value": tag} for tag in osm_tags_mapping.keys()
+                                        {"label": tag, "value": tag}
+                                        for tag in osm_tags_mapping.keys()
                                     ],
                                     value=list(osm_tags_mapping.keys()),
                                     inline=True,
@@ -139,7 +138,7 @@ side_bar = dbc.Offcanvas(
             ],
             # style={"display": "flex", "justify-content": "center"},
         ),
-        html.Div(id="plot-generation-status")#, style={"display": "none"}),
+        html.Div(id="plot-generation-status"),  # , style={"display": "none"}),
     ],
     id="offcanvas",
     scrollable=True,
@@ -147,11 +146,10 @@ side_bar = dbc.Offcanvas(
     is_open=False,
     autoFocus=True,
     style={
-        "width": "500px",  
-        "background-color": "#DBE2EF",  
+        "width": "500px",
+        "background-color": "#DBE2EF",
         "border": "2px solid #dee2e6",
     },
-    
 )
 
 # Generate the layout of the app

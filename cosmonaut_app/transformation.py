@@ -58,6 +58,7 @@ def get_convex_hull(self):
 
     return hull_buffer
 
+
 def _get_bounds(self):
     """
     Calculate the rectangular bounds of the given points.
@@ -73,6 +74,7 @@ def _get_bounds(self):
     min_lat, max_lat = lat.min(), lat.max()
 
     return [[min_lat, min_lon], [max_lat, max_lon]]
+
 
 class OsmRoads:
     """
