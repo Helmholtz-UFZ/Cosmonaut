@@ -34,7 +34,8 @@ ipykernel = "^6.29.0"
 osmnx = "^1.9.1"
 gdal = "^3.8.3"
 rasterio = "^1.3.9"
-terracotta = {git = "https://github.com/DHI/terracotta.git"}
+minio = "^7.2.5"
+python-dotenv = "^1.0.1"
 
 [tool.poetry.group.dev.dependencies]
 blinker = "1.6.2"
