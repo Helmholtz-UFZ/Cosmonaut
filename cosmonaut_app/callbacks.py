@@ -232,6 +232,7 @@ def routing_callback(n_clicks, current_layer):
         return current_layer
 
     # Define the routes for the example test
+    # TODO: FUTURE, get the routes from CAN's Navigation Algorithm
     routes = [
         {"way": "('way', 91403181)", "start_node": 1061793565, "end_node": 1036593570},
         {"way": "('way', 922732272)", "start_node": 1036593570, "end_node": 845193413},
@@ -263,6 +264,7 @@ def update_qr_code(n_clicks, current_layer):
         raise PreventUpdate
 
     # Define the routes for the example test
+    # TODO: FUTURE, get the routes from CAN's Navigation Algorithm
     routes = [
         {"way": "('way', 91403181)", "start_node": 1061793565, "end_node": 1036593570},
         {"way": "('way', 922732272)", "start_node": 1036593570, "end_node": 845193413},
@@ -285,3 +287,13 @@ def update_qr_code(n_clicks, current_layer):
     route_creator.delete_gpx()
 
     return qr_data_url
+
+@app.callback(
+    Output("offcanvas", "is_open"),
+    Input("open-offcanvas", "n_clicks"),
+    [State("offcanvas", "is_open")],
+)
+def toggle_offcanvas(n1, is_open):
+    if n1:
+        return not is_open
+    return is_open
