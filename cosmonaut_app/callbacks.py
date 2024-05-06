@@ -18,6 +18,7 @@ import matplotlib
 from flask_routes import UPLOAD_FOLDER, DOWNLOAD_FOLDER, uploaded_files, file_link, app
 import logging
 from navigation_routing import RouteCreator
+import json
 
 logging.basicConfig(
     filename="app.log",
@@ -145,34 +146,33 @@ def run_osm_query(upload_status, file_path, selected_tags):
             None,
         )
 
-
-# TODO: Not needed in the future.
 @app.callback(
-    Output("points", "children"),
-    Input("output-data-upload", "children"),
-    State("file-path", "children"),
+    Output('map', 'children'),
+    [Input('tags-dropdown', 'value')],
+    [State('map', 'children')],
+    prevent_initial_call=True
 )
-def show_points(upload_status, file_path):
-    if upload_status is None:
-        raise PreventUpdate
-    df = transform_csv(file_path, 31468, 4326)
+def update_map(selected_roads, current_children):
+    osm_values = [osm_tags_mapping[value] for value in selected_roads]
+    osm_values = [item for sublist in osm_values for item in sublist]
 
-    if len(df) > 200:
-        # Select 200 random points, otherwise the website will freeze for some time
-        df = df.sample(n=200, random_state=42)
+    # Remove any existing GeoJSON layers
+    current_children = [child for child in current_children if not (isinstance(child, dict) and child.get('type') == 'GeoJSON')]
 
-    points = []
-    for index, row in df.iterrows():
-        points.append(dl.Marker(position=[row["Latitude"], row["Longitude"]]))
+    # Load the GeoJSON data, TODO: FUTURE, load the data from the OSM file which was saved in the previous step
+    with open('download/20240424-105506_osm_data_4326.geojson') as f:
+        data = json.load(f)
 
-    group = dl.LayerGroup(children=points)
+    filtered_data = {
+        'type': 'FeatureCollection',
+        'features': [feature for feature in data['features'] if feature['properties']['highway'] in osm_values]
+    }
 
-    if len(df) > 200:
-        return html.Div(
-            [html.H6("Showing 200 random points out of {}".format(len(df))), group]
-        )
-    else:
-        return group
+    geojson_layer = dl.GeoJSON(data=filtered_data, options={'style': {'color': 'red', 'weight': 5}})
+
+    current_children.extend([geojson_layer])
+
+    return current_children
 
 
 @app.callback(
