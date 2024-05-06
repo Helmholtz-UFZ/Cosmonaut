@@ -7,7 +7,7 @@ from dash.exceptions import PreventUpdate
 from werkzeug.utils import secure_filename
 import base64
 import csv
-from transformation import OsmRoads, transform_csv, get_convex_hull
+from transformation import OsmRoads, transform_csv, get_convex_hull, _get_bounds
 import time
 import dash_leaflet as dl
 from matplotlib import pyplot as plt
@@ -27,20 +27,6 @@ logging.basicConfig(
 )
 
 matplotlib.use("Agg")
-
-
-@app.callback(
-    Output("file-list", "children"),
-    [Input("upload-data", "filename"), Input("upload-data", "contents")],
-)
-def update_output(uploaded_filenames, uploaded_file_contents):
-    """Save uploaded files and regenerate the file list."""
-    time.sleep(1)
-    files = uploaded_files()
-    if len(files) == 0:
-        return [html.Li("No files yet!")]
-    else:
-        return [html.Li(file_link(filename)) for filename in files]
 
 
 @app.callback(
@@ -91,6 +77,22 @@ def upload_file(contents, filename):
 
 
 @app.callback(
+    Output("map", "viewport"),
+    Input("file-path", "children"),
+    prevent_initial_call=True
+)
+def update_map_center(file_path):
+    if file_path is None:
+        raise PreventUpdate
+    
+    # Get the bounds of the uploaded data
+    data = transform_csv(file_path, 31468, 4326)
+    bounds = _get_bounds(data)
+
+    return dict(bounds=bounds, transition="flyTo")
+    
+
+@app.callback(
     Output("output-osm-query", "children"),
     Output("osm-file-path", "children"),
     [Input("output-data-upload", "children")],
@@ -112,7 +114,7 @@ def run_osm_query(upload_status, file_path, selected_tags):
         # Query OSM data with the modified tags
         osm = OsmRoads(convex_hull)
         osm.tags.update(additional_tags)
-        osm._get_roads(additional_tags=additional_tags)
+        osm._get_roads() # additional_tags=additional_tags)
 
         # Save and transform OSM data
         osm_file_path = osm.save_roads(DOWNLOAD_FOLDER, 4326)
