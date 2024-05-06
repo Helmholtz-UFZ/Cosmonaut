@@ -3,6 +3,7 @@ from werkzeug.utils import secure_filename
 import os
 import dash
 from dash import html
+import dash_bootstrap_components as dbc
 
 # Create upload and download folders if they do not exist
 UPLOAD_FOLDER = "upload"
@@ -31,7 +32,7 @@ def file_link(filename):
 
 
 server = Flask(__name__)
-app = dash.Dash(server=server)
+app = dash.Dash(server=server, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 
 @server.route("/download/<path:path>")
