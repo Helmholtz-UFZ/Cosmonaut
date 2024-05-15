@@ -49,7 +49,12 @@ main_map = html.Div(
             dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
             dl.ScaleControl(position="bottomleft"),
             dl.EasyButton(icon="fa-globe", title="So easy", id="open-offcanvas"),
+            # dl.Popup(id="popup", autoPan=False, closeOnClick=False),
+            dl.EasyButton(
+                icon="fa-globe", title="Remove selected road", id="remove-button"
+            ),
             dl.GeoJSON(id="geojson"),
+            dcc.Store(id="clicked-roads", data=[]),
         ],
         center=[51.70, 11.20],
         zoom=10,
@@ -145,7 +150,7 @@ side_bar = dbc.Offcanvas(
         "background-color": "#DBE2EF",
         "border": "2px solid #dee2e6",
     },
-    backdrop='static',
+    backdrop="static",
     close_button=True,
 )
 

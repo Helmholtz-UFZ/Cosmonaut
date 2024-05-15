@@ -143,8 +143,10 @@ def run_osm_query(upload_status, file_path, selected_tags):
             None,
         )
 
+
 # Define a JavaScript function for styling the GeoJSON features
-style_handle = assign("""
+style_handle = assign(
+    """
 function(feature, context){
     const {selected} = context.hideout;
     if(selected.includes(feature.id)){
@@ -152,11 +154,13 @@ function(feature, context){
     }
     return {color: 'red', weight: 5}
 }
-""")
+"""
+)
+
 
 @app.callback(
     Output("map", "children"),
-    [Input("tags-dropdown", "value")], # Input("osm-file-path", "children")],
+    [Input("tags-dropdown", "value")],  # Input("osm-file-path", "children")],
     [State("map", "children")],
     prevent_initial_call=True,
 )
@@ -184,6 +188,22 @@ def update_map(selected_roads, current_children):
         ],
     }
 
+    for feature in filtered_data["features"]:
+        highway_type = feature["properties"]["highway"]
+        name = feature["properties"].get("name")
+        ref = feature["properties"].get("ref")
+        tracktype = feature["properties"].get("tracktype")
+
+        # Use 'ref' if 'name' is None
+        if name is None:
+            name = ref
+
+        # Add 'tracktype' to the tooltip if 'highway' is 'track'
+        if highway_type == "track" and tracktype is not None:
+            feature["properties"]["tooltip"] = f"{name}, {highway_type}, {tracktype}"
+        else:
+            feature["properties"]["tooltip"] = f"{name}, {highway_type}"
+
     geojson_layer = dl.GeoJSON(
         data=filtered_data,
         options={"style": style_handle},
@@ -195,12 +215,13 @@ def update_map(selected_roads, current_children):
 
     return current_children
 
+
 @app.callback(
-    Output("geojson", "hideout"),
+    Output("geojson", "hideout", allow_duplicate=True),
     Input("geojson", "n_clicks"),
     State("geojson", "clickData"),
     State("geojson", "hideout"),
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 def toggle_select(_, clickData, hideout):
     if clickData is None or hideout is None or _ is None:
@@ -340,4 +361,41 @@ def toggle_offcanvas(n1, is_open):
     if n1:
         return not is_open
     return is_open
-    
+
+
+# Update the clicked roads when a road is clicked
+@app.callback(
+    Output("clicked-roads", "data"),
+    [Input("geojson", "clickData")],
+    [State("clicked-roads", "data")],
+    prevent_initial_call=True,
+)
+def update_clicked_roads(clickData, clicked_roads):
+    if clickData is None:
+        raise PreventUpdate
+    id = clickData["id"]
+    if id not in clicked_roads:
+        clicked_roads.append(id)
+    return clicked_roads
+
+
+# Update the GeoJSON's data when the button is clicked
+@app.callback(
+    Output("geojson", "data"),
+    [Input("remove-button", "n_clicks")],
+    [State("clicked-roads", "data"), State("geojson", "data")],
+    prevent_initial_call=True,
+)
+def remove_selected(n, clicked_roads, original_data):
+    if n is None or clicked_roads is None or original_data is None:
+        raise PreventUpdate
+    # Filter out the clicked roads
+    filtered_data = {
+        "type": "FeatureCollection",
+        "features": [
+            feature
+            for feature in original_data["features"]
+            if feature["id"] not in clicked_roads
+        ],
+    }
+    return filtered_data
