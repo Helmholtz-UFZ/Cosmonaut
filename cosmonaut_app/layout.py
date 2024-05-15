@@ -87,8 +87,8 @@ side_bar = dbc.Offcanvas(
                         ),
                         html.Div(id="output-data-upload"),
                         html.Div(id="output-osm-query"),
-                        html.Div(id="file-path"),  # style={"display": "none"}),
-                        html.Div(id="osm-file-path"),  # style={"display": "none"}),
+                        html.Div(id="file-path"),
+                        html.Div(id="osm-file-path"),
                         html.Div(
                             [
                                 html.H4("Straßenauswahl"),
@@ -109,13 +109,11 @@ side_bar = dbc.Offcanvas(
                                 html.Img(id="qr-code"),
                                 dcc.Store(id="qr-code-data"),
                             ],
-                            # style={"padding": "20px"},
                         ),
                         html.Div(
                             "Die heruntergeladene GPX-Datei enthält die Route, welche mit OsmAnd oder einer anderen Navigations-App geöffnet werden kann."
                         ),
                     ],
-                    # style={"flex": "1 1 20%", "padding-right": "20px"},
                 ),
                 html.Div(
                     [
@@ -123,7 +121,6 @@ side_bar = dbc.Offcanvas(
                             html.Button(
                                 "Nutzloser Knopf",
                                 id="btn",
-                                # style={"margin-top": "10px"},
                             ),
                             href="https://i.gifer.com/7bTq.gif",
                             target="_blank",
@@ -131,26 +128,25 @@ side_bar = dbc.Offcanvas(
                         html.Button(
                             "Test Routing Knopf",
                             id="btn-route",
-                            # style={"margin-top": "10px"},
                         ),
                     ],
-                    # style={"flex": "1 1 80%", "margin-top": "10px"},
                 ),
             ],
-            # style={"display": "flex", "justify-content": "center"},
         ),
-        html.Div(id="plot-generation-status"),  # , style={"display": "none"}),
+        html.Div(id="plot-generation-status"),
     ],
     id="offcanvas",
     scrollable=True,
     placement="end",
     is_open=False,
-    autoFocus=True,
+    autoFocus=False,
     style={
         "width": "500px",
         "background-color": "#DBE2EF",
         "border": "2px solid #dee2e6",
     },
+    backdrop='static',
+    close_button=True,
 )
 
 # Generate the layout of the app

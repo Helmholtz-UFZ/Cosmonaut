@@ -1,16 +1,14 @@
-from dash.dependencies import Input, Output, State
-from dash.exceptions import PreventUpdate
 import os
-from dash import html
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
+from dash import html, callback_context
 from dash_extensions.javascript import assign
+import dash_leaflet as dl
 from werkzeug.utils import secure_filename
 import base64
 import csv
 from transformation import OsmRoads, transform_csv, get_convex_hull, _get_bounds
 import time
-import dash_leaflet as dl
 from matplotlib import pyplot as plt
 from classification_plot import ClassificationPlot
 from minio_manager import MiniIOManager
@@ -342,3 +340,4 @@ def toggle_offcanvas(n1, is_open):
     if n1:
         return not is_open
     return is_open
+    
