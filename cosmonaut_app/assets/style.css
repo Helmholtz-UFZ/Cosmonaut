@@ -9,6 +9,11 @@
     to { opacity: 0; }
 }
 
+/* assets/style.css */
+.leaflet-tooltip {
+  font-size: 16px; /* Adjust as needed */
+}
+
 /* Table of contents
 ––––––––––––––––––––––––––––––––––––––––––––––––––
 - Plotly.js
