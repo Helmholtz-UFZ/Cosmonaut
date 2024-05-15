@@ -36,7 +36,20 @@ The image overlay is not the best solution. We need to think about using a WNSTi
 - PyProj: A Python interface to PROJ (cartographic projections and coordinate transformations library).
 
 
-## TODO's
+#
+# TODO's
+
+verschiedene SLD-file bereitstellen, welche vom user ausgewählt werden kann
+logik in viewer einbauen
+Postgres rdy machen (lokale instnaz mit docker) (python package: sqlalchemy)
+
+# Ablauf
+
+datei hochladen, zoom auf region, hintergrund (osm) daten laden /runterladen, user kann auswählen welche straßen, higliten, user nachfrage ob zufrieden, dann start rouute berechnen
+
+straßenselektor für die region
+
+erwartungshaltung fürs styling der SLD klarmachen
 
 # Geoserver
 
@@ -59,6 +72,17 @@ small discreption for list of road types - not super important
 feedback implementation for the agents (ticketsystem?) - not super important
 unify the .json - important
 
+Für CAN die OSM abfrage lesen (nodes wieder zurück als list ausgeben):
+```
+# Read GeoJSON file into a new DataFrame
+new_data = gpd.read_file(osm_file_path)
+
+# Convert strings back to lists
+import ast
+new_data['nodes'] = new_data['nodes'].apply(ast.literal_eval)
+```
+
+Check amount of highway=track which have maxspeed value
 # QR CODE für Gmaps navigation
 
 # Germany OSM Download
