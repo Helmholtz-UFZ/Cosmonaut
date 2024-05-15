@@ -49,6 +49,7 @@ main_map = html.Div(
             dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
             dl.ScaleControl(position="bottomleft"),
             dl.EasyButton(icon="fa-globe", title="So easy", id="open-offcanvas"),
+            dl.GeoJSON(id="geojson"),
         ],
         center=[51.70, 11.20],
         zoom=10,

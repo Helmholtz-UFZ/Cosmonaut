@@ -4,6 +4,7 @@ import os
 from dash import html
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
+from dash_extensions.javascript import assign
 from werkzeug.utils import secure_filename
 import base64
 import csv
@@ -144,10 +145,20 @@ def run_osm_query(upload_status, file_path, selected_tags):
             None,
         )
 
+# Define a JavaScript function for styling the GeoJSON features
+style_handle = assign("""
+function(feature, context){
+    const {selected} = context.hideout;
+    if(selected.includes(feature.id)){
+        return {color: 'yellow', weight: 5}
+    }
+    return {color: 'red', weight: 5}
+}
+""")
 
 @app.callback(
     Output("map", "children"),
-    [Input("tags-dropdown", "value")],
+    [Input("tags-dropdown", "value")], # Input("osm-file-path", "children")],
     [State("map", "children")],
     prevent_initial_call=True,
 )
@@ -176,12 +187,34 @@ def update_map(selected_roads, current_children):
     }
 
     geojson_layer = dl.GeoJSON(
-        data=filtered_data, options={"style": {"color": "red", "weight": 5}}
+        data=filtered_data,
+        options={"style": style_handle},
+        hideout=dict(selected=[]),
+        id="geojson",
     )
 
     current_children.extend([geojson_layer])
 
     return current_children
+
+@app.callback(
+    Output("geojson", "hideout"),
+    Input("geojson", "n_clicks"),
+    State("geojson", "clickData"),
+    State("geojson", "hideout"),
+    prevent_initial_call=True
+)
+def toggle_select(_, clickData, hideout):
+    if clickData is None or hideout is None or _ is None:
+        raise PreventUpdate
+
+    selected = hideout["selected"]
+    id = clickData["id"]
+    if id in selected:
+        selected.remove(id)
+    else:
+        selected.append(id)
+    return hideout
 
 
 @app.callback(
