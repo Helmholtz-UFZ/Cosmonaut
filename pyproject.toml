@@ -40,6 +40,8 @@ qrcode = {extras = ["pil"], version = "^7.4.2"}
 gpxpy = "^1.6.2"
 dash-bootstrap-components = "^1.6.0"
 dash-extensions = "^1.0.15"
+sqlalchemy = "^2.0.30"
+psycopg2 = "^2.9.9"
 
 [tool.poetry.group.dev.dependencies]
 blinker = "1.6.2"
