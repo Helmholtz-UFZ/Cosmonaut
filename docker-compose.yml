@@ -1,8 +1,21 @@
 services:
+  cosmonaut:
+    image: cosmonaut
+    container_name: cosmonaut
+    build: 
+      context: .
+      dockerfile: ./docker/dev.Dockerfile
+    env_file: .env
+    volumes:
+      - "./:/python_docker/cosmonaut"
+    user: "${DOCKER_UID}:${DOCKER_GID}"
+    ports:
+      - ${FLASK_PORT}:${FLASK_PORT}
+
   postgres:
     image: postgres:latest
     ports: 
-      - ${DB_PORT}:${DB_PORT}"
+      - ${DB_PORT}:${DB_PORT}
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PW}

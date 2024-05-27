@@ -31,8 +31,8 @@ DB_HOST_NAME = getenv("DB_HOST_NAME")
 DB_PORT = getenv("DB_PORT")
 DB_USER = getenv("DB_USER")
 DB_PW = getenv("DB_PW")
-Docker_UID = getenv("DOCKER_UID")
-Docker_GID = getenv("DOCKER_GID")
+DOCKER_UID = getenv("DOCKER_UID")
+DOCKER_GID = getenv("DOCKER_GID")
 
 # Mapping of OSM tags to the corresponding road classes
 osm_tags_mapping = {
