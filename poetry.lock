@@ -917,12 +917,12 @@ woff = ["brotli (>=1.0.1)", "brotlicffi (>=0.8.0)", "zopfli (>=0.1.4)"]
 
 [[package]]
 name = "gdal"
-version = "3.8.3"
+version = "3.3.0"
 description = "GDAL: Geospatial Data Abstraction Library"
 optional = false
 python-versions = ">=3.6.0"
 files = [
-    {file = "GDAL-3.8.3.tar.gz", hash = "sha256:eae2587c581d6609289e44f30afe30edcc25fbc640b5d6aba2f3c3e81def55be"},
+    {file = "GDAL-3.3.0.tar.gz", hash = "sha256:ed314a0b3f8b3729a9f6d8ca23f21473c2ff4a946d1a2969e0a1937bf0f4e700"},
 ]
 
 [package.extras]
@@ -3136,4 +3136,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "3.10.12"
-content-hash = "401220c5cf1dcd8678af33dc68f8c71b572f069737d3c512961b2a764c33feb8"
+content-hash = "f7efed01b7cbf77ddce3e46a5f6cdde1a243f9b64d8b9bc73143269cfc42872a"
