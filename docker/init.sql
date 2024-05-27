@@ -9,15 +9,20 @@ CREATE TABLE health_check (
     message VARCHAR
 );
 
-GRANT INSERT, UPDATE, DELETE, SELECT ON health_check TO postgres;
-
 -- Jobs table
 DROP TABLE IF EXISTS jobs;
 
 CREATE TABLE jobs (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR,
+    job_id VARCHAR PRIMARY KEY,
+    start_date DATE,
+    input_data JSONB,
+    files BYTEA[],
+    file_names VARCHAR[],
+    submitted BOOL,
+    cluster_job_id VARCHAR,
+    email VARCHAR,
+    notified_end BOOL,
+    logs VARCHAR,
     status VARCHAR,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    version DECIMAL
 );
