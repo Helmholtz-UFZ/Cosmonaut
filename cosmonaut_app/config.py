@@ -26,7 +26,13 @@ WEB_WORK_DIR = getenv("WEB_WORK_DIR")
 PORT = getenv("FLASK_PORT")
 MINIO_ACCESS_KEY = getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = getenv("MINIO_SECRET_KEY")
-
+DB_NAME = getenv("DB_NAME")
+DB_HOST_NAME = getenv("DB_HOST_NAME")
+DB_PORT = getenv("DB_PORT")
+DB_USER = getenv("DB_USER")
+DB_PW = getenv("DB_PW")
+Docker_UID = getenv("DOCKER_UID")
+Docker_GID = getenv("DOCKER_GID")
 
 # Mapping of OSM tags to the corresponding road classes
 osm_tags_mapping = {
