@@ -1,7 +1,6 @@
 from dash import dcc, html, Input, Output, State
 import dash_leaflet as dl
 from cosmonaut_app.config import osm_tags_mapping
-# from cosmonaut_app.flask_routes import app
 import dash_bootstrap_components as dbc
 
 # Main Map
@@ -48,10 +47,10 @@ main_map = html.Div(
             dl.FullScreenControl(),
             dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
             dl.ScaleControl(position="bottomleft"),
-            dl.EasyButton(icon="fa-globe", title="So easy", id="open-offcanvas"),
+            dl.EasyButton(icon="fa-bars", title="So easy", id="open-offcanvas"),
             # dl.Popup(id="popup", autoPan=False, closeOnClick=False),
             dl.EasyButton(
-                icon="fa-globe", title="Remove selected road", id="remove-button"
+                icon="fa-edit", title="Remove selected road", id="remove-button"
             ),
             dl.GeoJSON(id="geojson"),
             dcc.Store(id="clicked-roads", data=[]),
@@ -61,12 +60,26 @@ main_map = html.Div(
         style={"height": "100%"},
         id="map",
     ),
-    style={"height": "100vh"},
+    style={"height": "90vh"},
 )
 
-# Sidebar
+# Initial Sidebar for the Job Start
 side_bar = dbc.Offcanvas(
     [
+        dbc.Label(
+            [
+                html.H3(
+                    "Welcome to the COSmic ray based soil MOisture prediction NAvigation Utility Tool."
+                ),
+                html.H4("Press the Button to start initializing the job."),
+            ]
+        ),
+        dbc.Button(
+            "Start Job",
+            id="start-job",
+            className="me-auto",
+            size="lg",
+        ),
         dbc.Label(
             [
                 html.H2(
@@ -152,4 +165,69 @@ side_bar = dbc.Offcanvas(
     },
     backdrop="static",
     close_button=True,
+)
+
+# Search Bar
+search_bar = dbc.Row(
+    [
+        dbc.Col(
+            dbc.Input(
+                type="search",
+                placeholder="Job_ID",
+                id="search",
+            ),
+            width=6,
+        ),
+        dbc.Col(
+            dbc.Button(
+                "Search",
+                color="primary",
+                id="search-button",
+            ),
+            width="auto",
+        ),
+    ],
+    class_name="ml-auto flex-nowrap mt-2 mt-md-0",
+    align="center",
+)
+
+navbar = dbc.Navbar(
+    dbc.Container(
+        [
+            html.A(
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            html.Img(
+                                src="/static/sample_logo.svg",
+                                height="50px"
+                            ),
+                        ),
+                        dbc.Col(
+                            dbc.NavbarBrand(
+                                "COSMONAUT",
+                                className="ml-2",
+                                style={"font-size": "6vh"}
+                            ),
+                        ),
+                    ],
+                    align="center",
+                ),
+            ),
+            dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
+            dbc.Collapse(
+                search_bar,
+                id="navbar-collapse",
+                navbar=True,
+                is_open=False,
+            ),
+            html.Div(
+                id="search-results",
+                style={"color": "white"},
+            ),
+        ],
+    ),
+    color="dark",
+    dark=True,
+    style={"height": "10vh"}
 )

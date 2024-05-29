@@ -4,7 +4,7 @@ import os
 import dash
 from dash import html
 import dash_bootstrap_components as dbc
-from cosmonaut_app.layout import side_bar, main_map
+from cosmonaut_app.layout import side_bar, main_map, navbar
 
 # Create upload and download folders if they do not exist
 UPLOAD_FOLDER = "cosmonaut_app/upload"
@@ -33,14 +33,12 @@ def file_link(filename):
 
 
 server = Flask(__name__)
-app = dash.Dash(server=server, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(server=server, external_stylesheets=[dbc.themes.BOOTSTRAP, "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"])
 
 # Generate the layout of the app
 app.layout = html.Div(
     [
-        # html.H1(
-        #     "COSmic ray based soil MOisture prediction NAvigation Utility Tool"
-        # ),
+        navbar,
         side_bar,
         main_map,
         html.Div(id="hidden-div", style={"display": "none"}),
