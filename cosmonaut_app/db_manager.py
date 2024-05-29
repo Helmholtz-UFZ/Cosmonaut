@@ -310,7 +310,6 @@ class JobTable(Base):
     files = Column("files", ARRAY(LargeBinary))
     file_names = Column("file_names", ARRAY(String))
     submitted = Column("submitted", Boolean)
-    cluster_job_id = Column("cluster_job_id", String)
     email = Column("email", String)
     notified_end = Column("notified_end", Boolean)
     logs = Column("logs", String)

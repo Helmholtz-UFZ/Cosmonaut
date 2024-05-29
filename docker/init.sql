@@ -1,13 +1,6 @@
 -- init.sql
 
--- Health check table
-DROP TABLE IF EXISTS health_check;
-
-CREATE TABLE health_check (
-    check_time TIMESTAMP PRIMARY KEY,
-    status VARCHAR,
-    message VARCHAR
-);
+-- SQL ist nur für verwaltungsstuff
 
 -- Jobs table
 DROP TABLE IF EXISTS jobs;
@@ -19,7 +12,6 @@ CREATE TABLE jobs (
     files BYTEA[],
     file_names VARCHAR[],
     submitted BOOL,
-    cluster_job_id VARCHAR,
     email VARCHAR,
     notified_end BOOL,
     logs VARCHAR,
