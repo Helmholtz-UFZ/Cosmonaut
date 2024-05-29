@@ -7,8 +7,8 @@ import dash_bootstrap_components as dbc
 from cosmonaut_app.layout import side_bar, main_map
 
 # Create upload and download folders if they do not exist
-UPLOAD_FOLDER = "upload"
-DOWNLOAD_FOLDER = "download"
+UPLOAD_FOLDER = "cosmonaut_app/upload"
+DOWNLOAD_FOLDER = "cosmonaut_app/download"
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
