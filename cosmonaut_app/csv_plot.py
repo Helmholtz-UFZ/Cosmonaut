@@ -4,7 +4,7 @@ import matplotlib
 matplotlib.use("Agg")
 import pandas as pd
 import geopandas as gpd
-from transformation import transform_csv
+from cosmonaut_app.transformation import transform_csv
 
 import os
 import base64
@@ -30,7 +30,7 @@ class Plotter:
     def plot_data(self):
         num_points = len(self.gdf)
         dpi = 100  # Adjust this value as needed
-        fig, ax = plt.subplots(figsize=(num_points/dpi, num_points/dpi), dpi=dpi)
+        fig, ax = plt.subplots(figsize=(num_points / dpi, num_points / dpi), dpi=dpi)
         self.gdf.plot(
             column="Class", legend=True, marker="s", markersize=1, cmap="tab10", ax=ax
         )
@@ -40,7 +40,7 @@ class Plotter:
         ax.set_ylim(self.gdf.geometry.y.min(), self.gdf.geometry.y.max())
 
         # Save the image to the 'images' folder
-        image_path = os.path.join('images', 'image.png')
+        image_path = os.path.join("images", "image.png")
         plt.savefig(
             image_path,
             format="png",
@@ -52,7 +52,7 @@ class Plotter:
         plt.close(fig)
 
         # Convert the BytesIO object to a base64 string
-        image_base64 = base64.b64encode(open(image_path, 'rb').read()).decode()
+        image_base64 = base64.b64encode(open(image_path, "rb").read()).decode()
         return image_base64
 
 

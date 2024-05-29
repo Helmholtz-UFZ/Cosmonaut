@@ -1,7 +1,7 @@
 from dash import dcc, html, Input, Output, State
 import dash_leaflet as dl
-from config import osm_tags_mapping
-from flask_routes import app
+from cosmonaut_app.config import osm_tags_mapping
+# from cosmonaut_app.flask_routes import app
 import dash_bootstrap_components as dbc
 
 # Main Map
@@ -152,17 +152,4 @@ side_bar = dbc.Offcanvas(
     },
     backdrop="static",
     close_button=True,
-)
-
-# Generate the layout of the app
-app.layout = html.Div(
-    [
-        # html.H1(
-        #     "COSmic ray based soil MOisture prediction NAvigation Utility Tool"
-        # ),
-        side_bar,
-        main_map,
-        html.Div(id="hidden-div", style={"display": "none"}),
-    ],
-    style={"height": "100vh"},
 )

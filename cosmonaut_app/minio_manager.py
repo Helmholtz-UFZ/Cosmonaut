@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv(".env_test_priv")
 
-from config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
 
 
 class MiniIOManager:

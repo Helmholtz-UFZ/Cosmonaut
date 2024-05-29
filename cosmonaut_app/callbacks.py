@@ -7,17 +7,17 @@ import dash_leaflet as dl
 from werkzeug.utils import secure_filename
 import base64
 import csv
-from transformation import OsmRoads, transform_csv, get_convex_hull, _get_bounds
-import time
-from matplotlib import pyplot as plt
-from classification_plot import ClassificationPlot
-from minio_manager import MiniIOManager
-from config import osm_tags_mapping
-import matplotlib
-from flask_routes import UPLOAD_FOLDER, DOWNLOAD_FOLDER, uploaded_files, file_link, app
-import logging
-from navigation_routing import RouteCreator
 import json
+import logging
+import time
+import matplotlib
+from matplotlib import pyplot as plt
+from cosmonaut_app.transformation import OsmRoads, transform_csv, get_convex_hull, _get_bounds
+from cosmonaut_app.classification_plot import ClassificationPlot
+from cosmonaut_app.minio_manager import MiniIOManager
+from cosmonaut_app.config import osm_tags_mapping
+from cosmonaut_app.flask_routes import UPLOAD_FOLDER, DOWNLOAD_FOLDER, uploaded_files, file_link, app
+from cosmonaut_app.navigation_routing import RouteCreator
 
 logging.basicConfig(
     filename="app.log",
