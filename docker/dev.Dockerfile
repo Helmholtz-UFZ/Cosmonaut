@@ -27,7 +27,7 @@ USER 1000
 COPY . .
 
 CMD if [ "$GUNICORN" = 1 ] ; then \
-        gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.cosmonaut_web_server:app; \
+        gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.wsgi:app; \
     else \
         python3 /python_docker/cosmonaut/cosmonaut_app/app.py; \
     fi
