@@ -38,7 +38,7 @@ class CosmonautJob:
     file_names = None
     email = None
 
-    def __init(
+    def __init__(
         self,
         job_id=None,
         base_work_dir=WEB_WORK_DIR,
@@ -87,7 +87,7 @@ class CosmonautJob:
     def _blank_job(self):
         """Create a new job."""
         while True:
-            job_id = str(uuid.uuid4())
+            job_id = str(uuid.uuid4())[:8]
             if DataBaseManager.check_existence(self.job_id):
                 logging.debug(f"job_id {job_id} already exists")
                 continue
@@ -100,24 +100,26 @@ class CosmonautJob:
         logging.debug(f"save job {self.job_id}")
         # save job to database
         DataBaseManager.add_entry(
-            self.job_id,
-            self.start_date,
-            self.end_date,
-            self.status,
-            self.submitted,
-            self.file_names,
-            self.email,
+            {
+                "job_id": self.job_id,
+                "start_date": self.start_date,
+                "end_date": self.end_date,
+                "status": self.status,
+                "submitted": self.submitted,
+                "file_names": self.file_names,
+                "email": self.email,
+            }
         )
-        # upload files to MinIO
-        working_dir = os.path.join(self.base_work_dir, self.job_id)
-        for f_name in os.listdir(working_dir):
-            MiniIOManager.upload_file(os.path.join(working_dir, f_name), f_name)
+        # TODO upload files to MinIO - not implemented yet
+        # working_dir = self.base_work_dir #os.path.join(self.base_work_dir, self.job_id)
+        # for f_name in os.listdir(working_dir):
+        #     MiniIOManager.upload_file(os.path.join(self.base_work_dir, f_name), f_name)
 
     def delete(self):
         """Delete the job from the database and MinIO."""
         logging.debug(f"delete job {self.job_id}")
         # delete job from database
-        DataBaseManager.delete_entry(self.job_id)
+        DataBaseManager.delete_job(self.job_id)
         # delete files from MinIO
         for f_name in self.file_names:
             MiniIOManager.delete_file(f_name)
@@ -129,3 +131,10 @@ class CosmonautJob:
             return DAYS_DELETE_SUBMITTED - days_passed
         else:
             return DAYS_DELETE_NOT_SUBMITTED - days_passed
+
+    # TODO: Implement the submit method like John did it.
+    def submit(self):
+        """Submit the job."""
+        self.submitted = True
+        self.save()
+        return self.job_id
