@@ -1,9 +1,11 @@
 import os
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from dash import html, callback_context
+from dash import html, callback_context, dcc
 from dash_extensions.javascript import assign
 import dash_leaflet as dl
+import dash_bootstrap_components as dbc
+from flask import current_app
 from werkzeug.utils import secure_filename
 import base64
 import csv
@@ -12,12 +14,19 @@ import logging
 import time
 import matplotlib
 from matplotlib import pyplot as plt
-from cosmonaut_app.transformation import OsmRoads, transform_csv, get_convex_hull, _get_bounds
+from cosmonaut_app.transformation import (
+    OsmRoads,
+    transform_csv,
+    get_convex_hull,
+    _get_bounds,
+)
 from cosmonaut_app.classification_plot import ClassificationPlot
 from cosmonaut_app.minio_manager import MiniIOManager
-from cosmonaut_app.config import osm_tags_mapping
-from cosmonaut_app.flask_routes import UPLOAD_FOLDER, DOWNLOAD_FOLDER, uploaded_files, file_link, app
+from cosmonaut_app.config import osm_tags_mapping, WEB_WORK_DIR
+from cosmonaut_app.flask_routes import app
 from cosmonaut_app.navigation_routing import RouteCreator
+from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.db_manager import DataBaseManager
 
 logging.basicConfig(
     filename="app.log",
@@ -44,8 +53,10 @@ def upload_file(contents, filename):
     content_type, content_string = contents.split(",")
     decoded = base64.b64decode(content_string)
 
+    job_working_dir = current_app.config["JOB_WORKING_DIR"]
+
     filename = secure_filename(filename)
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file_path = os.path.join(job_working_dir, "upload", filename)
 
     with open(file_path, "wb") as f:
         f.write(decoded)
@@ -77,7 +88,9 @@ def upload_file(contents, filename):
 
 
 @app.callback(
-    Output("map", "viewport"), Input("file-path", "children"), prevent_initial_call=True
+    Output("map", "viewport"),
+    Input("file-path", "children"),
+    prevent_initial_call=True,
 )
 def update_map_center(file_path):
     if file_path is None:
@@ -94,28 +107,36 @@ def update_map_center(file_path):
     Output("output-osm-query", "children"),
     Output("osm-file-path", "children"),
     [Input("output-data-upload", "children")],
-    [State("file-path", "children"), State("tags-dropdown", "value")],
+    [State("file-path", "children")],
 )
-def run_osm_query(upload_status, file_path, selected_tags):
-    """Run an OSM query based on the uploaded data and the selected tags. Return the path to the saved OSM file."""
-    osm_values = [osm_tags_mapping[value] for value in selected_tags]
-    osm_values = [item for sublist in osm_values for item in sublist]
-    if upload_status is None or not selected_tags or file_path is None:
-        raise PreventUpdate
+def run_osm_query(upload_status, file_path):
+    """Run an OSM query based on the uploaded data. Return the path to the saved OSM file."""
+    osm_tags_mapping = {
+        "highway": [
+            "motorway",
+            "primary",
+            "secondary",
+            "tertiary",
+            "unclassified",
+            "residential",
+            "living_street",
+            "track",
+        ]
+    }
+
     try:
         data = transform_csv(file_path, 31468, 4326)
         convex_hull = get_convex_hull(data)
 
-        # Modify the tags based on the selected tags dropdown
-        additional_tags = {"highway": osm_values}
-
-        # Query OSM data with the modified tags
+        # Query OSM data with the initial tags
         osm = OsmRoads(convex_hull)
-        osm.tags.update(additional_tags)
-        osm._get_roads()  # additional_tags=additional_tags)
+        osm.tags.update(osm_tags_mapping)
+        osm._get_roads()
+
+        job_working_dir = current_app.config["JOB_WORKING_DIR"]
 
         # Save and transform OSM data
-        osm_file_path = osm.save_roads(DOWNLOAD_FOLDER, 4326)
+        osm_file_path = osm.save_roads(os.path.join(job_working_dir, "osm-data"), 4326)
         osm_data = osm._osm_transform()
         osm_file_path = osm_file_path.replace("4326", "31468")
         osm_data["nodes"] = osm_data["nodes"].apply(str)
@@ -176,7 +197,10 @@ def update_map(selected_roads, current_children):
     ]
 
     # Load the GeoJSON data, TODO: FUTURE, load the data from the OSM file which was saved in the previous step
-    with open("download/20240424-105506_osm_data_4326.geojson") as f:
+    geojson_path = os.path.join(
+        "cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
+    )
+    with open(geojson_path) as f:
         data = json.load(f)
 
     filtered_data = {
@@ -296,6 +320,7 @@ def routing_callback(n_clicks, current_layer):
 
     # Define the routes for the example test
     # TODO: FUTURE, get the routes from CAN's Navigation Algorithm
+    # FIXME This is testing -> should be moved to test file in the test folder
     routes = [
         {"way": "('way', 91403181)", "start_node": 1061793565, "end_node": 1036593570},
         {"way": "('way', 922732272)", "start_node": 1036593570, "end_node": 845193413},
@@ -309,9 +334,11 @@ def routing_callback(n_clicks, current_layer):
         {"way": "('way', 89369683)", "start_node": 683872135, "end_node": 1036584699},
     ]
 
-    route_creator = RouteCreator(
-        "/home/trinkle/git/UFZ-Flask/UFZ-Flask/cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
+    geojson_path = os.path.join(
+        "cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
     )
+
+    route_creator = RouteCreator(geojson_path)
     route_layer = route_creator.create_routes_layer(routes)
 
     return route_layer
@@ -328,6 +355,7 @@ def update_qr_code(n_clicks, current_layer):
 
     # Define the routes for the example test
     # TODO: FUTURE, get the routes from CAN's Navigation Algorithm
+    # FIXME This is testing -> should be moved to test file in the test folder
     routes = [
         {"way": "('way', 91403181)", "start_node": 1061793565, "end_node": 1036593570},
         {"way": "('way', 922732272)", "start_node": 1036593570, "end_node": 845193413},
@@ -341,9 +369,12 @@ def update_qr_code(n_clicks, current_layer):
         {"way": "('way', 89369683)", "start_node": 683872135, "end_node": 1036584699},
     ]
 
-    route_creator = RouteCreator(
-        "/home/trinkle/git/UFZ-Flask/UFZ-Flask/cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
+    geojson_path = os.path.join(
+        "cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
     )
+
+    route_creator = RouteCreator(geojson_path)
+
     route_creator.create_gpx(routes)
     gpx_url = route_creator.upload_gpx()
     qr_data_url = route_creator.create_qr_code(gpx_url)
@@ -399,3 +430,185 @@ def remove_selected(n, clicked_roads, original_data):
         ],
     }
     return filtered_data
+
+
+# add callback for toggling the collapse on small screens
+@app.callback(
+    Output("navbar-collapse", "is_open"),
+    [Input("navbar-toggler", "n_clicks")],
+    [State("navbar-collapse", "is_open")],
+)
+def toggle_navbar_collapse(n, is_open):
+    if n:
+        return not is_open
+    return is_open
+
+
+# TODO: This needs to be implemented
+# add callback which searches for the job_id typed into the search bar (button id = search_button, search bar id = search)
+# the job_id is saved in the postgres database, the corresponding job_id is referencing also to the saved files in the minio bucket
+@app.callback(
+    Output("search-results", "children"),
+    [Input("search-button", "n_clicks")],
+    [State("search", "value")],
+    prevent_initial_call=True,
+)
+def search_job_id(n_clicks, job_id):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    # search for the job_id in the postgres database
+    # if the job_id is found, return the corresponding files from the minio bucket
+    # if the job_id is not found, return an error message
+    # use database manager to search for the job_id (check_existence)
+    if DataBaseManager.check_existence(job_id):
+        return dbc.Alert(
+            f"Job {job_id} found",
+            color="light",
+            dismissable=False,
+            duration=3000,
+        )
+    else:
+        return dbc.Alert(
+            f"Job {job_id} not found",
+            color="light",
+            dismissable=False,
+            duration=3000,
+        )
+
+
+# start job when start-job button is clicked
+@app.callback(
+    Output("job-status-store", "data"),
+    Input("start-job", "n_clicks"),
+    State("start-job", "n_clicks"),
+)
+def start_job(n_clicks, _):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    # create a new CosmonautJob instance
+    job = CosmonautJob()
+
+    # start the job
+    job._blank_job()
+    job_id = job.job_id
+    job.save()
+
+    # create the working directory for the job
+    job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
+    current_app.config["JOB_WORKING_DIR"] = job_working_dir
+    os.makedirs(job_working_dir)
+    os.makedirs(os.path.join(job_working_dir, "upload"))
+    os.makedirs(os.path.join(job_working_dir, "osm-data"))
+    os.makedirs(os.path.join(job_working_dir, "plots"))
+
+    return job_id
+
+
+@app.callback(
+    Output("stage-content", "children"),
+    Output("progress-bar", "value"),
+    Output("progress-bar", "label"),
+    Input("job-status-store", "data"),
+    Input("current-stage", "data"),
+)
+def update_stage(job_id, current_stage):
+    if job_id is None:
+        return None, 0, "0%"
+
+    if current_stage == 0:
+        return (
+            html.Div(
+                [
+                    dbc.Alert(
+                        f"Started job {job_id}",
+                        color="light",
+                        dismissable=False,
+                        duration=3000,
+                    ),
+                    html.H3("Upload"),
+                    dcc.Upload(
+                        id="upload-data",
+                        accept=".csv",
+                        children=html.Div(
+                            [
+                                "Ziehen Sie eine Datei per Drag-and-Drop oder klicken Sie, um eine Datei zum Hochladen auszuwählen."
+                            ]
+                        ),
+                        multiple=False,
+                    ),
+                    html.Div(id="output-data-upload"),
+                    html.Div(id="output-osm-query"),
+                    html.Div(id="file-path", style={"display": "none"}),
+                    html.Div(id="osm-file-path"),
+                    dbc.Button(
+                        "Previous Step",
+                        id="prev-button",
+                        className="me-auto",
+                        size="lg",
+                        disabled=True,
+                    ),
+                    dbc.Button(
+                        "Next Step",
+                        id="next-button",
+                        className="me-auto",
+                        size="lg",
+                    ),
+                ],
+            ),
+            25,
+            "1/4",
+        )
+
+    elif current_stage == 1:
+        return (
+            html.Div(
+                [
+                    html.H4("Straßenauswahl"),
+                    dbc.Checklist(
+                        id="tags-dropdown",
+                        options=[
+                            {"label": tag, "value": tag}
+                            for tag in osm_tags_mapping.keys()
+                        ],
+                        value=list(osm_tags_mapping.keys()),
+                        inline=True,
+                    ),
+                    dbc.Button(
+                        "Previous Step",
+                        id="prev-button",
+                        className="me-auto",
+                        size="lg",
+                    ),
+                    dbc.Button(
+                        "Next Step",
+                        id="next-button",
+                        className="me-auto",
+                        size="lg",
+                    ),
+                ],
+            ),
+            50,
+            "2/4",
+        )
+
+    else:
+        return None, 0, "0%"
+
+
+@app.callback(
+    Output("current-stage", "data"),
+    Input("next-button", "n_clicks"),
+    Input("prev-button", "n_clicks"),
+    State("current-stage", "data"),
+)
+def update_current_stage(next_clicks, prev_clicks, current_stage):
+    if next_clicks is None and prev_clicks is None:
+        return 0
+
+    if next_clicks is not None:
+        return current_stage + 1
+
+    if prev_clicks is not None:
+        return current_stage - 1
