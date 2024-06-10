@@ -199,52 +199,6 @@ class DataBaseManager:
             return job_info
 
     @classmethod
-    def write_health(self, status, message):
-        """Write a health check entry to the 'health_check' table in the database.
-
-        This method writes a health check entry to the 'health_check' table in
-        the database. The health check entry includes the current date time,
-        the status of the health check, and a message with additional information.
-
-        Parameters:
-        status (str): The status of the health check, e.g., 'OK' or 'ERROR'.
-        message (str): A message with additional information about the health check.
-        """
-        with self.Session() as session:
-            health_check_row = HealthCheckTable(
-                check_time=datetime.now(), status=status, message=message
-            )
-            session.add(health_check_row)
-            session.commit()
-
-    @classmethod
-    def get_health(self):
-        """Retrieve the latest health check entry from the 'health_check' table.
-
-        This method queries the 'health_check' table in the database to retrieve
-        the latest health check entry. The health check entry includes the check
-        time, the status of the health check, and a message with additional information.
-
-        Returns:
-        dict: A dictionary containing the 'check_time', 'status', and 'message'
-        of the latest health check entry.
-        """
-        with self.Session() as session:
-            health_check_row = (
-                session.query(HealthCheckTable)
-                .order_by(HealthCheckTable.check_time.desc())
-                .first()
-            )
-            if health_check_row:
-                return (
-                    health_check_row.check_time,
-                    int(health_check_row.status),
-                    health_check_row.message,
-                )
-            else:
-                return None, None, None
-
-    @classmethod
     def get_lock(self, task_type):
         """Get a lock for a specific backgroung task type.
 
@@ -306,22 +260,12 @@ class JobTable(Base):
 
     job_id = Column(String, primary_key=True)
     start_date = Column("start_date", Date)
+    end_date = Column("end_date", Date)
     input_data = Column("input_data", JSON)
     files = Column("files", ARRAY(LargeBinary))
     file_names = Column("file_names", ARRAY(String))
     submitted = Column("submitted", Boolean)
     email = Column("email", String)
     notified_end = Column("notified_end", Boolean)
-    logs = Column("logs", String)
     status = Column("status", String)
     version = Column("version", Float)
-
-
-class HealthCheckTable(Base):
-    """Represents the 'health_check' table in the database."""
-
-    __tablename__ = "health_check"
-
-    check_time = Column("check_time", DateTime, primary_key=True)
-    status = Column("status", String)
-    message = Column("message", String)
