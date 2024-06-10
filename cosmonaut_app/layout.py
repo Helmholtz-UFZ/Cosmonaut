@@ -47,7 +47,7 @@ main_map = html.Div(
             dl.FullScreenControl(),
             dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
             dl.ScaleControl(position="bottomleft"),
-            dl.EasyButton(icon="fa-bars", title="So easy", id="open-offcanvas"),
+            dl.EasyButton(icon="fa-bars", title="Open side bar to start a new Job", id="open-offcanvas"),
             # dl.Popup(id="popup", autoPan=False, closeOnClick=False),
             dl.EasyButton(
                 icon="fa-edit", title="Remove selected road", id="remove-button"
@@ -72,7 +72,8 @@ side_bar = dbc.Offcanvas(
                     "Welcome to the COSmic ray based soil MOisture prediction NAvigation Utility Tool."
                 ),
                 html.H4("Press the Button to start initializing the job."),
-            ]
+            ],
+            id='welcome-label'
         ),
         dbc.Button(
             "Start Job",
@@ -80,78 +81,8 @@ side_bar = dbc.Offcanvas(
             className="me-auto",
             size="lg",
         ),
-        dbc.Label(
-            [
-                html.H2(
-                    "COSmic ray based soil MOisture prediction NAvigation Utility Tool"
-                ),
-                html.H4("Upload a CSV file with coordinates to start routing."),
-            ]
-        ),
-        html.Div(
-            [
-                html.Div(
-                    [
-                        html.H2("Upload"),
-                        dcc.Upload(
-                            id="upload-data",
-                            accept=".csv",
-                            children=html.Div(
-                                [
-                                    "Ziehen Sie eine Datei per Drag-and-Drop oder klicken Sie, um eine Datei zum Hochladen auszuwählen."
-                                ]
-                            ),
-                            multiple=False,
-                        ),
-                        html.Div(id="output-data-upload"),
-                        html.Div(id="output-osm-query"),
-                        html.Div(id="file-path"),
-                        html.Div(id="osm-file-path"),
-                        html.Div(
-                            [
-                                html.H4("Straßenauswahl"),
-                                dbc.Checklist(
-                                    id="tags-dropdown",
-                                    options=[
-                                        {"label": tag, "value": tag}
-                                        for tag in osm_tags_mapping.keys()
-                                    ],
-                                    value=list(osm_tags_mapping.keys()),
-                                    inline=True,
-                                ),
-                            ],
-                        ),
-                        html.H3("QR-Code zum Downloaden der Route als GPX-Datei"),
-                        html.Div(
-                            [
-                                html.Img(id="qr-code"),
-                                dcc.Store(id="qr-code-data"),
-                            ],
-                        ),
-                        html.Div(
-                            "Die heruntergeladene GPX-Datei enthält die Route, welche mit OsmAnd oder einer anderen Navigations-App geöffnet werden kann."
-                        ),
-                    ],
-                ),
-                html.Div(
-                    [
-                        dcc.Link(
-                            html.Button(
-                                "Nutzloser Knopf",
-                                id="btn",
-                            ),
-                            href="https://i.gifer.com/7bTq.gif",
-                            target="_blank",
-                        ),
-                        html.Button(
-                            "Test Routing Knopf",
-                            id="btn-route",
-                        ),
-                    ],
-                ),
-            ],
-        ),
-        html.Div(id="plot-generation-status"),
+        html.Div(id='stage-content'),
+        dbc.Progress(id='progress-bar', label="0%", value=0),
     ],
     id="offcanvas",
     scrollable=True,
@@ -198,16 +129,13 @@ navbar = dbc.Navbar(
                 dbc.Row(
                     [
                         dbc.Col(
-                            html.Img(
-                                src="/static/sample_logo.svg",
-                                height="50px"
-                            ),
+                            html.Img(src="/static/sample_logo.svg", height="50px"),
                         ),
                         dbc.Col(
                             dbc.NavbarBrand(
                                 "COSMONAUT",
                                 className="ml-2",
-                                style={"font-size": "6vh"}
+                                style={"font-size": "6vh"},
                             ),
                         ),
                     ],
@@ -229,5 +157,5 @@ navbar = dbc.Navbar(
     ),
     color="dark",
     dark=True,
-    style={"height": "10vh"}
+    style={"height": "10vh"},
 )
