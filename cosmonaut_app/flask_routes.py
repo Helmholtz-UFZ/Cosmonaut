@@ -12,6 +12,7 @@ app = dash.Dash(
     external_stylesheets=[
         dbc.themes.BOOTSTRAP,
         "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css",
+        "'src': '/assets/resize.js'",
     ],
 )
 
@@ -22,11 +23,11 @@ app.config.suppress_callback_exceptions = True
 app.layout = html.Div(
     [
         navbar,
-        side_bar,
         main_map,
+        side_bar,
         html.Div(id="hidden-div", style={"display": "none"}),
         dcc.Store(id="current-stage", data=0),
         dcc.Store(id="job-status-store", data=None),
     ],
-    style={"height": "100vh"},
+    style={"height": "100vh", "width": "100%"},
 )

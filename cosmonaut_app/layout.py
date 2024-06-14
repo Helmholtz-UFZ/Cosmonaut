@@ -47,8 +47,6 @@ main_map = html.Div(
             dl.FullScreenControl(),
             dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
             dl.ScaleControl(position="bottomleft"),
-            dl.EasyButton(icon="fa-bars", title="Open side bar to start a new Job", id="open-offcanvas"),
-            # dl.Popup(id="popup", autoPan=False, closeOnClick=False),
             dl.EasyButton(
                 icon="fa-edit", title="Remove selected road", id="remove-button"
             ),
@@ -60,11 +58,12 @@ main_map = html.Div(
         style={"height": "100%"},
         id="map",
     ),
-    style={"height": "90vh"},
+    id="main-map",
+    style={"height": "calc(100% - 10vh)", "width": "calc(100% - 500px)"},
 )
 
 # Initial Sidebar for the Job Start
-side_bar = dbc.Offcanvas(
+side_bar = dbc.Col(
     [
         dbc.Label(
             [
@@ -73,7 +72,7 @@ side_bar = dbc.Offcanvas(
                 ),
                 html.H4("Press the Button to start initializing the job."),
             ],
-            id='welcome-label'
+            id="welcome-label",
         ),
         dbc.Button(
             "Start Job",
@@ -81,21 +80,22 @@ side_bar = dbc.Offcanvas(
             className="me-auto",
             size="lg",
         ),
-        html.Div(id='stage-content'),
-        dbc.Progress(id='progress-bar', label="0%", value=0),
+        html.Div(id="stage-content"),
+        dbc.Progress(id="progress-bar", label="0%", value=0),
     ],
     id="offcanvas",
-    scrollable=True,
-    placement="end",
-    is_open=False,
-    autoFocus=False,
     style={
         "width": "500px",
         "background-color": "#DBE2EF",
         "border": "2px solid #dee2e6",
+        "position": "fixed",
+        "top": "10vh",
+        "right": 0,
+        "bottom": 0,
+        "padding": "2rem 1rem",
+        "overflow-y": "auto",
     },
-    backdrop="static",
-    close_button=True,
+    className="responsive-sidebar",
 )
 
 # Search Bar
