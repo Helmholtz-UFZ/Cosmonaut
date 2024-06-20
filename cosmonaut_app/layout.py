@@ -81,7 +81,7 @@ side_bar = dbc.Col(
             size="lg",
         ),
         html.Div(id="stage-content"),
-        dbc.Progress(id="progress-bar", label="0%", value=0),
+        dbc.Progress(id="progress-bar", label="0/5", value=0),
     ],
     id="offcanvas",
     style={
@@ -159,3 +159,105 @@ navbar = dbc.Navbar(
     dark=True,
     style={"height": "10vh"},
 )
+
+
+def stage1(job_id):
+    return (
+        html.Div(
+            [
+                html.H2(f"Job ID: {job_id}"),
+                dbc.Input(id="email-input", type="email", placeholder="Enter email"),
+                dbc.FormFeedback("Please enter a valid email.", id="email-feedback"),
+                dbc.Button(
+                    "Previous Step",
+                    id="prev-button",
+                    className="me-auto",
+                    size="lg",
+                    disabled=True,
+                ),
+                dbc.Button(
+                    "Next Step",
+                    id="next-button",
+                    className="me-auto",
+                    size="lg",
+                    disabled=True,
+                ),
+                html.Div(id="upload-data-dcc", style={"display": "none"}),
+            ],
+        ),
+        20,
+        "1/5",
+    )
+
+
+def stage2(job_id):
+    return (
+        html.Div(
+            [
+                html.H2(f"Job ID: {job_id}"),
+                html.H3("Upload"),
+                dcc.Upload(
+                    id="upload-data-dcc",
+                    accept=".csv",
+                    children=html.Div(
+                        ["Drag and drop a file or click to select a file to upload."]
+                    ),
+                    multiple=False,
+                ),
+                html.Div(id="output-data-upload"),
+                html.Div(id="file-path", style={"display": "none"}),
+                dbc.Button(
+                    "Previous Step",
+                    id="prev-button",
+                    className="me-auto",
+                    size="lg",
+                    disabled=False,
+                ),
+                dbc.Button(
+                    "Next Step",
+                    id="next-button",
+                    className="me-auto",
+                    size="lg",
+                    disabled=True,
+                ),
+                dbc.Input(id="email-input", type="email", style={"display": "none"}),
+            ],
+        ),
+        40,
+        "2/5",
+    )
+
+
+def stage3(job_id):
+    return (
+        html.Div(
+            [
+                html.H2(f"Job ID: {job_id}"),
+                html.H4("Straßenauswahl"),
+                dbc.Checklist(
+                    id="tags-dropdown",
+                    options=[
+                        {"label": tag, "value": tag} for tag in osm_tags_mapping.keys()
+                    ],
+                    value=list(osm_tags_mapping.keys()),
+                    inline=True,
+                ),
+                dbc.Button(
+                    "Previous Step",
+                    id="prev-button",
+                    className="me-auto",
+                    size="lg",
+                ),
+                dbc.Button(
+                    "Next Step",
+                    id="next-button",
+                    className="me-auto",
+                    size="lg",
+                ),
+                dbc.Input(id="email-input", type="email", style={"display": "none"}),
+                html.Div(id="upload-data-dcc", style={"display": "none"}),
+            ],
+        ),
+        60,
+        "3/5",
+    )

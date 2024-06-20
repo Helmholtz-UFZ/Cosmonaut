@@ -1,4 +1,5 @@
 import os
+import re
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from dash import html, callback_context, dcc
@@ -13,6 +14,7 @@ import json
 import logging
 import time
 import matplotlib
+import glob
 from matplotlib import pyplot as plt
 from cosmonaut_app.transformation import (
     OsmRoads,
@@ -26,24 +28,24 @@ from cosmonaut_app.config import osm_tags_mapping, WEB_WORK_DIR
 from cosmonaut_app.flask_routes import app
 from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
+from cosmonaut_app.layout import stage1, stage2, stage3
 
 logging.basicConfig(
-    filename="app.log",
-    filemode="w",
     format="%(name)s - %(levelname)s - %(message)s",
-    level=logging.ERROR,
+    level=logging.INFO,
 )
 
 matplotlib.use("Agg")
 
 
 @app.callback(
-    Output("upload-data", "contents"),
+    Output("upload-data-dcc", "contents"),
     Output("output-data-upload", "children"),
     Output("file-path", "children"),
-    Input("upload-data", "contents"),
-    State("upload-data", "filename"),
+    Input("upload-data-dcc", "contents"),
+    State("upload-data-dcc", "filename"),
+    prevent_initial_call=True,
 )
 def upload_file(contents, filename):
     """Upload a file to the server and save it in the upload directory."""
@@ -66,25 +68,27 @@ def upload_file(contents, filename):
         for row in csv_reader:
             if len(row) != 8:
                 os.remove(file_path)
+                logging.error("CSV must have 8 columns")
                 return (
                     None,
-                    html.Div(
-                        [html.H5("CSV must have 8 columns")],
-                        className="fade-out",
-                        key=str(time.time()),
-                    ),
+                    dbc.Alert("CSV must have 8 columns", color="danger", duration=5000),
                     None,
                 )
 
-    return (
+    logging.info("File uploaded successfully")
+    output_values = (
         None,
-        html.Div(
-            [html.H5("File uploaded successfully")],
-            className="fade-out",
-            key=str(time.time()),
-        ),
+        dbc.Alert("File uploaded successfully", color="success", duration=5000),
         file_path,
     )
+    logging.info(f"Output values: {output_values}")
+    return output_values
+
+
+@app.callback(Input("file-path", "children"))
+def check_file_path(file_path):
+    logging.info(f"File path: {file_path}")
+    return None
 
 
 @app.callback(
@@ -96,7 +100,6 @@ def update_map_center(file_path):
     if file_path is None:
         raise PreventUpdate
 
-    # Get the bounds of the uploaded data
     data = transform_csv(file_path, 31468, 4326)
     bounds = _get_bounds(data)
 
@@ -106,10 +109,10 @@ def update_map_center(file_path):
 @app.callback(
     Output("output-osm-query", "children"),
     Output("osm-file-path", "children"),
-    [Input("output-data-upload", "children")],
-    [State("file-path", "children")],
+    Input("file-path", "children"),
 )
-def run_osm_query(upload_status, file_path):
+def run_osm_query(file_path):
+    logging.info(f"run_osm_query triggered with file_path: {file_path}")
     """Run an OSM query based on the uploaded data. Return the path to the saved OSM file."""
     osm_tags_mapping = {
         "highway": [
@@ -128,14 +131,12 @@ def run_osm_query(upload_status, file_path):
         data = transform_csv(file_path, 31468, 4326)
         convex_hull = get_convex_hull(data)
 
-        # Query OSM data with the initial tags
         osm = OsmRoads(convex_hull)
         osm.tags.update(osm_tags_mapping)
         osm._get_roads()
 
         job_working_dir = current_app.config["JOB_WORKING_DIR"]
 
-        # Save and transform OSM data
         osm_file_path = osm.save_roads(os.path.join(job_working_dir, "osm-data"), 4326)
         osm_data = osm._osm_transform()
         osm_file_path = osm_file_path.replace("4326", "31468")
@@ -151,6 +152,7 @@ def run_osm_query(upload_status, file_path):
             osm_file_path,
         )
     except Exception as e:
+        logging.error(f"Error in run_osm_query: {e}")
         if file_path is not None:
             os.remove(file_path)
         error_message = f"OSM query failed: {str(e)}"
@@ -181,11 +183,14 @@ function(feature, context){
 
 @app.callback(
     Output("map", "children"),
-    [Input("tags-dropdown", "value")],  # Input("osm-file-path", "children")],
+    [Input("tags-dropdown", "value"), Input("job-status-store", "data")],
     [State("map", "children")],
     prevent_initial_call=True,
 )
-def update_map(selected_roads, current_children):
+def update_map(selected_roads, job_id, current_children):
+    if selected_roads is None:
+        return current_children
+
     osm_values = [osm_tags_mapping[value] for value in selected_roads]
     osm_values = [item for sublist in osm_values for item in sublist]
 
@@ -198,9 +203,10 @@ def update_map(selected_roads, current_children):
 
     # Load the GeoJSON data, TODO: FUTURE, load the data from the OSM file which was saved in the previous step
     geojson_path = os.path.join(
-        "cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
+        f"cosmonaut_app/download/{job_id}/osm_data/*_4326.geojson"
     )
-    with open(geojson_path) as f:
+    geojson_file = glob.glob(geojson_path)[0]
+    with open(geojson_file) as f:
         data = json.load(f)
 
     filtered_data = {
@@ -421,18 +427,6 @@ def remove_selected(n, clicked_roads, original_data):
     return filtered_data
 
 
-# add callback for toggling the collapse on small screens
-@app.callback(
-    Output("navbar-collapse", "is_open"),
-    [Input("navbar-toggler", "n_clicks")],
-    [State("navbar-collapse", "is_open")],
-)
-def toggle_navbar_collapse(n, is_open):
-    if n:
-        return not is_open
-    return is_open
-
-
 # TODO: This needs to be implemented
 # add callback which searches for the job_id typed into the search bar (button id = search_button, search bar id = search)
 # the job_id is saved in the postgres database, the corresponding job_id is referencing also to the saved files in the minio bucket
@@ -460,7 +454,7 @@ def search_job_id(n_clicks, job_id):
     else:
         return dbc.Alert(
             f"Job {job_id} not found",
-            color="light",
+            color="danger",
             dismissable=False,
             duration=3000,
         )
@@ -476,10 +470,8 @@ def start_job(n_clicks, _):
     if n_clicks is None:
         raise PreventUpdate
 
-    # create a new CosmonautJob instance
+    # create a new CosmonautJob instance and start the job
     job = CosmonautJob()
-
-    # start the job
     job._blank_job()
     job_id = job.job_id
     job.save()
@@ -504,83 +496,19 @@ def start_job(n_clicks, _):
 )
 def update_stage(job_id, current_stage):
     if job_id is None:
-        return None, 0, "0%"
+        return None, 0, "0/5"
 
     if current_stage == 0:
-        return (
-            html.Div(
-                [
-                    dbc.Alert(
-                        f"Started job {job_id}",
-                        color="light",
-                        dismissable=False,
-                        duration=3000,
-                    ),
-                    html.H3("Upload"),
-                    dcc.Upload(
-                        id="upload-data",
-                        accept=".csv",
-                        children=html.Div(
-                            [
-                                "Ziehen Sie eine Datei per Drag-and-Drop oder klicken Sie, um eine Datei zum Hochladen auszuwählen."
-                            ]
-                        ),
-                        multiple=False,
-                    ),
-                    html.Div(id="output-data-upload"),
-                    html.Div(id="output-osm-query"),
-                    html.Div(id="file-path", style={"display": "none"}),
-                    html.Div(id="osm-file-path"),
-                    dbc.Button(
-                        "Previous Step",
-                        id="prev-button",
-                        className="me-auto",
-                        size="lg",
-                        disabled=True,
-                    ),
-                    dbc.Button(
-                        "Next Step",
-                        id="next-button",
-                        className="me-auto",
-                        size="lg",
-                    ),
-                ],
-            ),
-            25,
-            "1/4",
-        )
+        logging.info("Stage 1")
+        return stage1(job_id)
 
     elif current_stage == 1:
-        return (
-            html.Div(
-                [
-                    html.H4("Straßenauswahl"),
-                    dbc.Checklist(
-                        id="tags-dropdown",
-                        options=[
-                            {"label": tag, "value": tag}
-                            for tag in osm_tags_mapping.keys()
-                        ],
-                        value=list(osm_tags_mapping.keys()),
-                        inline=True,
-                    ),
-                    dbc.Button(
-                        "Previous Step",
-                        id="prev-button",
-                        className="me-auto",
-                        size="lg",
-                    ),
-                    dbc.Button(
-                        "Next Step",
-                        id="next-button",
-                        className="me-auto",
-                        size="lg",
-                    ),
-                ],
-            ),
-            50,
-            "2/4",
-        )
+        logging.info("Stage 2")
+        return stage2(job_id)
+
+    elif current_stage == 2:
+        logging.info("Stage 3")
+        return stage3(job_id)
 
     else:
         return None, 0, "0%"
@@ -601,3 +529,69 @@ def update_current_stage(next_clicks, prev_clicks, current_stage):
 
     if prev_clicks is not None:
         return current_stage - 1
+
+
+@app.callback(
+    Output("upload-data-store", "children"),
+    Input("upload-data-dcc", "contents"),
+)
+def store_upload_data(contents):
+    return contents
+
+
+@app.callback(
+    Output("next-button", "disabled"),
+    Input("upload-data-dcc", "filename"),
+    Input("email-input", "value"),
+    State("current-stage", "data"),
+)
+def update_next_button(filename, email, current_stage):
+    email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+    if current_stage == 0 and email is not None and re.match(email_regex, email):
+        logging.info(f"Email: {email}")
+        return False
+    elif current_stage == 1 and filename is not None:
+        logging.info(f"Filename: {filename}")
+        return False
+    else:
+        return True
+
+
+@app.callback(
+    Output("email-store", "data"),
+    Input("email-input", "value"),
+    prevent_initial_call=True,
+)
+def store_email(email):
+    return email
+
+
+@app.callback(
+    Output("dummy-output", "children"),
+    Input("next-button", "n_clicks"),
+    State("email-store", "data"),
+    State("job-status-store", "data"),
+    prevent_initial_call=True,
+)
+def update_database_on_next(n_clicks, email, job_id):
+    if n_clicks is None or email is None:
+        raise PreventUpdate
+
+    try:
+        DataBaseManager.update_column(job_id, {"email": email})
+    except JobNotFound:
+        print(f"Job with ID {job_id} not found.")
+
+    return ""
+
+
+# add callback for toggling the collapse on small screens
+@app.callback(
+    Output("navbar-collapse", "is_open"),
+    [Input("navbar-toggler", "n_clicks")],
+    [State("navbar-collapse", "is_open")],
+)
+def toggle_navbar_collapse(n, is_open):
+    if n:
+        return not is_open
+    return is_open

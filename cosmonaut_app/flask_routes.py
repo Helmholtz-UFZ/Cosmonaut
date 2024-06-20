@@ -28,6 +28,18 @@ app.layout = html.Div(
         html.Div(id="hidden-div", style={"display": "none"}),
         dcc.Store(id="current-stage", data=0),
         dcc.Store(id="job-status-store", data=None),
+        dcc.Store(id="email-store"),
+        dcc.Dropdown(
+            id="tags-dropdown",
+            options=[],
+            value=None,
+            disabled=True,
+            style={"display": "none"},
+        ),
+        html.Div(id="upload-data-store", style={"display": "none"}),
+        html.Div(id="dummy-output", style={"display": "none"}),
+        html.Div(id="output-osm-query", style={"display": "none"}),
+        html.Div(id="osm-file-path", style={"display": "none"}),
     ],
     style={"height": "100vh", "width": "100%"},
 )
