@@ -33,9 +33,8 @@ class CosmonautJob:
     job_id = None
     start_date = None
     end_date = None
-    status = None
+    stage = None
     submitted = None
-    file_names = None
     email = None
 
     def __init__(
@@ -94,9 +93,12 @@ class CosmonautJob:
             break
         self.job_id = job_id
         self.start_date = date.today()
+        self.submitted = False
+        self.status = "created"
+        self.stage = 0
 
     def save(self):
-        """Save the job to the database and upload files to MinIO."""
+        """Save the job to the database."""
         logging.debug(f"save job {self.job_id}")
         # save job to database
         DataBaseManager.add_entry(
@@ -106,14 +108,10 @@ class CosmonautJob:
                 "end_date": self.end_date,
                 "status": self.status,
                 "submitted": self.submitted,
-                "file_names": self.file_names,
                 "email": self.email,
+                "stage": self.stage,
             }
         )
-        # TODO upload files to MinIO - not implemented yet
-        # working_dir = self.base_work_dir #os.path.join(self.base_work_dir, self.job_id)
-        # for f_name in os.listdir(working_dir):
-        #     MiniIOManager.upload_file(os.path.join(self.base_work_dir, f_name), f_name)
 
     def delete(self):
         """Delete the job from the database and MinIO."""
@@ -121,8 +119,7 @@ class CosmonautJob:
         # delete job from database
         DataBaseManager.delete_job(self.job_id)
         # delete files from MinIO
-        for f_name in self.file_names:
-            MiniIOManager.delete_file(f_name)
+        MiniIOManager.delete_file(self.job_id)
 
     def time_to_life(self):
         """Return the time to life of the job."""
