@@ -1,6 +1,7 @@
 from minio import Minio
 import os
 import datetime
+import io
 
 # TODO: Temporary loading of environment variables, later should be automatically loaded for Docker
 from dotenv import load_dotenv
@@ -41,8 +42,11 @@ class MiniIOManager:
             object_key (str): The key to assign to the uploaded file in the MinIO bucket.
         """
         _, file_extension = os.path.splitext(file_path)
-        if file_extension != ".tif":
-            print(f"Failed to upload file {file_path}: Only .tif files are allowed.")
+        allowed_extensions = [".tif", ".geojson", ".json", ".csv"]
+        if file_extension not in allowed_extensions:
+            print(
+                f"Failed to upload file {file_path}: Only {', '.join(allowed_extensions)} files are allowed."
+            )
             return
 
         try:
@@ -50,6 +54,20 @@ class MiniIOManager:
             print(f"File {file_path} uploaded successfully as {object_key}")
         except Exception as e:
             print(f"Failed to upload file {file_path}: {str(e)}")
+
+    def download_file(self, object_key, file_path):
+        """
+        Downloads a file from the MinIO bucket.
+
+        Args:
+            object_key (str): The key of the file to be downloaded from the MinIO bucket.
+            file_path (str): The path to save the downloaded file.
+        """
+        try:
+            self.minio_client.fget_object(self.bucket_name, object_key, file_path)
+            print(f"File {object_key} downloaded successfully as {file_path}")
+        except Exception as e:
+            print(f"Failed to download file {object_key}: {str(e)}")
 
     def delete_file(self, object_key):
         """
@@ -65,12 +83,42 @@ class MiniIOManager:
             print(f"Failed to delete file {object_key}: {str(e)}")
 
 
+    # return filenames asked for in the bucket
+    def get_files(self):
+        """
+        Lists all files in the MinIO bucket.
+        """
+        try:
+            objects = self.minio_client.list_objects(self.bucket_name)
+            return [obj.object_name for obj in objects]
+        except Exception as e:
+            print(f"Failed to list files in bucket {self.bucket_name}: {str(e)}")
+
+    def upload_placeholder(self, object_key):
+        """
+        Creates a placeholder object in the MinIO bucket to simulate a directory.
+
+        Args:
+            object_key (str): The key for the placeholder object, typically ending with a '/' to simulate a directory path.
+        """
+        try:
+            # Create an empty file-like object
+            empty_file = io.BytesIO(b'')
+            self.minio_client.put_object(
+                self.bucket_name, object_key, data=empty_file, length=0
+            )
+            print(f"Placeholder for {object_key} created successfully")
+        except Exception as e:
+            print(f"Failed to create placeholder for {object_key}: {str(e)}")
+
+
 if __name__ == "__main__":
     bucket_name = "cosmic-routing"
     manager = MiniIOManager(bucket_name)
     try:
         manager.minio_client.bucket_exists(bucket_name)
         manager.upload_file("test_data/no_csv.txt", "no_csv.txt")
+        manager.download_file("no_csv.txt", "test_data/no_csv_downloaded.txt")
         manager.delete_file("no_csv.txt")
     except Exception as e:
         print(f"Bucket {bucket_name} does not exist: {str(e)}")
