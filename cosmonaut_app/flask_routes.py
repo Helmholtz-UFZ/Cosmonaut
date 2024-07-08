@@ -38,7 +38,6 @@ app.layout = html.Div(
         ),
         html.Div(id="upload-data-store", style={"display": "none"}),
         html.Div(id="dummy-output", style={"display": "none"}),
-        html.Div(id="output-osm-query", style={"display": "none"}),
         html.Div(id="osm-file-path", style={"display": "none"}),
     ],
     style={"height": "100vh", "width": "100%"},
