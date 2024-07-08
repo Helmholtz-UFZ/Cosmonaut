@@ -205,6 +205,9 @@ def stage2(job_id):
                     multiple=False,
                 ),
                 html.Div(id="output-data-upload"),
+                html.Div(id="output-osm-query"),
+                html.Div(id="plot-generation-status"),
+                html.Div(id="output-minIO-status"),
                 html.Div(id="file-path", style={"display": "none"}),
                 dbc.Button(
                     "Previous Step",
