@@ -112,7 +112,10 @@ def update_map_center(file_path):
     Input("file-path", "children"),
 )
 def run_osm_query(file_path):
-    logging.info(f"run_osm_query triggered with file_path: {file_path}")
+    if not file_path:
+        raise PreventUpdate
+
+    logging.info(f"OSM triggered with file: {file_path}")
     """Run an OSM query based on the uploaded data. Return the path to the saved OSM file."""
     osm_tags_mapping = {
         "highway": [
@@ -142,13 +145,9 @@ def run_osm_query(file_path):
         osm_file_path = osm_file_path.replace("4326", "31468")
         osm_data["nodes"] = osm_data["nodes"].apply(str)
         osm_data.to_file(osm_file_path, driver="GeoJSON")
-
+        logging.info("OSM query successful")
         return (
-            html.Div(
-                [html.H5("OSM query run successfully")],
-                className="fade-out",
-                key=str(time.time()),
-            ),
+            dbc.Alert("OSM query successful", color="success", duration=5000),
             osm_file_path,
         )
     except Exception as e:
@@ -158,15 +157,53 @@ def run_osm_query(file_path):
         error_message = f"OSM query failed: {str(e)}"
         logging.error(error_message)
         return (
-            html.Div(
-                [html.H5("OSM query failed"), html.P(str(e))],
-                className="fade-out",
-                key=str(time.time()),
-            ),
+            dbc.Alert("OSM query failed", color="danger", duration=5000),
             None,
         )
 
+@app.callback(
+    Output("output-minIO-status", "children"),
+    Input("osm-file-path", "children"),
+    State("job-status-store", "data"),
+)
+def upload_to_minIO(osm_file_path, job_id):
+    ALLOWED_EXTENSIONS = {'.tif', '.geojson', '.json', '.csv'}
+    
+    if osm_file_path is None:
+        raise PreventUpdate
 
+    try:
+        minio_manager = MiniIOManager("cosmic-routing")
+        work_dir = f"cosmonaut_app/work_dir/{job_id}"
+        
+        for root, dirs, files in os.walk(work_dir):
+            # Calculate the relative path from work_dir to root
+            relative_path = os.path.relpath(root, work_dir)
+            
+            # Skip the job ID root directory itself to avoid creating an unnecessary directory
+            if relative_path == ".":
+                continue
+            
+            # Handle empty directories by creating a placeholder
+            if not dirs and not files:
+                minio_manager.upload_placeholder(f"{job_id}/{relative_path}/")
+                continue
+            
+            for file in files:
+                if os.path.splitext(file)[1] in ALLOWED_EXTENSIONS:
+                    file_path = os.path.join(root, file)
+                    logging.info(f"Uploading file {file_path} to MinIO")
+                    minio_manager.upload_file(file_path, f"{job_id}/{os.path.relpath(file_path, work_dir)}")
+                else:
+                    logging.warning(f"Skipping file {file_path}: Unsupported file type")
+                    
+        return dbc.Alert("Allowed files and directories uploaded to MinIO", color="success", duration=5000)
+    except Exception as e:
+        logging.error(f"Error in upload_to_minIO: {e}")
+        error_message = f"Uploading to MinIO failed: {str(e)}"
+        logging.error(error_message)
+        return dbc.Alert("Uploading to MinIO failed", color="danger", duration=5000)
+    
 # Define a JavaScript function for styling the GeoJSON features
 style_handle = assign(
     """
@@ -203,7 +240,7 @@ def update_map(selected_roads, job_id, current_children):
 
     # Load the GeoJSON data, TODO: FUTURE, load the data from the OSM file which was saved in the previous step
     geojson_path = os.path.join(
-        f"cosmonaut_app/download/{job_id}/osm_data/*_4326.geojson"
+        f"cosmonaut_app/work_dir/{job_id}/osm-data/*_4326.geojson"
     )
     geojson_file = glob.glob(geojson_path)[0]
     with open(geojson_file) as f:
@@ -265,19 +302,22 @@ def toggle_select(_, clickData, hideout):
         selected.append(id)
     return hideout
 
-
 @app.callback(
     Output("plot-generation-status", "children"),
     Input("output-data-upload", "children"),
     State("file-path", "children"),
+    State("job-status-store", "data"),  # Assuming the job ID is stored in a component with ID 'job-id'
 )
-def generate_classification_plot(upload_status, file_path):
+def generate_classification_plot(upload_status, file_path, job_id):
     """Generate classification plots based on the uploaded data. Upload the plots to MinIO."""
     if upload_status is None:
         raise PreventUpdate
 
     try:
-        plot = ClassificationPlot(file_path)
+        logging.info("Generating Plots for following job_id: " + job_id)
+        logging.info("Saving files to: " + os.path.join(WEB_WORK_DIR, job_id))
+        # Pass the job_id to the ClassificationPlot constructor
+        plot = ClassificationPlot(file_path, job_id)
         plot.generate_plots(
             [
                 plt.cm.Blues,
@@ -297,19 +337,21 @@ def generate_classification_plot(upload_status, file_path):
         # for file in plot.saved_files:
         #     manager.upload_file(file, file)
 
-        for file in plot.saved_files:
-            os.remove(file)
+        # for file in plot.saved_files:
+        #     os.remove(file)
 
-        return html.Div(
-            [html.H5("Plot generated successfully")],
+        return dbc.Alert(
+            "Plot generated successfully",
+            color="success",
             className="fade-out",
             key=str(time.time()),
         )
     except Exception as e:
         error_message = f"Generating Plots failed: {str(e)}"
         logging.error(error_message)
-        return html.Div(
-            [html.H5("Plot generation failed"), html.P(str(e))],
+        return dbc.Alert(
+            "Generating Plots failed",
+            color="danger",
             className="fade-out",
             key=str(time.time()),
         )
@@ -498,16 +540,28 @@ def update_stage(job_id, current_stage):
     if job_id is None:
         return None, 0, "0/5"
 
+    # Initialize stage 1
     if current_stage == 0:
         logging.info("Stage 1")
+        DataBaseManager.update_column(job_id, {"stage": 1})
         return stage1(job_id)
 
+    # Stage 2, User uploads a file and the OSM query is run
     elif current_stage == 1:
         logging.info("Stage 2")
+        DataBaseManager.update_column(job_id, {"stage": 2})
+        # when the OSM query is finished, upload all the data to minIO and update the database with the file names
+        minio_manager = MiniIOManager("cosmic-routing")
+        for file in os.listdir(f"cosmonaut_app/work_dir/{job_id}/osm-data"):
+            minio_manager.upload_file(
+                f"cosmonaut_app/work_dir/{job_id}/osm-data/{file}", file
+            )
+        DataBaseManager.update_column(job_id, {"data_uploaded": True})
         return stage2(job_id)
 
     elif current_stage == 2:
         logging.info("Stage 3")
+        DataBaseManager.update_column(job_id, {"stage": 3})
         return stage3(job_id)
 
     else:
@@ -548,10 +602,8 @@ def store_upload_data(contents):
 def update_next_button(filename, email, current_stage):
     email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
     if current_stage == 0 and email is not None and re.match(email_regex, email):
-        logging.info(f"Email: {email}")
         return False
     elif current_stage == 1 and filename is not None:
-        logging.info(f"Filename: {filename}")
         return False
     else:
         return True
