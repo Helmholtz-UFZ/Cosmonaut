@@ -154,7 +154,6 @@ class OsmRoads:
             file_path, "w"
         ) as osm_file:  # TODO Is it necessary to write the file here?
             geojson.dump(self.roads, osm_file)
-            print(f"tags of roads 2: {self.roads['highway'].unique()}")
         return file_path
 
     def _osm_transform(self):
