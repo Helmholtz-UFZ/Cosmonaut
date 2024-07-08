@@ -21,6 +21,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Float,
+    Integer,
     LargeBinary,
     String,
     create_engine,
@@ -269,3 +270,4 @@ class JobTable(Base):
     notified_end = Column("notified_end", Boolean)
     status = Column("status", String)
     version = Column("version", Float)
+    stage = Column("stage", Integer)
