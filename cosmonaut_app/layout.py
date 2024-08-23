@@ -3,6 +3,64 @@ import dash_leaflet as dl
 from cosmonaut_app.config import osm_tags_mapping
 import dash_bootstrap_components as dbc
 
+def main_page_layout():
+    return html.Div(
+        [
+            navbar,
+            main_map,
+            side_bar,
+            html.Div(id="hidden-div", style={"display": "none"}),
+            dcc.Store(id="current-stage", data=0),
+            dcc.Store(id="job-status-store", data=None),
+            dcc.Store(id="job-loaded-flag", data=None),
+            dcc.Store(id="email-store"),
+            dcc.Dropdown(
+                id="tags-dropdown",
+                options=[],
+                value=None,
+                disabled=True,
+                style={"display": "none"},
+            ),
+            html.Div(id="upload-data-store", style={"display": "none"}),
+            html.Div(id="dummy-output", style={"display": "none"}),
+            html.Div(id="osm-file-path", style={"display": "none"}),
+        ],
+        style={"height": "100vh", "width": "100%"},
+    )
+
+def new_page_layout():
+    return html.Div(
+        [
+            navbar,
+            main_map,
+            confirm_side_bar,
+            html.Div(id="hidden-div", style={"display": "none"}),
+            dcc.Store(id="current-stage", data=0),
+            dcc.Store(id="job-status-store", data=None),
+            dcc.Store(id="job-loaded-flag", data=None),
+            dcc.Store(id="email-store"),
+            dcc.Dropdown(
+                id="tags-dropdown",
+                options=[],
+                value=None,
+                disabled=True,
+                style={"display": "none"},
+            ),
+            html.Div(id="upload-data-store", style={"display": "none"}),
+            html.Div(id="dummy-output", style={"display": "none"}),
+            html.Div(id="osm-file-path", style={"display": "none"}),
+        ],
+        style={"height": "100vh", "width": "100%"},
+    )
+
+def not_found_page():
+    # Define the layout for the 404 Not Found page
+    # TODO: Add a link to the home page and also refine this page
+    return html.Div([
+        html.H1("404 Not Found"),
+        html.P("The page you are looking for does not exist.")
+    ])
+
 # Main Map
 main_map = html.Div(
     dl.Map(
@@ -98,6 +156,36 @@ side_bar = dbc.Col(
     className="responsive-sidebar",
 )
 
+# Sidebar when the input is confirmed, leads to th computation of the route
+def confirm_side_bar():
+    return dbc.Col(
+        [
+            dbc.Label(
+                [
+                    html.H3(
+                        "Your input has been confirmed. The route('s) are being computed."
+                    ),
+                    html.H4("Choose a Route on the map."),
+                ],
+                id="welcome-label",
+            ),
+            html.Div(id="stage-content"),
+        ],
+        id="offcanvas",
+        style={
+            "width": "500px",
+            "background-color": "#DBE2EF",
+            "border": "2px solid #dee2e6",
+            "position": "fixed",
+            "top": "10vh",
+            "right": 0,
+            "bottom": 0,
+            "padding": "2rem 1rem",
+            "overflow-y": "auto",
+        },
+        className="responsive-sidebar",
+    )
+
 # Search Bar
 search_bar = dbc.Row(
     [
@@ -185,8 +273,6 @@ def stage1(job_id):
                 html.Div(id="upload-data-dcc", style={"display": "none"}),
             ],
         ),
-        20,
-        "1/5",
     )
 
 
@@ -226,8 +312,6 @@ def stage2(job_id):
                 dbc.Input(id="email-input", type="email", style={"display": "none"}),
             ],
         ),
-        40,
-        "2/5",
     )
 
 
@@ -252,8 +336,8 @@ def stage3(job_id):
                     size="lg",
                 ),
                 dbc.Button(
-                    "Next Step",
-                    id="next-button",
+                    "Confirm Input",
+                    id="confirm-button",
                     className="me-auto",
                     size="lg",
                 ),
@@ -261,6 +345,5 @@ def stage3(job_id):
                 html.Div(id="upload-data-dcc", style={"display": "none"}),
             ],
         ),
-        60,
-        "3/5",
     )
+

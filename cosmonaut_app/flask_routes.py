@@ -19,26 +19,13 @@ app = dash.Dash(
 # Suppress callback exceptions because several callbacks need components which are created later
 app.config.suppress_callback_exceptions = True
 
-# Generate the layout of the app
-app.layout = html.Div(
-    [
-        navbar,
-        main_map,
-        side_bar,
-        html.Div(id="hidden-div", style={"display": "none"}),
-        dcc.Store(id="current-stage", data=0),
-        dcc.Store(id="job-status-store", data=None),
-        dcc.Store(id="email-store"),
-        dcc.Dropdown(
-            id="tags-dropdown",
-            options=[],
-            value=None,
-            disabled=True,
-            style={"display": "none"},
-        ),
-        html.Div(id="upload-data-store", style={"display": "none"}),
-        html.Div(id="dummy-output", style={"display": "none"}),
-        html.Div(id="osm-file-path", style={"display": "none"}),
-    ],
-    style={"height": "100vh", "width": "100%"},
-)
+def serve_layout():
+    return html.Div(
+        [
+            dcc.Location(id='url', refresh=False),
+            html.Div(id='page-content'),
+            dcc.Store(id="job-status-store", data=None),
+        ]
+    )
+
+app.layout = serve_layout

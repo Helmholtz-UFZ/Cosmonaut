@@ -2,7 +2,7 @@ import os
 import re
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from dash import html, callback_context, dcc
+from dash import html, callback_context, dcc, no_update
 from dash_extensions.javascript import assign
 import dash_leaflet as dl
 import dash_bootstrap_components as dbc
@@ -29,7 +29,7 @@ from cosmonaut_app.flask_routes import app
 from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
-from cosmonaut_app.layout import stage1, stage2, stage3
+from cosmonaut_app.layout import stage1, stage2, stage3, main_page_layout, confirm_side_bar, not_found_page
 
 logging.basicConfig(
     format="%(name)s - %(levelname)s - %(message)s",
@@ -474,6 +474,7 @@ def remove_selected(n, clicked_roads, original_data):
 # the job_id is saved in the postgres database, the corresponding job_id is referencing also to the saved files in the minio bucket
 @app.callback(
     Output("search-results", "children"),
+    Output("job-status-store", "data", allow_duplicate=True),  # Store the job_id in a hidden store for further processing
     [Input("search-button", "n_clicks")],
     [State("search", "value")],
     prevent_initial_call=True,
@@ -482,31 +483,41 @@ def search_job_id(n_clicks, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
-    # search for the job_id in the postgres database
-    # if the job_id is found, return the corresponding files from the minio bucket
-    # if the job_id is not found, return an error message
-    # use database manager to search for the job_id (check_existence)
+    # Check if the job_id exists in the database
     if DataBaseManager.check_existence(job_id):
-        return dbc.Alert(
-            f"Job {job_id} found",
-            color="light",
-            dismissable=False,
-            duration=3000,
+        # Load the job using the CosmonautJob class
+        job = CosmonautJob(job_id=job_id)
+        job.load()
+
+        # Update the UI with job found message and save job_id to the store
+        return (
+            dbc.Alert(
+                f"Job {job_id} found and loaded successfully.",
+                color="light",
+                dismissable=False,
+                duration=3000,
+            ),
+            job_id  # Store the job_id to job-status-store
         )
     else:
-        return dbc.Alert(
-            f"Job {job_id} not found",
-            color="danger",
-            dismissable=False,
-            duration=3000,
+        return (
+            dbc.Alert(
+                f"Job {job_id} not found",
+                color="danger",
+                dismissable=False,
+                duration=3000,
+            ),
+            None
         )
+
 
 
 # start job when start-job button is clicked
 @app.callback(
-    Output("job-status-store", "data"),
+    Output("job-status-store", "data", allow_duplicate=True),
     Input("start-job", "n_clicks"),
     State("start-job", "n_clicks"),
+    prevent_initial_call=True,
 )
 def start_job(n_clicks, _):
     if n_clicks is None:
@@ -535,37 +546,70 @@ def start_job(n_clicks, _):
     Output("progress-bar", "label"),
     Input("job-status-store", "data"),
     Input("current-stage", "data"),
+    State("job-loaded-flag", "data"),
 )
-def update_stage(job_id, current_stage):
+def update_stage(job_id, current_stage, job_loaded_flag):
     if job_id is None:
-        return None, 0, "0/5"
+        return None, 0, "0/3"
 
-    # Initialize stage 1
+    # Load the job
+    job = CosmonautJob(job_id=job_id)
+    # get the current stage of the job, needed when a job is loaded from the database
+    loaded_stage = job.stage
+
+    # Check if the job was just loaded
+    if current_stage is None or current_stage != loaded_stage:
+        current_stage = loaded_stage
+        job_loaded = True
+    else:
+        job_loaded = False
+
+    # Update the job_loaded_flag
+    if job_loaded_flag is None:
+        job_loaded_flag = job_loaded
+    elif job_loaded_flag and not job_loaded:
+        job_loaded_flag = False
+
+    # Proceed to stages based on current_stage
     if current_stage == 0:
-        logging.info("Stage 1")
-        DataBaseManager.update_column(job_id, {"stage": 1})
-        return stage1(job_id)
+        if not job_loaded_flag:
+            logging.info("Stage 1")
+            DataBaseManager.update_column(job_id, {"stage": 1})
+        return stage1(job_id), 33, "1/3"
 
-    # Stage 2, User uploads a file and the OSM query is run
     elif current_stage == 1:
-        logging.info("Stage 2")
-        DataBaseManager.update_column(job_id, {"stage": 2})
-        # when the OSM query is finished, upload all the data to minIO and update the database with the file names
-        minio_manager = MiniIOManager("cosmic-routing")
-        for file in os.listdir(f"cosmonaut_app/work_dir/{job_id}/osm-data"):
-            minio_manager.upload_file(
-                f"cosmonaut_app/work_dir/{job_id}/osm-data/{file}", file
-            )
-        DataBaseManager.update_column(job_id, {"data_uploaded": True})
-        return stage2(job_id)
+        if not job_loaded_flag:
+            logging.info("Stage 2")
+            DataBaseManager.update_column(job_id, {"stage": 2})
+            # Upload files to MinIO
+            minio_manager = MiniIOManager("cosmic-routing")
+            for file in os.listdir(f"cosmonaut_app/work_dir/{job_id}/osm-data"):
+                minio_manager.upload_file(
+                    f"cosmonaut_app/work_dir/{job_id}/osm-data/{file}", file
+                )
+            DataBaseManager.update_column(job_id, {"data_uploaded": True})
+        return stage2(job_id), 67, "2/3"
 
     elif current_stage == 2:
-        logging.info("Stage 3")
-        DataBaseManager.update_column(job_id, {"stage": 3})
-        return stage3(job_id)
+        if not job_loaded_flag:
+            logging.info("Stage 3")
+            DataBaseManager.update_column(job_id, {"stage": 3})
+        return stage3(job_id), 100, "3/3"
 
     else:
         return None, 0, "0%"
+
+# Add a callback to reset the job_loaded_flag when the user interacts with the job
+@app.callback(
+    Output("job-loaded-flag", "data"),
+    Input("next-stage-button", "n_clicks"),
+    State("job-loaded-flag", "data"),
+)
+def reset_job_loaded_flag(n_clicks, job_loaded_flag):
+    if n_clicks is not None and job_loaded_flag:
+        return False
+    return job_loaded_flag
+
 
 
 @app.callback(
@@ -647,3 +691,34 @@ def toggle_navbar_collapse(n, is_open):
     if n:
         return not is_open
     return is_open
+
+# # add a callback which triggers a new page when the confirm button is clicked (stage3)
+# @app.callback(
+#     Input("confirm-button", "n_clicks"),
+# )
+
+@app.callback(
+    Output('page-content', 'children'),
+    [Input('url', 'pathname')],
+    [State("job-status-store", "data")],
+    prevent_initial_call=True
+)
+def display_page(pathname, job_id):
+    if pathname == "/job/{}".format(job_id):
+        return confirm_side_bar()
+    elif pathname == "/":
+        return main_page_layout()
+    else:
+        return not_found_page()
+    
+@app.callback(
+    Output('url', 'pathname'),
+    [Input('confirm-button', 'n_clicks')],
+    [State("job-status-store", "data")],
+    prevent_initial_call=True
+)
+def navigate_to_new_page(n_clicks, job_id):
+    logging.info(f"n_clicks: {n_clicks}")
+    if n_clicks is not None:
+        return f'/job/{job_id}'
+    return no_update
