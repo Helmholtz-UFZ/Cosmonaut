@@ -111,6 +111,44 @@ class MiniIOManager:
         except Exception as e:
             print(f"Failed to create placeholder for {object_key}: {str(e)}")
 
+    @staticmethod
+    def download_directory(minio_path, local_path):
+        """
+        Downloads all objects from a MinIO bucket with the specified prefix to a local directory.
+
+        Args:
+            minio_path (str): The prefix of the objects to be downloaded from the MinIO bucket.
+            local_path (str): The local directory to save the downloaded objects.
+        """
+        try:
+            # Ensure the local path exists
+            if not os.path.exists(local_path):
+                os.makedirs(local_path)
+
+            # List all objects in the bucket with the specified prefix
+            minio_client = Minio(
+                "minio.ufz.de",
+                access_key=MINIO_ACCESS_KEY,
+                secret_key=MINIO_SECRET_KEY,
+                secure=True,
+            )
+            objects = minio_client.list_objects("cosmic-routing", prefix=minio_path, recursive=True)
+
+            for obj in objects:
+                # Construct the local file path
+                local_file_path = os.path.join(local_path, os.path.relpath(obj.object_name, minio_path))
+                local_file_dir = os.path.dirname(local_file_path)
+
+                # Ensure the local directory exists
+                if not os.path.exists(local_file_dir):
+                    os.makedirs(local_file_dir)
+
+                # Download the object
+                minio_client.fget_object("cosmic-routing", obj.object_name, local_file_path)
+                print(f"Downloaded {obj.object_name} to {local_file_path}")
+
+        except Exception as e:
+            print(f"Failed to download directory {minio_path}: {str(e)}")
 
 if __name__ == "__main__":
     bucket_name = "cosmic-routing"

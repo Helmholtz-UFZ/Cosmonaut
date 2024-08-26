@@ -17,10 +17,10 @@ def get_attributes(clazz):
     """Retrieve a list of non-method attributes of a class."""
     return [
         name
-        for name, attr in clazz.__dict___.items()
+        for name, attr in clazz.__dict__.items()
         if not name.startswith("__")
         and not callable(attr)
-        and not type(attr) is staticmethod
+        and not isinstance(attr, staticmethod)
     ]
 
 
@@ -33,9 +33,14 @@ class CosmonautJob:
     job_id = None
     start_date = None
     end_date = None
-    stage = None
+    data_uploaded = None
     submitted = None
     email = None
+    notified_end = None
+    stage = None
+    status = None
+    version = None
+    file_names = [] 
 
     def __init__(
         self,
@@ -46,7 +51,8 @@ class CosmonautJob:
         self.base_work_dir = base_work_dir
         if job_id is not None:
             logging.debug(f"load job with id {job_id}")
-            self.load(job_id)
+            self.job_id = job_id  # Set job_id to the instance variable
+            self.load()  # Call load without passing job_id
         else:
             logging.debug("create new job")
             self._blank_job()
@@ -56,32 +62,29 @@ class CosmonautJob:
         return self.job_id
 
     def load(self):
-        """get job information from database, load the data from minIO and store files in working dir."""
-        logging.debug(f"load job")
+        """Get job information from the database, load the data from MinIO, and store files in the working directory."""
+        logging.debug(f"load job with id {self.job_id}")
 
-        # get job information from database
-        class_attributes = get_attributes(self.job_id)
-        for name, value in DataBaseManager.get_job_columns(self.job_id):
-            if name == "files":
-                files = value
-                continue
-            if name not in class_attributes:
-                raise AttributeError(f"CosmonautJob has no attribute named {name}")
-            setattr(self, name, value)
+        # Get job information from the database
+        job_data = DataBaseManager.get_job_columns(self.job_id)
+        for name, value in job_data.items():
+            logging.info(f"Set attribute {name} to {value}")
+            if name in ['job_id', 'start_date', 'end_date', 'stage', 'submitted', 'email', 'data_uploaded']:
+                setattr(self, name, value)
+            else:
+                logging.warning(f"Unknown attribute {name} found in database")
 
-        # copy files from minIO to working directory
+        # Recreate the working directory
         working_dir = os.path.join(self.base_work_dir, self.job_id)
         if not os.path.exists(working_dir):
+            logging.info(f"Create working directory {working_dir} for job {self.job_id}")
             os.makedirs(working_dir)
 
-        for f_name in self.file_names:
-            if f_name in os.listdir((working_dir)):
-                logging.debug(f"file {f_name} already exists")
-                continue
-            # download file from minIO
-            MiniIOManager.download_file(f_name, os.path.join(working_dir, f_name))
-            with open(os.path.join(working_dir, f_name), "bw") as f_handle:
-                f_handle.write(files[self.file_names.index(f_name)])
+        # Download entire job directory from MinIO
+        minio_job_dir = f"{self.job_id}/"
+        MiniIOManager.download_directory(minio_job_dir, working_dir)
+        logging.info(f"Downloaded job directory {minio_job_dir} from MinIO to {working_dir}")
+
 
     def _blank_job(self):
         """Create a new job."""
@@ -110,6 +113,7 @@ class CosmonautJob:
                 "submitted": self.submitted,
                 "email": self.email,
                 "stage": self.stage,
+                "file_names": ",".join(self.file_names),
             }
         )
 
