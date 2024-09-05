@@ -29,7 +29,14 @@ from cosmonaut_app.flask_routes import app
 from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
-from cosmonaut_app.layout import stage1, stage2, stage3, main_page_layout, confirm_side_bar, not_found_page
+from cosmonaut_app.layout import (
+    stage1,
+    stage2,
+    stage3,
+    main_page_layout,
+    job_page_layout,
+    not_found_page,
+)
 
 logging.basicConfig(
     format="%(name)s - %(levelname)s - %(message)s",
@@ -161,49 +168,56 @@ def run_osm_query(file_path):
             None,
         )
 
+
 @app.callback(
     Output("output-minIO-status", "children"),
     Input("osm-file-path", "children"),
     State("job-status-store", "data"),
 )
 def upload_to_minIO(osm_file_path, job_id):
-    ALLOWED_EXTENSIONS = {'.tif', '.geojson', '.json', '.csv'}
-    
+    ALLOWED_EXTENSIONS = {".tif", ".geojson", ".json", ".csv"}
+
     if osm_file_path is None:
         raise PreventUpdate
 
     try:
         minio_manager = MiniIOManager("cosmic-routing")
         work_dir = f"cosmonaut_app/work_dir/{job_id}"
-        
+
         for root, dirs, files in os.walk(work_dir):
-            # Calculate the relative path from work_dir to root
             relative_path = os.path.relpath(root, work_dir)
-            
+
             # Skip the job ID root directory itself to avoid creating an unnecessary directory
             if relative_path == ".":
                 continue
-            
+
             # Handle empty directories by creating a placeholder
             if not dirs and not files:
                 minio_manager.upload_placeholder(f"{job_id}/{relative_path}/")
                 continue
-            
+
             for file in files:
                 if os.path.splitext(file)[1] in ALLOWED_EXTENSIONS:
                     file_path = os.path.join(root, file)
                     logging.info(f"Uploading file {file_path} to MinIO")
-                    minio_manager.upload_file(file_path, f"{job_id}/{os.path.relpath(file_path, work_dir)}")
+                    minio_manager.upload_file(
+                        file_path, f"{job_id}/{os.path.relpath(file_path, work_dir)}"
+                    )
                 else:
                     logging.warning(f"Skipping file {file_path}: Unsupported file type")
-                    
-        return dbc.Alert("Allowed files and directories uploaded to MinIO", color="success", duration=5000)
+
+        return dbc.Alert(
+            "Allowed files and directories uploaded to MinIO",
+            color="success",
+            duration=5000,
+        )
     except Exception as e:
         logging.error(f"Error in upload_to_minIO: {e}")
         error_message = f"Uploading to MinIO failed: {str(e)}"
         logging.error(error_message)
         return dbc.Alert("Uploading to MinIO failed", color="danger", duration=5000)
-    
+
+
 # Define a JavaScript function for styling the GeoJSON features
 style_handle = assign(
     """
@@ -224,21 +238,33 @@ function(feature, context){
     [State("map", "children")],
     prevent_initial_call=True,
 )
-def update_map(selected_roads, job_id, current_children):
+def update_map_with_geojson(selected_roads, job_id, current_children):
+    """
+    Update the map with GeoJSON layers based on the selected roads and job ID.
+
+    Parameters:
+    selected_roads (list): List of selected road tags from the dropdown.
+    job_id (str): The job ID used to locate the GeoJSON file.
+    current_children (list): The current children elements of the map.
+
+    Returns:
+    list: Updated list of children elements for the map.
+    """
     if selected_roads is None:
         return current_children
+
+    logging.error(f"geojson tags: {selected_roads}"),
 
     osm_values = [osm_tags_mapping[value] for value in selected_roads]
     osm_values = [item for sublist in osm_values for item in sublist]
 
-    # Remove any existing GeoJSON layers
     current_children = [
         child
         for child in current_children
         if not (isinstance(child, dict) and child.get("type") == "GeoJSON")
     ]
 
-    # Load the GeoJSON data, TODO: FUTURE, load the data from the OSM file which was saved in the previous step
+    # TODO: FUTURE, load the data from the OSM file which was saved in the previous step
     geojson_path = os.path.join(
         f"cosmonaut_app/work_dir/{job_id}/osm-data/*_4326.geojson"
     )
@@ -261,11 +287,9 @@ def update_map(selected_roads, job_id, current_children):
         ref = feature["properties"].get("ref")
         tracktype = feature["properties"].get("tracktype")
 
-        # Use 'ref' if 'name' is None
         if name is None:
             name = ref
 
-        # Add 'tracktype' to the tooltip if 'highway' is 'track'
         if highway_type == "track" and tracktype is not None:
             feature["properties"]["tooltip"] = f"{name}, {highway_type}, {tracktype}"
         else:
@@ -302,11 +326,14 @@ def toggle_select(_, clickData, hideout):
         selected.append(id)
     return hideout
 
+
 @app.callback(
     Output("plot-generation-status", "children"),
     Input("output-data-upload", "children"),
     State("file-path", "children"),
-    State("job-status-store", "data"),  # Assuming the job ID is stored in a component with ID 'job-id'
+    State(
+        "job-status-store", "data"
+    ),  # Assuming the job ID is stored in a component with ID 'job-id'
 )
 def generate_classification_plot(upload_status, file_path, job_id):
     """Generate classification plots based on the uploaded data. Upload the plots to MinIO."""
@@ -474,7 +501,9 @@ def remove_selected(n, clicked_roads, original_data):
 # the job_id is saved in the postgres database, the corresponding job_id is referencing also to the saved files in the minio bucket
 @app.callback(
     Output("search-results", "children"),
-    Output("job-status-store", "data", allow_duplicate=True),  # Store the job_id in a hidden store for further processing
+    Output("job-status-store", "data", allow_duplicate=True),
+    Output("url", "pathname", allow_duplicate=True),
+    Output("redirect-interval", "disabled"),
     [Input("search-button", "n_clicks")],
     [State("search", "value")],
     prevent_initial_call=True,
@@ -483,13 +512,10 @@ def search_job_id(n_clicks, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
-    # Check if the job_id exists in the database
     if DataBaseManager.check_existence(job_id):
-        # Load the job using the CosmonautJob class
         job = CosmonautJob(job_id=job_id)
         job.load()
 
-        # Update the UI with job found message and save job_id to the store
         return (
             dbc.Alert(
                 f"Job {job_id} found and loaded successfully.",
@@ -497,7 +523,9 @@ def search_job_id(n_clicks, job_id):
                 dismissable=False,
                 duration=3000,
             ),
-            job_id  # Store the job_id to job-status-store
+            job_id,
+            f"/job/{job_id}",
+            False,
         )
     else:
         return (
@@ -507,9 +535,19 @@ def search_job_id(n_clicks, job_id):
                 dismissable=False,
                 duration=3000,
             ),
-            None
+            None,
+            no_update,
+            False,
         )
 
+
+@app.callback(
+    Output("url", "pathname", allow_duplicate=True),
+    [Input("redirect-interval", "n_intervals")],
+    prevent_initial_call=True,
+)
+def redirect_to_home(n_intervals):
+    return "/"
 
 
 # start job when start-job button is clicked
@@ -542,19 +580,16 @@ def start_job(n_clicks, _):
 
 @app.callback(
     Output("stage-content", "children"),
-    Output("progress-bar", "value"),
-    Output("progress-bar", "label"),
     Input("job-status-store", "data"),
     Input("current-stage", "data"),
     State("job-loaded-flag", "data"),
+    prevent_initial_call=True,
 )
 def update_stage(job_id, current_stage, job_loaded_flag):
     if job_id is None:
-        return None, 0, "0/3"
+        return None
 
-    # Load the job
     job = CosmonautJob(job_id=job_id)
-    # get the current stage of the job, needed when a job is loaded from the database
     loaded_stage = job.stage
 
     # Check if the job was just loaded
@@ -575,29 +610,30 @@ def update_stage(job_id, current_stage, job_loaded_flag):
         if not job_loaded_flag:
             logging.info("Stage 1")
             DataBaseManager.update_column(job_id, {"stage": 1})
-        return stage1(job_id), 33, "1/3"
+        return stage1(job_id)
 
     elif current_stage == 1:
         if not job_loaded_flag:
             logging.info("Stage 2")
             DataBaseManager.update_column(job_id, {"stage": 2})
-            # Upload files to MinIO
+
             minio_manager = MiniIOManager("cosmic-routing")
             for file in os.listdir(f"cosmonaut_app/work_dir/{job_id}/osm-data"):
                 minio_manager.upload_file(
                     f"cosmonaut_app/work_dir/{job_id}/osm-data/{file}", file
                 )
             DataBaseManager.update_column(job_id, {"data_uploaded": True})
-        return stage2(job_id), 67, "2/3"
+        return stage2(job_id)
 
     elif current_stage == 2:
         if not job_loaded_flag:
             logging.info("Stage 3")
             DataBaseManager.update_column(job_id, {"stage": 3})
-        return stage3(job_id), 100, "3/3"
+        return stage3(job_id)
 
     else:
-        return None, 0, "0%"
+        return None
+
 
 # Add a callback to reset the job_loaded_flag when the user interacts with the job
 @app.callback(
@@ -609,7 +645,6 @@ def reset_job_loaded_flag(n_clicks, job_loaded_flag):
     if n_clicks is not None and job_loaded_flag:
         return False
     return job_loaded_flag
-
 
 
 @app.callback(
@@ -692,33 +727,67 @@ def toggle_navbar_collapse(n, is_open):
         return not is_open
     return is_open
 
-# # add a callback which triggers a new page when the confirm button is clicked (stage3)
-# @app.callback(
-#     Input("confirm-button", "n_clicks"),
-# )
 
 @app.callback(
-    Output('page-content', 'children'),
-    [Input('url', 'pathname')],
+    Output("page-content", "children"),
+    [Input("url", "pathname")],
     [State("job-status-store", "data")],
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
 def display_page(pathname, job_id):
-    if pathname == "/job/{}".format(job_id):
-        return confirm_side_bar()
+    if pathname.startswith("/job/"):
+        job_id_from_path = pathname.split("/job/")[1]
+        if DataBaseManager.check_existence(job_id_from_path):
+            return job_page_layout(job_id_from_path)
+        else:
+            return not_found_page()
     elif pathname == "/":
         return main_page_layout()
     else:
         return not_found_page()
-    
+
+
 @app.callback(
-    Output('url', 'pathname'),
-    [Input('confirm-button', 'n_clicks')],
+    Output("url", "pathname", allow_duplicate=True),
+    [Input("confirm-button", "n_clicks")],
     [State("job-status-store", "data")],
-    prevent_initial_call=True
+    prevent_initial_call=True,
 )
-def navigate_to_new_page(n_clicks, job_id):
+def navigate_to_job_page(n_clicks, job_id):
     logging.info(f"n_clicks: {n_clicks}")
     if n_clicks is not None:
-        return f'/job/{job_id}'
+        return f"/job/{job_id}"
+    return no_update
+
+
+@app.callback(
+    Output("url", "pathname", allow_duplicate=True),
+    [Input("navbar-brand", "n_clicks")],
+    prevent_initial_call=True,
+)
+def navigate_to_home(n_clicks):
+    if n_clicks is not None:
+        return "/"
+    return no_update
+
+
+# Add a callback which updates the "Straßenauswahl"(tags-dropdown) into the sql database
+@app.callback(
+    Output("none", "children"),
+    Input("tags-dropdown", "value"),
+    State("job-status-store", "data"),
+    prevent_initial_call=True,
+)
+def update_tags_dropdown(tags, job_id):
+    logging.error(f"sql before preventupdate: {tags}")
+    if tags is None:
+        raise PreventUpdate
+
+    logging.error(f"sql tags: {tags}")
+
+    try:
+        DataBaseManager.update_column(job_id, {"selected_road_tags": tags})
+    except JobNotFound:
+        logging.error(f"Job with ID {job_id} not found.")
+
     return no_update

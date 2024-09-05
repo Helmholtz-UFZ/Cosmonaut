@@ -19,13 +19,15 @@ app = dash.Dash(
 # Suppress callback exceptions because several callbacks need components which are created later
 app.config.suppress_callback_exceptions = True
 
+
 def serve_layout():
     return html.Div(
         [
-            dcc.Location(id='url', refresh=False),
-            html.Div(id='page-content'),
+            dcc.Location(id="url", refresh=False),
+            html.Div(id="page-content"),
             dcc.Store(id="job-status-store", data=None),
         ]
     )
+
 
 app.layout = serve_layout

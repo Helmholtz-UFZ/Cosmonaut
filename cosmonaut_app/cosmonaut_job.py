@@ -40,7 +40,8 @@ class CosmonautJob:
     stage = None
     status = None
     version = None
-    file_names = [] 
+    file_names = []
+    selected_road_tags = []
 
     def __init__(
         self,
@@ -69,7 +70,15 @@ class CosmonautJob:
         job_data = DataBaseManager.get_job_columns(self.job_id)
         for name, value in job_data.items():
             logging.info(f"Set attribute {name} to {value}")
-            if name in ['job_id', 'start_date', 'end_date', 'stage', 'submitted', 'email', 'data_uploaded']:
+            if name in [
+                "job_id",
+                "start_date",
+                "end_date",
+                "stage",
+                "submitted",
+                "email",
+                "data_uploaded",
+            ]:
                 setattr(self, name, value)
             else:
                 logging.warning(f"Unknown attribute {name} found in database")
@@ -77,14 +86,17 @@ class CosmonautJob:
         # Recreate the working directory
         working_dir = os.path.join(self.base_work_dir, self.job_id)
         if not os.path.exists(working_dir):
-            logging.info(f"Create working directory {working_dir} for job {self.job_id}")
+            logging.info(
+                f"Create working directory {working_dir} for job {self.job_id}"
+            )
             os.makedirs(working_dir)
 
         # Download entire job directory from MinIO
         minio_job_dir = f"{self.job_id}/"
         MiniIOManager.download_directory(minio_job_dir, working_dir)
-        logging.info(f"Downloaded job directory {minio_job_dir} from MinIO to {working_dir}")
-
+        logging.info(
+            f"Downloaded job directory {minio_job_dir} from MinIO to {working_dir}"
+        )
 
     def _blank_job(self):
         """Create a new job."""

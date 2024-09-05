@@ -15,7 +15,9 @@ CREATE TABLE jobs (
     notified_end BOOL,
     stage INT,
     status VARCHAR,
-    version DECIMAL
+    version DECIMAL,
+    file_names TEXT[],
+    selected_road_tags TEXT[]
 );
 
 -- psql -U cosmonaut -p 5432 -h localhost -d cosmonaut_db

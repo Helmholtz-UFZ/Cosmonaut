@@ -82,7 +82,6 @@ class MiniIOManager:
         except Exception as e:
             print(f"Failed to delete file {object_key}: {str(e)}")
 
-
     # return filenames asked for in the bucket
     def get_files(self):
         """
@@ -103,7 +102,7 @@ class MiniIOManager:
         """
         try:
             # Create an empty file-like object
-            empty_file = io.BytesIO(b'')
+            empty_file = io.BytesIO(b"")
             self.minio_client.put_object(
                 self.bucket_name, object_key, data=empty_file, length=0
             )
@@ -132,11 +131,15 @@ class MiniIOManager:
                 secret_key=MINIO_SECRET_KEY,
                 secure=True,
             )
-            objects = minio_client.list_objects("cosmic-routing", prefix=minio_path, recursive=True)
+            objects = minio_client.list_objects(
+                "cosmic-routing", prefix=minio_path, recursive=True
+            )
 
             for obj in objects:
                 # Construct the local file path
-                local_file_path = os.path.join(local_path, os.path.relpath(obj.object_name, minio_path))
+                local_file_path = os.path.join(
+                    local_path, os.path.relpath(obj.object_name, minio_path)
+                )
                 local_file_dir = os.path.dirname(local_file_path)
 
                 # Ensure the local directory exists
@@ -144,11 +147,14 @@ class MiniIOManager:
                     os.makedirs(local_file_dir)
 
                 # Download the object
-                minio_client.fget_object("cosmic-routing", obj.object_name, local_file_path)
+                minio_client.fget_object(
+                    "cosmic-routing", obj.object_name, local_file_path
+                )
                 print(f"Downloaded {obj.object_name} to {local_file_path}")
 
         except Exception as e:
             print(f"Failed to download directory {minio_path}: {str(e)}")
+
 
 if __name__ == "__main__":
     bucket_name = "cosmic-routing"

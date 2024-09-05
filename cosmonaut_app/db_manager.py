@@ -269,3 +269,5 @@ class JobTable(Base):
     stage = Column("stage", Integer)
     status = Column("status", String)
     version = Column("version", Float)
+    file_names = Column("file_names", ARRAY(String))
+    selected_road_tags = Column("selected_road_tags", ARRAY(String))

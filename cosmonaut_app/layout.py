@@ -3,6 +3,19 @@ import dash_leaflet as dl
 from cosmonaut_app.config import osm_tags_mapping
 import dash_bootstrap_components as dbc
 
+
+def not_found_page():
+    # Define the layout for the 404 Not Found page
+    return html.Div(
+        [
+            html.H1("404 Not Found"),
+            html.P("The page you are looking for does not exist."),
+            dcc.Link(html.Button("Go back to the Home Page"), href="/"),
+        ],
+        style={"height": "100vh", "width": "100%"},
+    )
+
+
 def main_page_layout():
     return html.Div(
         [
@@ -24,11 +37,53 @@ def main_page_layout():
             html.Div(id="upload-data-store", style={"display": "none"}),
             html.Div(id="dummy-output", style={"display": "none"}),
             html.Div(id="osm-file-path", style={"display": "none"}),
+            html.Div(id="none", style={"display": "none"}),
         ],
         style={"height": "100vh", "width": "100%"},
     )
 
-def new_page_layout():
+
+def job_page_layout(job_id):
+    confirm_side_bar = dbc.Col(
+        [
+            dbc.Label(
+                [
+                    html.H2(f"Job ID: {job_id}"),
+                    html.H3(
+                        "Your input has been confirmed. The route(s) are being computed."
+                    ),
+                    # add a dbc.button to start the calculation for the route based on the input
+                    dbc.Button(
+                        "Start Route Calculation",
+                        id="route-calculation",
+                        className="me-auto",
+                        size="lg",
+                        disabled=False,
+                    ),
+                    # html.H4("Choose a Route on the map."), # TODO sollte erst nach kalkulation der Routen erscheinen
+                ],
+                id="welcome-label",
+            ),
+            html.Div(id="stage-content"),
+            # dbc.Progress(
+            #     id="progress-bar", label="0/5", value=0, style={"display": "none"}
+            # ),
+        ],
+        id="offcanvas",
+        style={
+            "width": "500px",
+            "background-color": "#DBE2EF",
+            "border": "2px solid #dee2e6",
+            "position": "fixed",
+            "top": "10vh",
+            "right": 0,
+            "bottom": 0,
+            "padding": "2rem 1rem",
+            "overflow-y": "auto",
+        },
+        className="responsive-sidebar",
+    )
+
     return html.Div(
         [
             navbar,
@@ -42,8 +97,8 @@ def new_page_layout():
             dcc.Dropdown(
                 id="tags-dropdown",
                 options=[],
-                value=None,
-                disabled=True,
+                value=list(osm_tags_mapping.keys()),
+                # disabled=True,
                 style={"display": "none"},
             ),
             html.Div(id="upload-data-store", style={"display": "none"}),
@@ -53,13 +108,6 @@ def new_page_layout():
         style={"height": "100vh", "width": "100%"},
     )
 
-def not_found_page():
-    # Define the layout for the 404 Not Found page
-    # TODO: Add a link to the home page and also refine this page
-    return html.Div([
-        html.H1("404 Not Found"),
-        html.P("The page you are looking for does not exist.")
-    ])
 
 # Main Map
 main_map = html.Div(
@@ -139,7 +187,6 @@ side_bar = dbc.Col(
             size="lg",
         ),
         html.Div(id="stage-content"),
-        dbc.Progress(id="progress-bar", label="0/5", value=0),
     ],
     id="offcanvas",
     style={
@@ -155,36 +202,6 @@ side_bar = dbc.Col(
     },
     className="responsive-sidebar",
 )
-
-# Sidebar when the input is confirmed, leads to th computation of the route
-def confirm_side_bar():
-    return dbc.Col(
-        [
-            dbc.Label(
-                [
-                    html.H3(
-                        "Your input has been confirmed. The route('s) are being computed."
-                    ),
-                    html.H4("Choose a Route on the map."),
-                ],
-                id="welcome-label",
-            ),
-            html.Div(id="stage-content"),
-        ],
-        id="offcanvas",
-        style={
-            "width": "500px",
-            "background-color": "#DBE2EF",
-            "border": "2px solid #dee2e6",
-            "position": "fixed",
-            "top": "10vh",
-            "right": 0,
-            "bottom": 0,
-            "padding": "2rem 1rem",
-            "overflow-y": "auto",
-        },
-        className="responsive-sidebar",
-    )
 
 # Search Bar
 search_bar = dbc.Row(
@@ -229,6 +246,8 @@ navbar = dbc.Navbar(
                     ],
                     align="center",
                 ),
+                href="/",
+                className="navbar-link",
             ),
             dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
             dbc.Collapse(
@@ -240,6 +259,9 @@ navbar = dbc.Navbar(
             html.Div(
                 id="search-results",
                 style={"color": "white"},
+            ),
+            dcc.Interval(
+                id="redirect-interval", interval=3000, n_intervals=0, disabled=True
             ),
         ],
     ),
@@ -270,6 +292,12 @@ def stage1(job_id):
                     size="lg",
                     disabled=True,
                 ),
+                dbc.Progress(
+                    id="progress-bar",
+                    label="1/3",
+                    value=33,
+                    style={"margin-top": "1rem"},
+                ),
                 html.Div(id="upload-data-dcc", style={"display": "none"}),
             ],
         ),
@@ -290,11 +318,6 @@ def stage2(job_id):
                     ),
                     multiple=False,
                 ),
-                html.Div(id="output-data-upload"),
-                html.Div(id="output-osm-query"),
-                html.Div(id="plot-generation-status"),
-                html.Div(id="output-minIO-status"),
-                html.Div(id="file-path", style={"display": "none"}),
                 dbc.Button(
                     "Previous Step",
                     id="prev-button",
@@ -309,6 +332,17 @@ def stage2(job_id):
                     size="lg",
                     disabled=True,
                 ),
+                dbc.Progress(
+                    id="progress-bar",
+                    label="2/3",
+                    value=67,
+                    style={"margin-top": "1rem"},
+                ),
+                html.Div(id="output-data-upload"),
+                html.Div(id="output-osm-query"),
+                html.Div(id="plot-generation-status"),
+                html.Div(id="output-minIO-status"),
+                html.Div(id="file-path", style={"display": "none"}),
                 dbc.Input(id="email-input", type="email", style={"display": "none"}),
             ],
         ),
@@ -341,9 +375,14 @@ def stage3(job_id):
                     className="me-auto",
                     size="lg",
                 ),
+                dbc.Progress(
+                    id="progress-bar",
+                    label="3/3",
+                    value=100,
+                    style={"margin-top": "1rem"},
+                ),
                 dbc.Input(id="email-input", type="email", style={"display": "none"}),
                 html.Div(id="upload-data-dcc", style={"display": "none"}),
             ],
         ),
     )
-
