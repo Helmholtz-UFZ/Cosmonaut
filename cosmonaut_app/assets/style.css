@@ -441,3 +441,7 @@
       width: 200px !important;
     }
   }
+
+  .navbar-link {
+    text-decoration: none;
+}
