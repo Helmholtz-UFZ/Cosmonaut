@@ -24,7 +24,7 @@ def main_page_layout():
             side_bar,
             html.Div(id="hidden-div", style={"display": "none"}),
             dcc.Store(id="current-stage", data=0),
-            dcc.Store(id="job-status-store", data=None),
+            dcc.Store(id="job-id", data=None),
             dcc.Store(id="job-loaded-flag", data=None),
             dcc.Store(id="email-store"),
             dcc.Dropdown(
@@ -52,22 +52,20 @@ def job_page_layout(job_id):
                     html.H3(
                         "Your input has been confirmed. The route(s) are being computed."
                     ),
-                    # add a dbc.button to start the calculation for the route based on the input
+                    html.H4(
+                        "Choose a Route on the map.", style={"color": "grey"}
+                    ),  # TODO sollte erst nach kalkulation der Routen erscheinen
                     dbc.Button(
-                        "Start Route Calculation",
-                        id="route-calculation",
+                        "Start Route",
+                        id="start-route",
                         className="me-auto",
                         size="lg",
-                        disabled=False,
+                        disabled=True,
                     ),
-                    # html.H4("Choose a Route on the map."), # TODO sollte erst nach kalkulation der Routen erscheinen
                 ],
                 id="welcome-label",
             ),
             html.Div(id="stage-content"),
-            # dbc.Progress(
-            #     id="progress-bar", label="0/5", value=0, style={"display": "none"}
-            # ),
         ],
         id="offcanvas",
         style={
@@ -91,7 +89,7 @@ def job_page_layout(job_id):
             confirm_side_bar,
             html.Div(id="hidden-div", style={"display": "none"}),
             dcc.Store(id="current-stage", data=0),
-            dcc.Store(id="job-status-store", data=None),
+            dcc.Store(id="job-id", data=None),
             dcc.Store(id="job-loaded-flag", data=None),
             dcc.Store(id="email-store"),
             dcc.Dropdown(
