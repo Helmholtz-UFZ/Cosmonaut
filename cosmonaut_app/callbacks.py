@@ -107,6 +107,7 @@ def update_map_center(file_path):
     if file_path is None:
         raise PreventUpdate
 
+    # TODO: EPSG needs to be respected later on
     data = transform_csv(file_path, 31468, 4326)
     bounds = _get_bounds(data)
 
@@ -204,7 +205,7 @@ def upload_to_minIO(osm_file_path, job_id):
                         file_path, f"{job_id}/{os.path.relpath(file_path, work_dir)}"
                     )
                 else:
-                    logging.warning(f"Skipping file {file_path}: Unsupported file type")
+                    logging.warning(f"Skipping file {file_path}: Unsupported file type.")
 
         return dbc.Alert(
             "Allowed files and directories uploaded to MinIO",
@@ -212,7 +213,6 @@ def upload_to_minIO(osm_file_path, job_id):
             duration=5000,
         )
     except Exception as e:
-        logging.error(f"Error in upload_to_minIO: {e}")
         error_message = f"Uploading to MinIO failed: {str(e)}"
         logging.error(error_message)
         return dbc.Alert("Uploading to MinIO failed", color="danger", duration=5000)
@@ -253,7 +253,7 @@ def update_map_with_geojson(selected_roads, job_id, current_children):
     if selected_roads is None:
         return current_children
 
-    logging.error(f"geojson tags: {selected_roads}"),
+    # logging.info(f"geojson tags: {selected_roads}"),
 
     osm_values = [osm_tags_mapping[value] for value in selected_roads]
     osm_values = [item for sublist in osm_values for item in sublist]
@@ -711,7 +711,7 @@ def update_database_on_next(n_clicks, email, job_id):
     try:
         DataBaseManager.update_column(job_id, {"email": email})
     except JobNotFound:
-        print(f"Job with ID {job_id} not found.")
+        logging.error(f"Job with ID {job_id} not found.")
 
     return ""
 
@@ -783,7 +783,7 @@ def update_tags_dropdown(tags, job_id):
     if tags is None:
         raise PreventUpdate
 
-    logging.error(f"sql tags: {tags}")
+    # logging.info(f"sql tags: {tags}")
 
     try:
         DataBaseManager.update_column(job_id, {"selected_road_tags": tags})

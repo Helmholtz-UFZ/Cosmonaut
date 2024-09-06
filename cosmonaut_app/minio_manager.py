@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 load_dotenv(".env_test_priv")
 
 from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+import logging
 
 
 class MiniIOManager:
@@ -44,16 +45,16 @@ class MiniIOManager:
         _, file_extension = os.path.splitext(file_path)
         allowed_extensions = [".tif", ".geojson", ".json", ".csv"]
         if file_extension not in allowed_extensions:
-            print(
+            logging.error(
                 f"Failed to upload file {file_path}: Only {', '.join(allowed_extensions)} files are allowed."
             )
             return
 
         try:
             self.minio_client.fput_object(self.bucket_name, object_key, file_path)
-            print(f"File {file_path} uploaded successfully as {object_key}")
+            logging.info(f"File {file_path} uploaded successfully as {object_key}")
         except Exception as e:
-            print(f"Failed to upload file {file_path}: {str(e)}")
+            logging.error(f"Failed to upload file {file_path}: {str(e)}")
 
     def download_file(self, object_key, file_path):
         """
@@ -65,9 +66,9 @@ class MiniIOManager:
         """
         try:
             self.minio_client.fget_object(self.bucket_name, object_key, file_path)
-            print(f"File {object_key} downloaded successfully as {file_path}")
+            logging.info(f"File {object_key} downloaded successfully as {file_path}")
         except Exception as e:
-            print(f"Failed to download file {object_key}: {str(e)}")
+            logging.error(f"Failed to download file {object_key}: {str(e)}")
 
     def delete_file(self, object_key):
         """
@@ -78,9 +79,9 @@ class MiniIOManager:
         """
         try:
             self.minio_client.remove_object(self.bucket_name, object_key)
-            print(f"File {object_key} deleted successfully")
+            logging.info(f"File {object_key} deleted successfully")
         except Exception as e:
-            print(f"Failed to delete file {object_key}: {str(e)}")
+            logging.error(f"Failed to delete file {object_key}: {str(e)}")
 
     # return filenames asked for in the bucket
     def get_files(self):
@@ -91,7 +92,9 @@ class MiniIOManager:
             objects = self.minio_client.list_objects(self.bucket_name)
             return [obj.object_name for obj in objects]
         except Exception as e:
-            print(f"Failed to list files in bucket {self.bucket_name}: {str(e)}")
+            logging.warning(
+                f"Failed to list files in bucket {self.bucket_name}: {str(e)}"
+            )
 
     def upload_placeholder(self, object_key):
         """
@@ -106,9 +109,9 @@ class MiniIOManager:
             self.minio_client.put_object(
                 self.bucket_name, object_key, data=empty_file, length=0
             )
-            print(f"Placeholder for {object_key} created successfully")
+            logging.info(f"Placeholder for {object_key} created successfully")
         except Exception as e:
-            print(f"Failed to create placeholder for {object_key}: {str(e)}")
+            logging.error(f"Failed to create placeholder for {object_key}: {str(e)}")
 
     @staticmethod
     def download_directory(minio_path, local_path):
@@ -150,10 +153,10 @@ class MiniIOManager:
                 minio_client.fget_object(
                     "cosmic-routing", obj.object_name, local_file_path
                 )
-                print(f"Downloaded {obj.object_name} to {local_file_path}")
+                logging.info(f"Downloaded {obj.object_name} to {local_file_path}")
 
         except Exception as e:
-            print(f"Failed to download directory {minio_path}: {str(e)}")
+            logging.error(f"Failed to download directory {minio_path}: {str(e)}")
 
 
 if __name__ == "__main__":
@@ -165,4 +168,4 @@ if __name__ == "__main__":
         manager.download_file("no_csv.txt", "test_data/no_csv_downloaded.txt")
         manager.delete_file("no_csv.txt")
     except Exception as e:
-        print(f"Bucket {bucket_name} does not exist: {str(e)}")
+        logging.error(f"Bucket {bucket_name} does not exist: {str(e)}")
