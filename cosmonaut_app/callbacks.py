@@ -173,7 +173,7 @@ def run_osm_query(file_path):
 @app.callback(
     Output("output-minIO-status", "children"),
     Input("osm-file-path", "children"),
-    State("job-status-store", "data"),
+    State("job-id", "data"),
 )
 def upload_to_minIO(osm_file_path, job_id):
     ALLOWED_EXTENSIONS = {".tif", ".geojson", ".json", ".csv"}
@@ -205,7 +205,9 @@ def upload_to_minIO(osm_file_path, job_id):
                         file_path, f"{job_id}/{os.path.relpath(file_path, work_dir)}"
                     )
                 else:
-                    logging.warning(f"Skipping file {file_path}: Unsupported file type.")
+                    logging.warning(
+                        f"Skipping file {file_path}: Unsupported file type."
+                    )
 
         return dbc.Alert(
             "Allowed files and directories uploaded to MinIO",
@@ -234,8 +236,9 @@ function(feature, context){
 
 @app.callback(
     Output("map", "children"),
-    [Input("tags-dropdown", "value"), Input("job-status-store", "data")],
-    [State("map", "children")],
+    Input("tags-dropdown", "value"),
+    Input("job-id", "data"),
+    State("map", "children"),
     prevent_initial_call=True,
 )
 def update_map_with_geojson(selected_roads, job_id, current_children):
@@ -264,10 +267,21 @@ def update_map_with_geojson(selected_roads, job_id, current_children):
         if not (isinstance(child, dict) and child.get("type") == "GeoJSON")
     ]
 
-    # TODO: FUTURE, load the data from the OSM file which was saved in the previous step
     geojson_path = os.path.join(
         f"cosmonaut_app/work_dir/{job_id}/osm-data/*_4326.geojson"
     )
+
+    logging.info(f"Geojson Path: {geojson_path}"),
+
+    timeout = 30  # seconds
+    start_time = time.time()
+    while not glob.glob(geojson_path):
+        if time.time() - start_time > timeout:
+            raise TimeoutError(
+                "Timed out waiting for the geojson file to be available."
+            )
+        time.sleep(1)
+
     geojson_file = glob.glob(geojson_path)[0]
     with open(geojson_file) as f:
         data = json.load(f)
@@ -332,7 +346,7 @@ def toggle_select(_, clickData, hideout):
     Input("output-data-upload", "children"),
     State("file-path", "children"),
     State(
-        "job-status-store", "data"
+        "job-id", "data"
     ),  # Assuming the job ID is stored in a component with ID 'job-id'
 )
 def generate_classification_plot(upload_status, file_path, job_id):
@@ -474,7 +488,93 @@ def update_clicked_roads(clickData, clicked_roads):
     return clicked_roads
 
 
-# Update the GeoJSON's data when the button is clicked
+# This is nice and all but needs to be speed up a lot!
+# currently is also not removing correctly. for clear dead roads nice. otherwise meh
+# Also all function which are not callback should move to another file
+
+
+def is_critical_road(road):
+    """
+    Check if a road is critical (e.g., a bridge or highway).
+
+    Parameters:
+    road (dict): The road feature from the GeoJSON data.
+
+    Returns:
+    bool: True if the road is critical, False otherwise.
+    """
+    highway_type = road["properties"].get("highway", "")
+    is_bridge = road["properties"].get("bridge", False)
+
+    # Define criteria for critical roads (you can expand this)
+    critical_highways = []  # ["motorway", "trunk", "primary", "secondary", "tertiary"]
+
+    return is_bridge or highway_type in critical_highways
+
+
+def find_connected_roads(nodes, all_roads, exclude_road_id):
+    """
+    Find roads connected to a set of nodes, excluding a specific road.
+
+    Parameters:
+    nodes (list): List of node ids.
+    all_roads (list): List of all roads (features) in the dataset.
+    exclude_road_id (str): ID of the road to exclude from the search.
+
+    Returns:
+    list: List of connected road ids.
+    """
+    connected_roads = []
+    for road in all_roads:
+        if road["id"] == exclude_road_id:
+            continue  # Skip the excluded road
+        road_nodes = road["properties"]["nodes"]
+        if any(node in road_nodes for node in nodes):
+            connected_roads.append(road["id"])
+    return connected_roads
+
+
+def remove_dead_roads(road_id, all_roads):
+    """
+    Recursively remove dead roads connected to the deleted road.
+
+    Parameters:
+    road_id (str): The id of the road being removed.
+    all_roads (list): List of all road features.
+
+    Returns:
+    list: Updated list of roads with dead roads removed.
+    """
+    road_to_remove = next((road for road in all_roads if road["id"] == road_id), None)
+    if road_to_remove is None or is_critical_road(road_to_remove):
+        # Do not remove critical roads
+        return all_roads
+
+    road_nodes = road_to_remove["properties"]["nodes"]
+    all_roads = [road for road in all_roads if road["id"] != road_id]
+
+    connected_roads = find_connected_roads(road_nodes, all_roads, road_id)
+
+    for connected_road in connected_roads:
+        # Recursively remove connected dead roads, if they're not critical
+        connected_road_obj = next(
+            (road for road in all_roads if road["id"] == connected_road), None
+        )
+
+        if connected_road_obj and not is_critical_road(connected_road_obj):
+            # If connected road is only connected to the removed road, remove it
+            connected_nodes = connected_road_obj["properties"]["nodes"]
+            further_connections = find_connected_roads(
+                connected_nodes, all_roads, connected_road
+            )
+
+            # Remove the connected road if it only connects to the deleted one
+            if len(further_connections) <= 1:
+                all_roads = remove_dead_roads(connected_road, all_roads)
+
+    return all_roads
+
+
 @app.callback(
     Output("geojson", "data"),
     [Input("remove-button", "n_clicks")],
@@ -484,15 +584,18 @@ def update_clicked_roads(clickData, clicked_roads):
 def remove_selected(n, clicked_roads, original_data):
     if n is None or clicked_roads is None or original_data is None:
         raise PreventUpdate
-    # Filter out the clicked roads
+
+    all_roads = original_data["features"]
+
+    # Start by removing the clicked roads
+    for road_id in clicked_roads:
+        all_roads = remove_dead_roads(road_id, all_roads)
+
     filtered_data = {
         "type": "FeatureCollection",
-        "features": [
-            feature
-            for feature in original_data["features"]
-            if feature["id"] not in clicked_roads
-        ],
+        "features": all_roads,
     }
+
     return filtered_data
 
 
@@ -501,7 +604,7 @@ def remove_selected(n, clicked_roads, original_data):
 # the job_id is saved in the postgres database, the corresponding job_id is referencing also to the saved files in the minio bucket
 @app.callback(
     Output("search-results", "children"),
-    Output("job-status-store", "data", allow_duplicate=True),
+    Output("job-id", "data", allow_duplicate=True),
     Output("url", "pathname", allow_duplicate=True),
     Output("redirect-interval", "disabled"),
     [Input("search-button", "n_clicks")],
@@ -552,7 +655,7 @@ def redirect_to_home(n_intervals):
 
 # start job when start-job button is clicked
 @app.callback(
-    Output("job-status-store", "data", allow_duplicate=True),
+    Output("job-id", "data", allow_duplicate=True),
     Input("start-job", "n_clicks"),
     State("start-job", "n_clicks"),
     prevent_initial_call=True,
@@ -580,7 +683,7 @@ def start_job(n_clicks, _):
 
 @app.callback(
     Output("stage-content", "children"),
-    Input("job-status-store", "data"),
+    Input("job-id", "data"),
     Input("current-stage", "data"),
     State("job-loaded-flag", "data"),
     prevent_initial_call=True,
@@ -701,7 +804,7 @@ def store_email(email):
     Output("dummy-output", "children"),
     Input("next-button", "n_clicks"),
     State("email-store", "data"),
-    State("job-status-store", "data"),
+    State("job-id", "data"),
     prevent_initial_call=True,
 )
 def update_database_on_next(n_clicks, email, job_id):
@@ -731,7 +834,7 @@ def toggle_navbar_collapse(n, is_open):
 @app.callback(
     Output("page-content", "children"),
     [Input("url", "pathname")],
-    [State("job-status-store", "data")],
+    [State("job-id", "data")],
     prevent_initial_call=True,
 )
 def display_page(pathname, job_id):
@@ -750,7 +853,7 @@ def display_page(pathname, job_id):
 @app.callback(
     Output("url", "pathname", allow_duplicate=True),
     [Input("confirm-button", "n_clicks")],
-    [State("job-status-store", "data")],
+    [State("job-id", "data")],
     prevent_initial_call=True,
 )
 def navigate_to_job_page(n_clicks, job_id):
@@ -775,11 +878,10 @@ def navigate_to_home(n_clicks):
 @app.callback(
     Output("none", "children"),
     Input("tags-dropdown", "value"),
-    State("job-status-store", "data"),
+    State("job-id", "data"),
     prevent_initial_call=True,
 )
 def update_tags_dropdown(tags, job_id):
-    logging.error(f"sql before preventupdate: {tags}")
     if tags is None:
         raise PreventUpdate
 
