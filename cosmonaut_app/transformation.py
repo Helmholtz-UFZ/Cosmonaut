@@ -140,6 +140,7 @@ class OsmRoads:
             "source:maxspeed",
             "lanes:backward",
             "traffic_calming",
+            "oneway",
         ]
         columns_to_keep = [col for col in columns_to_keep if col in osm_data.columns]
         osm_data = osm_data[columns_to_keep]
