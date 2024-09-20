@@ -50,7 +50,9 @@ class ClassificationPlot:
         self.crs = None
         self.transform = None
         self.saved_files = []
-        self.base_dir = os.path.join(os.getcwd(), "cosmonaut_app/work_dir", str(job_id), "plots")
+        self.base_dir = os.path.join(
+            os.getcwd(), "cosmonaut_app/work_dir", str(job_id), "plots"
+        )
 
     def _process_data(self):
         """Read the data from the CSV file and preprocess it."""

@@ -1,5 +1,6 @@
 import networkx as nx
 
+
 def build_graph(all_roads):
     """
     Build a graph from the roads using nodes as connections.
@@ -17,6 +18,7 @@ def build_graph(all_roads):
             G.add_edge(nodes[i], nodes[i + 1], road_id=road["id"])
     return G
 
+
 def get_largest_subnetwork(G):
     """
     Find the largest connected subnetwork in the graph.
@@ -29,6 +31,7 @@ def get_largest_subnetwork(G):
     """
     largest_subnetwork = max(nx.connected_components(G), key=len)
     return largest_subnetwork
+
 
 def remove_disconnected_roads(G, largest_subnetwork, all_roads):
     """
@@ -49,6 +52,7 @@ def remove_disconnected_roads(G, largest_subnetwork, all_roads):
             remaining_roads.append(road)
     return remaining_roads
 
+
 def is_critical_road(road):
     """
     Check if a road is critical (e.g., a bridge or highway).
@@ -64,6 +68,7 @@ def is_critical_road(road):
     critical_highways = []  # ["motorway", "trunk", "primary", "secondary", "tertiary"]
 
     return is_bridge or highway_type in critical_highways
+
 
 def find_connected_roads(nodes, all_roads, exclude_road_id):
     """
@@ -85,6 +90,7 @@ def find_connected_roads(nodes, all_roads, exclude_road_id):
         if any(node in road_nodes for node in nodes):
             connected_roads.append(road["id"])
     return connected_roads
+
 
 def is_road_connected(road_id, all_roads, graph):
     """

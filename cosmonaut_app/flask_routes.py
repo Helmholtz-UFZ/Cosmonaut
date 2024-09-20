@@ -26,6 +26,7 @@ def serve_layout():
             dcc.Location(id="url", refresh=False),
             html.Div(id="page-content"),
             dcc.Store(id="job-id", data=None),
+            dcc.Store(id="job-page-loaded", data=False),
         ]
     )
 
