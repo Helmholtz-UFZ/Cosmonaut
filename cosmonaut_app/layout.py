@@ -60,7 +60,19 @@ def job_page_layout(job_id):
                         id="start-route",
                         className="me-auto",
                         size="lg",
-                        disabled=True,
+                    ),
+                    dcc.Loading(
+                        id="loading-qr-code",
+                        type="default",
+                        children=html.Img(
+                            id="qr-code",
+                            src="",
+                            style={
+                                "width": "100%",
+                                "padding-top": "1rem",
+                                "padding-bottom": "1rem",
+                            },
+                        ),
                     ),
                 ],
                 id="welcome-label",

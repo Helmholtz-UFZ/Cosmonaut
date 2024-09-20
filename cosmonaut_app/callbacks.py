@@ -45,7 +45,8 @@ from cosmonaut_app.road_network_utils import (
 )
 
 logging.basicConfig(
-    format="%(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
     level=logging.INFO,
 )
 
@@ -194,11 +195,9 @@ def upload_to_minIO(osm_file_path, job_id):
         for root, dirs, files in os.walk(work_dir):
             relative_path = os.path.relpath(root, work_dir)
 
-            # Skip the job ID root directory itself to avoid creating an unnecessary directory
             if relative_path == ".":
                 continue
 
-            # Handle empty directories by creating a placeholder
             if not dirs and not files:
                 minio_manager.upload_placeholder(f"{job_id}/{relative_path}/")
                 continue
@@ -406,12 +405,15 @@ def generate_classification_plot(upload_status, file_path, job_id):
 
 @app.callback(
     Output("route-layer", "children"),
-    [Input("btn-route", "n_clicks")],
+    Input("job-page-loaded", "data"),
     [State("route-layer", "children")],
+    prevent_initial_call=True,
 )
-def routing_callback(n_clicks, current_layer):
-    if n_clicks is None:
+def routing_callback(job_page_loaded, current_layer):
+    if not job_page_loaded:
         return current_layer
+
+    time.sleep(1)
 
     # Define the routes for the example test
     # TODO: FUTURE, get the routes from CAN's Navigation Algorithm
@@ -441,8 +443,9 @@ def routing_callback(n_clicks, current_layer):
 
 @app.callback(
     Output("qr-code", "src"),
-    Input("btn-route", "n_clicks"),
+    Input("start-route", "n_clicks"),
     [State("route-layer", "children")],
+    prevent_initial_call=True,
 )
 def update_qr_code(n_clicks, current_layer):
     if n_clicks is None:
@@ -494,7 +497,6 @@ def update_clicked_roads(clickData, clicked_roads):
     return clicked_roads
 
 
-
 @app.callback(
     Output("geojson", "data"),
     [Input("remove-button", "n_clicks")],
@@ -525,7 +527,6 @@ def remove_selected(n, clicked_roads, original_data):
     }
 
     return filtered_data
-
 
 
 # TODO: This needs to be implemented
@@ -761,27 +762,28 @@ def toggle_navbar_collapse(n, is_open):
 
 
 @app.callback(
-    Output("page-content", "children"),
+    [Output("page-content", "children"), Output("job-page-loaded", "data")],
     [Input("url", "pathname")],
     [State("job-id", "data")],
     prevent_initial_call=True,
 )
-def display_page(pathname, job_id):
+def display_page_and_update_url(pathname, job_id):
     if pathname.startswith("/job/"):
         job_id_from_path = pathname.split("/job/")[1]
         if DataBaseManager.check_existence(job_id_from_path):
-            return job_page_layout(job_id_from_path)
+            return job_page_layout(job_id_from_path), True
         else:
-            return not_found_page()
+            return not_found_page(), False
     elif pathname == "/":
-        return main_page_layout()
+        return main_page_layout(), False
     else:
-        return not_found_page()
+        return not_found_page(), False
+
 
 @app.callback(
-    Output('url', 'href'),
-    [Input('page-content', 'children')],
-    [State('url', 'pathname')]
+    Output("url", "href"),
+    [Input("page-content", "children")],
+    [State("url", "pathname")],
 )
 def update_url(content, pathname):
     if pathname.startswith("/job/"):
@@ -789,6 +791,7 @@ def update_url(content, pathname):
         if DataBaseManager.check_existence(job_id_from_path):
             return f"/job/{job_id_from_path}"
     return pathname
+
 
 @app.callback(
     Output("url", "pathname", allow_duplicate=True),
@@ -803,7 +806,7 @@ def navigate_to_job_page(n_clicks, job_id):
         # for now, just create a random route
         # Input: the OSM data with the tags defined by the user
         # Output: the route as a GeoJSON file
-        # 
+        #
         return f"/job/{job_id}"
     return no_update
 
