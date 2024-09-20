@@ -43,6 +43,7 @@ dash-extensions = "^1.0.15"
 sqlalchemy = "^2.0.30"
 psycopg2 = "^2.9.9"
 gunicorn = "^22.0.0"
+networkx = "^3.3"
 
 [tool.poetry.group.dev.dependencies]
 blinker = "1.6.2"
