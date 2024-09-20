@@ -10,7 +10,7 @@ from cosmonaut_app.config import (
 )
 
 from cosmonaut_app.db_manager import DataBaseManager
-from minio_manager import MiniIOManager
+from cosmonaut_app.minio_manager import MiniIOManager
 
 
 def get_attributes(clazz):
