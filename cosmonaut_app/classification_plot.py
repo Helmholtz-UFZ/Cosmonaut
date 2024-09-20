@@ -34,7 +34,7 @@ class ClassificationPlot:
     A class for generating classification plots from a CSV file as pre-step for TileServer rendering.
     """
 
-    def __init__(self, csv_path):
+    def __init__(self, csv_path, job_id):
         """Initialize the ClassificationPlot with the path to a CSV file."""
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"File not found: {csv_path}")
@@ -50,6 +50,9 @@ class ClassificationPlot:
         self.crs = None
         self.transform = None
         self.saved_files = []
+        self.base_dir = os.path.join(
+            os.getcwd(), "cosmonaut_app/work_dir", str(job_id), "plots"
+        )
 
     def _process_data(self):
         """Read the data from the CSV file and preprocess it."""
@@ -111,10 +114,11 @@ class ClassificationPlot:
         self.crs = "EPSG:31468"
 
     def _save_plots(self, cmaps):
-        """Create and save a plot for each colormap."""
         timestamp = datetime.datetime.now().strftime("%Y%m%d")
         base_name = os.path.splitext(os.path.basename(self.csv_path))[0]
         base_name = base_name.replace("31468", "4326")
+        # Ensure the plots directory exists
+        os.makedirs(self.base_dir, exist_ok=True)
         for i, cmap in enumerate(cmaps):
             self.image = np.moveaxis(self.image, 0, -1)
             mask = self.grid_max_class == i
@@ -128,8 +132,8 @@ class ClassificationPlot:
             dtype = self.image.dtype
             height = self.image.shape[1]
             width = self.image.shape[2]
-            filename = f"{timestamp}_{base_name}_class-{i+1}"
-            output = f"{filename}.tif"
+            filename = f"{timestamp}_{base_name}_class-{i+1}.tif"
+            output = os.path.join(self.base_dir, filename)
             with temporary_file(".tif") as temp_filename:
                 with rasterio.open(
                     temp_filename,

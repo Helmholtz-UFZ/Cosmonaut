@@ -6,6 +6,7 @@ import qrcode
 import io
 import base64
 import os
+from cosmonaut_app.minio_manager import MiniIOManager
 
 
 class RouteCreator:
@@ -128,6 +129,8 @@ class RouteCreator:
                 return response.json()["link"]
             else:
                 raise Exception("Failed to upload GPX file")
+
+    # TODO: Also provide the Link, not just the QR-Code
 
     def create_qr_code(self, url):
         """

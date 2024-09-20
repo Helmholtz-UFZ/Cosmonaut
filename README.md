@@ -2,11 +2,7 @@
 # COSmic ray based soil MOisture prediction NAvigation and UTility Tool
 
 This project is a web application built with Dash and Dash Leaflet for transforming and visualizing CSV data for the COSMOPOLITAN Project at UFZ. 
-It allows users to upload a CSV file, transforms the data, queries OpenStreetMap for a planed navigation feature, and visualizes the csv-data on a map (NOTE: Visualization doesn't work for bigger files)
-
-## NOTE (to me and John [and all others])
-
-The image overlay is not the best solution. We need to think about using a WNSTileServer (eg. Terracotta)
+It allows users to upload a CSV file, transforms the data, queries OpenStreetMap for a planed navigation feature, and visualizes the csv-data on a map (NOTE: Visualization doesn`t work for bigger files)
 
 ## Features
 
@@ -14,51 +10,49 @@ The image overlay is not the best solution. We need to think about using a WNSTi
 - Data transformation: The application transforms the uploaded data from EPSG:31468 to EPSG:4326.
 - OSM query: The application queries OpenStreetMap for roads within the convex hull of the uploaded data.
 - Data visualization: The application visualizes the uploaded data and the queried OSM data on a map.
+- It makes individual Jobs which are saved into a PostgreSQL DB.
+- (Future) Is triggering a route calculation based on User Input of the best roads.
 
 ## Installation
 
 1. Clone this repository.
-2. Install the required Python packages with Poetry: `poetry install`
-3. Spawn a new Poetry shell: `poetry shell`
-3. Run the application: `python app.py`
+2. Start the Service with `./dev_up.sh mock` or `./dev_up.sh prod`
 
-## Usage
+# DEV:
 
-1. Open the application in a web browser.
-2. Drag and drop a CSV file into the upload area or click the upload area to select a file.
-3. The application will automatically transform the data, query OSM, and visualize the data on the map.
+## TODO`s
 
-## Dependencies
+- guter commit bevor ich nach valencia gehe. mit note was ich geschafft habe und was ich machen will
 
-- Dash: A Python framework for building analytical web applications.
-- Dash Leaflet: An open-source JavaScript library for mobile-friendly interactive maps.
-- GeoPandas: A Python library for working with geospatial data.
-- PyProj: A Python interface to PROJ (cartographic projections and coordinate transformations library).
+### Implement Testing
 
+- unity test
+- integration test
 
-## TODO's
+- beides machen
+- höchstes der Gefühle wäre n Bot der die Webiste komplett testet, inklusive file upload etc
 
-# Geoserver
+### CAN
 
-aws bucket mit miniIoServer connecten
-GeoServer connecten
-mockups machen <- für tests gut (Dockerimage)
-laufen auf ufz infrastruktur
-und dann mit dockers
-dockercontainer von dennen
+- small discreption for list of road types - not super important
+- feedback implementation for the agents (ticketsystem?) - not super important
 
-2 funktionen safe und delete für minioapi file class
-.env file
-developer env und set up für server zu machen
+### Other:
 
+- Germany OSM Download ?
+- aws bucket mit miniIoServer connecten
+- GeoServer für WMS optimisieren
+- mockups machen <- für tests gut (Dockerimage)
+- laufen auf ufz infrastruktur
+- erwartungshaltung fürs styling der SLD klarmachen (?)
 
+## Useful Commands
 
-# CAN
+`./dev_up.sh mock`
 
-small discreption for list of road types - not super important
-feedback implementation for the agents (ticketsystem?) - not super important
-unify the .json - important
+`rm -rf cosmonaut_app/work_dir/*`
 
-# QR CODE für Gmaps navigation
+`psql -U cosmonaut -p 5432 -h localhost -d cosmonaut_db`
 
-# Germany OSM Download
+- with gunicorn
+`gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.wsgi:app`, add `--log-level debug` for detailed debuging.

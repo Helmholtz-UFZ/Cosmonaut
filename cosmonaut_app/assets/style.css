@@ -9,6 +9,11 @@
     to { opacity: 0; }
 }
 
+/* assets/style.css */
+.leaflet-tooltip {
+  font-size: 16px; /* Adjust as needed */
+}
+
 /* Table of contents
 ––––––––––––––––––––––––––––––––––––––––––––––––––
 - Plotly.js
@@ -424,3 +429,19 @@
   
   /* Larger than Desktop HD */
   @media (min-width: 1200px) {}
+
+  @media (max-width: 768px) {
+    .responsive-sidebar {
+      width: 300px !important;
+    }
+  }
+  
+  @media (max-width: 576px) {
+    .responsive-sidebar {
+      width: 200px !important;
+    }
+  }
+
+  .navbar-link {
+    text-decoration: none;
+}

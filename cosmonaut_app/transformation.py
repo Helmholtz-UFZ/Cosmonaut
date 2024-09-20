@@ -140,6 +140,8 @@ class OsmRoads:
             "source:maxspeed",
             "lanes:backward",
             "traffic_calming",
+            "oneway",
+            "access",
         ]
         columns_to_keep = [col for col in columns_to_keep if col in osm_data.columns]
         osm_data = osm_data[columns_to_keep]
@@ -154,7 +156,6 @@ class OsmRoads:
             file_path, "w"
         ) as osm_file:  # TODO Is it necessary to write the file here?
             geojson.dump(self.roads, osm_file)
-            print(f"tags of roads 2: {self.roads['highway'].unique()}")
         return file_path
 
     def _osm_transform(self):

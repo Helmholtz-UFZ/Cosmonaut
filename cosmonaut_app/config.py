@@ -20,13 +20,24 @@ def getenv(name):
     return value
 
 
+# Number of days to keep a submitted job entries in the database
+DAYS_DELETE_SUBMITTED = 60
+# Number of days to keep an unsubmitted job entries in the database
+DAYS_DELETE_NOT_SUBMITTED = 2
+
 load_dotenv(".env_test_priv")
 
 WEB_WORK_DIR = getenv("WEB_WORK_DIR")
 PORT = getenv("FLASK_PORT")
 MINIO_ACCESS_KEY = getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = getenv("MINIO_SECRET_KEY")
-
+DB_NAME = getenv("DB_NAME")
+DB_HOST_NAME = getenv("DB_HOST_NAME")
+DB_PORT = getenv("DB_PORT")
+DB_USER = getenv("DB_USER")
+DB_PW = getenv("DB_PW")
+DOCKER_UID = getenv("DOCKER_UID")
+DOCKER_GID = getenv("DOCKER_GID")
 
 # Mapping of OSM tags to the corresponding road classes
 osm_tags_mapping = {

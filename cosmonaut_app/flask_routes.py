@@ -2,40 +2,33 @@ from flask import Flask, send_from_directory, redirect
 from werkzeug.utils import secure_filename
 import os
 import dash
-from dash import html
+from dash import html, dcc
 import dash_bootstrap_components as dbc
-
-# Create upload and download folders if they do not exist
-UPLOAD_FOLDER = "upload"
-DOWNLOAD_FOLDER = "download"
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-if not os.path.exists(DOWNLOAD_FOLDER):
-    os.makedirs(DOWNLOAD_FOLDER)
-
-
-def uploaded_files():
-    """List the files in the upload directory."""
-    files = []
-    for filename in os.listdir(UPLOAD_FOLDER):
-        path = os.path.join(UPLOAD_FOLDER, filename)
-        if os.path.isfile(path):
-            files.append(filename)
-    return files
-
-
-def file_link(filename):
-    """Create a Plotly Dash 'A' element that just shows the fils uploaded."""
-    return html.A(filename, href="#", id=filename)
-
+from cosmonaut_app.layout import side_bar, main_map, navbar
 
 server = Flask(__name__)
-app = dash.Dash(server=server, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(
+    server=server,
+    external_stylesheets=[
+        dbc.themes.BOOTSTRAP,
+        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css",
+        "'src': '/assets/resize.js'",
+    ],
+)
+
+# Suppress callback exceptions because several callbacks need components which are created later
+app.config.suppress_callback_exceptions = True
 
 
-@server.route("/download/<path:path>")
-def download(path):
-    """Serve a file from the upload directory."""
-    return send_from_directory(UPLOAD_FOLDER, path, as_attachment=True)
+def serve_layout():
+    return html.Div(
+        [
+            dcc.Location(id="url", refresh=False),
+            html.Div(id="page-content"),
+            dcc.Store(id="job-id", data=None),
+            dcc.Store(id="job-page-loaded", data=False),
+        ]
+    )
+
+
+app.layout = serve_layout

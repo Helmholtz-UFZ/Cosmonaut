@@ -9,3 +9,5 @@ cosmonaut_app/cache/*
 credentials.json
 .env_test_priv
 *.log
+*_priv
+priv*
