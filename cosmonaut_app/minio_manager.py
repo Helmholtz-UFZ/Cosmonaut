@@ -149,11 +149,17 @@ class MiniIOManager:
                 if not os.path.exists(local_file_dir):
                     os.makedirs(local_file_dir)
 
-                # Download the object
-                minio_client.fget_object(
-                    "cosmic-routing", obj.object_name, local_file_path
-                )
-                logging.info(f"Downloaded {obj.object_name} to {local_file_path}")
+                # Check if the file already exists locally
+                if not os.path.exists(local_file_path):
+                    # Download the object
+                    minio_client.fget_object(
+                        "cosmic-routing", obj.object_name, local_file_path
+                    )
+                    logging.info(f"Downloaded {obj.object_name} to {local_file_path}")
+                else:
+                    logging.info(
+                        f"Skipped {obj.object_name} as it already exists locally"
+                    )
 
         except Exception as e:
             logging.error(f"Failed to download directory {minio_path}: {str(e)}")

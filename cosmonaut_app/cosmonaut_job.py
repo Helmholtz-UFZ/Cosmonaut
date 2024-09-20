@@ -94,9 +94,6 @@ class CosmonautJob:
         # Download entire job directory from MinIO
         minio_job_dir = f"{self.job_id}/"
         MiniIOManager.download_directory(minio_job_dir, working_dir)
-        logging.info(
-            f"Downloaded job directory {minio_job_dir} from MinIO to {working_dir}"
-        )
 
     def _blank_job(self):
         """Create a new job."""
