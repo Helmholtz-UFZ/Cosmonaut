@@ -6,7 +6,7 @@ authors = ["Louis Ferdinand Trinkle <louis-ferdinand.trinkle@ufz.de>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "3.10.12"
+python = "3.12.0"
 blinker = "1.6.2"
 click = "8.1.7"
 flask = "2.3.3"
@@ -21,7 +21,6 @@ bootstrap-flask = "^2.3.2"
 pyproj = "^3.6.1"
 shapely = "^2.0.2"
 geojson = "^3.0.1"
-overpass = "^0.7"
 pandas = "^2.1.2"
 plotly = "^5.18.0"
 dash = "^2.14.1"

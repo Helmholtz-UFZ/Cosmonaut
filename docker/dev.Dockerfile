@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.10.12-slim
+FROM python:3.12.0-slim
 
 ENV MPLCONFIGDIR /python_docker/cosmonaut/.config/matplotlib
 
