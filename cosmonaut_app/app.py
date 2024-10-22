@@ -1,4 +1,5 @@
-import cosmonaut_app.callbacks  # This import is necessary to register the callbacks with the app
+# callbacks import is necessary to register the callbacks with the app
+import cosmonaut_app.callbacks  # noqa: F401
 from cosmonaut_app.config import PORT
 from cosmonaut_app.flask_routes import app, server
 

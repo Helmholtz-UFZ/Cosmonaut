@@ -27,12 +27,14 @@ def temporary_file(suffix):
 
 
 # TODO: Use the Download directory for the output files
-# TODO: Make the Coloring of the classes more flexible (dont let the user define the colormaps)
+# TODO: Make the Coloring of the classes more flexible
+#  (dont let the user define the colormaps)
 
 
 class ClassificationPlot:
     """
-    A class for generating classification plots from a CSV file as pre-step for TileServer rendering.
+    A class for generating classification plots from a CSV file
+    as pre-step for TileServer rendering.
     """
 
     def __init__(self, csv_path, job_id):
@@ -95,7 +97,7 @@ class ClassificationPlot:
         """Create an image from the 3D grid using the provided colormaps."""
         if not all(isinstance(cmap, matplotlib.colors.Colormap) for cmap in cmaps):
             raise ValueError(
-                "All elements of 'cmaps' must be instances of matplotlib.colors.Colormap."
+                "Not an instances of matplotlib.colors.Colormap."
             )
         self.image = np.zeros((len(self.x_unique), len(self.y_unique), 4))
         for i, cmap in enumerate(cmaps):
@@ -182,4 +184,4 @@ class ClassificationPlot:
 # from matplotlib import pyplot as plt
 
 # plot = ClassificationPlot('test_data/8-col-31468.csv')
-# plot.generate_plots([plt.cm.Blues, plt.cm.Oranges, plt.cm.Greens, plt.cm.Purples, plt.cm.Reds, plt.cm.Greys])
+# plot.generate_plots([plt.cm.Blues, plt.cm.Oranges])

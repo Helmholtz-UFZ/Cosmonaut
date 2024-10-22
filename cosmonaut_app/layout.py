@@ -1,6 +1,6 @@
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
-from dash import Input, Output, State, dcc, html
+from dash import dcc, html
 
 from cosmonaut_app.config import osm_tags_mapping
 
@@ -63,7 +63,7 @@ main_map = html.Div(
                     ),
                     dl.Overlay(
                         dl.WMSTileLayer(
-                            url="https://gdi-fs.ufz.de/geoserver/cosmic-routing/ows?service=WMS",
+                            url="https://gdi-fs.ufz.de/geoserver/cosmic-routing/ows?service=WMS",  # noqa: E501
                             layers="20240410_8-col-4326_class-5",
                             styles="raster",
                             format="image/jpeg",
@@ -109,7 +109,7 @@ side_bar = dbc.Col(
         dbc.Label(
             [
                 html.H3(
-                    "Welcome to the COSmic ray based soil MOisture prediction NAvigation Utility Tool."
+                    "Welcome to the COSmic ray based soil MOisture prediction NAvigation Utility Tool."  # noqa: E501
                 ),
                 html.H4("Press the Button to start initializing the job."),
             ],
@@ -330,7 +330,7 @@ def stage4(job_id):
                 [
                     html.H2(f"Job ID: {job_id}"),
                     html.H3(
-                        "Your input has been confirmed. The route(s) are being computed."
+                        "Your input has been confirmed. The route(s) are being computed."  # noqa: E501
                     ),
                     html.H4(
                         "Choose a Route on the map.", style={"color": "grey"}

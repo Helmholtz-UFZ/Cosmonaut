@@ -10,7 +10,7 @@ import time
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
 import matplotlib
-from dash import callback_context, dcc, html, no_update
+from dash import no_update
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from dash_extensions.javascript import assign
@@ -146,7 +146,6 @@ def run_osm_query(file_path):
         raise PreventUpdate
 
     logging.info(f"OSM triggered with file: {file_path}")
-    """Run an OSM query based on the uploaded data. Return the path to the saved OSM file."""
     osm_tags_mapping = {
         "highway": [
             "motorway",
@@ -370,7 +369,11 @@ def toggle_select(_, clickData, hideout):
     ),  # Assuming the job ID is stored in a component with ID 'job-id'
 )
 def generate_classification_plot(upload_status, file_path, job_id):
-    """Generate classification plots based on the uploaded data. Upload the plots to MinIO."""
+    """
+    Generate classification plots based on the uploaded data.
+
+    Upload the plots to MinIO.
+    """
     if upload_status is None:
         raise PreventUpdate
 
@@ -391,7 +394,8 @@ def generate_classification_plot(upload_status, file_path, job_id):
         )
         # TODO: FUTURE, plot the returned TileLayer on the map
 
-        # commented out for now, as for testing purposes the files dont need to be uploaded every time
+        # commented out for now,
+        # as for testing purposes the files dont need to be uploaded every time
 
         # bucket_name = "cosmic-routing"
         # manager = MiniIOManager(bucket_name)
@@ -544,9 +548,6 @@ def remove_selected(n, clicked_roads, original_data):
     return filtered_data
 
 
-# TODO: This needs to be implemented
-# add callback which searches for the job_id typed into the search bar (button id = search_button, search bar id = search)
-# the job_id is saved in the postgres database, the corresponding job_id is referencing also to the saved files in the minio bucket
 @app.callback(
     Output("search-results", "children"),
     Output("job-id", "data", allow_duplicate=True),

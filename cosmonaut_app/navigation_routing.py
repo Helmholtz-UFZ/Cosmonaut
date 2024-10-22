@@ -8,8 +8,6 @@ import gpxpy
 import qrcode
 import requests
 
-from cosmonaut_app.minio_manager import MiniIOManager
-
 
 class RouteCreator:
     """
@@ -71,7 +69,8 @@ class RouteCreator:
 
         Args:
             routes (list): A list of route objects.
-            filename (str, optional): The name of the GPX file to be created. Defaults to "route.gpx".
+            filename (str, optional): The name of the GPX file to be created.
+                Defaults to "route.gpx".
 
         """
         gpx = gpxpy.gpx.GPX()
@@ -103,7 +102,8 @@ class RouteCreator:
         Deletes the specified GPX file.
 
         Args:
-            filename (str, optional): The name of the GPX file to be deleted. Defaults to "route.gpx".
+            filename (str, optional): The name of the GPX file to be deleted.
+                Defaults to "route.gpx".
 
         """
         os.remove(filename)
@@ -113,7 +113,8 @@ class RouteCreator:
         Uploads the specified GPX file and returns the link.
 
         Args:
-            filename (str, optional): The name of the GPX file to be uploaded. Defaults to "route.gpx".
+            filename (str, optional): The name of the GPX file to be uploaded.
+                Defaults to "route.gpx".
 
         Returns:
             str: The link to the uploaded GPX file.
@@ -179,7 +180,7 @@ class RouteCreator:
 #     {"way": "('way', 89369683)", "start_node": 683872135, "end_node": 1036584699},
 # ]
 
-# route_creator = RouteCreator("/home/trinkle/git/UFZ-Flask/UFZ-Flask/cosmonaut_app/download/20240424-105506_osm_data_4326.geojson")
+# route_creator = RouteCreator("/path/to/osm_data_epsgcode.geojson")
 # line_layer = route_creator.create_routes_layer(routes)
 # google_maps_url = route_creator.create_gmaps_url(routes)
 # route_creator.create_gpx(routes)

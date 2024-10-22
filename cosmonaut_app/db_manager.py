@@ -11,18 +11,14 @@ Classes:
 """
 
 import logging
-from datetime import datetime
 
 from sqlalchemy import (
     ARRAY,
-    JSON,
     Boolean,
     Column,
     Date,
-    DateTime,
     Float,
     Integer,
-    LargeBinary,
     String,
     create_engine,
 )
@@ -146,6 +142,29 @@ class DataBaseManager:
                     for column in JobTable.__table__.columns
                 }
                 return job_columns
+            else:
+                raise JobNotFound(job_id)
+
+    @classmethod
+    def get_stage(self, job_id):
+        """Retrieve the stage of a specific job entry based on its job ID.
+
+        This method queries the 'jobs' table in the database to retrieve the
+        stage of the job entry associated with the provided job ID.
+
+        Parameters:
+        job_id (str): The unique identifier for the job.
+
+        Returns:
+        int: The stage of the job.
+
+        Raises:
+        JobNotFound: If the job with the provided job ID does not exist.
+        """
+        with self.Session() as session:
+            job_row = session.query(JobTable).filter_by(job_id=job_id).first()
+            if job_row:
+                return job_row.stage
             else:
                 raise JobNotFound(job_id)
 

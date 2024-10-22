@@ -4,7 +4,7 @@ import datetime
 import os
 import sys
 
-# Add the parent directory to the path to import the db_manager (did not work with relative import)
+# Add the parent directory to the path to import the db_manager
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 

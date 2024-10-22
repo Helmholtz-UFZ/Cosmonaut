@@ -24,9 +24,12 @@ def get_attributes(clazz):
 
 
 class CosmonautJob:
-    """This class represents a job submission by the user.
+    """
+    This class represents a job submission by the user.
 
-    It submits jobs to the PostgreSQL database, uploads the file to the MinIO object storage and can retrieve the job again.
+    It submits jobs to the PostgreSQL database,
+    uploads the file to the MinIO object storage
+    and can retrieve the job again.
     """
 
     job_id = None
@@ -62,7 +65,12 @@ class CosmonautJob:
         return self.job_id
 
     def load(self):
-        """Get job information from the database, load the data from MinIO, and store files in the working directory."""
+        """
+        Get job information from the database,
+        load the data from MinIO,
+        and store files in the working directory.
+        """
+
         logging.debug(f"load job with id {self.job_id}")
 
         # Get job information from the database

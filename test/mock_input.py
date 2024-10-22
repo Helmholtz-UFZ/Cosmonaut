@@ -1,6 +1,6 @@
 """Set up mock input data for testing in development and production."""
 
-# FIXME: This mock up is from John's code. Needs to be adapted to the current project. Currently not used. Is it even necessary?
+# FIXME: This mock up is from John's code. Currently not used. Is it even necessary?
 
 import importlib.resources
 import json

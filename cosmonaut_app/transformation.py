@@ -11,7 +11,8 @@ from shapely.geometry import Polygon
 
 def transform_csv(input_file, epsg_input, epsg_output):
     """
-    Transforms the coordinates in a CSV file from one coordinate reference system (CRS) to another.
+    Transforms the coordinates in a CSV file
+    from one coordinate reference system (CRS) to another.
 
     Args:
         input_file (str): Path to the input CSV file.
@@ -79,9 +80,12 @@ class OsmRoads:
     A class for handling OpenStreetMap road data transformation.
 
     Args:
-        polygon (shapely.geometry.Polygon): The polygon representing the area of interest.
-        epsg_input (int, optional): The EPSG code of the input coordinate system. Defaults to 4326.
-        epsg_output (int, optional): The EPSG code of the output coordinate system. Defaults to 31468.
+        polygon (shapely.geometry.Polygon):
+            The polygon representing the area of interest.
+        epsg_input (int, optional):
+            The EPSG code of the input coordinate system. Defaults to 4326.
+        epsg_output (int, optional):
+            The EPSG code of the output coordinate system. Defaults to 31468.
     """
 
     def __init__(self, polygon, epsg_input=4326, epsg_output=31468):
@@ -112,7 +116,8 @@ class OsmRoads:
         Get road data from OpenStreetMap based on the specified tags.
 
         Args:
-            additional_tags (dict, optional): Additional tags to filter the road data. Defaults to None.
+            additional_tags (dict, optional):
+                Additional tags to filter the road data. Defaults to None.
 
         Returns:
             geopandas.GeoDataFrame: The road data as a GeoDataFrame.
@@ -159,6 +164,6 @@ class OsmRoads:
     def _osm_transform(self):
         osm_data = self.roads
         epsg_output = self.epsg_output
-        epsg_input = self.epsg_input
+        # epsg_input = self.epsg_input
         osm_data = osm_data.to_crs(epsg=epsg_output)
         return osm_data

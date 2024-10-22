@@ -1,16 +1,15 @@
-import datetime
 import io
+import logging
 import os
 
-# TODO: Temporary loading of environment variables, later should be automatically loaded for Docker
 from dotenv import load_dotenv
 from minio import Minio
 
-load_dotenv(".env_test_priv")
-
-import logging
-
 from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+
+# TODO: Temporary loading of environment variables
+# later should be automatically loaded for Docker
+load_dotenv(".env_test_priv")
 
 
 class MiniIOManager:
@@ -40,14 +39,14 @@ class MiniIOManager:
         Uploads a file to the MinIO bucket.
 
         Args:
-            file_path (str): The path of the file to be uploaded.
-            object_key (str): The key to assign to the uploaded file in the MinIO bucket.
+            file_path (str): Path of the file to be uploaded.
+            object_key (str): Key to assign to the uploaded file in MinIO bucket.
         """
         _, file_extension = os.path.splitext(file_path)
         allowed_extensions = [".tif", ".geojson", ".json", ".csv"]
         if file_extension not in allowed_extensions:
             logging.error(
-                f"Failed to upload file {file_path}: Only {', '.join(allowed_extensions)} files are allowed."
+                f"Failed to upload file {file_path}: Only {', '.join(allowed_extensions)} files are allowed."  # noqa: E501
             )
             return
 
@@ -62,7 +61,7 @@ class MiniIOManager:
         Downloads a file from the MinIO bucket.
 
         Args:
-            object_key (str): The key of the file to be downloaded from the MinIO bucket.
+            object_key (str): Key of the file to be downloaded from the MinIO bucket.
             file_path (str): The path to save the downloaded file.
         """
         try:
@@ -102,7 +101,8 @@ class MiniIOManager:
         Creates a placeholder object in the MinIO bucket to simulate a directory.
 
         Args:
-            object_key (str): The key for the placeholder object, typically ending with a '/' to simulate a directory path.
+            object_key (str): Key for the placeholder object, typically ending with
+                a '/' to simulate a directory path.
         """
         try:
             # Create an empty file-like object
@@ -117,11 +117,12 @@ class MiniIOManager:
     @staticmethod
     def download_directory(minio_path, local_path):
         """
-        Downloads all objects from a MinIO bucket with the specified prefix to a local directory.
+        Downloads all objects from a MinIO bucket
+        with the specified prefix to a local directory.
 
         Args:
-            minio_path (str): The prefix of the objects to be downloaded from the MinIO bucket.
-            local_path (str): The local directory to save the downloaded objects.
+            minio_path (str): Prefix of the objects to be downloaded.
+            local_path (str): Local directory to save the objects.
         """
         try:
             # Ensure the local path exists
