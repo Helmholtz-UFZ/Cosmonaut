@@ -44,7 +44,6 @@ def main_page_layout():
     )
 
 
-
 # Main Map
 main_map = html.Div(
     dl.Map(
@@ -322,6 +321,7 @@ def stage3(job_id):
             ],
         ),
     )
+
 
 def stage4(job_id):
     confirm_side_bar = dbc.Col(

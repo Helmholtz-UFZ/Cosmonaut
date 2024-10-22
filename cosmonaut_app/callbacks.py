@@ -76,7 +76,9 @@ def upload_file(contents, filename):
         logging.error("Job working directory is not set")
         return (
             None,
-            dbc.Alert("Job working directory is not set", color="danger", duration=5000),
+            dbc.Alert(
+                "Job working directory is not set", color="danger", duration=5000
+            ),
             None,
         )
 
@@ -561,7 +563,7 @@ def search_job_id(n_clicks, job_id):
     if DataBaseManager.check_existence(job_id):
         job = CosmonautJob(job_id=job_id)
         job.load()
-        
+
         job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
         current_app.config["JOB_WORKING_DIR"] = job_working_dir
 
