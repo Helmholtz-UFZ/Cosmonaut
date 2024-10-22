@@ -133,7 +133,7 @@ class ClassificationPlot:
             dtype = self.image.dtype
             height = self.image.shape[1]
             width = self.image.shape[2]
-            filename = f"{timestamp}_{base_name}_class-{i+1}.tif"
+            filename = f"{timestamp}_{base_name}_class-{i + 1}.tif"
             output = os.path.join(self.base_dir, filename)
             with temporary_file(".tif") as temp_filename:
                 with rasterio.open(
