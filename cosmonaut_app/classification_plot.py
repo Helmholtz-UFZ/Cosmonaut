@@ -1,13 +1,14 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors
-import rasterio
-from osgeo import gdal
 import datetime
 import os
-from contextlib import contextmanager
 import warnings
+from contextlib import contextmanager
+
+import matplotlib.colors
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import rasterio
+from osgeo import gdal
 
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 

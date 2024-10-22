@@ -1,47 +1,49 @@
-import os
-import re
-from dash.dependencies import Input, Output, State
-from dash.exceptions import PreventUpdate
-from dash import html, callback_context, dcc, no_update
-from dash_extensions.javascript import assign
-import dash_leaflet as dl
-import dash_bootstrap_components as dbc
-from flask import current_app
-from werkzeug.utils import secure_filename
 import base64
 import csv
+import glob
 import json
 import logging
+import os
+import re
 import time
+
+import dash_bootstrap_components as dbc
+import dash_leaflet as dl
 import matplotlib
-import glob
+from dash import callback_context, dcc, html, no_update
+from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
+from dash_extensions.javascript import assign
+from flask import current_app
 from matplotlib import pyplot as plt
-from cosmonaut_app.transformation import (
-    OsmRoads,
-    transform_csv,
-    get_convex_hull,
-    _get_bounds,
-)
+from werkzeug.utils import secure_filename
+
 from cosmonaut_app.classification_plot import ClassificationPlot
-from cosmonaut_app.minio_manager import MiniIOManager
-from cosmonaut_app.config import osm_tags_mapping, WEB_WORK_DIR
-from cosmonaut_app.flask_routes import app
-from cosmonaut_app.navigation_routing import RouteCreator
+from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
+from cosmonaut_app.flask_routes import app
 from cosmonaut_app.layout import (
+    main_page_layout,
+    not_found_page,
     stage1,
     stage2,
     stage3,
-    main_page_layout,
-    job_page_layout,
-    not_found_page,
+    stage4,
 )
+from cosmonaut_app.minio_manager import MiniIOManager
+from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.road_network_utils import (
     build_graph,
     get_largest_subnetwork,
-    remove_disconnected_roads,
     remove_dead_roads,
+    remove_disconnected_roads,
+)
+from cosmonaut_app.transformation import (
+    OsmRoads,
+    _get_bounds,
+    get_convex_hull,
+    transform_csv,
 )
 
 logging.basicConfig(
@@ -70,6 +72,17 @@ def upload_file(contents, filename):
     decoded = base64.b64decode(content_string)
 
     job_working_dir = current_app.config["JOB_WORKING_DIR"]
+    if not job_working_dir:
+        logging.error("Job working directory is not set")
+        return (
+            None,
+            dbc.Alert("Job working directory is not set", color="danger", duration=5000),
+            None,
+        )
+
+    upload_dir = os.path.join(job_working_dir, "upload")
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir)
 
     filename = secure_filename(filename)
     file_path = os.path.join(job_working_dir, "upload", filename)
@@ -548,6 +561,9 @@ def search_job_id(n_clicks, job_id):
     if DataBaseManager.check_existence(job_id):
         job = CosmonautJob(job_id=job_id)
         job.load()
+        
+        job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
+        current_app.config["JOB_WORKING_DIR"] = job_working_dir
 
         return (
             dbc.Alert(
@@ -771,7 +787,7 @@ def display_page_and_update_url(pathname, job_id):
     if pathname.startswith("/job/"):
         job_id_from_path = pathname.split("/job/")[1]
         if DataBaseManager.check_existence(job_id_from_path):
-            return job_page_layout(job_id_from_path), True
+            return stage4(job_id_from_path), True
         else:
             return not_found_page(), False
     elif pathname == "/":

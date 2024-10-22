@@ -4,11 +4,10 @@ import uuid
 from datetime import date
 
 from cosmonaut_app.config import (
-    WEB_WORK_DIR,
-    DAYS_DELETE_SUBMITTED,
     DAYS_DELETE_NOT_SUBMITTED,
+    DAYS_DELETE_SUBMITTED,
+    WEB_WORK_DIR,
 )
-
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.minio_manager import MiniIOManager
 

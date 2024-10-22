@@ -1,11 +1,13 @@
+import base64
+import io
 import json
+import os
+
 import dash_leaflet as dl
 import gpxpy
-import requests
 import qrcode
-import io
-import base64
-import os
+import requests
+
 from cosmonaut_app.minio_manager import MiniIOManager
 
 

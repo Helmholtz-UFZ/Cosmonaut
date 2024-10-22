@@ -1,15 +1,16 @@
-from minio import Minio
-import os
 import datetime
 import io
+import os
 
 # TODO: Temporary loading of environment variables, later should be automatically loaded for Docker
 from dotenv import load_dotenv
+from minio import Minio
 
 load_dotenv(".env_test_priv")
 
-from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
 import logging
+
+from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
 
 
 class MiniIOManager:

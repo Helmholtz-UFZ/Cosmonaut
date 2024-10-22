@@ -1,14 +1,15 @@
-import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.pyplot as plt
 
 matplotlib.use("Agg")
-import pandas as pd
-import geopandas as gpd
-from cosmonaut_app.transformation import transform_csv
-
-import os
 import base64
 import io
+import os
+
+import geopandas as gpd
+import pandas as pd
+
+from cosmonaut_app.transformation import transform_csv
 
 
 class Plotter:

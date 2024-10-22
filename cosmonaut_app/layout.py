@@ -1,7 +1,8 @@
-from dash import dcc, html, Input, Output, State
-import dash_leaflet as dl
-from cosmonaut_app.config import osm_tags_mapping
 import dash_bootstrap_components as dbc
+import dash_leaflet as dl
+from dash import Input, Output, State, dcc, html
+
+from cosmonaut_app.config import osm_tags_mapping
 
 
 def not_found_page():
@@ -42,81 +43,6 @@ def main_page_layout():
         style={"height": "100vh", "width": "100%"},
     )
 
-
-def job_page_layout(job_id):
-    confirm_side_bar = dbc.Col(
-        [
-            dbc.Label(
-                [
-                    html.H2(f"Job ID: {job_id}"),
-                    html.H3(
-                        "Your input has been confirmed. The route(s) are being computed."
-                    ),
-                    html.H4(
-                        "Choose a Route on the map.", style={"color": "grey"}
-                    ),  # TODO sollte erst nach kalkulation der Routen erscheinen
-                    dbc.Button(
-                        "Start Route",
-                        id="start-route",
-                        className="me-auto",
-                        size="lg",
-                    ),
-                    dcc.Loading(
-                        id="loading-qr-code",
-                        type="default",
-                        children=html.Img(
-                            id="qr-code",
-                            src="",
-                            style={
-                                "width": "100%",
-                                "padding-top": "1rem",
-                                "padding-bottom": "1rem",
-                            },
-                        ),
-                    ),
-                ],
-                id="welcome-label",
-            ),
-            html.Div(id="stage-content"),
-        ],
-        id="offcanvas",
-        style={
-            "width": "500px",
-            "background-color": "#DBE2EF",
-            "border": "2px solid #dee2e6",
-            "position": "fixed",
-            "top": "10vh",
-            "right": 0,
-            "bottom": 0,
-            "padding": "2rem 1rem",
-            "overflow-y": "auto",
-        },
-        className="responsive-sidebar",
-    )
-
-    return html.Div(
-        [
-            navbar,
-            main_map,
-            confirm_side_bar,
-            html.Div(id="hidden-div", style={"display": "none"}),
-            dcc.Store(id="current-stage", data=0),
-            dcc.Store(id="job-id", data=None),
-            dcc.Store(id="job-loaded-flag", data=None),
-            dcc.Store(id="email-store"),
-            dcc.Dropdown(
-                id="tags-dropdown",
-                options=[],
-                value=list(osm_tags_mapping.keys()),
-                # disabled=True,
-                style={"display": "none"},
-            ),
-            html.Div(id="upload-data-store", style={"display": "none"}),
-            html.Div(id="dummy-output", style={"display": "none"}),
-            html.Div(id="osm-file-path", style={"display": "none"}),
-        ],
-        style={"height": "100vh", "width": "100%"},
-    )
 
 
 # Main Map
@@ -395,4 +321,79 @@ def stage3(job_id):
                 html.Div(id="upload-data-dcc", style={"display": "none"}),
             ],
         ),
+    )
+
+def stage4(job_id):
+    confirm_side_bar = dbc.Col(
+        [
+            dbc.Label(
+                [
+                    html.H2(f"Job ID: {job_id}"),
+                    html.H3(
+                        "Your input has been confirmed. The route(s) are being computed."
+                    ),
+                    html.H4(
+                        "Choose a Route on the map.", style={"color": "grey"}
+                    ),  # TODO sollte erst nach kalkulation der Routen erscheinen
+                    dbc.Button(
+                        "Start Route",
+                        id="start-route",
+                        className="me-auto",
+                        size="lg",
+                    ),
+                    dcc.Loading(
+                        id="loading-qr-code",
+                        type="default",
+                        children=html.Img(
+                            id="qr-code",
+                            src="",
+                            style={
+                                "width": "100%",
+                                "padding-top": "1rem",
+                                "padding-bottom": "1rem",
+                            },
+                        ),
+                    ),
+                ],
+                id="welcome-label",
+            ),
+            html.Div(id="stage-content"),
+        ],
+        id="offcanvas",
+        style={
+            "width": "500px",
+            "background-color": "#DBE2EF",
+            "border": "2px solid #dee2e6",
+            "position": "fixed",
+            "top": "10vh",
+            "right": 0,
+            "bottom": 0,
+            "padding": "2rem 1rem",
+            "overflow-y": "auto",
+        },
+        className="responsive-sidebar",
+    )
+
+    return html.Div(
+        [
+            navbar,
+            main_map,
+            confirm_side_bar,
+            html.Div(id="hidden-div", style={"display": "none"}),
+            dcc.Store(id="current-stage", data=0),
+            dcc.Store(id="job-id", data=None),
+            dcc.Store(id="job-loaded-flag", data=None),
+            dcc.Store(id="email-store"),
+            dcc.Dropdown(
+                id="tags-dropdown",
+                options=[],
+                value=list(osm_tags_mapping.keys()),
+                # disabled=True,
+                style={"display": "none"},
+            ),
+            html.Div(id="upload-data-store", style={"display": "none"}),
+            html.Div(id="dummy-output", style={"display": "none"}),
+            html.Div(id="osm-file-path", style={"display": "none"}),
+        ],
+        style={"height": "100vh", "width": "100%"},
     )

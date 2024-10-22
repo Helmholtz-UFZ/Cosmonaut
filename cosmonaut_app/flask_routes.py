@@ -1,10 +1,12 @@
-from flask import Flask, send_from_directory, redirect
-from werkzeug.utils import secure_filename
 import os
+
 import dash
-from dash import html, dcc
 import dash_bootstrap_components as dbc
-from cosmonaut_app.layout import side_bar, main_map, navbar
+from dash import dcc, html
+from flask import Flask, redirect, send_from_directory
+from werkzeug.utils import secure_filename
+
+from cosmonaut_app.layout import main_map, navbar, side_bar
 
 server = Flask(__name__)
 app = dash.Dash(
