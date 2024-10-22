@@ -25,7 +25,7 @@ linting:
   stage: "lint"
   image: "python:3.10.12"
   before_script:
-    - "sudo apt-get install libgdal-dev"
+    - "apt-get install libgdal-dev"
     - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"
     - "export C_INCLUDE_PATH=/usr/include/gdal"
     - "pip install poetry"
