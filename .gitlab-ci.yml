@@ -1,0 +1,33 @@
+stages:
+  - "lint"
+  # - "test"
+  # - "build"
+  # - "deploy"
+
+variables:
+  POSTGRES_DB: somweb_stage
+  POSTGRES_USER: somweb_stage_rw
+  POSTGRES_PASSWORD: test
+  POSTGRES_HOST_AUTH_METHOD: trust
+  DB_HOST_NAME: postgres
+
+.docker_login: &docker_login
+  - 'echo "${CI_REGISTRY_PASSWORD}" | docker login --username "$CI_REGISTRY_USER" --password-stdin "${CI_REGISTRY}"'
+
+.base_before_build_script:
+  image: "docker:24-cli"
+  services:
+    - "docker:24-dind"
+  tags:
+    - "hifis"
+
+linting:
+  stage: "lint"
+  image: "python:3.10.12"
+  before_script:
+    - "pip install poetry"
+    - "poetry install"
+  script:
+    - "poetry run black --check ."
+    - "poetry run isort --check --profile black ."
+    - "poetry run flake8 --max-line-length=88 --ignore=E203,W503"
