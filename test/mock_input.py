@@ -8,6 +8,7 @@ from io import BytesIO
 
 from werkzeug.datastructures import MultiDict
 
+
 def iterate_test_data():
     """Yield the file paths of the test data.
 
@@ -54,7 +55,6 @@ def create_input_files(input_type):
     return mock_file_list
 
 
-
 def create_valid_form_data(parameters):
     """Create a MultiDict object representing a valid form data.
 
@@ -81,6 +81,7 @@ def create_valid_form_data(parameters):
             "average_measurements_over_time": "y",
         }
     )
+
 
 class MockFileStorage:
     """A mock up for files passed from the request to flask.
@@ -111,6 +112,7 @@ class MockFileStorage:
         except ValueError:
             self.streamIO = BytesIO(self.content)
         return self.streamIO
+
 
 example_parameters = load_parameters()
 valid_form_data = create_valid_form_data(example_parameters)

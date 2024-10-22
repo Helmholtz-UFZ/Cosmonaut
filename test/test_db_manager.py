@@ -1,11 +1,11 @@
 """Test the db_manager class."""
 
 import datetime
-
-import sys
 import os
+import sys
+
 # Add the parent directory to the path to import the db_manager (did not work with relative import)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 def test_db_manager():
@@ -31,9 +31,9 @@ def test_db_manager():
     DataBaseManager.add_entry(data_to_insert)
     assert DataBaseManager.check_existence(job_id)
 
+
 def test_if_test_job_exists():
     """Test if the test job exists in the database."""
     from cosmonaut_app.db_manager import DataBaseManager
 
     assert DataBaseManager.check_existence("job123")
-
