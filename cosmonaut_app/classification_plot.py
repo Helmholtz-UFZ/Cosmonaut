@@ -96,9 +96,7 @@ class ClassificationPlot:
     def _create_image(self, cmaps):
         """Create an image from the 3D grid using the provided colormaps."""
         if not all(isinstance(cmap, matplotlib.colors.Colormap) for cmap in cmaps):
-            raise ValueError(
-                "Not an instances of matplotlib.colors.Colormap."
-            )
+            raise ValueError("Not an instances of matplotlib.colors.Colormap.")
         self.image = np.zeros((len(self.x_unique), len(self.y_unique), 4))
         for i, cmap in enumerate(cmaps):
             mask = self.grid_max_class == i
