@@ -1,7 +1,7 @@
 stages:
   - "lint"
   # - "test"
-  # - "build"
+  - "build"
   # - "deploy"
 
 variables:
@@ -34,3 +34,29 @@ linting:
     - "echo '[tool.ruff]' > pyproject.toml"
     - "echo 'exclude = [\"*.ipynb\"]' >> pyproject.toml"
     - "poetry run ruff check ."
+
+build-latest:
+  stage: "build"
+  extends: ".base_before_build_script"
+  script:
+    - "docker build -t $CI_REGISTRY_IMAGE:latest ."
+    - "docker push $CI_REGISTRY_IMAGE:latest"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - when: never
+
+build-release:
+  stage: "build"
+  extends: ".base_before_build_script"
+  script:
+    - "docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG ."
+    - "docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+    - 'echo -e "image:\n  tag: ${CI_COMMIT_TAG}" > values.yaml'
+  artifacts:
+    paths:
+      - "values.yaml"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^\d+.\d+.\d+/'
+      when: "always"
+    - when: "never"
+
