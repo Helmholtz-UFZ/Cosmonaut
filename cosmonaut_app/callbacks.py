@@ -71,13 +71,15 @@ def upload_file(contents, filename):
     content_type, content_string = contents.split(",")
     decoded = base64.b64decode(content_string)
 
-    job_working_dir = current_app.config["JOB_WORKING_DIR"]
+    job_working_dir = WEB_WORK_DIR
     if not job_working_dir:
         logging.error("Job working directory is not set")
         return (
             None,
             dbc.Alert(
-                "Job working directory is not set", color="danger", duration=5000
+                "Job working directory is not set",
+                color="danger",
+                duration=5000,
             ),
             None,
         )
@@ -100,7 +102,11 @@ def upload_file(contents, filename):
                 logging.error("CSV must have 8 columns")
                 return (
                     None,
-                    dbc.Alert("CSV must have 8 columns", color="danger", duration=5000),
+                    dbc.Alert(
+                        "CSV must have 8 columns",
+                        color="danger",
+                        duration=5000,
+                    ),
                     None,
                 )
 
@@ -221,7 +227,8 @@ def upload_to_minIO(osm_file_path, job_id):
                     file_path = os.path.join(root, file)
                     logging.info(f"Uploading file {file_path} to MinIO")
                     minio_manager.upload_file(
-                        file_path, f"{job_id}/{os.path.relpath(file_path, work_dir)}"
+                        file_path,
+                        f"{job_id}/{os.path.relpath(file_path, work_dir)}",
                     )
                 else:
                     logging.warning(
@@ -290,7 +297,7 @@ def update_map_with_geojson(selected_roads, job_id, current_children):
         f"cosmonaut_app/work_dir/{job_id}/osm-data/*_4326.geojson"
     )
 
-    logging.info(f"Geojson Path: {geojson_path}"),
+    (logging.info(f"Geojson Path: {geojson_path}"),)
 
     timeout = 30  # seconds
     start_time = time.time()
@@ -438,16 +445,56 @@ def routing_callback(job_page_loaded, current_layer):
     # TODO: FUTURE, get the routes from CAN's Navigation Algorithm
     # FIXME This is testing -> should be moved to test file in the test folder
     routes = [
-        {"way": "('way', 91403181)", "start_node": 1061793565, "end_node": 1036593570},
-        {"way": "('way', 922732272)", "start_node": 1036593570, "end_node": 845193413},
-        {"way": "('way', 70909551)", "start_node": 845193413, "end_node": 845197359},
-        {"way": "('way', 70909733)", "start_node": 845197359, "end_node": 845197431},
-        {"way": "('way', 70909838)", "start_node": 845197431, "end_node": 845190677},
-        {"way": "('way), 70909517)", "start_node": 845190677, "end_node": 845190684},
-        {"way": "('way', 70909551)", "start_node": 845190684, "end_node": 9232344563},
-        {"way": "('way', 1000189951)", "start_node": 9232344563, "end_node": 845189629},
-        {"way": "('way', 54234166)", "start_node": 845189629, "end_node": 683872135},
-        {"way": "('way', 89369683)", "start_node": 683872135, "end_node": 1036584699},
+        {
+            "way": "('way', 91403181)",
+            "start_node": 1061793565,
+            "end_node": 1036593570,
+        },
+        {
+            "way": "('way', 922732272)",
+            "start_node": 1036593570,
+            "end_node": 845193413,
+        },
+        {
+            "way": "('way', 70909551)",
+            "start_node": 845193413,
+            "end_node": 845197359,
+        },
+        {
+            "way": "('way', 70909733)",
+            "start_node": 845197359,
+            "end_node": 845197431,
+        },
+        {
+            "way": "('way', 70909838)",
+            "start_node": 845197431,
+            "end_node": 845190677,
+        },
+        {
+            "way": "('way), 70909517)",
+            "start_node": 845190677,
+            "end_node": 845190684,
+        },
+        {
+            "way": "('way', 70909551)",
+            "start_node": 845190684,
+            "end_node": 9232344563,
+        },
+        {
+            "way": "('way', 1000189951)",
+            "start_node": 9232344563,
+            "end_node": 845189629,
+        },
+        {
+            "way": "('way', 54234166)",
+            "start_node": 845189629,
+            "end_node": 683872135,
+        },
+        {
+            "way": "('way', 89369683)",
+            "start_node": 683872135,
+            "end_node": 1036584699,
+        },
     ]
 
     geojson_path = os.path.join(
@@ -474,16 +521,56 @@ def update_qr_code(n_clicks, current_layer):
     # TODO: FUTURE, get the routes from CAN's Navigation Algorithm
     # FIXME This is testing -> should be moved to test file in the test folder
     routes = [
-        {"way": "('way', 91403181)", "start_node": 1061793565, "end_node": 1036593570},
-        {"way": "('way', 922732272)", "start_node": 1036593570, "end_node": 845193413},
-        {"way": "('way', 70909551)", "start_node": 845193413, "end_node": 845197359},
-        {"way": "('way', 70909733)", "start_node": 845197359, "end_node": 845197431},
-        {"way": "('way', 70909838)", "start_node": 845197431, "end_node": 845190677},
-        {"way": "('way), 70909517)", "start_node": 845190677, "end_node": 845190684},
-        {"way": "('way', 70909551)", "start_node": 845190684, "end_node": 9232344563},
-        {"way": "('way', 1000189951)", "start_node": 9232344563, "end_node": 845189629},
-        {"way": "('way', 54234166)", "start_node": 845189629, "end_node": 683872135},
-        {"way": "('way', 89369683)", "start_node": 683872135, "end_node": 1036584699},
+        {
+            "way": "('way', 91403181)",
+            "start_node": 1061793565,
+            "end_node": 1036593570,
+        },
+        {
+            "way": "('way', 922732272)",
+            "start_node": 1036593570,
+            "end_node": 845193413,
+        },
+        {
+            "way": "('way', 70909551)",
+            "start_node": 845193413,
+            "end_node": 845197359,
+        },
+        {
+            "way": "('way', 70909733)",
+            "start_node": 845197359,
+            "end_node": 845197431,
+        },
+        {
+            "way": "('way', 70909838)",
+            "start_node": 845197431,
+            "end_node": 845190677,
+        },
+        {
+            "way": "('way), 70909517)",
+            "start_node": 845190677,
+            "end_node": 845190684,
+        },
+        {
+            "way": "('way', 70909551)",
+            "start_node": 845190684,
+            "end_node": 9232344563,
+        },
+        {
+            "way": "('way', 1000189951)",
+            "start_node": 9232344563,
+            "end_node": 845189629,
+        },
+        {
+            "way": "('way', 54234166)",
+            "start_node": 845189629,
+            "end_node": 683872135,
+        },
+        {
+            "way": "('way', 89369683)",
+            "start_node": 683872135,
+            "end_node": 1036584699,
+        },
     ]
 
     geojson_path = os.path.join(
