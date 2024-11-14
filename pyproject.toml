@@ -1,3 +1,6 @@
+[tool.ruff]
+line-length = 88
+
 [tool.poetry]
 name = "ufz-flask"
 version = "0.1.0"
@@ -44,6 +47,7 @@ psycopg2 = "^2.9.9"
 gunicorn = "^22.0.0"
 networkx = "^3.3"
 ruff = "^0.7.3"
+pre-commit = "^4.0.1"
 
 [tool.poetry.group.dev.dependencies]
 blinker = "1.6.2"
