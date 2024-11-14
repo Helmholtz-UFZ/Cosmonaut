@@ -1,5 +1,6 @@
 [tool.ruff]
 line-length = 88
+exclude = ["*.ipynb"]
 
 [tool.poetry]
 name = "ufz-flask"
