@@ -31,4 +31,6 @@ linting:
     - "pip install poetry"
     - "poetry install"
   script:
+    - "echo '[tool.ruff]' > pyproject.toml"
+    - "echo 'exclude = [\"*.ipynb\"]' >> pyproject.toml"
     - "poetry run ruff check ."
