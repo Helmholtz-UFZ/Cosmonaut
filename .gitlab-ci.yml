@@ -37,7 +37,7 @@ build-latest:
   stage: "build"
   extends: ".base_before_build_script"
   script:
-    - "docker build -t $CI_REGISTRY_IMAGE:latest ."
+    - "docker build -t $CI_REGISTRY_IMAGE:latest -f docker/prod.Dockerfile ."
     - "docker push $CI_REGISTRY_IMAGE:latest"
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
