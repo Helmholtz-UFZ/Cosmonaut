@@ -7,6 +7,8 @@ from minio import Minio
 
 from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
 
+# TODO: Replace with rclone for performance
+
 # TODO: Temporary loading of environment variables
 # later should be automatically loaded for Docker
 load_dotenv(".env_test_priv")
