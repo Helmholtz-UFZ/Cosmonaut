@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "This is Poetry"
 authors = ["Louis Ferdinand Trinkle <louis-ferdinand.trinkle@ufz.de>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "3.12.0"
