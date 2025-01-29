@@ -16,8 +16,11 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.javascript import assign
 from flask import current_app
 from matplotlib import pyplot as plt
+
+# from sensor_routing import sensor_routing_cli
 from werkzeug.utils import secure_filename
 
+# from cosmonaut_app.celery_config import celery
 from cosmonaut_app.classification_plot import ClassificationPlot
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -61,11 +64,12 @@ matplotlib.use("Agg")
     Output("file-path", "children"),
     Input("upload-data-dcc", "contents"),
     State("upload-data-dcc", "filename"),
+    State("amount-classes-input", "value"),
     prevent_initial_call=True,
 )
-def upload_file(contents, filename):
+def upload_file(contents, filename, amount_classes):
     """Upload a file to the server and save it in the upload directory."""
-    if contents is None:
+    if contents is None or filename is None or amount_classes is None:
         raise PreventUpdate
 
     content_type, content_string = contents.split(",")
@@ -95,15 +99,22 @@ def upload_file(contents, filename):
         f.write(decoded)
 
     with open(file_path, "r", encoding="utf-8") as file:
-        csv_reader = csv.reader(file)
+        sample = file.read(1024)
+        file.seek(0)
+        sniffer = csv.Sniffer()
+        try:
+            dialect = sniffer.sniff(sample)
+        except csv.Error:
+            dialect = csv.excel
+        csv_reader = csv.reader(file, dialect)
         for row in csv_reader:
-            if len(row) != 8:
+            if len(row) != amount_classes + 2:
                 os.remove(file_path)
-                logging.error("CSV must have 8 columns")
+                logging.error(f"CSV must have {amount_classes + 2} columns")
                 return (
                     None,
                     dbc.Alert(
-                        "CSV must have 8 columns",
+                        f"CSV must have {amount_classes + 2} columns",
                         color="danger",
                         duration=5000,
                     ),
@@ -129,14 +140,15 @@ def check_file_path(file_path):
 @app.callback(
     Output("map", "viewport"),
     Input("file-path", "children"),
+    State("epsg-input", "value"),
     prevent_initial_call=True,
 )
-def update_map_center(file_path):
+def update_map_center(file_path, epsg_input):
     if file_path is None:
         raise PreventUpdate
 
     # TODO: EPSG needs to be respected later on
-    data = transform_csv(file_path, 31468, 4326)
+    data = transform_csv(file_path, epsg_input, 4326)
     bounds = _get_bounds(data)
 
     return dict(bounds=bounds, transition="flyTo")
@@ -146,8 +158,9 @@ def update_map_center(file_path):
     Output("output-osm-query", "children"),
     Output("osm-file-path", "children"),
     Input("file-path", "children"),
+    State("epsg-input", "value"),
 )
-def run_osm_query(file_path):
+def run_osm_query(file_path, epsg_input):
     if not file_path:
         raise PreventUpdate
 
@@ -166,7 +179,7 @@ def run_osm_query(file_path):
     }
 
     try:
-        data = transform_csv(file_path, 31468, 4326)
+        data = transform_csv(file_path, epsg_input, 4326)
         convex_hull = get_convex_hull(data)
 
         osm = OsmRoads(convex_hull)
@@ -177,7 +190,7 @@ def run_osm_query(file_path):
 
         osm_file_path = osm.save_roads(os.path.join(job_working_dir, "osm-data"), 4326)
         osm_data = osm._osm_transform()
-        osm_file_path = osm_file_path.replace("4326", "31468")
+        osm_file_path = osm_file_path.replace("4326", str(epsg_input))
         osm_data["nodes"] = osm_data["nodes"].apply(str)
         osm_data.to_file(osm_file_path, driver="GeoJSON")
         logging.info("OSM query successful")
@@ -297,18 +310,24 @@ def update_map_with_geojson(selected_roads, job_id, current_children):
         f"cosmonaut_app/work_dir/{job_id}/osm-data/*_4326.geojson"
     )
 
-    (logging.info(f"Geojson Path: {geojson_path}"),)
+    logging.info(f"Geojson Path: {geojson_path}")
 
     timeout = 30  # seconds
     start_time = time.time()
     while not glob.glob(geojson_path):
+        logging.info(f"Waiting for geojson file at path: {geojson_path}")
         if time.time() - start_time > timeout:
             raise TimeoutError(
                 "Timed out waiting for the geojson file to be available."
             )
         time.sleep(1)
 
-    geojson_file = glob.glob(geojson_path)[0]
+    geojson_files = glob.glob(geojson_path)
+    if not geojson_files:
+        raise FileNotFoundError(f"No GeoJSON file found at path: {geojson_path}")
+
+    geojson_file = geojson_files[0]
+    logging.info(f"Geojson file found: {geojson_file}")
     with open(geojson_file) as f:
         data = json.load(f)
 
@@ -432,77 +451,89 @@ def generate_classification_plot(upload_status, file_path, job_id):
 @app.callback(
     Output("route-layer", "children"),
     Input("job-page-loaded", "data"),
-    [State("route-layer", "children")],
+    [State("route-layer", "children"), State("osm-file-path", "children")],
     prevent_initial_call=True,
 )
-def routing_callback(job_page_loaded, current_layer):
+def routing_callback(job_page_loaded, current_layer, osm_file_path):
     if not job_page_loaded:
         return current_layer
 
     time.sleep(1)
 
-    # Define the routes for the example test
-    # TODO: FUTURE, get the routes from CAN's Navigation Algorithm
-    # FIXME This is testing -> should be moved to test file in the test folder
-    routes = [
-        {
-            "way": "('way', 91403181)",
-            "start_node": 1061793565,
-            "end_node": 1036593570,
-        },
-        {
-            "way": "('way', 922732272)",
-            "start_node": 1036593570,
-            "end_node": 845193413,
-        },
-        {
-            "way": "('way', 70909551)",
-            "start_node": 845193413,
-            "end_node": 845197359,
-        },
-        {
-            "way": "('way', 70909733)",
-            "start_node": 845197359,
-            "end_node": 845197431,
-        },
-        {
-            "way": "('way', 70909838)",
-            "start_node": 845197431,
-            "end_node": 845190677,
-        },
-        {
-            "way": "('way), 70909517)",
-            "start_node": 845190677,
-            "end_node": 845190684,
-        },
-        {
-            "way": "('way', 70909551)",
-            "start_node": 845190684,
-            "end_node": 9232344563,
-        },
-        {
-            "way": "('way', 1000189951)",
-            "start_node": 9232344563,
-            "end_node": 845189629,
-        },
-        {
-            "way": "('way', 54234166)",
-            "start_node": 845189629,
-            "end_node": 683872135,
-        },
-        {
-            "way": "('way', 89369683)",
-            "start_node": 683872135,
-            "end_node": 1036584699,
-        },
-    ]
+    # total_number_of_classes = 9
+    # segments_number_per_class = 2
+    # max_distance = 50
+    # class_data = (
+    #     "Mueglitz_extended_9Cluster_EPSG25832-2.csv"  # Update this path as needed
+    # )
+    # time_limit = 8
+    # optimization_objective = "d"
+    # max_aco_iteration = 500
+    # ant_no = 50
+    # point_mapping_output = "pm_output.json"
+    # benefit_calculation_output_benefit = "bc_benefits_output.json"
+    # benefit_calculation_output_top_benefit = "bc_top_benefits_output.json"
+    # path_finding_output = "pf_output.json"
+    solution_path = "solution.json"
 
-    geojson_path = os.path.join(
-        "cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
-    )
+    # run_sensor_routing.delay(
+    #     total_number_of_classes,
+    #     segments_number_per_class,
+    #     max_distance,
+    #     osm_file_path,
+    #     class_data,
+    #     time_limit,
+    #     optimization_objective,
+    #     max_aco_iteration,
+    #     ant_no,
+    #     point_mapping_output,
+    #     benefit_calculation_output_benefit,
+    #     benefit_calculation_output_top_benefit,
+    #     path_finding_output,
+    #     solution_path,
+    # )
+
+    # @celery.task
+    # def run_sensor_routing(
+    #     total_number_of_classes,
+    #     segments_number_per_class,
+    #     max_distance,
+    #     osm_file_path,
+    #     class_data,
+    #     time_limit,
+    #     optimization_objective,
+    #     max_aco_iteration,
+    #     ant_no,
+    #     point_mapping_output,
+    #     benefit_calculation_output_benefit,
+    #     benefit_calculation_output_top_benefit,
+    #     path_finding_output,
+    #     solution_path,
+    # ):
+    #     sensor_routing_cli.sensor_routing(
+    #         total_number_of_classes,
+    #         segments_number_per_class,
+    #         max_distance,
+    #         osm_file_path,
+    #         class_data,
+    #         time_limit,
+    #         optimization_objective,
+    #         max_aco_iteration,
+    #         ant_no,
+    #         point_mapping_output,
+    #         benefit_calculation_output_benefit,
+    #         benefit_calculation_output_top_benefit,
+    #         path_finding_output,
+    #         solution_path,
+    #     )
+
+    with open(solution_path) as f:
+        data = json.load(f)
+
+    geojson_path = osm_file_path
 
     route_creator = RouteCreator(geojson_path)
-    route_layer = route_creator.create_routes_layer(routes)
+    route_layer = route_creator.create_route_layer(data)
 
     return route_layer
 
@@ -907,14 +938,14 @@ def update_url(content, pathname):
 )
 def navigate_to_job_page(n_clicks, job_id):
     logging.info(f"n_clicks: {n_clicks}")
-    if n_clicks is not None:
-        # TODO: Here the Route Calculation should be triggered
-        # for now, just create a random route
-        # Input: the OSM data with the tags defined by the user
-        # Output: the route as a GeoJSON file
-        #
-        return f"/job/{job_id}"
-    return no_update
+    if n_clicks is None:
+        raise PreventUpdate
+    # TODO: Here the Route Calculation should be triggered
+    # for now, just create a random route
+    # Input: the OSM data with the tags defined by the user
+    # Output: the route as a GeoJSON file
+    #
+    return f"/job/{job_id}"
 
 
 @app.callback(
@@ -923,9 +954,9 @@ def navigate_to_job_page(n_clicks, job_id):
     prevent_initial_call=True,
 )
 def navigate_to_home(n_clicks):
-    if n_clicks is not None:
-        return "/"
-    return no_update
+    if n_clicks is None:
+        raise PreventUpdate
+    return "/"
 
 
 # Add a callback which updates the "Straßenauswahl"(tags-dropdown) into the sql database

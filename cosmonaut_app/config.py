@@ -28,7 +28,8 @@ DAYS_DELETE_NOT_SUBMITTED = 2
 load_dotenv(".env_test_priv")
 
 WEB_WORK_DIR = getenv("WEB_WORK_DIR")
-PORT = getenv("FLASK_PORT")
+FLASK_PORT = getenv("FLASK_PORT")
+REDIS_PORT = getenv("REDIS_PORT")
 MINIO_ACCESS_KEY = getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = getenv("MINIO_SECRET_KEY")
 DB_NAME = getenv("DB_NAME")

@@ -245,6 +245,18 @@ def stage2(job_id):
             [
                 html.H2(f"Job ID: {job_id}"),
                 html.H3("Upload"),
+                dbc.Input(
+                    id="epsg-input",
+                    type="number",
+                    placeholder="Please Enter a valid EPSG Code for your data.",
+                    style={"margin-top": "1rem"},
+                ),
+                dbc.Input(
+                    id="amount-classes-input",
+                    type="number",
+                    placeholder="Please Enter the amount of classes for your data.",
+                    style={"margin-top": "1rem"},
+                ),
                 dcc.Upload(
                     id="upload-data-dcc",
                     accept=".csv",

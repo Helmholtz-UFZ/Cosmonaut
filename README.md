@@ -11,7 +11,11 @@ It allows users to upload a CSV file, transforms the data, queries OpenStreetMap
 - OSM query: The application queries OpenStreetMap for roads within the convex hull of the uploaded data.
 - Data visualization: The application visualizes the uploaded data and the queried OSM data on a map.
 - It makes individual Jobs which are saved into a PostgreSQL DB.
-- (Future) Is triggering a route calculation based on User Input of the best roads.
+- (Work) Is triggering a route calculation based on User Input of the best roads.
+
+## WOMBAT
+
+You can find the Docker-Compose Setup in the [docker-compose.yml](docker-compose.yml).
 
 ## Installation
 

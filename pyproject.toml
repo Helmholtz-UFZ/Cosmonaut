@@ -49,6 +49,9 @@ gunicorn = "^22.0.0"
 networkx = "^3.3"
 ruff = "^0.7.3"
 pre-commit = "^4.0.1"
+sensor-routing = "^0.1"
+celery = "^5.4.0"
+redis = "^5.2.1"
 
 [tool.poetry.group.dev.dependencies]
 blinker = "1.6.2"
