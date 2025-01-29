@@ -694,7 +694,7 @@ def search_job_id(n_clicks, job_id):
                 duration=3000,
             ),
             job_id,
-            f"/job/{job_id}",
+            f"/met/wg7/cosmonaut/job/{job_id}",
             False,
         )
     else:
@@ -717,7 +717,7 @@ def search_job_id(n_clicks, job_id):
     prevent_initial_call=True,
 )
 def redirect_to_home(n_intervals):
-    return "/"
+    return "/met/wg7/cosmonaut/"
 
 
 # start job when start-job button is clicked
@@ -905,13 +905,13 @@ def toggle_navbar_collapse(n, is_open):
     prevent_initial_call=True,
 )
 def display_page_and_update_url(pathname, job_id):
-    if pathname.startswith("/job/"):
-        job_id_from_path = pathname.split("/job/")[1]
+    if pathname.startswith("/met/wg7/cosmonaut/job/"):
+        job_id_from_path = pathname.split("/met/wg7/cosmonaut/job/")[1]
         if DataBaseManager.check_existence(job_id_from_path):
             return stage4(job_id_from_path), True
         else:
             return not_found_page(), False
-    elif pathname == "/":
+    elif pathname == "/met/wg7/cosmonaut/":
         return main_page_layout(), False
     else:
         return not_found_page(), False
@@ -923,10 +923,10 @@ def display_page_and_update_url(pathname, job_id):
     [State("url", "pathname")],
 )
 def update_url(content, pathname):
-    if pathname.startswith("/job/"):
-        job_id_from_path = pathname.split("/job/")[1]
+    if pathname.startswith("/met/wg7/cosmonaut/job/"):
+        job_id_from_path = pathname.split("/met/wg7/cosmonaut/job/")[1]
         if DataBaseManager.check_existence(job_id_from_path):
-            return f"/job/{job_id_from_path}"
+            return f"/met/wg7/cosmonaut/job/{job_id_from_path}"
     return pathname
 
 
@@ -945,7 +945,7 @@ def navigate_to_job_page(n_clicks, job_id):
     # Input: the OSM data with the tags defined by the user
     # Output: the route as a GeoJSON file
     #
-    return f"/job/{job_id}"
+    return f"/met/wg7/cosmonaut/job/{job_id}"
 
 
 @app.callback(
@@ -956,7 +956,7 @@ def navigate_to_job_page(n_clicks, job_id):
 def navigate_to_home(n_clicks):
     if n_clicks is None:
         raise PreventUpdate
-    return "/"
+    return "/met/wg7/cosmonaut/"
 
 
 # Add a callback which updates the "Straßenauswahl"(tags-dropdown) into the sql database

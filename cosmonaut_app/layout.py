@@ -181,7 +181,7 @@ navbar = dbc.Navbar(
                     ],
                     align="center",
                 ),
-                href="/",
+                href="/met/wg7/cosmonaut/",
                 className="navbar-link",
             ),
             dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
