@@ -28,6 +28,8 @@ def main_page_layout():
             dcc.Store(id="job-id", data=None),
             dcc.Store(id="job-loaded-flag", data=None),
             dcc.Store(id="email-store"),
+            dcc.Store(id="epsg-store"),
+            dcc.Store(id="routing-complete"),
             dcc.Dropdown(
                 id="tags-dropdown",
                 options=[],
@@ -181,7 +183,7 @@ navbar = dbc.Navbar(
                     ],
                     align="center",
                 ),
-                href="/met/wg7/cosmonaut/",
+                href="/met/wg7/cosmonaut",
                 className="navbar-link",
             ),
             dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
@@ -250,12 +252,14 @@ def stage2(job_id):
                     type="number",
                     placeholder="Please Enter a valid EPSG Code for your data.",
                     style={"margin-top": "1rem"},
+                    value=31468,
                 ),
                 dbc.Input(
                     id="amount-classes-input",
                     type="number",
                     placeholder="Please Enter the amount of classes for your data.",
                     style={"margin-top": "1rem"},
+                    value=6,
                 ),
                 dcc.Upload(
                     id="upload-data-dcc",

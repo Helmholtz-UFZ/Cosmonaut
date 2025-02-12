@@ -113,6 +113,7 @@ class ClassificationPlot:
             self.x_unique_len,
         )
         self.crs = "EPSG:31468"
+        # TODO: Make the srcSRS more flexible
 
     def _save_plots(self, cmaps):
         timestamp = datetime.datetime.now().strftime("%Y%m%d")
@@ -154,7 +155,7 @@ class ClassificationPlot:
                     output,
                     raster,
                     format="GTiff",
-                    srcSRS="EPSG:31468",
+                    srcSRS="EPSG:31468",  # TODO: make the srcSRS more flexible
                     dstSRS="EPSG:4326",
                     xRes=0.0003,
                     yRes=0.0003,

@@ -17,10 +17,9 @@ from dash_extensions.javascript import assign
 from flask import current_app
 from matplotlib import pyplot as plt
 
-# from sensor_routing import sensor_routing_cli
+from sensor_routing import sensor_routing_cli
 from werkzeug.utils import secure_filename
 
-# from cosmonaut_app.celery_config import celery
 from cosmonaut_app.classification_plot import ClassificationPlot
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -65,9 +64,10 @@ matplotlib.use("Agg")
     Input("upload-data-dcc", "contents"),
     State("upload-data-dcc", "filename"),
     State("amount-classes-input", "value"),
+    State("job-id", "data"),
     prevent_initial_call=True,
 )
-def upload_file(contents, filename, amount_classes):
+def upload_file(contents, filename, amount_classes, job_id):
     """Upload a file to the server and save it in the upload directory."""
     if contents is None or filename is None or amount_classes is None:
         raise PreventUpdate
@@ -75,7 +75,8 @@ def upload_file(contents, filename, amount_classes):
     content_type, content_string = contents.split(",")
     decoded = base64.b64decode(content_string)
 
-    job_working_dir = WEB_WORK_DIR
+    job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
+    logging.info(f"Job working directory: {job_working_dir}")
     if not job_working_dir:
         logging.error("Job working directory is not set")
         return (
@@ -88,12 +89,12 @@ def upload_file(contents, filename, amount_classes):
             None,
         )
 
-    upload_dir = os.path.join(job_working_dir, "upload")
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
+    input_dir = os.path.join(job_working_dir, "input")
+    if not os.path.exists(input_dir):
+        os.makedirs(input_dir)
 
     filename = secure_filename(filename)
-    file_path = os.path.join(job_working_dir, "upload", filename)
+    file_path = os.path.join(job_working_dir, "input", filename)
 
     with open(file_path, "wb") as f:
         f.write(decoded)
@@ -121,10 +122,10 @@ def upload_file(contents, filename, amount_classes):
                     None,
                 )
 
-    logging.info("File uploaded successfully")
+    logging.info("CSV File uploaded successfully")
     output_values = (
         None,
-        dbc.Alert("File uploaded successfully", color="success", duration=5000),
+        dbc.Alert("CSV File uploaded successfully", color="success", duration=5000),
         file_path,
     )
     logging.info(f"Output values: {output_values}")
@@ -188,7 +189,7 @@ def run_osm_query(file_path, epsg_input):
 
         job_working_dir = current_app.config["JOB_WORKING_DIR"]
 
-        osm_file_path = osm.save_roads(os.path.join(job_working_dir, "osm-data"), 4326)
+        osm_file_path = osm.save_roads(os.path.join(job_working_dir, "input"), 4326)
         osm_data = osm._osm_transform()
         osm_file_path = osm_file_path.replace("4326", str(epsg_input))
         osm_data["nodes"] = osm_data["nodes"].apply(str)
@@ -279,6 +280,7 @@ function(feature, context){
     Input("job-id", "data"),
     State("map", "children"),
     prevent_initial_call=True,
+    allow_duplicate=True,
 )
 def update_map_with_geojson(selected_roads, job_id, current_children):
     """
@@ -306,9 +308,7 @@ def update_map_with_geojson(selected_roads, job_id, current_children):
         if not (isinstance(child, dict) and child.get("type") == "GeoJSON")
     ]
 
-    geojson_path = os.path.join(
-        f"cosmonaut_app/work_dir/{job_id}/osm-data/*_4326.geojson"
-    )
+    geojson_path = os.path.join(f"cosmonaut_app/work_dir/{job_id}/input/*_4326.geojson")
 
     logging.info(f"Geojson Path: {geojson_path}")
 
@@ -449,93 +449,94 @@ def generate_classification_plot(upload_status, file_path, job_id):
 
 
 @app.callback(
-    Output("route-layer", "children"),
-    Input("job-page-loaded", "data"),
-    [State("route-layer", "children"), State("osm-file-path", "children")],
+    Output("routing-complete", "data"),
+    [Input("confirm-button", "n_clicks")],
+    [State("job-id", "data"), State("epsg-store", "data")],
     prevent_initial_call=True,
 )
-def routing_callback(job_page_loaded, current_layer, osm_file_path):
-    if not job_page_loaded:
-        return current_layer
+def routing_callback(n_clicks, job_id, epsg_input):
+    if n_clicks is None:
+        raise PreventUpdate
 
     time.sleep(1)
 
-    # total_number_of_classes = 9
-    # segments_number_per_class = 2
-    # max_distance = 50
-    # class_data = (
-    #     "Mueglitz_extended_9Cluster_EPSG25832-2.csv"  # Update this path as needed
-    # )
-    # time_limit = 8
-    # optimization_objective = "d"
-    # max_aco_iteration = 500
-    # ant_no = 50
-    # point_mapping_output = "pm_output.json"
-    # benefit_calculation_output_benefit = "bc_benefits_output.json"
-    # benefit_calculation_output_top_benefit = "bc_top_benefits_output.json"
-    # path_finding_output = "pf_output.json"
-    solution_path = "solution.json"
+    # get the current job_id working directory
+    job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
 
-    # run_sensor_routing.delay(
-    #     total_number_of_classes,
-    #     segments_number_per_class,
-    #     max_distance,
-    #     osm_file_path,
-    #     class_data,
-    #     time_limit,
-    #     optimization_objective,
-    #     max_aco_iteration,
-    #     ant_no,
-    #     point_mapping_output,
-    #     benefit_calculation_output_benefit,
-    #     benefit_calculation_output_top_benefit,
-    #     path_finding_output,
-    #     solution_path,
-    # )
+    logging.info(f"Job working directory - ROUTING: {job_working_dir}")
 
-    # @celery.task
-    # def run_sensor_routing(
-    #     total_number_of_classes,
-    #     segments_number_per_class,
-    #     max_distance,
-    #     osm_file_path,
-    #     class_data,
-    #     time_limit,
-    #     optimization_objective,
-    #     max_aco_iteration,
-    #     ant_no,
-    #     point_mapping_output,
-    #     benefit_calculation_output_benefit,
-    #     benefit_calculation_output_top_benefit,
-    #     path_finding_output,
-    #     solution_path,
-    # ):
-    #     sensor_routing_cli.sensor_routing(
-    #         total_number_of_classes,
-    #         segments_number_per_class,
-    #         max_distance,
-    #         osm_file_path,
-    #         class_data,
-    #         time_limit,
-    #         optimization_objective,
-    #         max_aco_iteration,
-    #         ant_no,
-    #         point_mapping_output,
-    #         benefit_calculation_output_benefit,
-    #         benefit_calculation_output_top_benefit,
-    #         path_finding_output,
-    #         solution_path,
-    #     )
+    # TODO make the following parameters configurable in the frontend
+    total_number_of_classes = 6
+    segments_number_per_class = 2
+    max_distance = 50
+    time_limit = 8
+    optimization_objective = "d"
+    max_aco_iteration = 500
+    ant_no = 50
+    lower_benefit_limit = 0.5
 
-    with open(solution_path) as f:
-        data = json.load(f)
+    # Run the routing directly
+    sensor_routing_cli.sensor_routing(
+        total_number_of_classes,
+        segments_number_per_class,
+        max_distance,
+        job_working_dir,
+        time_limit,
+        optimization_objective,
+        max_aco_iteration,
+        ant_no,
+        True,  # is_reversed
+        lower_benefit_limit,
+    )
 
-    geojson_path = osm_file_path
+    # Set the routing completion flag
+    return True
 
-    route_creator = RouteCreator(geojson_path)
-    route_layer = route_creator.create_route_layer(data)
 
-    return route_layer
+# TODO FIXME Callback does not work yet. has errors with map beeing duplicated. allow_duplicate didnt help
+# @app.callback(
+#     Output("map", "children"),
+#     Input("routing-complete", "data"),
+#     State("map", "children"),
+#     State("job-id", "data"),
+#     State("epsg-store", "data"),
+#     prevent_initial_call=True,
+#     allow_duplicate=True,
+# )
+# def add_transformed_geojson_to_map(routing_complete, current_children, job_id, epsg_input):
+#     if not routing_complete:
+#         raise PreventUpdate
+
+#     # Get the current job_id working directory
+#     job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
+
+#     logging.info(f"Job working directory - ROUTING: {job_working_dir}")
+
+#     solution_path = os.path.join(job_working_dir, "transient", "solution.json")
+
+#     # Transform the solution to the correct CRS for displaying on the map
+#     transformed_solution = transform_solution(solution_path, epsg_input, 4326)
+
+#     # Create a GeoJSON layer from the transformed path
+#     geojson_layer = dl.GeoJSON(
+#         data=transformed_solution,
+#         options={"style": {"color": "blue", "weight": 5}},
+#         id="route-geojson",
+#     )
+
+#     # Update the map children
+#     current_children.append(geojson_layer)
+
+#     return current_children
+
+
+@app.callback(
+    Output("epsg-store", "data"),
+    Input("epsg-input", "value"),
+    prevent_initial_call=True,
+)
+def store_epsg(epsg):
+    return epsg
 
 
 @app.callback(
@@ -741,9 +742,10 @@ def start_job(n_clicks, _):
     job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
     current_app.config["JOB_WORKING_DIR"] = job_working_dir
     os.makedirs(job_working_dir)
-    os.makedirs(os.path.join(job_working_dir, "upload"))
-    os.makedirs(os.path.join(job_working_dir, "osm-data"))
+    os.makedirs(os.path.join(job_working_dir, "transient/debug"))
+    os.makedirs(os.path.join(job_working_dir, "input"))
     os.makedirs(os.path.join(job_working_dir, "plots"))
+    os.makedirs(os.path.join(job_working_dir, "routing"))
 
     return job_id
 
@@ -788,9 +790,9 @@ def update_stage(job_id, current_stage, job_loaded_flag):
             DataBaseManager.update_column(job_id, {"stage": 2})
 
             minio_manager = MiniIOManager("cosmic-routing")
-            for file in os.listdir(f"cosmonaut_app/work_dir/{job_id}/osm-data"):
+            for file in os.listdir(f"cosmonaut_app/work_dir/{job_id}/input"):
                 minio_manager.upload_file(
-                    f"cosmonaut_app/work_dir/{job_id}/osm-data/{file}", file
+                    f"cosmonaut_app/work_dir/{job_id}/input/{file}", file
                 )
             DataBaseManager.update_column(job_id, {"data_uploaded": True})
         return stage2(job_id)

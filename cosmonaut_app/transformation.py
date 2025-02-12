@@ -40,6 +40,35 @@ def transform_csv(input_file, epsg_input, epsg_output):
     return df
 
 
+def transform_solution(input_file, epsg_input, epsg_output):
+    """
+    Transforms the coordinates of sensor-routing solution .json
+    from one coordinate reference system (CRS) to another.
+    """
+    if not input_file.endswith(".json"):
+        raise ValueError("Input file must be a .json file.")
+    if not os.path.exists(input_file):
+        raise FileNotFoundError("Input file does not exist.")
+
+    with open(input_file, "r") as f:
+        data = geojson.load(f)
+
+    crs_output = CRS.from_epsg(epsg_output)
+    crs_input = CRS.from_epsg(epsg_input)
+    transformer = Transformer.from_crs(crs_input, crs_output)
+
+    # Transform the coordinates in the "Path" key
+    transformed_path = [transformer.transform(x, y) for x, y in data["Path"]]
+    data["Path"] = transformed_path
+
+    # Save the transformed data to a new file
+    output_file = os.path.join(os.path.dirname(input_file), "solution_transformed.json")
+    with open(output_file, "w") as f:
+        geojson.dump(data, f)
+
+    return data
+
+
 def get_convex_hull(self):
     """
     Calculate the convex hull of the given points and return a buffered polygon.
@@ -88,6 +117,7 @@ class OsmRoads:
             The EPSG code of the output coordinate system. Defaults to 31468.
     """
 
+    # TOPO: make the epsg output flexible
     def __init__(self, polygon, epsg_input=4326, epsg_output=31468):
         self.polygon = polygon
         self.tags = {
