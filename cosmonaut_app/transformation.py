@@ -40,10 +40,12 @@ def transform_csv(input_file, epsg_input, epsg_output):
     return df
 
 
-def transform_solution(input_file, epsg_input, epsg_output):
+# TODO The transformation into a correct geojson format should be in CANs Sensor-routing package
+def transform_solution(input_file, epsg_input, epsg_output, reversed_coords=False):
     """
     Transforms the coordinates of sensor-routing solution .json
-    from one coordinate reference system (CRS) to another.
+    from one coordinate reference system (CRS) to another and
+    converts the solution to GeoJSON format.
     """
     if not input_file.endswith(".json"):
         raise ValueError("Input file must be a .json file.")
@@ -58,15 +60,33 @@ def transform_solution(input_file, epsg_input, epsg_output):
     transformer = Transformer.from_crs(crs_input, crs_output)
 
     # Transform the coordinates in the "Path" key
-    transformed_path = [transformer.transform(x, y) for x, y in data["Path"]]
-    data["Path"] = transformed_path
+    if reversed_coords:
+        transformed_path = [transformer.transform(y, x) for x, y in data["Path"]]
+        transformed_path = [(lon, lat) for lat, lon in transformed_path]
+    else:
+        transformed_path = [transformer.transform(x, y) for x, y in data["Path"]]
+
+    # Create GeoJSON features
+    features = []
+    for i in range(len(transformed_path) - 1):
+        start = transformed_path[i]
+        end = transformed_path[i + 1]
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {"type": "LineString", "coordinates": [start, end]},
+                "properties": {},
+            }
+        )
+
+    geojson_data = {"type": "FeatureCollection", "features": features}
 
     # Save the transformed data to a new file
     output_file = os.path.join(os.path.dirname(input_file), "solution_transformed.json")
     with open(output_file, "w") as f:
-        geojson.dump(data, f)
+        geojson.dump(geojson_data, f)
 
-    return data
+    return geojson_data
 
 
 def get_convex_hull(self):

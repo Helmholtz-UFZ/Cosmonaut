@@ -25,7 +25,7 @@ def main_page_layout():
             side_bar,
             html.Div(id="hidden-div", style={"display": "none"}),
             dcc.Store(id="current-stage", data=0),
-            dcc.Store(id="job-id", data=None),
+            # dcc.Store(id="job-id", data=  ),
             dcc.Store(id="job-loaded-flag", data=None),
             dcc.Store(id="email-store"),
             dcc.Store(id="epsg-store"),
@@ -93,8 +93,11 @@ main_map = html.Div(
             dl.EasyButton(
                 icon="fa-edit", title="Remove selected road", id="remove-button"
             ),
-            dl.GeoJSON(id="geojson"),
+            dl.GeoJSON(id="osm-geojson"),
+            dl.GeoJSON(id="route-geojson"),
             dcc.Store(id="clicked-roads", data=[]),
+            dcc.Store(id="routing-complete", data=False),
+            dcc.Store(id="epsg-store", data=31468),
         ],
         center=[51.70, 11.20],
         zoom=10,
@@ -397,7 +400,7 @@ def stage4(job_id):
             confirm_side_bar,
             html.Div(id="hidden-div", style={"display": "none"}),
             dcc.Store(id="current-stage", data=0),
-            dcc.Store(id="job-id", data=None),
+            # dcc.Store(id="job-id", data=None),
             dcc.Store(id="job-loaded-flag", data=None),
             dcc.Store(id="email-store"),
             dcc.Dropdown(

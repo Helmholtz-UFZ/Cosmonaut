@@ -63,7 +63,7 @@ class RouteCreator:
         line_layer = dl.Polyline(positions=coordinates, color="red")
         return line_layer
 
-    def create_gpx(self, routes, filename="route.gpx"):
+    def create_gpx(self, routes, filename="route.gpx", path="."):
         """
         Creates a GPX file based on the provided routes.
 
@@ -71,6 +71,8 @@ class RouteCreator:
             routes (list): A list of route objects.
             filename (str, optional): The name of the GPX file to be created.
                 Defaults to "route.gpx".
+            path (str, optional): The path where the GPX file will be saved.
+                Defaults to the current directory.
 
         """
         gpx = gpxpy.gpx.GPX()
@@ -94,7 +96,8 @@ class RouteCreator:
                         )
             gpx.routes.append(gpx_route)
 
-        with open(filename, "w") as file:
+        full_path = os.path.join(path, filename)
+        with open(full_path, "w") as file:
             file.write(gpx.to_xml())
 
     def delete_gpx(self, filename="route.gpx"):
@@ -133,8 +136,6 @@ class RouteCreator:
             else:
                 raise Exception("Failed to upload GPX file")
 
-    # TODO: Also provide the Link, not just the QR-Code
-
     def create_qr_code(self, url):
         """
         Creates a QR code image based on the provided URL.
@@ -143,7 +144,7 @@ class RouteCreator:
             url (str): The URL to be encoded in the QR code.
 
         Returns:
-            str: The base64-encoded data URI of the QR code image.
+            dict: A dictionary containing the URL and the base64-encoded data URI of the QR code image.
 
         """
         qr = qrcode.QRCode(
@@ -161,7 +162,7 @@ class RouteCreator:
         img_io.seek(0)
         img_data = base64.b64encode(img_io.getvalue()).decode()
 
-        return f"data:image/png;base64,{img_data}"
+        return {"url": url, "qr_code": f"data:image/png;base64,{img_data}"}
 
 
 # # Usage:

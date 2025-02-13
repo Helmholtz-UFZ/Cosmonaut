@@ -10,7 +10,7 @@ import time
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
 import matplotlib
-from dash import no_update
+from dash import no_update, ctx
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from dash_extensions.javascript import assign
@@ -46,6 +46,7 @@ from cosmonaut_app.transformation import (
     _get_bounds,
     get_convex_hull,
     transform_csv,
+    transform_solution,
 )
 
 logging.basicConfig(
@@ -55,6 +56,8 @@ logging.basicConfig(
 )
 
 matplotlib.use("Agg")
+
+# TODO Refactor the code to make it more readable and maintainable
 
 
 @app.callback(
@@ -274,98 +277,108 @@ function(feature, context){
 )
 
 
+# TODO FIXME Plotting works but the delete street button and recalculate the biggest network does not work anymore
 @app.callback(
     Output("map", "children"),
     Input("tags-dropdown", "value"),
-    Input("job-id", "data"),
+    State("job-id", "data"),
+    Input("routing-complete", "data"),
     State("map", "children"),
+    State("epsg-store", "data"),
     prevent_initial_call=True,
-    allow_duplicate=True,
 )
-def update_map_with_geojson(selected_roads, job_id, current_children):
-    """
-    Update the map with GeoJSON layers based on the selected roads and job ID.
+def update_map(selected_roads, job_id, routing_complete, current_children, epsg_input):
+    logging.info(f"Trigger ID for geojson update: {ctx.triggered_id}")
+    logging.info(f"Routing complete: {routing_complete}")
 
-    Parameters:
-    selected_roads (list): List of selected road tags from the dropdown.
-    job_id (str): The job ID used to locate the GeoJSON file.
-    current_children (list): The current children elements of the map.
-
-    Returns:
-    list: Updated list of children elements for the map.
-    """
-    if selected_roads is None:
-        return current_children
-
-    # logging.info(f"geojson tags: {selected_roads}"),
-
-    osm_values = [osm_tags_mapping[value] for value in selected_roads]
-    osm_values = [item for sublist in osm_values for item in sublist]
-
+    # Remove existing GeoJSON layers
     current_children = [
         child
         for child in current_children
         if not (isinstance(child, dict) and child.get("type") == "GeoJSON")
     ]
 
-    geojson_path = os.path.join(f"cosmonaut_app/work_dir/{job_id}/input/*_4326.geojson")
+    # Only proceed if routing is complete
+    if routing_complete:
+        logging.info("Routing complete detected. Updating map.")
+        logging.info(job_id)
 
-    logging.info(f"Geojson Path: {geojson_path}")
+        job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
+        solution_path = os.path.join(job_working_dir, "transient", "solution.json")
+        transformed_solution = transform_solution(solution_path, epsg_input, 4326, True)
+        logging.info(f"EPSG input: {epsg_input}")
 
-    timeout = 30  # seconds
-    start_time = time.time()
-    while not glob.glob(geojson_path):
-        logging.info(f"Waiting for geojson file at path: {geojson_path}")
-        if time.time() - start_time > timeout:
-            raise TimeoutError(
-                "Timed out waiting for the geojson file to be available."
-            )
-        time.sleep(1)
+        logging.info("Routing solution transformed")
 
-    geojson_files = glob.glob(geojson_path)
-    if not geojson_files:
-        raise FileNotFoundError(f"No GeoJSON file found at path: {geojson_path}")
+        geojson_layer = dl.GeoJSON(
+            data=transformed_solution,
+            options={"style": {"color": "blue", "weight": 5}},
+            id="route-geojson",
+        )
+        logging.info("Route GeoJSON layer created.")
+        current_children.append(geojson_layer)
 
-    geojson_file = geojson_files[0]
-    logging.info(f"Geojson file found: {geojson_file}")
-    with open(geojson_file) as f:
-        data = json.load(f)
+    # If triggered by tags-dropdown, update map with selected road types
+    elif ctx.triggered_id == "tags-dropdown" and selected_roads is not None:
+        logging.info("Updating map based on selected roads.")
 
-    filtered_data = {
-        "type": "FeatureCollection",
-        "features": [
-            feature
-            for feature in data["features"]
-            if feature["properties"]["highway"] in osm_values
-        ],
-    }
+        osm_values = [osm_tags_mapping[value] for value in selected_roads]
+        osm_values = [item for sublist in osm_values for item in sublist]
 
-    for feature in filtered_data["features"]:
-        highway_type = feature["properties"]["highway"]
-        name = feature["properties"].get("name")
-        ref = feature["properties"].get("ref")
-        tracktype = feature["properties"].get("tracktype")
+        geojson_path = os.path.join(
+            f"cosmonaut_app/work_dir/{job_id}/input/*_4326.geojson"
+        )
+        timeout = 30  # seconds
+        start_time = time.time()
+        while not glob.glob(geojson_path):
+            if time.time() - start_time > timeout:
+                raise TimeoutError(
+                    "Timed out waiting for the geojson file to be available."
+                )
+            time.sleep(1)
 
-        if name is None:
-            name = ref
+        geojson_files = glob.glob(geojson_path)
+        if not geojson_files:
+            raise FileNotFoundError(f"No GeoJSON file found at path: {geojson_path}")
 
-        if highway_type == "track" and tracktype is not None:
-            feature["properties"]["tooltip"] = f"{name}, {highway_type}, {tracktype}"
-        else:
-            feature["properties"]["tooltip"] = f"{name}, {highway_type}"
+        with open(geojson_files[0]) as f:
+            data = json.load(f)
 
-    geojson_layer = dl.GeoJSON(
-        data=filtered_data,
-        options={"style": style_handle},
-        hideout=dict(selected=[]),
-        id="geojson",
-    )
+        filtered_data = {
+            "type": "FeatureCollection",
+            "features": [
+                feature
+                for feature in data["features"]
+                if feature["properties"]["highway"] in osm_values
+            ],
+        }
 
-    current_children.extend([geojson_layer])
+        for feature in filtered_data["features"]:
+            highway_type = feature["properties"]["highway"]
+            name = feature["properties"].get("name") or feature["properties"].get("ref")
+            tracktype = feature["properties"].get("tracktype")
+
+            if highway_type == "track" and tracktype:
+                feature["properties"]["tooltip"] = (
+                    f"{name}, {highway_type}, {tracktype}"
+                )
+            else:
+                feature["properties"]["tooltip"] = f"{name}, {highway_type}"
+
+        geojson_layer = dl.GeoJSON(
+            data=filtered_data,
+            options={"style": style_handle},
+            hideout=dict(selected=[]),
+            id="osm-geojson",
+        )
+        current_children.append(geojson_layer)
+
+    logging.info("Map updated successfully.")
 
     return current_children
 
 
+# TODO not sure if the selected are passed currently or just highlighted for the user
 @app.callback(
     Output("geojson", "hideout", allow_duplicate=True),
     Input("geojson", "n_clicks"),
@@ -450,20 +463,25 @@ def generate_classification_plot(upload_status, file_path, job_id):
 
 @app.callback(
     Output("routing-complete", "data"),
-    [Input("confirm-button", "n_clicks")],
-    [State("job-id", "data"), State("epsg-store", "data")],
+    Input("confirm-button", "n_clicks"),
+    State("routing-complete", "data"),
+    State("job-id", "data"),
+    State("epsg-store", "data"),
     prevent_initial_call=True,
+    allow_duplicate=True,
 )
-def routing_callback(n_clicks, job_id, epsg_input):
+def routing_callback(n_clicks, routing_complete, job_id, epsg_input):
     if n_clicks is None:
         raise PreventUpdate
+
+    if routing_complete:
+        logging.info("Setting routing complete to False first")
+        return False
 
     time.sleep(1)
 
     # get the current job_id working directory
     job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
-
-    logging.info(f"Job working directory - ROUTING: {job_working_dir}")
 
     # TODO make the following parameters configurable in the frontend
     total_number_of_classes = 6
@@ -489,7 +507,8 @@ def routing_callback(n_clicks, job_id, epsg_input):
         lower_benefit_limit,
     )
 
-    # Set the routing completion flag
+    logging.info("Routing completed successfully")
+
     return True
 
 
@@ -525,7 +544,7 @@ def routing_callback(n_clicks, job_id, epsg_input):
 #     )
 
 #     # Update the map children
-#     current_children.append(geojson_layer)
+#     current_children.extend([geojson_layer])
 
 #     return current_children
 
@@ -745,7 +764,6 @@ def start_job(n_clicks, _):
     os.makedirs(os.path.join(job_working_dir, "transient/debug"))
     os.makedirs(os.path.join(job_working_dir, "input"))
     os.makedirs(os.path.join(job_working_dir, "plots"))
-    os.makedirs(os.path.join(job_working_dir, "routing"))
 
     return job_id
 
@@ -789,6 +807,7 @@ def update_stage(job_id, current_stage, job_loaded_flag):
             logging.info("Stage 2")
             DataBaseManager.update_column(job_id, {"stage": 2})
 
+            # TODO upload to MiniIO seems to be done twice, check if this is necessary
             minio_manager = MiniIOManager("cosmic-routing")
             for file in os.listdir(f"cosmonaut_app/work_dir/{job_id}/input"):
                 minio_manager.upload_file(
