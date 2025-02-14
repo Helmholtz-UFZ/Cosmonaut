@@ -1,11 +1,20 @@
 import io
 import logging
 import os
+import json
 
 from dotenv import load_dotenv
 from minio import Minio
+from minio.error import S3Error
 
 from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
 
 # TODO: Replace with rclone for performance
 
@@ -25,6 +34,8 @@ class MiniIOManager:
     Methods:
         upload_file(file_path, object_key): Uploads a file to the MinIO bucket.
         delete_file(object_key): Deletes a file from the MinIO bucket.
+        make_file_public(object_key): Makes a file in the MinIO bucket public.
+        get_file_url(object_key): Gets the URL of a file in the MinIO bucket.
     """
 
     def __init__(self, bucket_name):
@@ -45,7 +56,7 @@ class MiniIOManager:
             object_key (str): Key to assign to the uploaded file in MinIO bucket.
         """
         _, file_extension = os.path.splitext(file_path)
-        allowed_extensions = [".tif", ".geojson", ".json", ".csv"]
+        allowed_extensions = [".tif", ".geojson", ".json", ".csv", ".gpx"]
         if file_extension not in allowed_extensions:
             logging.error(
                 f"Failed to upload file {file_path}: Only {', '.join(allowed_extensions)} files are allowed."  # noqa: E501
@@ -84,6 +95,49 @@ class MiniIOManager:
             logging.info(f"File {object_key} deleted successfully")
         except Exception as e:
             logging.error(f"Failed to delete file {object_key}: {str(e)}")
+
+    def make_file_public(self, object_key):
+        """
+        Makes a file in the MinIO bucket public.
+
+        Args:
+            object_key (str): The key of the file to be made public.
+        """
+        try:
+            policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"AWS": ["*"]},
+                        "Action": ["s3:GetObject"],
+                        "Resource": [f"arn:aws:s3:::{self.bucket_name}/{object_key}"],
+                    }
+                ],
+            }
+            policy_json = json.dumps(policy)
+            self.minio_client.set_bucket_policy(self.bucket_name, policy_json)
+            logging.info(f"File {object_key} made public successfully")
+        except S3Error as e:
+            logging.error(f"Failed to make file {object_key} public: {str(e)}")
+
+    def get_file_url(self, object_key):
+        """
+        Gets the URL of a file in the MinIO bucket.
+
+        Args:
+            object_key (str): The key of the file to get the URL for.
+
+        Returns:
+            str: The URL of the file.
+        """
+        try:
+            url = self.minio_client.presigned_get_object(self.bucket_name, object_key)
+            logging.info(f"URL for file {object_key} retrieved successfully")
+            return url
+        except Exception as e:
+            logging.error(f"Failed to get URL for file {object_key}: {str(e)}")
+            return None
 
     # return filenames asked for in the bucket
     def get_files(self):

@@ -26,6 +26,13 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from cosmonaut_app.config import DB_HOST_NAME, DB_NAME, DB_PORT, DB_PW, DB_USER
 
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
+
 
 class Base(DeclarativeBase):
     """Base class for declarative base."""

@@ -151,7 +151,6 @@ def update_map_center(file_path, epsg_input):
     if file_path is None:
         raise PreventUpdate
 
-    # TODO: EPSG needs to be respected later on
     data = transform_csv(file_path, epsg_input, 4326)
     bounds = _get_bounds(data)
 
@@ -466,11 +465,11 @@ def generate_classification_plot(upload_status, file_path, job_id):
     Input("confirm-button", "n_clicks"),
     State("routing-complete", "data"),
     State("job-id", "data"),
-    State("epsg-store", "data"),
+    # State("amount-classes-input", "data"),
     prevent_initial_call=True,
     allow_duplicate=True,
 )
-def routing_callback(n_clicks, routing_complete, job_id, epsg_input):
+def routing_callback(n_clicks, routing_complete, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
@@ -512,43 +511,6 @@ def routing_callback(n_clicks, routing_complete, job_id, epsg_input):
     return True
 
 
-# TODO FIXME Callback does not work yet. has errors with map beeing duplicated. allow_duplicate didnt help
-# @app.callback(
-#     Output("map", "children"),
-#     Input("routing-complete", "data"),
-#     State("map", "children"),
-#     State("job-id", "data"),
-#     State("epsg-store", "data"),
-#     prevent_initial_call=True,
-#     allow_duplicate=True,
-# )
-# def add_transformed_geojson_to_map(routing_complete, current_children, job_id, epsg_input):
-#     if not routing_complete:
-#         raise PreventUpdate
-
-#     # Get the current job_id working directory
-#     job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
-
-#     logging.info(f"Job working directory - ROUTING: {job_working_dir}")
-
-#     solution_path = os.path.join(job_working_dir, "transient", "solution.json")
-
-#     # Transform the solution to the correct CRS for displaying on the map
-#     transformed_solution = transform_solution(solution_path, epsg_input, 4326)
-
-#     # Create a GeoJSON layer from the transformed path
-#     geojson_layer = dl.GeoJSON(
-#         data=transformed_solution,
-#         options={"style": {"color": "blue", "weight": 5}},
-#         id="route-geojson",
-#     )
-
-#     # Update the map children
-#     current_children.extend([geojson_layer])
-
-#     return current_children
-
-
 @app.callback(
     Output("epsg-store", "data"),
     Input("epsg-input", "value"),
@@ -561,81 +523,36 @@ def store_epsg(epsg):
 @app.callback(
     Output("qr-code", "src"),
     Input("start-route", "n_clicks"),
-    [State("route-layer", "children")],
+    [State("route-layer", "children"), State("job-id", "data")],
     prevent_initial_call=True,
 )
-def update_qr_code(n_clicks, current_layer):
+def update_qr_code(n_clicks, current_layer, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
-    # Define the routes for the example test
-    # TODO: FUTURE, get the routes from CAN's Navigation Algorithm
-    # FIXME This is testing -> should be moved to test file in the test folder
-    routes = [
-        {
-            "way": "('way', 91403181)",
-            "start_node": 1061793565,
-            "end_node": 1036593570,
-        },
-        {
-            "way": "('way', 922732272)",
-            "start_node": 1036593570,
-            "end_node": 845193413,
-        },
-        {
-            "way": "('way', 70909551)",
-            "start_node": 845193413,
-            "end_node": 845197359,
-        },
-        {
-            "way": "('way', 70909733)",
-            "start_node": 845197359,
-            "end_node": 845197431,
-        },
-        {
-            "way": "('way', 70909838)",
-            "start_node": 845197431,
-            "end_node": 845190677,
-        },
-        {
-            "way": "('way), 70909517)",
-            "start_node": 845190677,
-            "end_node": 845190684,
-        },
-        {
-            "way": "('way', 70909551)",
-            "start_node": 845190684,
-            "end_node": 9232344563,
-        },
-        {
-            "way": "('way', 1000189951)",
-            "start_node": 9232344563,
-            "end_node": 845189629,
-        },
-        {
-            "way": "('way', 54234166)",
-            "start_node": 845189629,
-            "end_node": 683872135,
-        },
-        {
-            "way": "('way', 89369683)",
-            "start_node": 683872135,
-            "end_node": 1036584699,
-        },
-    ]
-
+    # Load the GeoJSON data from the solution_transformed.json file
     geojson_path = os.path.join(
-        "cosmonaut_app/download/20240424-105506_osm_data_4326.geojson"
+        WEB_WORK_DIR, job_id, "transient", "solution_transformed.json"
     )
+    with open(geojson_path) as f:
+        geojson_data = json.load(f)
 
-    route_creator = RouteCreator(geojson_path)
+    # Create the RouteCreator instance with the GeoJSON data
+    route_creator = RouteCreator(geojson_data)
 
-    route_creator.create_gpx(routes)
-    gpx_url = route_creator.upload_gpx()
-    qr_data_url = route_creator.create_qr_code(gpx_url)
-    route_creator.delete_gpx()
+    # Create the GPX file
+    output_dir = os.path.join(WEB_WORK_DIR, job_id, "output")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    route_creator.create_gpx(path=output_dir)
 
-    return qr_data_url
+    # Upload the GPX file to MinIO and get the URL
+    gpx_url = route_creator.upload_gpx(job_id=job_id)
+
+    # Create the QR code for the GPX URL
+    qr_data = route_creator.create_qr_code(gpx_url, path=output_dir)
+
+    return qr_data["qr_code"]
 
 
 # Update the clicked roads when a road is clicked
@@ -764,6 +681,7 @@ def start_job(n_clicks, _):
     os.makedirs(os.path.join(job_working_dir, "transient/debug"))
     os.makedirs(os.path.join(job_working_dir, "input"))
     os.makedirs(os.path.join(job_working_dir, "plots"))
+    os.makedirs(os.path.join(job_working_dir, "output"))
 
     return job_id
 
