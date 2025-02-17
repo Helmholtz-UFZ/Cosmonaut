@@ -23,7 +23,7 @@ variables:
 
 linting:
   stage: "lint"
-  image: "python:3.12.0"
+  image: "python:3.12"
   before_script:
     - "apt-get update && apt-get install -y libgdal-dev"
     - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"
@@ -40,7 +40,7 @@ build-latest:
     - "docker build -t $CI_REGISTRY_IMAGE:latest -f docker/prod.Dockerfile ."
     - "docker push $CI_REGISTRY_IMAGE:latest"
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
     - when: never
 
 build-release:
@@ -57,4 +57,3 @@ build-release:
     - if: '$CI_COMMIT_TAG =~ /^\d+.\d+.\d+/'
       when: "always"
     - when: "never"
-

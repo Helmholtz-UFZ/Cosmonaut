@@ -6,7 +6,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 if [ "$1" == "mock" ]; then
-    env_file=".env_test_priv"
+    env_file=".env_test"
 elif [ "$1" == "prod" ]; then
     env_file=".env_prod_priv"
 else
@@ -28,11 +28,11 @@ if [ ! -e ".docker_build_hash" ] || [ "$(sha256sum poetry.lock)" != "$(cat .dock
     docker compose build cosmonaut
 
     # Save the hash of the poetry.lock file
-    sha256sum poetry.lock > .docker_build_hash
+    sha256sum poetry.lock >.docker_build_hash
 fi
 
 if [ "$1" == "prod" ]; then
     docker compose up --no-log-prefix cosmonaut
 else
-    docker compose up --no-log-prefix --attach cosmonaut 
+    docker compose up --no-log-prefix --attach cosmonaut
 fi

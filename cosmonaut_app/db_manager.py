@@ -29,7 +29,7 @@ from cosmonaut_app.config import DB_HOST_NAME, DB_NAME, DB_PORT, DB_PW, DB_USER
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO,
+    level=logging.DEBUG,
 )
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,7 @@ class DataBaseManager:
         Returns:
         bool: True if a job with the given job ID exists, False otherwise.
         """
+        logging.debug(f"Check existence of job with ID: {job_id}")
         with self.Session() as session:
             job_row = session.query(JobTable).filter_by(job_id=job_id).first()
         return job_row is not None
@@ -297,3 +298,7 @@ class JobTable(Base):
     version = Column("version", Float)
     file_names = Column("file_names", ARRAY(String))
     selected_road_tags = Column("selected_road_tags", ARRAY(String))
+
+
+if __name__ == "__main__":
+    DataBaseManager.check_existence("test")

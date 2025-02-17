@@ -25,7 +25,7 @@ DAYS_DELETE_SUBMITTED = 60
 # Number of days to keep an unsubmitted job entries in the database
 DAYS_DELETE_NOT_SUBMITTED = 2
 
-load_dotenv(".env_test_priv")
+load_dotenv()
 
 WEB_WORK_DIR = getenv("WEB_WORK_DIR")
 FLASK_PORT = getenv("FLASK_PORT")
