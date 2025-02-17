@@ -9,6 +9,7 @@ import time
 
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
+import geojson
 import matplotlib
 from dash import no_update, ctx
 from dash.dependencies import Input, Output, State
@@ -219,7 +220,7 @@ def run_osm_query(file_path, epsg_input):
     State("job-id", "data"),
 )
 def upload_to_minIO(osm_file_path, job_id):
-    ALLOWED_EXTENSIONS = {".tif", ".geojson", ".json", ".csv"}
+    ALLOWED_EXTENSIONS = {".tif", ".geojson", ".json", ".csv", ".gpx"}
 
     if osm_file_path is None:
         raise PreventUpdate
@@ -379,10 +380,10 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
 
 # TODO not sure if the selected are passed currently or just highlighted for the user
 @app.callback(
-    Output("geojson", "hideout", allow_duplicate=True),
-    Input("geojson", "n_clicks"),
-    State("geojson", "clickData"),
-    State("geojson", "hideout"),
+    Output("osm-geojson", "hideout", allow_duplicate=True),
+    Input("osm-geojson", "n_clicks"),
+    State("osm-geojson", "clickData"),
+    State("osm-geojson", "hideout"),
     prevent_initial_call=True,
 )
 def toggle_select(_, clickData, hideout):
@@ -477,7 +478,7 @@ def routing_callback(n_clicks, routing_complete, job_id):
         logging.info("Setting routing complete to False first")
         return False
 
-    time.sleep(1)
+    time.sleep(0.1)
 
     # get the current job_id working directory
     job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
@@ -523,10 +524,10 @@ def store_epsg(epsg):
 @app.callback(
     Output("qr-code", "src"),
     Input("start-route", "n_clicks"),
-    [State("route-layer", "children"), State("job-id", "data")],
+    State("job-id", "data"),
     prevent_initial_call=True,
 )
-def update_qr_code(n_clicks, current_layer, job_id):
+def update_qr_code(n_clicks, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
@@ -558,7 +559,7 @@ def update_qr_code(n_clicks, current_layer, job_id):
 # Update the clicked roads when a road is clicked
 @app.callback(
     Output("clicked-roads", "data"),
-    [Input("geojson", "clickData")],
+    [Input("osm-geojson", "clickData")],
     [State("clicked-roads", "data")],
     prevent_initial_call=True,
 )
@@ -572,12 +573,16 @@ def update_clicked_roads(clickData, clicked_roads):
 
 
 @app.callback(
-    Output("geojson", "data"),
+    Output("osm-geojson", "data"),
     [Input("remove-button", "n_clicks")],
-    [State("clicked-roads", "data"), State("geojson", "data")],
+    [
+        State("clicked-roads", "data"),
+        State("osm-geojson", "data"),
+        State("job-id", "data"),
+    ],
     prevent_initial_call=True,
 )
-def remove_selected(n, clicked_roads, original_data):
+def remove_selected(n, clicked_roads, original_data, job_id):
     if n is None or clicked_roads is None or original_data is None:
         raise PreventUpdate
 
@@ -599,6 +604,15 @@ def remove_selected(n, clicked_roads, original_data):
         "type": "FeatureCollection",
         "features": all_roads,
     }
+
+    # Save the filtered data to a new GeoJSON file
+    job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
+    filtered_geojson_path = os.path.join(
+        job_working_dir, "transient", "filtered_osm.geojson"
+    )
+    with open(filtered_geojson_path, "w") as f:
+        geojson.dump(filtered_data, f)
+        # TODO USE THIS FOR THE ROUTING BACKEND
 
     return filtered_data
 
