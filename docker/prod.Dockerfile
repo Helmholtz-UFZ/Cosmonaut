@@ -4,10 +4,10 @@ FROM python:3.12.0-slim
 
 ENV MPLCONFIGDIR /python_docker/cosmonaut/.config/matplotlib
 
-RUN apt-get update
-RUN apt-get -y upgrade
-RUN apt-get -y install git libpq-dev gcc g++ libgdal-dev gdal-bin
-RUN pip install --upgrade pip wheel setuptools && pip install poetry
+RUN apt-get update && \
+    apt-get -y upgrade && \
+    apt-get -y install git libpq-dev gcc g++ libgdal-dev gdal-bin && \
+    pip install --upgrade pip wheel setuptools && pip install poetry
 
 WORKDIR /python_docker/cosmonaut
 
@@ -19,8 +19,8 @@ ENV C_INCLUDE_PATH=/usr/include/gdal
 
 COPY poetry.lock pyproject.toml /python_docker/cosmonaut/
 
-RUN poetry config virtualenvs.create false 
-RUN poetry install --no-interaction --no-ansi
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi
 
 USER 1000
 
@@ -28,4 +28,4 @@ COPY . .
 
 COPY .env_prod .env
 
-CMD gunicorn --timeout 120 -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.wsgi:app; \
+CMD gunicorn --timeout 120 -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.wsgi:app;
