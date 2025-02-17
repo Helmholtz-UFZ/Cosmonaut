@@ -12,3 +12,8 @@ credentials.json
 *_priv
 priv*
 README.html
+cosmonaut_app/work_dir/*
+cache/*
+.env
+.ruff_cache
+.docker_build_hash

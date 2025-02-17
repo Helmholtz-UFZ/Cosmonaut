@@ -11,13 +11,12 @@ import dash_bootstrap_components as dbc
 import dash_leaflet as dl
 import geojson
 import matplotlib
-from dash import no_update, ctx
+from dash import ctx, no_update
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from dash_extensions.javascript import assign
 from flask import current_app
 from matplotlib import pyplot as plt
-
 from sensor_routing import sensor_routing_cli
 from werkzeug.utils import secure_filename
 
@@ -477,8 +476,6 @@ def routing_callback(n_clicks, routing_complete, job_id):
     if routing_complete:
         logging.info("Setting routing complete to False first")
         return False
-
-    time.sleep(0.1)
 
     # get the current job_id working directory
     job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
