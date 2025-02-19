@@ -11,6 +11,7 @@ Classes:
 """
 
 import logging
+import time
 
 from sqlalchemy import (
     ARRAY,
@@ -23,6 +24,7 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.exc import OperationalError
 
 from cosmonaut_app.config import DB_HOST_NAME, DB_NAME, DB_PORT, DB_PW, DB_USER
 
@@ -78,7 +80,7 @@ class DataBaseManager:
     Session = sessionmaker(bind=engine)
 
     @classmethod
-    def check_existence(self, job_id):
+    def check_existence(self, job_id, retries=3, delay=5):
         """Check if a job with the given job ID exists in the database.
 
         This method queries the 'jobs' table in the database to determine
@@ -91,9 +93,18 @@ class DataBaseManager:
         bool: True if a job with the given job ID exists, False otherwise.
         """
         logging.debug(f"Check existence of job with ID: {job_id}")
-        with self.Session() as session:
-            job_row = session.query(JobTable).filter_by(job_id=job_id).first()
-        return job_row is not None
+        for attempt in range(retries):
+            try:
+                with self.Session() as session:
+                    job_row = session.query(JobTable).filter_by(job_id=job_id).first()
+                return job_row is not None
+            except OperationalError as e:
+                logging.error(f"Database connection failed: {e}")
+                if attempt < retries - 1:
+                    logging.info(f"Retrying in {delay} seconds...")
+                    time.sleep(delay)
+                else:
+                    raise
 
     @classmethod
     def add_entry(self, data_to_insert):

@@ -255,22 +255,33 @@ def stage2(job_id):
                     type="number",
                     placeholder="Please Enter a valid EPSG Code for your data.",
                     style={"margin-top": "1rem"},
-                    value=31468,
                 ),
                 dbc.Input(
                     id="amount-classes-input",
                     type="number",
                     placeholder="Please Enter the amount of classes for your data.",
                     style={"margin-top": "1rem"},
-                    value=6,
                 ),
-                dcc.Upload(
-                    id="upload-data-dcc",
-                    accept=".csv",
-                    children=html.Div(
-                        ["Drag and drop a file or click to select a file to upload."]
-                    ),
-                    multiple=False,
+                dbc.Form(
+                    [
+                        dcc.Upload(
+                            id="upload-data-dcc",
+                            accept=".csv",
+                            children=html.Div(
+                                [
+                                    dbc.Button(
+                                        "Click to select a file to upload.",
+                                        # TODO FIXME the drag and drop does not work with the Form wrapper
+                                        # "Drag and drop a file or click to select a file to upload.",
+                                        color="primary",
+                                        className="mt-2",
+                                    )
+                                ]
+                            ),
+                            multiple=False,
+                        ),
+                    ],
+                    className="mt-3 mb-3",
                 ),
                 dbc.Button(
                     "Previous Step",
