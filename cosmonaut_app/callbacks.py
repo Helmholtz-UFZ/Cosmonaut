@@ -677,23 +677,40 @@ def redirect_to_home(n_intervals):
 )
 def start_job(n_clicks, _):
     if n_clicks is None:
+        logging.debug("No clicks detected, preventing update")
         raise PreventUpdate
 
-    # create a new CosmonautJob instance and start the job
+    # Create a new CosmonautJob instance and start the job
+    logging.info("Initializing new CosmonautJob")
     job = CosmonautJob()
     job._blank_job()
     job_id = job.job_id
-    job.save()
 
-    # create the working directory for the job
+    try:
+        job.save()
+        logging.info(f"Successfully saved new job with id={job_id}")
+    except Exception as e:
+        logging.error(f"Failed to save job {job_id}: {str(e)}")
+        raise
+
+    # Create the working directory structure
     job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
     current_app.config["JOB_WORKING_DIR"] = job_working_dir
-    os.makedirs(job_working_dir)
-    os.makedirs(os.path.join(job_working_dir, "transient/debug"))
-    os.makedirs(os.path.join(job_working_dir, "input"))
-    os.makedirs(os.path.join(job_working_dir, "plots"))
-    os.makedirs(os.path.join(job_working_dir, "output"))
 
+    dirs_to_create = ["", "transient/debug", "input", "plots", "output"]
+
+    for dir_path in dirs_to_create:
+        full_path = os.path.join(job_working_dir, dir_path)
+        try:
+            os.makedirs(full_path)
+            logging.debug(f"Created directory: {full_path}")
+        except OSError as e:
+            logging.error(f"Failed to create directory {full_path}: {str(e)}")
+            raise
+
+    logging.info(
+        f"Successfully initialized working directory structure for job {job_id}"
+    )
     return job_id
 
 
@@ -706,17 +723,30 @@ def start_job(n_clicks, _):
 )
 def update_stage(job_id, current_stage, job_loaded_flag):
     if job_id is None:
+        logging.debug("No job_id provided, returning None")
         return None
 
-    job = CosmonautJob(job_id=job_id)
-    loaded_stage = job.stage
+    logging.info(f"Processing job {job_id}")
+    logging.debug(
+        f"Input state - stage: {current_stage}, loaded_flag: {job_loaded_flag}"
+    )
+
+    try:
+        job = CosmonautJob(job_id=job_id)
+        loaded_stage = job.stage
+        logging.debug(f"Loaded stage from job: {loaded_stage}")
+    except Exception as e:
+        logging.error(f"Failed to load job {job_id}: {str(e)}")
+        raise
 
     # Check if the job was just loaded
     if current_stage is None or current_stage != loaded_stage:
         current_stage = loaded_stage
         job_loaded = True
+        logging.info(f"Job {job_id} loaded with stage {current_stage}")
     else:
         job_loaded = False
+        logging.debug(f"Job {job_id} already loaded")
 
     # Update the job_loaded_flag
     if job_loaded_flag is None:
@@ -724,35 +754,50 @@ def update_stage(job_id, current_stage, job_loaded_flag):
     elif job_loaded_flag and not job_loaded:
         job_loaded_flag = False
 
+    logging.debug(f"Updated job_loaded_flag: {job_loaded_flag}")
+
     # Proceed to stages based on current_stage
-    if current_stage == 0:
-        if not job_loaded_flag:
-            logging.info("Stage 1")
-            DataBaseManager.update_column(job_id, {"stage": 1})
-        return stage1(job_id)
+    try:
+        if current_stage == 0:
+            if not job_loaded_flag:
+                logging.info(f"Job {job_id} progressing to Stage 1")
+                DataBaseManager.update_column(job_id, {"stage": 1})
+                return stage1(job_id)
+        elif current_stage == 1:
+            if not job_loaded_flag:
+                logging.info(f"Job {job_id} progressing to Stage 2")
+                DataBaseManager.update_column(job_id, {"stage": 2})
 
-    elif current_stage == 1:
-        if not job_loaded_flag:
-            logging.info("Stage 2")
-            DataBaseManager.update_column(job_id, {"stage": 2})
+                # Log MinIO operations
+                logging.info(f"Starting MinIO file upload for job {job_id}")
+                minio_manager = MiniIOManager("cosmic-routing")
+                input_dir = f"cosmonaut_app/work_dir/{job_id}/input"
 
-            # TODO upload to MiniIO seems to be done twice, check if this is necessary
-            minio_manager = MiniIOManager("cosmic-routing")
-            for file in os.listdir(f"cosmonaut_app/work_dir/{job_id}/input"):
-                minio_manager.upload_file(
-                    f"cosmonaut_app/work_dir/{job_id}/input/{file}", file
-                )
-            DataBaseManager.update_column(job_id, {"data_uploaded": True})
-        return stage2(job_id)
+                for file in os.listdir(input_dir):
+                    file_path = f"{input_dir}/{file}"
+                    try:
+                        minio_manager.upload_file(file_path, file)
+                        logging.debug(f"Successfully uploaded {file} to MinIO")
+                    except Exception as e:
+                        logging.error(f"Failed to upload {file} to MinIO: {str(e)}")
+                        raise
 
-    elif current_stage == 2:
-        if not job_loaded_flag:
-            logging.info("Stage 3")
-            DataBaseManager.update_column(job_id, {"stage": 3})
-        return stage3(job_id)
+                DataBaseManager.update_column(job_id, {"data_uploaded": True})
+                logging.info(f"Completed MinIO uploads for job {job_id}")
+                return stage2(job_id)
+        elif current_stage == 2:
+            if not job_loaded_flag:
+                logging.info(f"Job {job_id} progressing to Stage 3")
+                DataBaseManager.update_column(job_id, {"stage": 3})
+                return stage3(job_id)
+    except Exception as e:
+        logging.error(
+            f"Error processing stage {current_stage} for job {job_id}: {str(e)}"
+        )
+        raise
 
-    else:
-        return None
+    logging.debug(f"No stage transition needed for job {job_id}")
+    return None
 
 
 # Add a callback to reset the job_loaded_flag when the user interacts with the job
@@ -767,6 +812,7 @@ def reset_job_loaded_flag(n_clicks, job_loaded_flag):
     return job_loaded_flag
 
 
+# TODO FIXME prev-button is buggy as hell
 @app.callback(
     Output("current-stage", "data"),
     Input("next-button", "n_clicks"),
@@ -801,10 +847,15 @@ def store_upload_data(contents):
 def update_next_button(filename, email, current_stage):
     email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
     if current_stage == 0 and email is not None and re.match(email_regex, email):
+        logging.info("Email is valid - enabling next button")
         return False
     elif current_stage == 1 and filename is not None:
+        logging.info("File is uploaded - enabling next button")
         return False
     else:
+        logging.info(
+            "Disabling next button as {filename} is not uploaded, or email is not valid"
+        )
         return True
 
 
@@ -890,11 +941,7 @@ def navigate_to_job_page(n_clicks, job_id):
     logging.info(f"n_clicks: {n_clicks}")
     if n_clicks is None:
         raise PreventUpdate
-    # TODO: Here the Route Calculation should be triggered
-    # for now, just create a random route
-    # Input: the OSM data with the tags defined by the user
-    # Output: the route as a GeoJSON file
-    #
+
     return f"/met/wg7/cosmonaut/job/{job_id}"
 
 
@@ -920,10 +967,9 @@ def update_tags_dropdown(tags, job_id):
     if tags is None:
         raise PreventUpdate
 
-    # logging.info(f"sql tags: {tags}")
-
     try:
         DataBaseManager.update_column(job_id, {"selected_road_tags": tags})
+        logging.info(f"Updated selected road tags with following tags: {tags}")
     except JobNotFound:
         logging.error(f"Job with ID {job_id} not found.")
 
