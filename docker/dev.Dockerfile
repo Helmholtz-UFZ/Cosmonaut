@@ -4,6 +4,8 @@ FROM python:3.12.0-slim
 
 ENV MPLCONFIGDIR /python_docker/cosmonaut/.config/matplotlib
 
+RUN useradd -m -u 1000 appuser
+
 RUN apt-get update && \
     apt-get -y upgrade && \
     apt-get -y install git libpq-dev gcc g++ libgdal-dev gdal-bin && \
@@ -25,6 +27,8 @@ RUN poetry config virtualenvs.create false && \
 USER 1000
 
 COPY . .
+
+USER appuser
 
 CMD if [ "$GUNICORN" = 1 ] ; then \
         gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.wsgi:app; \
