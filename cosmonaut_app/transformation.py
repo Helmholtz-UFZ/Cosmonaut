@@ -1,5 +1,4 @@
 import os
-import time
 
 import geojson
 import numpy as np
@@ -124,6 +123,46 @@ def _get_bounds(self):
     return [[min_lat, min_lon], [max_lat, max_lon]]
 
 
+def transform_geojson(input_file, epsg_input, epsg_output):
+    """
+    Transforms the coordinates in a GeoJSON file
+    from one coordinate reference system (CRS) to another.
+
+    Args:
+        input_file (str): Path to the input GeoJSON file.
+        epsg_input (int): EPSG code of the input CRS.
+        epsg_output (int): EPSG code of the output CRS.
+
+    Returns:
+        dict: GeoJSON data with transformed coordinates.
+    """
+    if not input_file.endswith(".geojson"):
+        raise ValueError("Input file must be a GeoJSON file.")
+
+    crs_output = CRS.from_epsg(epsg_output)
+    crs_input = CRS.from_epsg(epsg_input)
+    transformer = Transformer.from_crs(crs_input, crs_output)
+
+    with open(input_file, "r") as f:
+        data = geojson.load(f)
+
+    # Transform the coordinates in the "coordinates" key
+    for feature in data["features"]:
+        geometry = feature["geometry"]
+        if geometry["type"] == "Point":
+            x, y = geometry["coordinates"]
+            transformed_x, transformed_y = transformer.transform(x, y)
+            geometry["coordinates"] = [transformed_x, transformed_y]
+        elif geometry["type"] == "LineString":
+            coordinates = geometry["coordinates"]
+            transformed_coordinates = [
+                transformer.transform(x, y) for x, y in coordinates
+            ]
+            geometry["coordinates"] = transformed_coordinates
+
+    return data
+
+
 class OsmRoads:
     """
     A class for handling OpenStreetMap road data transformation.
@@ -202,8 +241,7 @@ class OsmRoads:
 
     def save_roads(self, DOWNLOAD_FOLDER, epsg_code, additional_tags: dict = None):
         self.roads = self._get_roads(additional_tags)
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        file_name = f"{timestamp}_osm_data_{epsg_code}.geojson"
+        file_name = f"osm_data_{epsg_code}.geojson"
         file_path = os.path.join(DOWNLOAD_FOLDER, file_name)
         with open(
             file_path, "w"
