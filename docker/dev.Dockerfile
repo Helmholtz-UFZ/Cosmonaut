@@ -2,7 +2,7 @@
 
 FROM python:3.13-slim
 
-ENV MPLCONFIGDIR /python_docker/cosmonaut/.config/matplotlib
+ENV MPLCONFIGDIR=/python_docker/cosmonaut/.config/matplotlib
 
 RUN useradd -m -u 1000 appuser
 
@@ -19,14 +19,14 @@ ENV PYTHONPATH=/python_docker/cosmonaut/
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
 ENV C_INCLUDE_PATH=/usr/include/gdal
 
-COPY poetry.lock pyproject.toml /python_docker/cosmonaut/
+COPY --chown=1000:1000 poetry.lock pyproject.toml /python_docker/cosmonaut/
 
 RUN poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi
 
-USER 1000
+COPY --chown=1000:1000 . .
 
-COPY . .
+COPY --chown=1000:1000 .env_test .env
 
 RUN chown -R 1000:1000 /python_docker/cosmonaut
 
