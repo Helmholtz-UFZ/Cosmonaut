@@ -3,11 +3,10 @@ import logging
 import os
 import json
 
-from dotenv import load_dotenv
 from minio import Minio
 from minio.error import S3Error
 
-from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_HOST
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -17,10 +16,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # TODO: Replace with rclone for performance
-
-# TODO: Temporary loading of environment variables
-# later should be automatically loaded for Docker
-load_dotenv(".env_test_priv")
 
 
 class MiniIOManager:
@@ -41,7 +36,7 @@ class MiniIOManager:
     def __init__(self, bucket_name):
         self.bucket_name = bucket_name
         self.minio_client = Minio(
-            "minio.ufz.de",
+            endpoint=f"{MINIO_HOST}",
             access_key=MINIO_ACCESS_KEY,
             secret_key=MINIO_SECRET_KEY,
             secure=True,

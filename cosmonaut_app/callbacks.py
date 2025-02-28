@@ -47,6 +47,7 @@ from cosmonaut_app.transformation import (
     get_convex_hull,
     transform_csv,
     transform_solution,
+    transform_geojson,
 )
 
 logging.basicConfig(
@@ -276,7 +277,6 @@ function(feature, context){
 )
 
 
-# TODO FIXME Plotting works but the delete street button and recalculate the biggest network does not work anymore
 @app.callback(
     Output("map", "children"),
     Input("tags-dropdown", "value"),
@@ -576,10 +576,11 @@ def update_clicked_roads(clickData, clicked_roads):
         State("clicked-roads", "data"),
         State("osm-geojson", "data"),
         State("job-id", "data"),
+        State("epsg-store", "data"),
     ],
     prevent_initial_call=True,
 )
-def remove_selected(n, clicked_roads, original_data, job_id):
+def remove_selected(n, clicked_roads, original_data, job_id, epsg_input):
     if n is None or clicked_roads is None or original_data is None:
         raise PreventUpdate
 
@@ -605,11 +606,25 @@ def remove_selected(n, clicked_roads, original_data, job_id):
     # Save the filtered data to a new GeoJSON file
     job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
     filtered_geojson_path = os.path.join(
-        job_working_dir, "transient", "filtered_osm.geojson"
+        job_working_dir, "input", "osm_data_4326.geojson"
+    )
+    # rename the old file to keep it for debugging purposes
+    os.rename(
+        os.path.join(job_working_dir, "input", "osm_data_4326.geojson"),
+        os.path.join(job_working_dir, "input", "osm_data_4326_old.geojson"),
     )
     with open(filtered_geojson_path, "w") as f:
         geojson.dump(filtered_data, f)
-        # TODO USE THIS FOR THE ROUTING BACKEND
+        logging.info(f"Filtered data saved to {filtered_geojson_path}")
+    # transform the data to the input EPSG
+    transformed_geojson = transform_geojson(filtered_geojson_path, 4326, epsg_input)
+    # save the transformed data to the osm_data_epsg_input.geojson file
+    transformed_geojson_path = os.path.join(
+        job_working_dir, "input", f"osm_data_{epsg_input}.geojson"
+    )
+    with open(transformed_geojson_path, "w") as f:
+        geojson.dump(transformed_geojson, f)
+        logging.info(f"Transformed data saved to {transformed_geojson_path}")
 
     return filtered_data
 

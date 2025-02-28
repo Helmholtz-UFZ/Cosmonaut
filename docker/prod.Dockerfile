@@ -30,6 +30,8 @@ COPY . .
 
 COPY .env_prod .env
 
+RUN chown -R 1000:1000 /python_docker/cosmonaut
+
 USER appuser
 
 CMD gunicorn --timeout 120 -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.wsgi:app;

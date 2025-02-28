@@ -28,6 +28,8 @@ USER 1000
 
 COPY . .
 
+RUN chown -R 1000:1000 /python_docker/cosmonaut
+
 USER appuser
 
 CMD if [ "$GUNICORN" = 1 ] ; then \
