@@ -1,5 +1,4 @@
 import base64
-import csv
 import glob
 import json
 import logging
@@ -67,13 +66,12 @@ matplotlib.use("Agg")
     Output("file-path", "children"),
     Input("upload-data-dcc", "contents"),
     State("upload-data-dcc", "filename"),
-    State("amount-classes-input", "value"),
     State("job-id", "data"),
     prevent_initial_call=True,
 )
-def upload_file(contents, filename, amount_classes, job_id):
+def upload_file(contents, filename, job_id):
     """Upload a file to the server and save it in the upload directory."""
-    if contents is None or filename is None or amount_classes is None:
+    if contents is None or filename is None:
         raise PreventUpdate
 
     content_type, content_string = contents.split(",")
@@ -103,28 +101,28 @@ def upload_file(contents, filename, amount_classes, job_id):
     with open(file_path, "wb") as f:
         f.write(decoded)
 
-    with open(file_path, "r", encoding="utf-8") as file:
-        sample = file.read(1024)
-        file.seek(0)
-        sniffer = csv.Sniffer()
-        try:
-            dialect = sniffer.sniff(sample)
-        except csv.Error:
-            dialect = csv.excel
-        csv_reader = csv.reader(file, dialect)
-        for row in csv_reader:
-            if len(row) != amount_classes + 2:
-                os.remove(file_path)
-                logging.error(f"CSV must have {amount_classes + 2} columns")
-                return (
-                    None,
-                    dbc.Alert(
-                        f"CSV must have {amount_classes + 2} columns",
-                        color="danger",
-                        duration=5000,
-                    ),
-                    None,
-                )
+    # with open(file_path, "r", encoding="utf-8") as file:
+    #     sample = file.read(1024)
+    #     file.seek(0)
+    #     sniffer = csv.Sniffer()
+    #     try:
+    #         dialect = sniffer.sniff(sample)
+    #     except csv.Error:
+    #         dialect = csv.excel
+    #     csv_reader = csv.reader(file, dialect)
+    #     for row in csv_reader:
+    #         if len(row) != amount_classes + 2:
+    #             os.remove(file_path)
+    #             logging.error(f"CSV must have {amount_classes + 2} columns")
+    #             return (
+    #                 None,
+    #                 dbc.Alert(
+    #                     f"CSV must have {amount_classes + 2} columns",
+    #                     color="danger",
+    #                     duration=5000,
+    #                 ),
+    #                 None,
+    #             )
 
     logging.info("CSV File uploaded successfully")
     output_values = (
@@ -465,7 +463,6 @@ def generate_classification_plot(upload_status, file_path, job_id):
     Input("confirm-button", "n_clicks"),
     State("routing-complete", "data"),
     State("job-id", "data"),
-    # State("amount-classes-input", "data"),
     prevent_initial_call=True,
     allow_duplicate=True,
 )

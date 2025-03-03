@@ -27,7 +27,6 @@ def serve_layout():
             html.Div(id="page-content"),
             dcc.Store(id="job-id", data=None),
             dcc.Store(id="job-page-loaded", data=False),
-            dcc.Store(id="amount-classes-input", data=0),
         ]
     )
 

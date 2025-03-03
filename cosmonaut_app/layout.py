@@ -256,12 +256,6 @@ def stage2(job_id):
                     placeholder="Please Enter a valid EPSG Code for your data.",
                     style={"margin-top": "1rem"},
                 ),
-                dbc.Input(
-                    id="amount-classes-input",
-                    type="number",
-                    placeholder="Please Enter the amount of classes for your data.",
-                    style={"margin-top": "1rem"},
-                ),
                 dbc.Form(
                     [
                         dcc.Upload(
@@ -288,7 +282,7 @@ def stage2(job_id):
                     id="prev-button",
                     className="me-auto",
                     size="lg",
-                    disabled=False,
+                    disabled=True,
                 ),
                 dbc.Button(
                     "Next Step",
@@ -333,6 +327,7 @@ def stage3(job_id):
                     id="prev-button",
                     className="me-auto",
                     size="lg",
+                    disabled=True,
                 ),
                 dbc.Button(
                     "Confirm Input",
