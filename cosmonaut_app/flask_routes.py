@@ -8,7 +8,7 @@ app = dash.Dash(
     server=server,
     external_stylesheets=[
         dbc.themes.BOOTSTRAP,
-        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css",  # noqa: E501
+        "'src': 'hfont-awesome.min.css'",
         "'src': '/assets/resize.js'",
     ],
     requests_pathname_prefix="/met/wg7/cosmonaut/",
