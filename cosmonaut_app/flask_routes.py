@@ -1,5 +1,4 @@
 import dash
-import dash_bootstrap_components as dbc
 from dash import dcc, html
 from flask import Flask
 
@@ -7,9 +6,9 @@ server = Flask(__name__)
 app = dash.Dash(
     server=server,
     external_stylesheets=[
-        dbc.themes.BOOTSTRAP,
-        "'src': 'hfont-awesome.min.css'",
-        "'src': '/assets/resize.js'",
+        "/assets/bootstrap.min.css",
+        "/assets/font-awesome.min.css",
+        "/assets/resize.js",
     ],
     requests_pathname_prefix="/met/wg7/cosmonaut/",
     routes_pathname_prefix="/met/wg7/cosmonaut/",
