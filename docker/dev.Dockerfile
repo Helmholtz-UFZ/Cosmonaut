@@ -4,16 +4,18 @@ FROM python:3.13-slim
 
 ENV MPLCONFIGDIR=/python_docker/cosmonaut/.config/matplotlib
 
-RUN useradd -m -u 1000 appuser
-
-RUN apt-get update && \
+RUN useradd -m -u 1000 appuser && \
+    apt-get update && \
     apt-get -y upgrade && \
     apt-get -y install git libpq-dev gcc g++ libgdal-dev gdal-bin && \
-    pip install --upgrade pip wheel setuptools && pip install poetry
+    pip install --upgrade pip wheel setuptools && \
+    pip install poetry && \
+    mkdir -p $MPLCONFIGDIR && chmod 777 $MPLCONFIGDIR && \
+    mkdir -p /python_docker/cosmonaut/.config && chmod 777 /python_docker/cosmonaut/.config && \
+    mkdir -p /python_docker/cosmonaut/assets && chmod 777 /python_docker/cosmonaut/assets
+
 
 WORKDIR /python_docker/cosmonaut
-
-RUN mkdir -p $MPLCONFIGDIR && chmod 777 $MPLCONFIGDIR
 
 ENV PYTHONPATH=/python_docker/cosmonaut/
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
