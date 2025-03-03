@@ -1327,13 +1327,13 @@ test = ["flaky", "ipyparallel", "pre-commit", "pytest (>=7.0)", "pytest-asyncio 
 
 [[package]]
 name = "ipython"
-version = "9.0.0"
+version = "9.0.1"
 description = "IPython: Productive Interactive Computing"
 optional = false
 python-versions = ">=3.11"
 files = [
-    {file = "ipython-9.0.0-py3-none-any.whl", hash = "sha256:2cce23069b830a54a5b9d3d66ccd6433047c1503a7b9a3b34593c0b5c2c08477"},
-    {file = "ipython-9.0.0.tar.gz", hash = "sha256:9368d65b3d4a471e9a698fed3ea486bbf6737e45111e915279c971b77f974397"},
+    {file = "ipython-9.0.1-py3-none-any.whl", hash = "sha256:3e878273824b52e0a2280ed84f8193aba8c4ba9a6f45a438348a3d5ef1a34bd0"},
+    {file = "ipython-9.0.1.tar.gz", hash = "sha256:377ea91c8226b48dc9021ac9846a64761abc7ddf74c5efe38e6eb06f6e052f3a"},
 ]
 
 [package.dependencies]
@@ -3117,13 +3117,13 @@ files = [
 
 [[package]]
 name = "sensor-routing"
-version = "0.1.10"
+version = "0.1.9"
 description = "Sensor routing"
 optional = false
 python-versions = ">=3.12"
 files = [
-    {file = "sensor_routing-0.1.10-py3-none-any.whl", hash = "sha256:78717f8f029489d2ed5050584d55d938598e2531f6bc4f9dc575aad587bc9e10"},
-    {file = "sensor_routing-0.1.10.tar.gz", hash = "sha256:0729c34aaa7032439c0805912489425dbc6139f9b8f6bdb022dac1d7e618099f"},
+    {file = "sensor_routing-0.1.9-py3-none-any.whl", hash = "sha256:6849841e06789fee762235f9d7eecf65fe8d2e6396e0e9d28581a3e959e0ce6d"},
+    {file = "sensor_routing-0.1.9.tar.gz", hash = "sha256:0ce1acffa5b2bd60357d585e00fc3456a676e38733e08c811837de7b36d9187b"},
 ]
 
 [[package]]
@@ -3579,4 +3579,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12.0"
-content-hash = "4387faf2bc6dda31f11ea4c3f46b9986f6d6d56e55783b78645d43e10caa8d7a"
+content-hash = "3057bea5252a79f670c244bf99d42df8736804fb0cfc247b2122354592dea344"

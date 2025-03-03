@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "This is Poetry"
 authors = ["Louis Ferdinand Trinkle <louis-ferdinand.trinkle@ufz.de>"]
 readme = "README.md"
-
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12.0"
@@ -52,7 +52,7 @@ pre-commit = "^4.0.1"
 celery = "^5.4.0"
 redis = "^5.2.1"
 osmnx = "1.9.1"
-sensor-routing = "^0.1.9"
+sensor-routing = "0.1.9"
 
 [tool.poetry.group.dev.dependencies]
 blinker = "1.6.2"

@@ -6,7 +6,12 @@ import json
 from minio import Minio
 from minio.error import S3Error
 
-from cosmonaut_app.config import MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_HOST
+from cosmonaut_app.config import (
+    MINIO_ACCESS_KEY,
+    MINIO_SECRET_KEY,
+    MINIO_HOST,
+    MINIO_PORT,
+)
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -36,7 +41,7 @@ class MiniIOManager:
     def __init__(self, bucket_name):
         self.bucket_name = bucket_name
         self.minio_client = Minio(
-            endpoint=f"{MINIO_HOST}",
+            endpoint=f"{MINIO_HOST}:{MINIO_PORT}",
             access_key=MINIO_ACCESS_KEY,
             secret_key=MINIO_SECRET_KEY,
             secure=True,
@@ -182,10 +187,10 @@ class MiniIOManager:
 
             # List all objects in the bucket with the specified prefix
             minio_client = Minio(
-                "minio.ufz.de",
+                f"{MINIO_HOST}:{MINIO_PORT}",
                 access_key=MINIO_ACCESS_KEY,
                 secret_key=MINIO_SECRET_KEY,
-                secure=True,
+                secure=(MINIO_PORT == 443),
             )
             objects = minio_client.list_objects(
                 "cosmic-routing", prefix=minio_path, recursive=True
