@@ -26,7 +26,7 @@ services:
 
   redis:
     image: redis:7.4
-    container_name: redis
+    container_name: redis_cosmonaut
     ports:
       - ${REDIS_PORT}:${REDIS_PORT}
 

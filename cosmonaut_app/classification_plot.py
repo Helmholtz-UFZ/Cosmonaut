@@ -1,4 +1,5 @@
 import datetime
+import logging
 import os
 import warnings
 from contextlib import contextmanager
@@ -13,6 +14,8 @@ from osgeo import gdal
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 
 gdal.DontUseExceptions()
+
+logging.getLogger("rasterio").setLevel(logging.CRITICAL)
 
 
 @contextmanager
