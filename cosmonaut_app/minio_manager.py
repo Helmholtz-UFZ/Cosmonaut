@@ -40,12 +40,19 @@ class MiniIOManager:
 
     def __init__(self, bucket_name):
         self.bucket_name = bucket_name
+
+        endpoint = f"{MINIO_HOST}:{MINIO_PORT}".strip()
+
+        # Initialize the Minio client
         self.minio_client = Minio(
-            endpoint=f"{MINIO_HOST}:{MINIO_PORT}",
+            endpoint=endpoint,
             access_key=MINIO_ACCESS_KEY,
             secret_key=MINIO_SECRET_KEY,
             secure=True,
         )
+
+    logging.info(f"MINIO_HOST: {MINIO_HOST}, MINIO_PORT: {MINIO_PORT}")
+    logging.info(f"Together: {MINIO_HOST}:{MINIO_PORT}")
 
     def upload_file(self, file_path, object_key):
         """
