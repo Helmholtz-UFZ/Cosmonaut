@@ -176,8 +176,7 @@ class OsmRoads:
             The EPSG code of the output coordinate system. Defaults to 31468.
     """
 
-    # TOPO: make the epsg output flexible
-    def __init__(self, polygon, epsg_input=4326, epsg_output=31468):
+    def __init__(self, polygon, epsg_input=4326, epsg_output=25832):
         self.polygon = polygon
         self.tags = {
             "highway": [

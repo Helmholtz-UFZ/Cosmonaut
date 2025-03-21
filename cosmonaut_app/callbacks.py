@@ -54,6 +54,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     level=logging.INFO,
 )
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 matplotlib.use("Agg")
 
@@ -167,6 +168,7 @@ def run_osm_query(file_path, epsg_input):
         raise PreventUpdate
 
     logging.info(f"OSM triggered with file: {file_path}")
+
     osm_tags_mapping = {
         "highway": [
             "motorway",
@@ -184,7 +186,7 @@ def run_osm_query(file_path, epsg_input):
         data = transform_csv(file_path, epsg_input, 4326)
         convex_hull = get_convex_hull(data)
 
-        osm = OsmRoads(convex_hull)
+        osm = OsmRoads(convex_hull, epsg_input=4326, epsg_output=epsg_input)
         osm.tags.update(osm_tags_mapping)
         osm._get_roads()
 

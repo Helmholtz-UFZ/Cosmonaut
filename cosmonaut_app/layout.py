@@ -97,7 +97,7 @@ main_map = html.Div(
             dl.GeoJSON(id="route-geojson"),
             dcc.Store(id="clicked-roads", data=[]),
             dcc.Store(id="routing-complete", data=False),
-            dcc.Store(id="epsg-store", data=31468),
+            dcc.Store(id="epsg-store"),
         ],
         center=[51.70, 11.20],
         zoom=10,
