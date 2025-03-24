@@ -46,31 +46,24 @@ class CosmonautJob:
     selected_road_tags = []
 
     def __init__(
-        self,
-        job_id=None,
-        base_work_dir=WEB_WORK_DIR,
+        self, job_id=None, base_work_dir=WEB_WORK_DIR, download_from_minio=False
     ):
         """Init class by id or make a new one."""
         self.base_work_dir = base_work_dir
         if job_id is not None:
             logging.debug(f"load job with id {job_id}")
             self.job_id = job_id  # Set job_id to the instance variable
-            self.load()  # Call load without passing job_id
+            self.load(download_from_minio)  # Pass the flag to control MinIO downloads
         else:
             logging.debug("create new job")
             self._blank_job()
 
-    def __str__(self):
-        """Return a string representation of the job."""
-        return self.job_id
-
-    def load(self):
+    def load(self, download_from_minio=False):
         """
         Get job information from the database,
-        load the data from MinIO,
+        load the data from MinIO (if specified),
         and store files in the working directory.
         """
-
         logging.debug(f"load job with id {self.job_id}")
 
         # Get job information from the database
@@ -98,9 +91,10 @@ class CosmonautJob:
             )
             os.makedirs(working_dir)
 
-        # Download entire job directory from MinIO
-        minio_job_dir = f"{self.job_id}/"
-        MiniIOManager.download_directory(minio_job_dir, working_dir)
+        # Download entire job directory from MinIO only if the flag is True
+        if download_from_minio:
+            minio_job_dir = f"{self.job_id}/"
+            MiniIOManager.download_directory(minio_job_dir, working_dir)
 
     def _blank_job(self):
         """Create a new job."""

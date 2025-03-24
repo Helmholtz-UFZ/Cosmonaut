@@ -646,7 +646,7 @@ def search_job_id(n_clicks, job_id):
         raise PreventUpdate
 
     if DataBaseManager.check_existence(job_id):
-        job = CosmonautJob(job_id=job_id)
+        job = CosmonautJob(job_id=job_id, download_from_minio=True)
         job.load()
 
         job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
@@ -787,18 +787,19 @@ def update_stage(job_id, current_stage, job_loaded_flag):
                 DataBaseManager.update_column(job_id, {"stage": 2})
 
                 # Log MinIO operations
-                logging.info(f"Starting MinIO file upload for job {job_id}")
-                minio_manager = MiniIOManager("cosmic-routing")
                 input_dir = f"cosmonaut_app/work_dir/{job_id}/input"
 
-                for file in os.listdir(input_dir):
-                    file_path = f"{input_dir}/{file}"
-                    try:
-                        minio_manager.upload_file(file_path, file)
-                        logging.debug(f"Successfully uploaded {file} to MinIO")
-                    except Exception as e:
-                        logging.error(f"Failed to upload {file} to MinIO: {str(e)}")
-                        raise
+                if os.listdir(input_dir):
+                    logging.info(f"Starting MinIO file upload for job {job_id}")
+                    minio_manager = MiniIOManager("cosmic-routing")
+                    for file in os.listdir(input_dir):
+                        file_path = f"{input_dir}/{file}"
+                        try:
+                            minio_manager.upload_file(file_path, file)
+                            logging.debug(f"Successfully uploaded {file} to MinIO")
+                        except Exception as e:
+                            logging.error(f"Failed to upload {file} to MinIO: {str(e)}")
+                            raise
 
                 DataBaseManager.update_column(job_id, {"data_uploaded": True})
                 logging.info(f"Completed MinIO uploads for job {job_id}")

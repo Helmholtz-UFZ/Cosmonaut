@@ -39,6 +39,7 @@ class MiniIOManager:
     """
 
     def __init__(self, bucket_name):
+        logging.info(f"Initializing MinIO manager for bucket {bucket_name}")
         self.bucket_name = bucket_name
 
         endpoint = f"{MINIO_HOST}:{MINIO_PORT}".strip()
@@ -62,6 +63,7 @@ class MiniIOManager:
             file_path (str): Path of the file to be uploaded.
             object_key (str): Key to assign to the uploaded file in MinIO bucket.
         """
+        logging.info(f"Uploading file {file_path} as {object_key}")
         _, file_extension = os.path.splitext(file_path)
         allowed_extensions = [".tif", ".geojson", ".json", ".csv", ".gpx"]
         if file_extension not in allowed_extensions:
@@ -187,6 +189,7 @@ class MiniIOManager:
             minio_path (str): Prefix of the objects to be downloaded.
             local_path (str): Local directory to save the objects.
         """
+        logging.info(f"Downloading directory {minio_path} to {local_path}")
         try:
             # Ensure the local path exists
             if not os.path.exists(local_path):
