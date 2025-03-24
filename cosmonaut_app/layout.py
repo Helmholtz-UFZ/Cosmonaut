@@ -28,7 +28,7 @@ def main_page_layout():
             # dcc.Store(id="job-id", data=  ),
             dcc.Store(id="job-loaded-flag", data=None),
             dcc.Store(id="email-store"),
-            dcc.Store(id="epsg-store"),
+            dcc.Store(id="epsg-store", data=None),
             dcc.Store(id="routing-complete"),
             dcc.Dropdown(
                 id="tags-dropdown",
@@ -97,7 +97,6 @@ main_map = html.Div(
             dl.GeoJSON(id="route-geojson"),
             dcc.Store(id="clicked-roads", data=[]),
             dcc.Store(id="routing-complete", data=False),
-            dcc.Store(id="epsg-store"),
         ],
         center=[51.70, 11.20],
         zoom=10,

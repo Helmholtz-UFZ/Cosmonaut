@@ -511,9 +511,13 @@ def routing_callback(n_clicks, routing_complete, job_id):
 @app.callback(
     Output("epsg-store", "data"),
     Input("epsg-input", "value"),
+    State("epsg-store", "data"),
     prevent_initial_call=True,
 )
-def store_epsg(epsg):
+def store_epsg(epsg, current_epsg):
+    if epsg is None:
+        return current_epsg
+    logging.info(f"Storing EPSG value: {epsg}")
     return epsg
 
 
