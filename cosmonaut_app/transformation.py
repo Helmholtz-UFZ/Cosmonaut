@@ -70,10 +70,14 @@ def transform_solution(input_file, epsg_input, epsg_output, reversed_coords=Fals
     for i in range(len(transformed_path) - 1):
         start = transformed_path[i]
         end = transformed_path[i + 1]
+        # Ensure the coordinates are saved as (longitude, latitude)
         features.append(
             {
                 "type": "Feature",
-                "geometry": {"type": "LineString", "coordinates": [start, end]},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[start[1], start[0]], [end[1], end[0]]],
+                },
                 "properties": {},
             }
         )
@@ -139,14 +143,16 @@ def transform_geojson(input_file, epsg_input, epsg_output):
     if not input_file.endswith(".geojson"):
         raise ValueError("Input file must be a GeoJSON file.")
 
-    crs_output = CRS.from_epsg(epsg_output)
+    # Initialize CRS and transformer
     crs_input = CRS.from_epsg(epsg_input)
-    transformer = Transformer.from_crs(crs_input, crs_output)
+    crs_output = CRS.from_epsg(epsg_output)
+    transformer = Transformer.from_crs(crs_input, crs_output, always_xy=True)
 
+    # Load the input GeoJSON file
     with open(input_file, "r") as f:
         data = geojson.load(f)
 
-    # Transform the coordinates in the "coordinates" key
+    # Transform the coordinates in the "geometry" key
     for feature in data["features"]:
         geometry = feature["geometry"]
         if geometry["type"] == "Point":
@@ -159,8 +165,55 @@ def transform_geojson(input_file, epsg_input, epsg_output):
                 transformer.transform(x, y) for x, y in coordinates
             ]
             geometry["coordinates"] = transformed_coordinates
+        elif geometry["type"] == "Polygon":
+            coordinates = geometry["coordinates"]
+            transformed_coordinates = [
+                [transformer.transform(x, y) for x, y in ring] for ring in coordinates
+            ]
+            geometry["coordinates"] = transformed_coordinates
+        elif geometry["type"] == "MultiLineString":
+            coordinates = geometry["coordinates"]
+            transformed_coordinates = [
+                [transformer.transform(x, y) for x, y in line] for line in coordinates
+            ]
+            geometry["coordinates"] = transformed_coordinates
+        elif geometry["type"] == "MultiPolygon":
+            coordinates = geometry["coordinates"]
+            transformed_coordinates = [
+                [[transformer.transform(x, y) for x, y in ring] for ring in polygon]
+                for polygon in coordinates
+            ]
+            geometry["coordinates"] = transformed_coordinates
+        else:
+            raise ValueError(f"Unsupported geometry type: {geometry['type']}")
+
+        if "element_type" not in feature["properties"]:
+            feature["properties"]["element_type"] = "way"
 
     return data
+
+
+def update_geojson_ids(input_file, output_file):
+    """
+    Updates the GeoJSON file by moving the 'id' field into 'properties["osmid"]'
+    and removing the 'id' field.
+
+    Args:
+        input_file (str): Path to the input GeoJSON file.
+        output_file (str): Path to save the updated GeoJSON file.
+    """
+    with open(input_file, "r") as f:
+        data = geojson.load(f)
+
+    for feature in data["features"]:
+        # Extract the numeric part of the 'id' field and move it to 'properties["osmid"]'
+        if isinstance(feature["id"], str) and feature["id"].startswith("('way',"):
+            osmid = int(feature["id"].split(",")[1].strip(" )"))
+            feature["properties"]["osmid"] = osmid
+
+    # Save the updated GeoJSON
+    with open(output_file, "w") as f:
+        geojson.dump(data, f, indent=2)
 
 
 class OsmRoads:
@@ -242,10 +295,11 @@ class OsmRoads:
         self.roads = self._get_roads(additional_tags)
         file_name = f"osm_data_{epsg_code}.geojson"
         file_path = os.path.join(DOWNLOAD_FOLDER, file_name)
-        with open(
-            file_path, "w"
-        ) as osm_file:  # TODO Is it necessary to write the file here?
+        with open(file_path, "w") as osm_file:
             geojson.dump(self.roads, osm_file)
+
+        update_geojson_ids(file_path, file_path)
+
         return file_path
 
     def _osm_transform(self):

@@ -25,7 +25,6 @@ def main_page_layout():
             side_bar,
             html.Div(id="hidden-div", style={"display": "none"}),
             dcc.Store(id="current-stage", data=0),
-            # dcc.Store(id="job-id", data=  ),
             dcc.Store(id="job-loaded-flag", data=None),
             dcc.Store(id="email-store"),
             dcc.Store(id="epsg-store", data=None),
@@ -408,6 +407,7 @@ def stage4(job_id):
             # dcc.Store(id="job-id", data=None),
             dcc.Store(id="job-loaded-flag", data=None),
             dcc.Store(id="email-store"),
+            dcc.Store(id="epsg-store"),
             dcc.Dropdown(
                 id="tags-dropdown",
                 options=[],

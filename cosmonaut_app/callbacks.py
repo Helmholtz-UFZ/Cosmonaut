@@ -18,7 +18,6 @@ from flask import current_app
 from matplotlib import pyplot as plt
 from sensor_routing import sensor_routing_cli
 from werkzeug.utils import secure_filename
-
 from cosmonaut_app.classification_plot import ClassificationPlot
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -285,6 +284,7 @@ function(feature, context){
     State("map", "children"),
     State("epsg-store", "data"),
     prevent_initial_call=True,
+    allow_duplicate=True,
 )
 def update_map(selected_roads, job_id, routing_complete, current_children, epsg_input):
     logging.info(f"Trigger ID for geojson update: {ctx.triggered_id}")
@@ -304,7 +304,9 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
 
         job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
         solution_path = os.path.join(job_working_dir, "transient", "solution.json")
-        transformed_solution = transform_solution(solution_path, epsg_input, 4326, True)
+        transformed_solution = transform_solution(
+            solution_path, epsg_input, 4326, False
+        )
         logging.info(f"EPSG input: {epsg_input}")
 
         logging.info("Routing solution transformed")
@@ -480,7 +482,6 @@ def routing_callback(n_clicks, routing_complete, job_id):
     job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
 
     # TODO make the following parameters configurable in the frontend
-    total_number_of_classes = 6
     segments_number_per_class = 2
     max_distance = 50
     time_limit = 8
@@ -491,7 +492,6 @@ def routing_callback(n_clicks, routing_complete, job_id):
 
     # Run the routing directly
     sensor_routing_cli.sensor_routing(
-        total_number_of_classes,
         segments_number_per_class,
         max_distance,
         job_working_dir,
@@ -499,7 +499,7 @@ def routing_callback(n_clicks, routing_complete, job_id):
         optimization_objective,
         max_aco_iteration,
         ant_no,
-        True,  # is_reversed
+        False,  # is_reversed
         lower_benefit_limit,
     )
 
@@ -587,6 +587,8 @@ def remove_selected(n, clicked_roads, original_data, job_id, epsg_input):
     if n is None or clicked_roads is None or original_data is None:
         raise PreventUpdate
 
+    logging.info(f"EPSG-Input while largest subnetwork: {epsg_input}")
+
     all_roads = original_data["features"]
 
     # Build the road network graph
@@ -616,17 +618,32 @@ def remove_selected(n, clicked_roads, original_data, job_id, epsg_input):
         os.path.join(job_working_dir, "input", "osm_data_4326.geojson"),
         os.path.join(job_working_dir, "input", "osm_data_4326_old.geojson"),
     )
+    # delete the old file with epsg_input
+    os.remove(os.path.join(job_working_dir, "input", f"osm_data_{epsg_input}.geojson"))
     with open(filtered_geojson_path, "w") as f:
         geojson.dump(filtered_data, f)
         logging.info(f"Filtered data saved to {filtered_geojson_path}")
     # transform the data to the input EPSG
     transformed_geojson = transform_geojson(filtered_geojson_path, 4326, epsg_input)
+    transformed_geojson = {
+        "type": "FeatureCollection",
+        "crs": {
+            "type": "name",
+            "properties": {"name": f"urn:ogc:def:crs:EPSG::{epsg_input}"},
+        },
+        "features": transformed_geojson["features"],
+    }
+
     # save the transformed data to the osm_data_epsg_input.geojson file
     transformed_geojson_path = os.path.join(
-        job_working_dir, "input", f"osm_data_{epsg_input}.geojson"
+        job_working_dir, "input", "osm_data.geojson"
     )
+    # delete all .geojson files which are not osm_data.geojson
+    for file in os.listdir(os.path.join(job_working_dir, "input")):
+        if file.endswith(".geojson") and file != "osm_data.geojson":
+            os.remove(os.path.join(job_working_dir, "input", file))
     with open(transformed_geojson_path, "w") as f:
-        geojson.dump(transformed_geojson, f)
+        geojson.dump(transformed_geojson, f, indent=2)
         logging.info(f"Transformed data saved to {transformed_geojson_path}")
 
     return filtered_data
