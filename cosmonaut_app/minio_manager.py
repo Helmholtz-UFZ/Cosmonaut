@@ -5,6 +5,7 @@ import json
 
 from minio import Minio
 from minio.error import S3Error
+from urllib.parse import urlparse
 
 from cosmonaut_app.config import (
     MINIO_ACCESS_KEY,
@@ -42,7 +43,10 @@ class MiniIOManager:
         logging.info(f"Initializing MinIO manager for bucket {bucket_name}")
         self.bucket_name = bucket_name
 
-        endpoint = f"{MINIO_HOST}:{MINIO_PORT}".strip()
+        # Parse and sanitize MINIO_HOST to remove any scheme
+        parsed_host = urlparse(MINIO_HOST)
+        host = parsed_host.netloc if parsed_host.netloc else parsed_host.path
+        endpoint = f"{host}:{MINIO_PORT}" if MINIO_PORT else host
         logging.info(f"Constructed MinIO endpoint: {endpoint}")
 
         # Initialize the Minio client
@@ -51,7 +55,7 @@ class MiniIOManager:
                 endpoint=endpoint,
                 access_key=MINIO_ACCESS_KEY,
                 secret_key=MINIO_SECRET_KEY,
-                secure=True,
+                secure=(MINIO_PORT == "443"),
             )
             logging.info("MinIO client initialized successfully")
         except Exception as e:
