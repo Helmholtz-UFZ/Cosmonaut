@@ -222,25 +222,33 @@ def upload_to_minIO(osm_file_path, job_id):
     ALLOWED_EXTENSIONS = {".tif", ".geojson", ".json", ".csv", ".gpx"}
 
     if osm_file_path is None:
+        logging.error("OSM file path is None. Preventing update.")
         raise PreventUpdate
 
     try:
+        logging.info("Initializing MinIO manager for bucket 'cosmic-routing'")
         minio_manager = MiniIOManager("cosmic-routing")
         work_dir = f"cosmonaut_app/work_dir/{job_id}"
 
         for root, dirs, files in os.walk(work_dir):
+            logging.info(f"Walking directory: {root}")
             relative_path = os.path.relpath(root, work_dir)
+            logging.info(f"Relative path: {relative_path}")
 
             if relative_path == ".":
                 continue
 
             if not dirs and not files:
+                logging.info(
+                    f"Creating placeholder for empty directory: {relative_path}"
+                )
                 minio_manager.upload_placeholder(f"{job_id}/{relative_path}/")
                 continue
 
             for file in files:
+                file_path = os.path.join(root, file)
+                logging.info(f"Found file: {file_path}")
                 if os.path.splitext(file)[1] in ALLOWED_EXTENSIONS:
-                    file_path = os.path.join(root, file)
                     logging.info(f"Uploading file {file_path} to MinIO")
                     minio_manager.upload_file(
                         file_path,
@@ -258,7 +266,7 @@ def upload_to_minIO(osm_file_path, job_id):
         )
     except Exception as e:
         error_message = f"Uploading to MinIO failed: {str(e)}"
-        logging.error(error_message)
+        logging.error(error_message, exc_info=True)
         return dbc.Alert("Uploading to MinIO failed", color="danger", duration=5000)
 
 

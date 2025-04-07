@@ -1,11 +1,19 @@
 import os
-
+import csv
 import geojson
+import logging
 import numpy as np
 import osmnx as ox
 import pandas as pd
 from pyproj import CRS, Transformer
 from shapely.geometry import Polygon
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
 
 
 def transform_csv(input_file, epsg_input, epsg_output):
@@ -21,21 +29,105 @@ def transform_csv(input_file, epsg_input, epsg_output):
     Returns:
         pandas.DataFrame: DataFrame with transformed coordinates.
     """
-    if not input_file.endswith(".csv"):
+    logger.info(f"Starting transformation of CSV file: {input_file}")
+
+    if not input_file.endswith((".csv", ".txt")):
+        logger.error("Input file must be a CSV or TXT file.")
         raise ValueError("Input file must be a CSV file.")
 
-    crs_output = CRS.from_epsg(epsg_output)
-    crs_input = CRS.from_epsg(epsg_input)
-    transformer = Transformer.from_crs(crs_input, crs_output)
+    # Use csv.Sniffer to detect delimiter
+    try:
+        with open(input_file, "r") as csvfile:
+            sample = csvfile.read(4096)  # Read a sample to detect format
+            dialect = csv.Sniffer().sniff(sample)
+            has_header = csv.Sniffer().has_header(sample)
+            delimiter = dialect.delimiter
+        logger.info(f"Detected delimiter: '{delimiter}', Header: {has_header}")
+    except Exception as e:
+        logger.error(f"Error detecting CSV format: {e}")
+        raise
 
-    df = pd.read_csv(input_file)
+    # Create transformer
+    try:
+        crs_input = CRS.from_epsg(epsg_input)
+        crs_output = CRS.from_epsg(epsg_output)
+        transformer = Transformer.from_crs(crs_input, crs_output)
+        logger.info("Transformer successfully created.")
+    except Exception as e:
+        logger.error(f"Error creating CRS transformer: {e}")
+        raise
 
-    df["Latitude"], df["Longitude"] = transformer.transform(
-        df["Easting (m)"].values, df["Northing (m)"].values
-    )
+    # Read the file with detected delimiter
+    try:
+        df = pd.read_csv(
+            input_file, delimiter=delimiter, header=0 if has_header else None
+        )
+        logger.info(f"CSV file successfully read. Shape: {df.shape}")
+    except Exception as e:
+        logger.error(f"Error reading CSV file: {e}")
+        raise
 
-    df.drop(["Easting (m)", "Northing (m)"], axis=1, inplace=True)
+    # If no header, create default column names
+    if not has_header:
+        df.columns = [f"col_{i}" for i in range(len(df.columns))]
+        logger.info("No header detected. Default column names assigned.")
 
+    # Dynamically find coordinate columns
+    potential_coord_cols = []
+    for col in df.columns:
+        if df[col].dtype.kind in "iuf":  # Only check numeric columns
+            if (df[col].min() < 0 or df[col].max() > 1) and len(df[col].unique()) > 10:
+                potential_coord_cols.append(col)
+
+    try:
+        if len(potential_coord_cols) == 2:
+            x_col, y_col = potential_coord_cols
+            logger.info(
+                f"Automatically identified coordinate columns: {x_col}, {y_col}"
+            )
+        elif has_header:
+            x_candidates = [
+                col
+                for col in df.columns
+                if any(term in col.lower() for term in ["east", "long", "x", "lon"])
+            ]
+            y_candidates = [
+                col
+                for col in df.columns
+                if any(term in col.lower() for term in ["north", "lat", "y"])
+            ]
+
+            if len(x_candidates) > 0 and len(y_candidates) > 0:
+                x_col = x_candidates[0]
+                y_col = y_candidates[0]
+                logger.info(
+                    f"Identified coordinate columns based on header: {x_col}, {y_col}"
+                )
+            else:
+                logger.error("Could not automatically identify coordinate columns.")
+                raise ValueError("Could not automatically identify coordinate columns.")
+        else:
+            logger.error("Could not automatically identify coordinate columns.")
+            raise ValueError("Could not automatically identify coordinate columns.")
+    except Exception as e:
+        logger.error(f"Error identifying coordinate columns: {e}")
+        raise
+
+    # Transform coordinates
+    try:
+        df["Latitude"], df["Longitude"] = transformer.transform(
+            df[x_col].values, df[y_col].values
+        )
+        logger.info("Coordinates successfully transformed.")
+    except Exception as e:
+        logger.error(f"Error transforming coordinates: {e}")
+        raise
+
+    # Drop original coordinate columns
+    df.drop([x_col, y_col], axis=1, inplace=True)
+    logger.info("Original coordinate columns dropped.")
+
+    logger.info("CSV transformation completed successfully.")
     return df
 
 
@@ -251,6 +343,9 @@ class OsmRoads:
         }
         self.epsg_input = epsg_input
         self.epsg_output = epsg_output
+        logger.info(
+            f"OsmRoads initialized with EPSG input: {epsg_input}, EPSG output: {epsg_output}"
+        )
 
     def _get_roads(self, additional_tags: dict = None):
         """
@@ -265,7 +360,17 @@ class OsmRoads:
         """
         if additional_tags is not None:
             self.tags = additional_tags
-        osm_data = ox.features_from_polygon(self.polygon, tags=self.tags)
+            logger.debug(f"Additional tags provided: {additional_tags}")
+        logger.info("Fetching road data from OpenStreetMap...")
+        try:
+            osm_data = ox.features_from_polygon(self.polygon, tags=self.tags)
+            logger.info(
+                f"Successfully fetched road data. Number of records: {len(osm_data)}"
+            )
+        except Exception as e:
+            logger.error(f"Error fetching road data: {e}")
+            raise
+
         columns_to_keep = [
             "geometry",
             "name",
@@ -288,23 +393,54 @@ class OsmRoads:
             "access",
         ]
         columns_to_keep = [col for col in columns_to_keep if col in osm_data.columns]
+        logger.debug(f"Columns to keep: {columns_to_keep}")
         osm_data = osm_data[columns_to_keep]
+        logger.info("Filtered road data to keep relevant columns.")
         return osm_data
 
     def save_roads(self, DOWNLOAD_FOLDER, epsg_code, additional_tags: dict = None):
-        self.roads = self._get_roads(additional_tags)
-        file_name = f"osm_data_{epsg_code}.geojson"
-        file_path = os.path.join(DOWNLOAD_FOLDER, file_name)
-        with open(file_path, "w") as osm_file:
-            geojson.dump(self.roads, osm_file)
+        """
+        Save the road data to a GeoJSON file.
 
-        update_geojson_ids(file_path, file_path)
+        Args:
+            DOWNLOAD_FOLDER (str): Path to the folder where the file will be saved.
+            epsg_code (int): EPSG code for the output file.
+            additional_tags (dict, optional): Additional tags for filtering road data.
+
+        Returns:
+            str: Path to the saved GeoJSON file.
+        """
+        logger.info("Saving road data...")
+        try:
+            self.roads = self._get_roads(additional_tags)
+            file_name = f"osm_data_{epsg_code}.geojson"
+            file_path = os.path.join(DOWNLOAD_FOLDER, file_name)
+            with open(file_path, "w") as osm_file:
+                geojson.dump(self.roads, osm_file)
+            logger.info(f"Road data saved to {file_path}")
+
+            update_geojson_ids(file_path, file_path)
+            logger.info("GeoJSON IDs updated successfully.")
+        except Exception as e:
+            logger.error(f"Error saving road data: {e}")
+            raise
 
         return file_path
 
     def _osm_transform(self):
-        osm_data = self.roads
-        epsg_output = self.epsg_output
-        # epsg_input = self.epsg_input
-        osm_data = osm_data.to_crs(epsg=epsg_output)
+        """
+        Transform the road data to the specified output CRS.
+
+        Returns:
+            geopandas.GeoDataFrame: Transformed road data.
+        """
+        logger.info("Transforming road data to the specified CRS...")
+        try:
+            osm_data = self.roads
+            epsg_output = self.epsg_output
+            osm_data = osm_data.to_crs(epsg=epsg_output)
+            logger.info(f"Road data successfully transformed to EPSG: {epsg_output}")
+        except Exception as e:
+            logger.error(f"Error transforming road data: {e}")
+            raise
         return osm_data

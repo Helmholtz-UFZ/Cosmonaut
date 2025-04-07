@@ -258,7 +258,7 @@ def stage2(job_id):
                     [
                         dcc.Upload(
                             id="upload-data-dcc",
-                            accept=".csv",
+                            accept=".csv,.txt",
                             children=html.Div(
                                 [
                                     dbc.Button(

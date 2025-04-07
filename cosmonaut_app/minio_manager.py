@@ -63,27 +63,24 @@ class MiniIOManager:
             raise
 
     def upload_file(self, file_path, object_key):
-        """
-        Uploads a file to the MinIO bucket.
-
-        Args:
-            file_path (str): Path of the file to be uploaded.
-            object_key (str): Key to assign to the uploaded file in MinIO bucket.
-        """
         logging.info(f"Uploading file {file_path} as {object_key}")
         _, file_extension = os.path.splitext(file_path)
         allowed_extensions = [".tif", ".geojson", ".json", ".csv", ".gpx"]
         if file_extension not in allowed_extensions:
             logging.error(
-                f"Failed to upload file {file_path}: Only {', '.join(allowed_extensions)} files are allowed."  # noqa: E501
+                f"Failed to upload file {file_path}: Only {', '.join(allowed_extensions)} files are allowed."
             )
             return
 
         try:
+            if not os.path.exists(file_path):
+                logging.error(f"File does not exist: {file_path}")
+                return
+
             self.minio_client.fput_object(self.bucket_name, object_key, file_path)
             logging.info(f"File {file_path} uploaded successfully as {object_key}")
         except Exception as e:
-            logging.error(f"Failed to upload file {file_path}: {str(e)}")
+            logging.error(f"Failed to upload file {file_path}: {str(e)}", exc_info=True)
 
     def download_file(self, object_key, file_path):
         """
@@ -169,22 +166,18 @@ class MiniIOManager:
             )
 
     def upload_placeholder(self, object_key):
-        """
-        Creates a placeholder object in the MinIO bucket to simulate a directory.
-
-        Args:
-            object_key (str): Key for the placeholder object, typically ending with
-                a '/' to simulate a directory path.
-        """
         try:
-            # Create an empty file-like object
+            logging.info(f"Creating placeholder for object key: {object_key}")
             empty_file = io.BytesIO(b"")
             self.minio_client.put_object(
                 self.bucket_name, object_key, data=empty_file, length=0
             )
             logging.info(f"Placeholder for {object_key} created successfully")
         except Exception as e:
-            logging.error(f"Failed to create placeholder for {object_key}: {str(e)}")
+            logging.error(
+                f"Failed to create placeholder for {object_key}: {str(e)}",
+                exc_info=True,
+            )
 
     @staticmethod
     def download_directory(minio_path, local_path):
