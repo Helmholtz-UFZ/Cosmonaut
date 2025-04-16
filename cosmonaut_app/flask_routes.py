@@ -2,14 +2,10 @@ import dash
 from dash import dcc, html
 from flask import Flask
 
-server = Flask(__name__)
+server = Flask(__name__, static_url_path="/met/wg7/cosmonaut/static")
 app = dash.Dash(
     server=server,
-    external_stylesheets=[
-        "/assets/bootstrap.min.css",
-        "/assets/font-awesome.min.css",
-        "/assets/resize.js",
-    ],
+    assets_url_path="/assets",
     requests_pathname_prefix="/met/wg7/cosmonaut/",
     routes_pathname_prefix="/met/wg7/cosmonaut/",
 )

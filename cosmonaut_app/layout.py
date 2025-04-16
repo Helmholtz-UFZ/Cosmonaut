@@ -57,12 +57,6 @@ main_map = html.Div(
                         checked=True,
                     ),
                     dl.Overlay(
-                        dl.LayerGroup(),
-                        name="points",
-                        checked=False,
-                        id="points",
-                    ),
-                    dl.Overlay(
                         dl.WMSTileLayer(
                             url="https://gdi-fs.ufz.de/geoserver/cosmic-routing/ows?service=WMS",  # noqa: E501
                             layers="20240410_8-col-4326_class-5",
@@ -76,12 +70,6 @@ main_map = html.Div(
                         name="WMS Layer",
                         checked=False,
                         id="wms-layer",
-                    ),
-                    dl.Overlay(
-                        dl.LayerGroup(id="route-layer"),
-                        name="Route Layer",
-                        checked=True,
-                        id="route",
                     ),
                 ],
                 id="lc",
@@ -129,14 +117,14 @@ side_bar = dbc.Col(
     id="offcanvas",
     style={
         "width": "500px",
-        "background-color": "#DBE2EF",
+        "backgroundColor": "#DBE2EF",
         "border": "2px solid #dee2e6",
         "position": "fixed",
         "top": "10vh",
         "right": 0,
         "bottom": 0,
         "padding": "2rem 1rem",
-        "overflow-y": "auto",
+        "overflow": "auto",
     },
     className="responsive-sidebar",
 )
@@ -172,13 +160,16 @@ navbar = dbc.Navbar(
                 dbc.Row(
                     [
                         dbc.Col(
-                            html.Img(src="/static/sample_logo.svg", height="50px"),
+                            html.Img(
+                                src="/met/wg7/cosmonaut/static/sample_logo.svg",
+                                height="50px",
+                            ),
                         ),
                         dbc.Col(
                             dbc.NavbarBrand(
                                 "COSMONAUT",
                                 className="ml-2",
-                                style={"font-size": "6vh"},
+                                style={"fontSize": "6vh"},
                             ),
                         ),
                     ],
@@ -385,14 +376,14 @@ def stage4(job_id):
         id="offcanvas",
         style={
             "width": "500px",
-            "background-color": "#DBE2EF",
+            "backgroundColor": "#DBE2EF",
             "border": "2px solid #dee2e6",
             "position": "fixed",
             "top": "10vh",
             "right": 0,
             "bottom": 0,
             "padding": "2rem 1rem",
-            "overflow-y": "auto",
+            "overflow": "auto",
         },
         className="responsive-sidebar",
     )
