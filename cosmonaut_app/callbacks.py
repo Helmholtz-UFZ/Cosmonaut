@@ -33,6 +33,8 @@ from cosmonaut_app.layout import (
 )
 from cosmonaut_app.minio_manager import MiniIOManager
 from cosmonaut_app.navigation_routing import RouteCreator
+from pyproj.exceptions import CRSError
+from pyproj import CRS
 from cosmonaut_app.road_network_utils import (
     build_graph,
     get_largest_subnetwork,
@@ -100,29 +102,6 @@ def upload_file(contents, filename, job_id):
 
     with open(file_path, "wb") as f:
         f.write(decoded)
-
-    # with open(file_path, "r", encoding="utf-8") as file:
-    #     sample = file.read(1024)
-    #     file.seek(0)
-    #     sniffer = csv.Sniffer()
-    #     try:
-    #         dialect = sniffer.sniff(sample)
-    #     except csv.Error:
-    #         dialect = csv.excel
-    #     csv_reader = csv.reader(file, dialect)
-    #     for row in csv_reader:
-    #         if len(row) != amount_classes + 2:
-    #             os.remove(file_path)
-    #             logging.error(f"CSV must have {amount_classes + 2} columns")
-    #             return (
-    #                 None,
-    #                 dbc.Alert(
-    #                     f"CSV must have {amount_classes + 2} columns",
-    #                     color="danger",
-    #                     duration=5000,
-    #                 ),
-    #                 None,
-    #             )
 
     logging.info("CSV File uploaded successfully")
     output_values = (
@@ -515,19 +494,6 @@ def routing_callback(n_clicks, routing_complete, job_id):
     logging.info("Routing completed successfully")
 
     return True
-
-
-@app.callback(
-    Output("epsg-store", "data"),
-    Input("epsg-input", "value"),
-    State("epsg-store", "data"),
-    prevent_initial_call=True,
-)
-def store_epsg(epsg, current_epsg):
-    if epsg is None:
-        return current_epsg
-    logging.info(f"Storing EPSG value: {epsg}")
-    return epsg
 
 
 @app.callback(
@@ -1021,3 +987,58 @@ def update_tags_dropdown(tags, job_id):
         logging.error(f"Job with ID {job_id} not found.")
 
     return no_update
+
+
+@app.callback(
+    [
+        Output("epsg-feedback", "children"),
+        Output("epsg-feedback", "style"),
+        Output("epsg-store", "data"),
+    ],
+    [
+        Input("epsg-input", "value"),
+        State("epsg-store", "data"),
+    ],
+    prevent_initial_call=True,
+)
+def validate_and_store_epsg(epsg, current_epsg):
+    if epsg is None:
+        raise PreventUpdate
+
+    # Ensure EPSG is an integer
+    try:
+        if isinstance(epsg, str) and epsg.upper().startswith("EPSG:"):
+            epsg = epsg[5:]  # Remove "EPSG:" prefix
+        epsg = int(epsg)  # Convert to integer if it's a string
+    except ValueError:
+        logging.warning(f"Invalid EPSG value (not an integer): {epsg}")
+        return (
+            "❌ Ungültiger EPSG-Code",
+            {"color": "red", "margin-left": "10px"},
+            None,  # Setze epsg-store auf None bei ungültigem Code
+        )
+
+    # Validate EPSG code using pyproj.CRS
+    try:
+        CRS.from_epsg(epsg)  # Attempt to create a CRS from the EPSG code
+        logging.info(f"Storing valid EPSG value: {epsg}")
+        return (
+            "✔️ EPSG-Code akzeptiert",
+            {"color": "green", "margin-left": "10px"},
+            epsg,  # Speichere den gültigen EPSG-Code
+        )
+    except (CRSError, ValueError, TypeError):
+        logging.warning(f"Invalid EPSG value: {epsg}")
+        return (
+            "❌ Ungültiger EPSG-Code",
+            {"color": "red", "margin-left": "10px"},
+            None,  # Setze epsg-store auf None bei ungültigem Code
+        )
+
+
+@app.callback(
+    Output("upload-button", "disabled"),
+    Input("epsg-store", "data"),
+)
+def toggle_upload_button(epsg):
+    return epsg is None

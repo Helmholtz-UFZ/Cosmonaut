@@ -112,6 +112,8 @@ side_bar = dbc.Col(
             className="me-auto",
             size="lg",
         ),
+        html.Br(),
+        html.Br(),
         html.Div(id="stage-content"),
     ],
     id="offcanvas",
@@ -204,6 +206,7 @@ def stage1(job_id):
     return (
         html.Div(
             [
+                html.H1("Stage 1"),
                 html.H2(f"Job ID: {job_id}"),
                 dbc.Input(id="email-input", type="email", placeholder="Enter email"),
                 dbc.FormFeedback("Please enter a valid email.", id="email-feedback"),
@@ -237,13 +240,24 @@ def stage2(job_id):
     return (
         html.Div(
             [
+                html.H1("Stage 2"),
+                html.P(
+                    "Bitte geben Sie einen gültigen EPSG-Code ein und laden Sie anschließend die Membership-Daten hoch. ",
+                    style={"margin-bottom": "1rem", "font-size": "1.3rem"},
+                ),
                 html.H2(f"Job ID: {job_id}"),
                 html.H3("Upload"),
-                dbc.Input(
-                    id="epsg-input",
-                    type="number",
-                    placeholder="Please Enter a valid EPSG Code for your data.",
-                    style={"margin-top": "1rem"},
+                dbc.InputGroup(
+                    [
+                        dbc.Input(
+                            id="epsg-input",
+                            type="number",
+                            placeholder="Geben Sie einen gültigen EPSG-Code ein",
+                            style={"margin-top": "1rem"},
+                        ),
+                        dbc.InputGroupText(id="epsg-feedback", children=""),
+                    ],
+                    className="mb-3",
                 ),
                 dbc.Form(
                     [
@@ -254,10 +268,10 @@ def stage2(job_id):
                                 [
                                     dbc.Button(
                                         "Click to select a file to upload.",
-                                        # TODO FIXME the drag and drop does not work with the Form wrapper
-                                        # "Drag and drop a file or click to select a file to upload.",
                                         color="primary",
                                         className="mt-2",
+                                        id="upload-button",  # Button ID hinzufügen
+                                        disabled=True,  # Standardmäßig deaktiviert
                                     )
                                 ]
                             ),
@@ -301,6 +315,7 @@ def stage3(job_id):
     return (
         html.Div(
             [
+                html.H1("Stage 3"),
                 html.H2(f"Job ID: {job_id}"),
                 html.H4("Straßenauswahl"),
                 dbc.Checklist(
@@ -342,6 +357,7 @@ def stage4(job_id):
         [
             dbc.Label(
                 [
+                    html.H1("Stage 4"),
                     html.H2(f"Job ID: {job_id}"),
                     html.H3(
                         "Your input has been confirmed. The route(s) are being computed."  # noqa: E501
