@@ -274,11 +274,12 @@ def upload_to_minIO(osm_file_path, job_id):
 style_handle = assign(
     """
 function(feature, context){
-    const {selected} = context.hideout;
+    const {selected, zoom} = context.hideout;
+    const lineWeight = zoom ? Math.max(1, 5 / zoom) : 2; // Adjust weight based on zoom level
     if(selected.includes(feature.id)){
-        return {color: 'yellow', weight: 5}
+        return {color: 'yellow', weight: lineWeight};
     }
-    return {color: 'red', weight: 5}
+    return {color: 'red', weight: lineWeight};
 }
 """
 )
@@ -377,7 +378,7 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
         geojson_layer = dl.GeoJSON(
             data=filtered_data,
             options={"style": style_handle},
-            hideout=dict(selected=[]),
+            hideout=dict(selected=[], zoom=10),  # Pass the zoom level dynamically
             id="osm-geojson",
         )
         current_children.append(geojson_layer)
