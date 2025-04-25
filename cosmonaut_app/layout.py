@@ -97,23 +97,6 @@ main_map = html.Div(
 # Initial Sidebar for the Job Start
 side_bar = dbc.Col(
     [
-        dbc.Label(
-            [
-                html.H3(
-                    "Welcome to the COSmic ray based soil MOisture prediction NAvigation Utility Tool."  # noqa: E501
-                ),
-                html.H4("Press the Button to start initializing the job."),
-            ],
-            id="welcome-label",
-        ),
-        dbc.Button(
-            "Start Job",
-            id="start-job",
-            className="me-auto",
-            size="lg",
-        ),
-        html.Br(),
-        html.Br(),
         html.Div(id="stage-content"),
     ],
     id="offcanvas",
@@ -300,10 +283,46 @@ def stage2(job_id):
                     value=67,
                     style={"margin-top": "1rem"},
                 ),
-                html.Div(id="output-data-upload"),
-                html.Div(id="output-osm-query"),
-                html.Div(id="plot-generation-status"),
-                html.Div(id="output-minIO-status"),
+                html.Div(
+                    dcc.Loading(
+                        id="loading-output-data-upload",
+                        type="default",
+                        children=html.Div(
+                            id="output-data-upload",
+                            style={"padding": "1rem"},
+                        ),
+                    )
+                ),
+                html.Div(
+                    dcc.Loading(
+                        id="loading-output-osm-query",
+                        type="default",
+                        children=html.Div(
+                            id="output-osm-query",
+                            style={"padding": "1rem"},
+                        ),
+                    )
+                ),
+                html.Div(
+                    dcc.Loading(
+                        id="loading-plot-generation-status",
+                        type="default",
+                        children=html.Div(
+                            id="plot-generation-status",
+                            style={"padding": "1rem"},
+                        ),
+                    )
+                ),
+                html.Div(
+                    dcc.Loading(
+                        id="loading-output-minIO-status",
+                        type="default",
+                        children=html.Div(
+                            id="output-minIO-status",
+                            style={"padding": "1rem"},
+                        ),
+                    )
+                ),
                 html.Div(id="file-path", style={"display": "none"}),
                 dbc.Input(id="email-input", type="email", style={"display": "none"}),
             ],
@@ -317,6 +336,22 @@ def stage3(job_id):
             [
                 html.H1("Stage 3"),
                 html.H2(f"Job ID: {job_id}"),
+                html.P(
+                    "Wählen Sie die gewünschten Straßen aus.",
+                    style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
+                ),
+                html.P(
+                    "Per Klick auf eine Straße kann diese mit dem Button "
+                    '"Remove selected Roads" entfernt werden. Dieser Button entfernt '
+                    "auch alle nicht angeschlossenen Straßen und behält nur das größte "
+                    "zusammenhängende Straßennetzwerk. Er muss gedrückt werden, bevor "
+                    "es zur nächsten Stage geht.",
+                    style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
+                ),
+                html.P(
+                    "Bitte haben Sie Geduld bei großen Dateien.",
+                    style={"margin-bottom": "1rem", "font-size": "1.2rem"},
+                ),
                 html.H4("Straßenauswahl"),
                 dbc.Checklist(
                     id="tags-dropdown",
@@ -359,8 +394,18 @@ def stage4(job_id):
                 [
                     html.H1("Stage 4"),
                     html.H2(f"Job ID: {job_id}"),
-                    html.H3(
-                        "Your input has been confirmed. The route(s) are being computed."  # noqa: E501
+                    html.P(
+                        "Hier sollen später eine Mehrfachauswahl kommen.",
+                        style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
+                    ),
+                    html.P(
+                        "Bitte haben Sie Geduld, bis die Route berechnet ist.",
+                        style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
+                    ),
+                    html.P(
+                        "Wenn der 'Start Route'-Button gedrückt wird, erscheint ein "
+                        "QR-Code, mit welchem eine GPX-Datei der finalen Route heruntergeladen werden kann.",
+                        style={"margin-bottom": "1rem", "font-size": "1.2rem"},
                     ),
                     html.H4(
                         "Choose a Route on the map.", style={"color": "grey"}

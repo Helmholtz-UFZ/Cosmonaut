@@ -10,7 +10,7 @@ import dash_bootstrap_components as dbc
 import dash_leaflet as dl
 import geojson
 import matplotlib
-from dash import ctx, no_update
+from dash import ctx, no_update, html
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from dash_extensions.javascript import assign
@@ -731,12 +731,25 @@ def start_job(n_clicks, _):
     Input("job-id", "data"),
     Input("current-stage", "data"),
     State("job-loaded-flag", "data"),
-    prevent_initial_call=True,
 )
 def update_stage(job_id, current_stage, job_loaded_flag):
+    logging.info(f"Job ID: {job_id}")
     if job_id is None:
-        logging.debug("No job_id provided, returning None")
-        return None
+        logging.info("No job initialized. Showing welcome message.")
+        return html.Div(
+            [
+                html.H3(
+                    "Welcome to the COSmic ray based soil MOisture prediction NAvigation Utility Tool."
+                ),
+                html.H4("Press the Button to start initializing the job."),
+                dbc.Button(
+                    "Start Job",
+                    id="start-job",
+                    className="me-auto",
+                    size="lg",
+                ),
+            ]
+        )
 
     logging.info(f"Processing job {job_id}")
     logging.debug(
