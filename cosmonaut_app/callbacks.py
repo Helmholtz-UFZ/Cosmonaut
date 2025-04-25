@@ -556,7 +556,9 @@ def update_qr_code(n_clicks, job_id):
     route_creator.create_gpx(path=output_dir)
 
     # Upload the GPX file to MinIO and get the URL
-    gpx_url = route_creator.upload_gpx(job_id=job_id)
+    gpx_url = route_creator.upload_gpx(
+        job_id=job_id, filename=f"{job_id}_route_{time.strftime('%Y%m%d')}.gpx"
+    )
 
     # Create the QR code for the GPX URL
     qr_data = route_creator.create_qr_code(gpx_url, path=output_dir)
