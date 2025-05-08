@@ -49,17 +49,35 @@ class RouteCreator:
         logger.info("Creating GPX file.")
         gpx = gpxpy.gpx.GPX()
 
-        for feature in self.geojson_data["features"]:
-            if feature["geometry"]["type"] == "LineString":
-                gpx_track = gpxpy.gpx.GPXTrack()
-                gpx_track_segment = gpxpy.gpx.GPXTrackSegment()
-                for coordinate in feature["geometry"]["coordinates"]:
-                    gpx_track_segment.points.append(
-                        gpxpy.gpx.GPXTrackPoint(coordinate[1], coordinate[0])
-                    )
-                gpx_track.segments.append(gpx_track_segment)
-                gpx.tracks.append(gpx_track)
+        # Add metadata to GPX
+        metadata = self.geojson_data.get("metadata", {})
+        gpx.name = metadata.get("Optimization Objective", "Route")
+        gpx.description = f"Distance: {metadata.get('Distance', 'N/A')} km, Benefit: {metadata.get('Benefit', 'N/A')}"
 
+        # Create a single track
+        gpx_track = gpxpy.gpx.GPXTrack()
+
+        # Handle segments based on features like "slow"
+        slow_segments = metadata.get("slow", [])
+        current_segment = gpxpy.gpx.GPXTrackSegment()
+
+        for i, feature in enumerate(self.geojson_data["features"]):
+            for coordinate in feature["geometry"]["coordinates"]:
+                point = gpxpy.gpx.GPXTrackPoint(coordinate[1], coordinate[0])
+                current_segment.points.append(point)
+
+            # Check if the current segment should end
+            if any(start <= i <= end for start, end in slow_segments):
+                gpx_track.segments.append(current_segment)
+                current_segment = gpxpy.gpx.GPXTrackSegment()
+
+        # Append the last segment
+        if current_segment.points:
+            gpx_track.segments.append(current_segment)
+
+        gpx.tracks.append(gpx_track)
+
+        # Save the GPX file
         full_path = os.path.join(path, filename)
         with open(full_path, "w") as file:
             file.write(gpx.to_xml())

@@ -131,12 +131,20 @@ def transform_csv(input_file, epsg_input, epsg_output):
     return df
 
 
-# TODO The transformation into a correct geojson format should be in CANs Sensor-routing package
 def transform_solution(input_file, epsg_input, epsg_output, reversed_coords=False):
     """
     Transforms the coordinates of sensor-routing solution .json
     from one coordinate reference system (CRS) to another and
-    converts the solution to GeoJSON format.
+    converts the solution to GeoJSON format, preserving metadata.
+
+    Args:
+        input_file (str): Path to the solution.json file.
+        epsg_input (int): Input EPSG code.
+        epsg_output (int): Output EPSG code.
+        reversed_coords (bool): Whether to reverse coordinates.
+
+    Returns:
+        dict: Transformed solution with metadata and features.
     """
     if not input_file.endswith(".json"):
         raise ValueError("Input file must be a .json file.")
@@ -146,11 +154,14 @@ def transform_solution(input_file, epsg_input, epsg_output, reversed_coords=Fals
     with open(input_file, "r") as f:
         data = geojson.load(f)
 
+    # Extract metadata
+    metadata = {key: data[key] for key in data if key != "Path"}
+
+    # Transform coordinates
     crs_output = CRS.from_epsg(epsg_output)
     crs_input = CRS.from_epsg(epsg_input)
     transformer = Transformer.from_crs(crs_input, crs_output)
 
-    # Transform the coordinates in the "Path" key
     if reversed_coords:
         transformed_path = [transformer.transform(y, x) for x, y in data["Path"]]
         transformed_path = [(lon, lat) for lat, lon in transformed_path]
@@ -162,7 +173,6 @@ def transform_solution(input_file, epsg_input, epsg_output, reversed_coords=Fals
     for i in range(len(transformed_path) - 1):
         start = transformed_path[i]
         end = transformed_path[i + 1]
-        # Ensure the coordinates are saved as (longitude, latitude)
         features.append(
             {
                 "type": "Feature",
@@ -170,16 +180,21 @@ def transform_solution(input_file, epsg_input, epsg_output, reversed_coords=Fals
                     "type": "LineString",
                     "coordinates": [[start[1], start[0]], [end[1], end[0]]],
                 },
-                "properties": {},
+                "properties": {"segment_index": i},
             }
         )
 
-    geojson_data = {"type": "FeatureCollection", "features": features}
+    # Include metadata and features
+    geojson_data = {
+        "type": "FeatureCollection",
+        "metadata": metadata,
+        "features": features,
+    }
 
     # Save the transformed data to a new file
     output_file = os.path.join(os.path.dirname(input_file), "solution_transformed.json")
     with open(output_file, "w") as f:
-        geojson.dump(geojson_data, f)
+        geojson.dump(geojson_data, f, indent=2)
 
     return geojson_data
 
