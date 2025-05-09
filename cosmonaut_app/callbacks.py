@@ -15,7 +15,6 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from dash_extensions.javascript import assign
 from flask import current_app
-from matplotlib import pyplot as plt
 from sensor_routing import sensor_routing_cli
 from werkzeug.utils import secure_filename
 from cosmonaut_app.classification_plot import ClassificationPlot
@@ -392,11 +391,11 @@ def toggle_select(_, clickData, hideout):
     Output("plot-generation-status", "children"),
     Input("output-data-upload", "children"),
     State("file-path", "children"),
-    State(
-        "job-id", "data"
-    ),  # Assuming the job ID is stored in a component with ID 'job-id'
+    State("job-id", "data"),
+    State("epsg-store", "data"),  # Retrieve source EPSG from epsg-store
+    prevent_initial_call=True,
 )
-def generate_classification_plot(upload_status, file_path, job_id):
+def generate_classification_plot(upload_status, file_path, job_id, src_epsg):
     """
     Generate classification plots based on the uploaded data.
 
@@ -405,21 +404,27 @@ def generate_classification_plot(upload_status, file_path, job_id):
     if upload_status is None:
         raise PreventUpdate
 
-    try:
-        logging.info("Generating Plots for following job_id: " + job_id)
-        logging.info("Saving files to: " + os.path.join(WEB_WORK_DIR, job_id))
-        # Pass the job_id to the ClassificationPlot constructor
-        plot = ClassificationPlot(file_path, job_id)
-        plot.generate_plots(
-            [
-                plt.cm.Blues,
-                plt.cm.Oranges,
-                plt.cm.Greens,
-                plt.cm.Purples,
-                plt.cm.Reds,
-                plt.cm.Greys,
-            ]
+    if src_epsg is None:
+        logging.error("Source EPSG is not set. Cannot proceed.")
+        return dbc.Alert(
+            "Source EPSG is not set. Please provide a valid EPSG code.",
+            color="danger",
+            className="fade-out",
+            key=str(time.time()),
         )
+
+    try:
+        logging.info(
+            f"Generating Plots for job_id: {job_id} with source EPSG: {src_epsg}"
+        )
+        logging.info(f"Saving files to: {os.path.join(WEB_WORK_DIR, job_id)}")
+
+        # Pass the job_id and source EPSG to the ClassificationPlot constructor
+        plot = ClassificationPlot(file_path, job_id, src_epsg=f"EPSG:{src_epsg}")
+
+        # Call the generate_plots method without arguments
+        plot.generate_plots()
+
         # TODO: FUTURE, plot the returned TileLayer on the map
 
         # commented out for now,
@@ -520,12 +525,19 @@ def update_qr_code(n_clicks, job_id):
     output_dir = os.path.join(WEB_WORK_DIR, job_id, "output")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    route_creator.create_gpx(path=output_dir)
+    gpx_filename = f"{job_id}_route_{time.strftime('%Y%m%d')}.gpx"
+    full_path = os.path.join(output_dir, gpx_filename)
+    route_creator.create_gpx(filename=gpx_filename, path=output_dir)
+
+    logging.debug(f"GPX file created at {full_path}")
+
+    # Verify file existence before upload
+    if not os.path.exists(full_path):
+        logging.error(f"GPX file does not exist: {full_path}")
+        raise FileNotFoundError(f"GPX file not found: {full_path}")
 
     # Upload the GPX file to MinIO and get the URL
-    gpx_url = route_creator.upload_gpx(
-        job_id=job_id, filename=f"{job_id}_route_{time.strftime('%Y%m%d')}.gpx"
-    )
+    gpx_url = route_creator.upload_gpx(filename=gpx_filename, job_id=job_id)
 
     # Create the QR code for the GPX URL
     qr_data = route_creator.create_qr_code(gpx_url, path=output_dir)

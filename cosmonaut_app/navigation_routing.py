@@ -79,30 +79,44 @@ class RouteCreator:
 
         # Save the GPX file
         full_path = os.path.join(path, filename)
-        with open(full_path, "w") as file:
+        with open(full_path, "w", encoding="utf-8") as file:  # Explicitly set encoding
             file.write(gpx.to_xml())
         logger.info(f"GPX file created at {full_path}.")
+        if not os.path.exists(full_path):
+            logger.error(f"GPX file not found after creation: {full_path}")
 
-    def upload_gpx(self, filename="route.gpx", job_id=None):
+    def upload_gpx(self, filename, job_id=None):
         """
         Uploads the specified GPX file to MinIO and returns the link.
 
         Args:
-            filename (str, optional): The name of the GPX file to be uploaded.
-                Defaults to "route.gpx".
+            filename (str): The name of the GPX file to be uploaded.
             job_id (str, optional): The job ID for the MinIO path.
 
         Returns:
             str: The link to the uploaded GPX file.
         """
-        logger.info("Uploading GPX file to MinIO.")
+        logger.info(f"Uploading GPX file '{filename}' to MinIO.")
         minio_manager = MiniIOManager("cosmic-routing")
         file_path = os.path.join("cosmonaut_app/work_dir", job_id, "output", filename)
-        minio_manager.upload_file(file_path, f"{job_id}/output/{filename}")
-        minio_manager.make_file_public(f"{job_id}/output/{filename}")
-        url = minio_manager.get_file_url(f"{job_id}/output/{filename}")
-        logger.info(f"GPX file uploaded to MinIO. URL: {url}")
-        return url
+        if not os.path.exists(file_path):
+            logger.error(f"GPX file not found at path: {file_path}")
+            raise FileNotFoundError(f"GPX file not found: {file_path}")
+        if not minio_manager.upload_file(file_path, f"{job_id}/output/{filename}"):
+            logger.error(f"Failed to upload GPX file: {file_path}")
+            raise RuntimeError("File upload to MinIO failed.")
+        try:
+            minio_manager.make_file_public(f"{job_id}/output/{filename}")
+        except Exception as e:
+            logger.error(f"Failed to make file public: {str(e)}")
+            raise
+        try:
+            url = minio_manager.get_file_url(f"{job_id}/output/{filename}")
+            logger.info(f"GPX file uploaded to MinIO. URL: {url}")
+            return url
+        except Exception as e:
+            logger.error(f"Failed to retrieve file URL: {str(e)}")
+            raise
 
     def create_qr_code(self, url, filename="qr_code.png", path="."):
         """

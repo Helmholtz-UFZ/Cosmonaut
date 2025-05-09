@@ -55,7 +55,7 @@ class MiniIOManager:
                 endpoint=endpoint,
                 access_key=MINIO_ACCESS_KEY,
                 secret_key=MINIO_SECRET_KEY,
-                secure=(MINIO_PORT == "443"),
+                # secure=(MINIO_PORT == "443"),
             )
             logging.info("MinIO client initialized successfully")
         except Exception as e:
@@ -70,17 +70,19 @@ class MiniIOManager:
             logging.error(
                 f"Failed to upload file {file_path}: Only {', '.join(allowed_extensions)} files are allowed."
             )
-            return
+            return False
 
         try:
             if not os.path.exists(file_path):
                 logging.error(f"File does not exist: {file_path}")
-                return
+                return False
 
             self.minio_client.fput_object(self.bucket_name, object_key, file_path)
             logging.info(f"File {file_path} uploaded successfully as {object_key}")
+            return True
         except Exception as e:
             logging.error(f"Failed to upload file {file_path}: {str(e)}", exc_info=True)
+            return False
 
     def download_file(self, object_key, file_path):
         """
