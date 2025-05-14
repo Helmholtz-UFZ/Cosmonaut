@@ -14,7 +14,7 @@ RUN useradd -m -u 1000 appuser && \
     mkdir -p /python_docker/cosmonaut/.config && chmod 777 /python_docker/cosmonaut/.config && \
     mkdir -p /python_docker/cosmonaut/assets && chmod 777 /python_docker/cosmonaut/assets
 
-
+    
 WORKDIR /python_docker/cosmonaut
 
 ENV PYTHONPATH=/python_docker/cosmonaut/
@@ -28,14 +28,14 @@ RUN poetry config virtualenvs.create false && \
 
 COPY --chown=1000:1000 . .
 
-COPY --chown=1000:1000 .env_test .env
+COPY --chown=1000:1000 .env .env
 
 RUN chown -R 1000:1000 /python_docker/cosmonaut
 
 USER appuser
 
 CMD if [ "$GUNICORN" = 1 ] ; then \
-        gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.wsgi:app; \
+        gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT --timeout 600 cosmonaut_app.wsgi:app; \
     else \
         python3 /python_docker/cosmonaut/cosmonaut_app/app.py; \
     fi

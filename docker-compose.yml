@@ -13,7 +13,7 @@ services:
       - ${FLASK_PORT}:${FLASK_PORT}
 
   postgres:
-    image: postgres:17.3
+    image: postgres:17.5
     ports:
       - ${DB_PORT}:${DB_PORT}
     environment:
@@ -37,6 +37,24 @@ services:
       - "9000:9000"
       - "9001:9001" # Web-based admin console
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
     command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
+      /usr/bin/mc mb myminio/${MINIO_BUCKET};
+      /usr/bin/mc policy set public ${MINIO_BUCKET};
+      exit 0;
+      "

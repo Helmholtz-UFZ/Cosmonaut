@@ -27,7 +27,7 @@ RUN poetry config virtualenvs.create false && \
 
 COPY --chown=1000:1000 . .
 
-COPY --chown=1000:1000 .env_prod .env
+COPY --chown=1000:1000 .env_prod_priv .env
 
 RUN chown -R 1000:1000 /python_docker/cosmonaut
 
