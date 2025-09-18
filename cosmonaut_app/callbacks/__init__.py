@@ -3,6 +3,7 @@ from . import callbacks_map  # noqa: F401
 from . import callbacks_routing  # noqa: F401
 from . import callbacks_job  # noqa: F401
 from . import callbacks_ui  # noqa: F401
+from . import callbacks_user_info  # noqa: F401
 
 # Project Structure:
 # callbacks/

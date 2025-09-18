@@ -7,7 +7,6 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
-from cosmonaut_app.layout import main_page_layout, not_found_page, stage4
 from cosmonaut_app.flask_routes import app
 
 
@@ -80,23 +79,23 @@ def toggle_navbar_collapse(n, is_open):
     return is_open
 
 
-@app.callback(
-    [Output("page-content", "children"), Output("job-page-loaded", "data")],
-    [Input("url", "pathname")],
-    [State("job-id", "data")],
-    prevent_initial_call=True,
-)
-def display_page_and_update_url(pathname, job_id):
-    if pathname.startswith("/met/wg7/cosmonaut/job/"):
-        job_id_from_path = pathname.split("/met/wg7/cosmonaut/job/")[1]
-        if DataBaseManager.check_existence(job_id_from_path):
-            return stage4(job_id_from_path), True
-        else:
-            return not_found_page(), False
-    elif pathname == "/met/wg7/cosmonaut/":
-        return main_page_layout(), False
-    else:
-        return not_found_page(), False
+# @app.callback(
+#     [Output("page-content", "children"), Output("job-page-loaded", "data")],
+#     [Input("url", "pathname")],
+#     [State("job-id", "data")],
+#     prevent_initial_call=True,
+# )
+# def display_page_and_update_url(pathname, job_id):
+#     if pathname.startswith("/met/wg7/cosmonaut/job/"):
+#         job_id_from_path = pathname.split("/met/wg7/cosmonaut/job/")[1]
+#         if DataBaseManager.check_existence(job_id_from_path):
+#             return stage4(job_id_from_path), True
+#         else:
+#             return not_found_page(), False
+#     elif pathname == "/met/wg7/cosmonaut/":
+#         return main_page_layout(), False
+#     else:
+#         return not_found_page(), False
 
 
 @app.callback(

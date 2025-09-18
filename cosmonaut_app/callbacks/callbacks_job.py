@@ -2,7 +2,7 @@
 
 import os
 import logging
-from dash import html, no_update
+from dash import no_update
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
@@ -76,6 +76,9 @@ def redirect_to_home(n_intervals):
 
 @app.callback(
     Output("job-id", "data", allow_duplicate=True),
+    Output(
+        "hidden-redirect-link", "href", allow_duplicate=True
+    ),  # Set the href for the hidden link
     Input("start-job", "n_clicks"),
     State("start-job", "n_clicks"),
     prevent_initial_call=True,
@@ -114,7 +117,8 @@ def start_job(n_clicks, _):
     logging.info(
         "Successfully initialized working directory structure for job %s", job_id
     )
-    return job_id
+    # Set the href for the hidden link to trigger clientside redirect
+    return job_id, f"/{job_id}/user-info"
 
 
 @app.callback(
@@ -127,20 +131,20 @@ def update_stage(job_id, current_stage, job_loaded_flag):
     logging.info("Job ID: %s", job_id)
     if job_id is None:
         logging.info("No job initialized. Showing welcome message.")
-        return html.Div(
-            [
-                html.H3(
-                    "Welcome to the COSmic ray based soil MOisture prediction NAvigation Utility Tool."
-                ),
-                html.H4("Press the Button to start initializing the job."),
-                dbc.Button(
-                    "Start Job",
-                    id="start-job",
-                    className="me-auto",
-                    size="lg",
-                ),
-            ]
-        )
+        # return html.Div(
+        #     [
+        #         html.H3(
+        #             "Welcome to the COSmic ray based soil MOisture prediction NAvigation Utility Tool."
+        #         ),
+        #         html.H4("Press the Button to start initializing the job."),
+        #         dbc.Button(
+        #             "Start Job",
+        #             id="start-job",
+        #             className="me-auto",
+        #             size="lg",
+        #         ),
+        #     ]
+        # )
 
     logging.info("Processing job %s", job_id)
     logging.debug(
@@ -241,3 +245,12 @@ def update_current_stage(next_clicks, prev_clicks, current_stage):
 
     if prev_clicks is not None:
         return current_stage - 1
+
+
+@app.callback(
+    Output("force-refresh", "children"),
+    Input("user-info-url", "pathname"),
+)
+def force_user_info_refresh(pathname):
+    # Return the pathname or a timestamp to force update
+    return f"refreshed: {pathname}"
