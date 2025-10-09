@@ -17,3 +17,5 @@ cache/*
 .env
 .ruff_cache
 .docker_build_hash
+*.ipynb
+.gitmodules
