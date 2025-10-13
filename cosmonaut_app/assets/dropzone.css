@@ -1,0 +1,45 @@
+#data-upload-dropzone {
+  border: 2px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 0.6rem;
+  padding: 1.25rem;
+  background: #f8fafc;
+  color: #5b6b7a;
+  text-align: center;
+}
+#data-upload-dropzone:hover {
+  background: #f2f6fb;
+}
+
+#data-upload-dropzone {
+  border: 2px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 0.6rem;
+  padding: 1.25rem;
+  background: #f8fafc;
+  color: #5b6b7a;
+  text-align: center;
+}
+#data-upload-dropzone:hover {
+  background: #f2f6fb;
+}
+
+/* EPSG helper styles */
+#data-upload-epsg-helper {
+  color: var(--bs-success);
+}
+input#data-upload-epsg.is-invalid ~ #data-upload-epsg-helper { color: var(--bs-danger); }
+
+/* Toast stack below the card (no overlay) */
+.toast-stack {
+  position: static;      /* was: fixed */
+  top: auto;
+  right: auto;
+  width: 100%;
+  max-width: none;
+  margin-top: 0.75rem;
+  pointer-events: auto;  /* clickable */
+}
+.toast-stack > div { margin-bottom: .5rem; }
+.toast-stack .toast {
+  width: 100%;
+  max-width: none;
+}
