@@ -1,11 +1,11 @@
 import io
+import json
 import logging
 import os
-import json
+from urllib.parse import urlparse
 
 from minio import Minio
 from minio.error import S3Error
-from urllib.parse import urlparse
 
 from cosmonaut_app.config import (
     MINIO_ACCESS_KEY,
@@ -21,103 +21,115 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# TODO: Replace with rclone for performance
+
+def _to_bool(val, default=None):
+    if val is None:
+        return default
+    return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _resolve_minio_endpoint_and_secure(host: str, port) -> tuple[str, bool]:
+    """
+    Decide endpoint and TLS (secure) based on:
+    - scheme in MINIO_HOST (http/https)
+    - env MINIO_SECURE
+    - port heuristic (443 -> TLS; 9000 -> plain)
+    """
+    parsed = urlparse(str(host))
+    scheme = parsed.scheme
+    hostname = parsed.netloc if parsed.netloc else parsed.path
+
+    # Build endpoint host:port
+    port_str = str(port) if port not in (None, "") else ""
+    endpoint = f"{hostname}:{port_str}" if port_str else hostname
+
+    # 1) Scheme wins if provided
+    if scheme == "https":
+        return endpoint, True
+    if scheme == "http":
+        return endpoint, False
+
+    # 2) Explicit env override
+    env_secure = _to_bool(os.getenv("MINIO_SECURE"), default=None)
+    if env_secure is not None:
+        return endpoint, env_secure
+
+    # 3) Port heuristic
+    if str(port_str) == "443":
+        return endpoint, True
+    # Default MinIO in docker on 9000 is HTTP
+    if str(port_str) == "9000":
+        return endpoint, False
+
+    # 4) Safe default: no TLS unless told otherwise
+    return endpoint, False
 
 
 class MiniIOManager:
     """
-    A class to manage file uploads and deletions to a MinIO bucket.
-
-    Attributes:
-        bucket_name (str): The name of the MinIO bucket.
-        minio_client (Minio): The MinIO client object.
-
-    Methods:
-        upload_file(file_path, object_key): Uploads a file to the MinIO bucket.
-        delete_file(object_key): Deletes a file from the MinIO bucket.
-        make_file_public(object_key): Makes a file in the MinIO bucket public.
-        get_file_url(object_key): Gets the URL of a file in the MinIO bucket.
+    Manage uploads/downloads to a MinIO bucket.
     """
 
-    def __init__(self, bucket_name):
-        logging.info(f"Initializing MinIO manager for bucket {bucket_name}")
+    def __init__(self, bucket_name: str):
+        logging.info("Initializing MinIO manager for bucket %s", bucket_name)
         self.bucket_name = bucket_name
 
-        # Parse and sanitize MINIO_HOST to remove any scheme
-        parsed_host = urlparse(MINIO_HOST)
-        host = parsed_host.netloc if parsed_host.netloc else parsed_host.path
-        endpoint = f"{host}:{MINIO_PORT}" if MINIO_PORT else host
-        logging.info(f"Constructed MinIO endpoint: {endpoint}")
+        endpoint, secure = _resolve_minio_endpoint_and_secure(MINIO_HOST, MINIO_PORT)
+        logging.info("Constructed MinIO endpoint: %s (secure=%s)", endpoint, secure)
 
-        # Initialize the Minio client
         try:
             self.minio_client = Minio(
                 endpoint=endpoint,
                 access_key=MINIO_ACCESS_KEY,
                 secret_key=MINIO_SECRET_KEY,
-                # secure=(MINIO_PORT == "443"),
+                secure=secure,
             )
             logging.info("MinIO client initialized successfully")
+
+            # Ensure bucket exists (also checks connectivity once)
+            if not self.minio_client.bucket_exists(self.bucket_name):
+                self.minio_client.make_bucket(self.bucket_name)
         except Exception as e:
-            logging.error(f"Failed to initialize MinIO client: {str(e)}")
+            logging.error("Failed to initialize MinIO client: %s", e, exc_info=True)
             raise
 
-    def upload_file(self, file_path, object_key):
-        logging.info(f"Uploading file {file_path} as {object_key}")
-        _, file_extension = os.path.splitext(file_path)
-        allowed_extensions = [".tif", ".geojson", ".json", ".csv", ".gpx"]
-        if file_extension not in allowed_extensions:
+    def upload_file(self, file_path: str, object_key: str) -> bool:
+        logging.info("Uploading file %s as %s", file_path, object_key)
+        _, ext = os.path.splitext(file_path)
+        allowed = {".tif", ".geojson", ".json", ".csv", ".gpx"}
+        if ext not in allowed:
             logging.error(
-                f"Failed to upload file {file_path}: Only {', '.join(allowed_extensions)} files are allowed."
+                "Failed to upload %s: only %s are allowed.",
+                file_path,
+                ", ".join(sorted(allowed)),
             )
             return False
-
+        if not os.path.exists(file_path):
+            logging.error("File does not exist: %s", file_path)
+            return False
         try:
-            if not os.path.exists(file_path):
-                logging.error(f"File does not exist: {file_path}")
-                return False
-
             self.minio_client.fput_object(self.bucket_name, object_key, file_path)
-            logging.info(f"File {file_path} uploaded successfully as {object_key}")
+            logging.info("File %s uploaded successfully as %s", file_path, object_key)
             return True
         except Exception as e:
-            logging.error(f"Failed to upload file {file_path}: {str(e)}", exc_info=True)
+            logging.error("Failed to upload file %s: %s", file_path, e, exc_info=True)
             return False
 
-    def download_file(self, object_key, file_path):
-        """
-        Downloads a file from the MinIO bucket.
-
-        Args:
-            object_key (str): Key of the file to be downloaded from the MinIO bucket.
-            file_path (str): The path to save the downloaded file.
-        """
+    def download_file(self, object_key: str, file_path: str) -> None:
         try:
             self.minio_client.fget_object(self.bucket_name, object_key, file_path)
-            logging.info(f"File {object_key} downloaded successfully as {file_path}")
+            logging.info("File %s downloaded successfully as %s", object_key, file_path)
         except Exception as e:
-            logging.error(f"Failed to download file {object_key}: {str(e)}")
+            logging.error("Failed to download file %s: %s", object_key, e)
 
-    def delete_file(self, object_key):
-        """
-        Deletes a file from the MinIO bucket.
-
-        Args:
-            object_key (str): The key of the file to be deleted from the MinIO bucket.
-        """
+    def delete_file(self, object_key: str) -> None:
         try:
             self.minio_client.remove_object(self.bucket_name, object_key)
-            logging.info(f"File {object_key} deleted successfully")
+            logging.info("File %s deleted successfully", object_key)
         except Exception as e:
-            logging.error(f"Failed to delete file {object_key}: {str(e)}")
+            logging.error("Failed to delete file %s: %s", object_key, e)
 
-    def make_file_public(self, object_key):
-        """
-        Makes a file in the MinIO bucket public.
-
-        Args:
-            object_key (str): The key of the file to be made public.
-        """
+    def make_file_public(self, object_key: str) -> None:
         try:
             policy = {
                 "Version": "2012-10-17",
@@ -130,109 +142,74 @@ class MiniIOManager:
                     }
                 ],
             }
-            policy_json = json.dumps(policy)
-            self.minio_client.set_bucket_policy(self.bucket_name, policy_json)
-            logging.info(f"File {object_key} made public successfully")
+            self.minio_client.set_bucket_policy(self.bucket_name, json.dumps(policy))
+            logging.info("File %s made public successfully", object_key)
         except S3Error as e:
-            logging.error(f"Failed to make file {object_key} public: {str(e)}")
+            logging.error("Failed to make file %s public: %s", object_key, e)
 
-    def get_file_url(self, object_key):
-        """
-        Gets the URL of a file in the MinIO bucket.
-
-        Args:
-            object_key (str): The key of the file to get the URL for.
-
-        Returns:
-            str: The URL of the file.
-        """
+    def get_file_url(self, object_key: str) -> str | None:
         try:
             url = self.minio_client.presigned_get_object(self.bucket_name, object_key)
-            logging.info(f"URL for file {object_key} retrieved successfully")
+            logging.info("URL for file %s retrieved", object_key)
             return url
         except Exception as e:
-            logging.error(f"Failed to get URL for file {object_key}: {str(e)}")
+            logging.error("Failed to get URL for file %s: %s", object_key, e)
             return None
 
-    # return filenames asked for in the bucket
-    def get_files(self):
-        """
-        Lists all files in the MinIO bucket.
-        """
+    def get_files(self) -> list[str] | None:
         try:
-            objects = self.minio_client.list_objects(self.bucket_name)
-            return [obj.object_name for obj in objects]
+            return [
+                obj.object_name
+                for obj in self.minio_client.list_objects(self.bucket_name)
+            ]
         except Exception as e:
             logging.warning(
-                f"Failed to list files in bucket {self.bucket_name}: {str(e)}"
+                "Failed to list files in bucket %s: %s", self.bucket_name, e
             )
+            return None
 
-    def upload_placeholder(self, object_key):
+    def upload_placeholder(self, object_key: str) -> None:
         try:
-            logging.info(f"Creating placeholder for object key: {object_key}")
-            empty_file = io.BytesIO(b"")
+            logging.info("Creating placeholder for object key: %s", object_key)
+            empty = io.BytesIO(b"")
             self.minio_client.put_object(
-                self.bucket_name, object_key, data=empty_file, length=0
+                self.bucket_name, object_key, data=empty, length=0
             )
-            logging.info(f"Placeholder for {object_key} created successfully")
+            logging.info("Placeholder for %s created", object_key)
         except Exception as e:
             logging.error(
-                f"Failed to create placeholder for {object_key}: {str(e)}",
-                exc_info=True,
+                "Failed to create placeholder for %s: %s", object_key, e, exc_info=True
             )
 
     @staticmethod
-    def download_directory(minio_path, local_path):
-        """
-        Downloads all objects from a MinIO bucket
-        with the specified prefix to a local directory.
-
-        Args:
-            minio_path (str): Prefix of the objects to be downloaded.
-            local_path (str): Local directory to save the objects.
-        """
-        logging.info(f"Downloading directory {minio_path} to {local_path}")
+    def download_directory(minio_path: str, local_path: str) -> None:
+        logging.info("Downloading directory %s to %s", minio_path, local_path)
         try:
-            # Ensure the local path exists
-            if not os.path.exists(local_path):
-                os.makedirs(local_path)
+            os.makedirs(local_path, exist_ok=True)
 
-            # List all objects in the bucket with the specified prefix
-            minio_client = Minio(
-                f"{MINIO_HOST}:{MINIO_PORT}",
+            endpoint, secure = _resolve_minio_endpoint_and_secure(
+                MINIO_HOST, MINIO_PORT
+            )
+            m = Minio(
+                endpoint,
                 access_key=MINIO_ACCESS_KEY,
                 secret_key=MINIO_SECRET_KEY,
-                secure=(MINIO_PORT == 443),
+                secure=secure,
             )
-            objects = minio_client.list_objects(
+
+            objects = m.list_objects(
                 "cosmic-routing", prefix=minio_path, recursive=True
             )
-
             for obj in objects:
-                # Construct the local file path
-                local_file_path = os.path.join(
+                local_file = os.path.join(
                     local_path, os.path.relpath(obj.object_name, minio_path)
                 )
-                local_file_dir = os.path.dirname(local_file_path)
-
-                # Ensure the local directory exists
-                if not os.path.exists(local_file_dir):
-                    os.makedirs(local_file_dir)
-
-                # Check if the file already exists locally
-                if not os.path.exists(local_file_path):
-                    # Download the object
-                    minio_client.fget_object(
-                        "cosmic-routing", obj.object_name, local_file_path
-                    )
-                    logging.info(f"Downloaded {obj.object_name} to {local_file_path}")
-                else:
-                    logging.info(
-                        f"Skipped {obj.object_name} as it already exists locally"
-                    )
-
+                os.makedirs(os.path.dirname(local_file), exist_ok=True)
+                if not os.path.exists(local_file):
+                    m.fget_object("cosmic-routing", obj.object_name, local_file)
+                    logging.info("Downloaded %s to %s", obj.object_name, local_file)
         except Exception as e:
-            logging.error(f"Failed to download directory {minio_path}: {str(e)}")
+            logging.error("Failed to download directory %s: %s", minio_path, e)
 
 
 if __name__ == "__main__":
