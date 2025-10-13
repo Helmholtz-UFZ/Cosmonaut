@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: ./docker/dev.Dockerfile
+      args:
+        - REQUIREMENTS_SHA=${REQUIREMENTS_SHA-}
     env_file: .env
     volumes:
       - "./:/python_docker/cosmonaut"

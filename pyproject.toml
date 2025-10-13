@@ -1,83 +1,165 @@
-[tool.ruff]
-line-length = 88
-exclude = ["*.ipynb"]
-
-[tool.poetry]
+[project]
 name = "ufz-flask"
 version = "0.1.0"
-description = "This is Poetry"
-authors = ["Louis Ferdinand Trinkle <louis-ferdinand.trinkle@ufz.de>"]
+description = "Add your description here"
 readme = "README.md"
-package-mode = false
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "affine==2.4.0",
+    "amqp==5.3.1",
+    "annotated-types==0.7.0",
+    "appnope==0.1.4 ; sys_platform == 'darwin'",
+    "argon2-cffi==25.1.0",
+    "argon2-cffi-bindings==25.1.0",
+    "asttokens==3.0.0",
+    "attrs==25.4.0",
+    "billiard==4.2.2",
+    "blinker==1.6.2",
+    "bootstrap-flask==2.5.0",
+    "cachelib==0.13.0",
+    "celery==5.4.0",
+    "certifi==2024.8.30",
+    "cffi==2.0.0",
+    "cfgv==3.4.0",
+    "charset-normalizer==3.4.0",
+    "click==8.1.7",
+    "click-didyoumean==0.3.1",
+    "click-plugins==1.1.1.2",
+    "click-repl==0.3.0",
+    "cligj==0.7.2",
+    "colorama==0.4.6; sys_platform == 'win32'",
+    "colorcet==3.1.0",
+    "comm==0.2.3",
+    "contourpy==1.3.3",
+    "cycler==0.12.1",
+    "dash==3.2.0",
+    "dash-ag-grid==32.3.2",
+    "dash-bootstrap-components==1.7.1",
+    "dash-extensions==2.0.4",
+    "dash-iconify==0.1.2",
+    "dash-leaflet==1.1.3",
+    "dash-mantine-components==1.1.1",
+    "dash-pydantic-form==0.16.2",
+    "dash-pydantic-utils==0.17.5",
+    "dash-svg==0.0.12",
+    "dataclass-wizard==0.35.1",
+    "debugpy==1.8.17",
+    "decorator==5.2.1",
+    "distlib==0.4.0",
+    "dominate==2.9.1",
+    "editorconfig==0.17.1",
+    "executing==2.2.1",
+    "filelock==3.20.0",
+    "flask==2.3.3",
+    "flask-bootstrap==3.3.7.1",
+    "flask-caching==2.3.1",
+    "flask-wtf==1.1.1",
+    "fonttools==4.60.1",
+    "fsspec==2025.9.0",
+    "gdal==3.3.0",
+    "geobuf==2.0.0",
+    "geographiclib==2.1",
+    "geojson==3.2.0",
+    "geopandas==1.0.1",
+    "geopy==2.4.1",
+    "gpxpy==1.6.2",
+    "greenlet==3.2.4 ; (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'WIN32') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'amd64') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'ppc64le') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'win32') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64')",
+    "gunicorn==22.0.0",
+    "identify==2.6.15",
+    "idna==3.10",
+    "importlib-metadata==8.7.0",
+    "ipykernel==6.30.1",
+    "ipython==9.6.0",
+    "ipython-pygments-lexers==1.1.1",
+    "itsdangerous==2.1.2",
+    "jedi==0.19.2",
+    "jinja2==3.1.2",
+    "jsbeautifier==1.15.4",
+    "jupyter-client==8.6.3",
+    "jupyter-core==5.8.1",
+    "kiwisolver==1.4.9",
+    "kombu==5.4.2",
+    "markupsafe==2.1.3",
+    "matplotlib==3.10.7",
+    "matplotlib-inline==0.1.7",
+    "minio==7.2.18",
+    "more-itertools==10.8.0",
+    "nest-asyncio==1.6.0",
+    "networkx==3.4.2",
+    "nodeenv==1.9.1",
+    "numpy==2.2.0",
+    "osmnx==1.9.1",
+    "packaging==24.2",
+    "pandas==2.2.3",
+    "parso==0.8.5",
+    "pexpect==4.9.0; sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "pillow==11.3.0",
+    "platformdirs==4.5.0",
+    "plotly==5.24.1",
+    "pre-commit==4.3.0",
+    "prompt-toolkit==3.0.52",
+    "protobuf==6.32.1",
+    "psutil==7.1.0",
+    "psycopg2==2.9.11",
+    "ptyprocess==0.7.0; sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "pure-eval==0.2.3",
+    "pycparser==2.23; implementation_name != 'PyPy'",
+    "pycryptodome==3.23.0",
+    "pydantic==2.12.0",
+    "pydantic-core==2.41.1",
+    "pygments==2.19.2",
+    "pyjwt==2.10.1",
+    "pyogrio==0.10.0",
+    "pyparsing==3.2.5",
+    "pypng==0.20220715.0",
+    "pyproj==3.7.0",
+    "python-dateutil==2.9.0.post0",
+    "python-dotenv==1.1.1",
+    "pytz==2024.2",
+    "pywin32==311; platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
+    "pyyaml==6.0.3",
+    "pyzmq==27.1.0",
+    "qrcode[pil]==7.4.2",
+    "rasterio==1.4.3",
+    "redis==5.3.1",
+    "requests==2.32.3",
+    "retrying==1.4.2",
+    "ruff==0.7.4",
+    "sensor-routing==0.1.15",
+    "setuptools==80.9.0",
+    "shapely==2.0.6",
+    "six==1.17.0",
+    "sqlalchemy==2.0.44",
+    "stack-data==0.6.3",
+    "tenacity==9.1.2",
+    "tornado==6.5.2",
+    "traitlets==5.14.3",
+    "typing-extensions==4.15.0",
+    "typing-inspection==0.4.2",
+    "tzdata==2024.2",
+    "urllib3==2.2.3",
+    "vine==5.1.0",
+    "virtualenv==20.35.3",
+    "visitor==0.1.3",
+    "wcwidth==0.2.14",
+    "werkzeug==3.1.3",
+    "wtforms==3.0.1",
+    "zipp==3.23.0",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.12.0,<3.14"
-blinker = "1.6.2"
-click = "8.1.7"
-flask = "2.3.3"
-flask-wtf = "1.1.1"
-itsdangerous = "2.1.2"
-jinja2 = "3.1.2"
-markupsafe = "2.1.3"
-WTForms = "3.0.1"
-flask-bootstrap = "^3.3.7.1"
-bootstrap-flask = "^2.3.2"
-pyproj = "^3.6.1"
-shapely = "^2.0.2"
-geojson = "^3.0.1"
-pandas = "^2.1.2"
-plotly = "^5.18.0"
-geopandas = "^1.0.0"
-pydantic = "^2.5.3"
-matplotlib = "^3.8.2"
-numpy = "^2.2.0"
-ipykernel = "^6.29.0"
-gdal = "3.3.0"
-rasterio = "^1.3.9"
-minio = "^7.2.5"
-python-dotenv = "^1.0.1"
-qrcode = {extras = ["pil"], version = "^7.4.2"}
-gpxpy = "^1.6.2"
-dash-bootstrap-components = "^1.6.0"
-sqlalchemy = "^2.0.30"
-psycopg2 = "^2.9.9"
-gunicorn = "^22.0.0"
-networkx = "^3.3"
-ruff = "^0.7.3"
-pre-commit = "^4.0.1"
-celery = "^5.4.0"
-redis = "^5.2.1"
-osmnx = "1.9.1"
-geopy = "^2.4.1"
-dash-mantine-components = "1.1.1"
-dash-pydantic-form = "^0.16.0"
-dash = "^3.0.4"
-dash-leaflet = "^1.1.3"
-dash-extensions = "^2.0.4"
-sensor-routing = "^0.1.15"
+[dependency-groups]
+dev = [
+    "ipykernel>=6.30.1",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.2",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.7.4",
+]
+docs = [
+    "mkdocs>=1.6.1",
+]
 
-[tool.poetry.group.dev.dependencies]
-blinker = "1.6.2"
-click = "8.1.7"
-flask = "2.3.3"
-flask-wtf = "1.1.1"
-itsdangerous = "2.1.2"
-jinja2 = "3.1.2"
-markupsafe = "2.1.3"
-WTForms = "3.0.1"
-flask-bootstrap = "^3.3.7.1"
-bootstrap-flask = "^2.3.2"
-
-[tool.poetry.group.test.dependencies]
-pytest = "6.2.5"
-pytest-mock = "3.6.1"
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
-mkdocs = "*"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.uv]
+default-groups = [
+    "dev"
+]

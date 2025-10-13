@@ -2,6 +2,8 @@
 
 FROM python:3.13-slim
 
+ARG REQUIREMENTS_SHA
+
 ENV MPLCONFIGDIR=/python_docker/cosmonaut/.config/matplotlib
 
 RUN useradd -m -u 1000 appuser && \
@@ -9,7 +11,7 @@ RUN useradd -m -u 1000 appuser && \
     apt-get -y upgrade && \
     apt-get -y install git libpq-dev gcc g++ libgdal-dev gdal-bin && \
     pip install --upgrade pip wheel setuptools && \
-    pip install poetry && \
+    pip install uv && \
     mkdir -p $MPLCONFIGDIR && chmod 777 $MPLCONFIGDIR && \
     mkdir -p /python_docker/cosmonaut/.config && chmod 777 /python_docker/cosmonaut/.config && \
     mkdir -p /python_docker/cosmonaut/assets && chmod 777 /python_docker/cosmonaut/assets
@@ -20,10 +22,10 @@ ENV PYTHONPATH=/python_docker/cosmonaut/
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
 ENV C_INCLUDE_PATH=/usr/include/gdal
 
-COPY --chown=1000:1000 poetry.lock pyproject.toml /python_docker/cosmonaut/
+COPY --chown=1000:1000 pyproject.toml uv.lock /python_docker/cosmonaut/
 
-RUN poetry config virtualenvs.create false && \
-    poetry install --no-interaction --no-ansi
+RUN uv export --format requirements-txt --no-hashes > /tmp/lock-reqs.txt \
+    && uv pip install --system -r /tmp/lock-reqs.txt
 
 COPY --chown=1000:1000 . .
 
@@ -33,4 +35,4 @@ RUN chown -R 1000:1000 /python_docker/cosmonaut
 
 USER appuser
 
-CMD ["gunicorn", "--timeout", "120", "-w", "4", "-b", "0.0.0.0:$FLASK_PORT", "cosmonaut_app.wsgi:app"]
+CMD gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT --timeout 600 cosmonaut_app.wsgi:app
