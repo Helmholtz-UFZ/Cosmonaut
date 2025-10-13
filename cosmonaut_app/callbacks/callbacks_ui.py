@@ -79,38 +79,6 @@ def toggle_navbar_collapse(n, is_open):
     return is_open
 
 
-# @app.callback(
-#     [Output("page-content", "children"), Output("job-page-loaded", "data")],
-#     [Input("url", "pathname")],
-#     [State("job-id", "data")],
-#     prevent_initial_call=True,
-# )
-# def display_page_and_update_url(pathname, job_id):
-#     if pathname.startswith("/met/wg7/cosmonaut/job/"):
-#         job_id_from_path = pathname.split("/met/wg7/cosmonaut/job/")[1]
-#         if DataBaseManager.check_existence(job_id_from_path):
-#             return stage4(job_id_from_path), True
-#         else:
-#             return not_found_page(), False
-#     elif pathname == "/met/wg7/cosmonaut/":
-#         return main_page_layout(), False
-#     else:
-#         return not_found_page(), False
-
-
-@app.callback(
-    Output("url", "href"),
-    [Input("page-content", "children")],
-    [State("url", "pathname")],
-)
-def update_url(content, pathname):
-    if pathname.startswith("/met/wg7/cosmonaut/job/"):
-        job_id_from_path = pathname.split("/met/wg7/cosmonaut/job/")[1]
-        if DataBaseManager.check_existence(job_id_from_path):
-            return f"/met/wg7/cosmonaut/job/{job_id_from_path}"
-    return pathname
-
-
 @app.callback(
     Output("url", "pathname", allow_duplicate=True),
     [Input("confirm-button", "n_clicks")],
@@ -118,11 +86,10 @@ def update_url(content, pathname):
     prevent_initial_call=True,
 )
 def navigate_to_job_page(n_clicks, job_id):
-    logging.info("n_clicks: %s", n_clicks)
     if n_clicks is None:
         raise PreventUpdate
-
-    return f"/met/wg7/cosmonaut/job/{job_id}"
+    # If still needed, direct to the next new-page step; default to user-info
+    return f"/{job_id}/user-info"
 
 
 @app.callback(
