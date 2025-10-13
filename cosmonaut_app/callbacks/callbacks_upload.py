@@ -155,8 +155,9 @@ def run_osm_query(file_path, epsg_input, job_id):
         in_dir = os.path.join(job_working_dir, "input")
         os.makedirs(in_dir, exist_ok=True)
 
-        # Keep original save (returns a 4326 path, legacy)
-        # osm_file_path = osm.save_roads(in_dir, 4326)
+        # Keep original save call for side-effects (populates osm.roads inside OsmRoads)
+        # Assign to '_' to satisfy ruff F841 (unused variable)
+        _ = osm.save_roads(in_dir, 4326)
 
         # GeoDataFrame for our new baseline/working copies
         osm_data = osm._osm_transform()
