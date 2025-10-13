@@ -1,0 +1,107 @@
+:root {
+  --nav-h: 64px;
+  --sidebar-bg: #DBE2EF;
+  --border: rgba(0,0,0,.08);
+}
+
+/* 2/3–1/3 grid below navbar */
+.app-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-auto-rows: 1fr;
+  min-height: calc(100dvh - var(--nav-h));
+}
+
+.map-panel { min-width: 0; min-height: 0; overflow: hidden; }
+.sidebar-panel {
+  min-width: 0; min-height: 0;
+  overflow: auto;
+  background: var(--sidebar-bg); padding: 0.75rem;
+}
+
+/* keep page content scrolled inside sidebar */
+.page-main { height: 100%; overflow: auto; }
+
+/* Footer controls: left/right buttons, bar full width */
+.page-footer .row { margin-left: 0; margin-right: 0; }
+.page-footer .ms-auto { margin-left: auto !important; }
+
+/* Modern footer */
+.page-footer {
+  background: transparent;
+  border-top: 1px solid var(--border);
+}
+.page-footer .progress { height: 6px; }
+
+/* Pill buttons with subtle shadow; no uppercase */
+.page-footer .btn {
+  border-radius: 9999px;
+  padding: 0.5rem 0.9rem;
+  font-weight: 500;
+  text-transform: none;
+}
+.page-footer .btn-outline-secondary { border-color: var(--border); }
+.footer-actions .btn-primary { box-shadow: 0 2px 8px rgba(13,110,253,.25); }
+
+/* Stepper */
+.stepper { align-items: center; }
+.step-badge {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.step-badge { border: 1px solid transparent; }
+.step-badge.step-done { background-color: rgba(25,135,84,.1); color: #198754; border-color: #198754; }
+.step-badge.step-upcoming { background-color: transparent; border-color: rgba(108,117,125,.5); color: #6c757d; }
+.step-badge.step-current { box-shadow: 0 2px 8px rgba(13,110,253,.25); }
+
+/* Modern progress steps (rail + nodes) */
+.progress-steps { position: relative; padding: .4rem 0 .8rem; --ps-gutter: 12px; --ps-rail-top: 11px; }
+.progress-steps .rail {
+  position: absolute; top: var(--ps-rail-top); left: var(--ps-gutter); right: var(--ps-gutter); height: 2px;
+  background: rgba(0,0,0,.12); border-radius: 2px; overflow: hidden;
+}
+.progress-steps .rail-fill {
+  position: absolute; top: 0; left: 0; height: 100%; background: #0d6efd;
+  transition: width .25s ease;
+}
+.progress-steps .nodes { position: relative; min-height: 42px; margin: 0 var(--ps-gutter); }
+.progress-steps .node {
+  position: absolute; top: 0; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+/* Cosine-spaced internal points (more weight near edges) */
+.progress-steps .node:nth-child(1) { left: 6.6987%; }
+.progress-steps .node:nth-child(2) { left: 25.4970%; }
+.progress-steps .node:nth-child(3) { left: 50.0000%; }
+.progress-steps .node:nth-child(4) { left: 74.5030%; }
+.progress-steps .node:nth-child(5) { left: 93.3013%; }
+.progress-steps .node .dot {
+  margin-top: calc(var(--ps-rail-top) - 8px);
+  width: 10px; height: 10px; border-radius: 50%; background: #9aa0a6;
+  box-shadow: 0 0 0 2px #fff inset;
+}
+.progress-steps .node .label {
+  margin-top: 12px; font-size: .84rem; color: #6b7280; white-space: nowrap; max-width: 9.5rem; overflow: hidden; text-overflow: ellipsis; line-height: 1.1;
+  padding: 2px 8px; border-radius: 9999px; border: 1px solid rgba(107,114,128,.35);
+  background: #f8f9fa;
+}
+.progress-steps .node.current .dot { background: #0d6efd; box-shadow: 0 0 0 2px rgba(13,110,253,.25); }
+.progress-steps .node.current .label { color: #0d6efd; border-color: rgba(13,110,253,.5); background: rgba(13,110,253,.06); font-weight: 600; }
+.progress-steps .node.done .dot { background: #198754; }
+.progress-steps .node.done .label { color: #198754; border-color: rgba(25,135,84,.5); background: rgba(25,135,84,.06); }
+
+@media (max-width: 1200px) { .progress-steps .node .label { font-size: .8rem; max-width: 8.5rem; } }
+@media (max-width: 992px)  { .progress-steps .node .label { font-size: .78rem; max-width: 7.5rem; } }
+
+/* Home variant: same geometry, no fill already applied via variant */
+.progress-steps.home { padding-top: .5rem; }
+.progress-steps.home .rail { background: rgba(0,0,0,.08); }
+.progress-steps.home .node .dot { background: #c1c7cd; }
+.progress-steps.home .node .label { background: #fff; }
+/* Stack on narrow screens if needed */
+@media (max-width: 768px) {
+  .app-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr; /* map then sidebar */
+  }
+}
