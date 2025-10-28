@@ -52,6 +52,7 @@ testing:
     - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
     # Initialize database schema
     - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
+    - "cp .env_test .env"
   script:
     - "uv run pytest test/test_db_manager.py -v"
 
