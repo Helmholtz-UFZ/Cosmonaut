@@ -1,15 +1,18 @@
 stages:
   - "lint"
-  # - "test"
+  - "test"
   - "build"
   # - "deploy"
 
 variables:
-  POSTGRES_DB: somweb_stage
-  POSTGRES_USER: somweb_stage_rw
-  POSTGRES_PASSWORD: test
-  POSTGRES_HOST_AUTH_METHOD: trust
+  POSTGRES_DB: cosmonaut_db
+  POSTGRES_USER: cosmonaut
+  POSTGRES_PASSWORD: password
   DB_HOST_NAME: postgres
+  DB_NAME: cosmonaut_db
+  DB_PORT: "5432"
+  DB_USER: cosmonaut
+  DB_PW: password
 
 .docker_login: &docker_login
   - 'echo "${CI_REGISTRY_PASSWORD}" | docker login --username "$CI_REGISTRY_USER" --password-stdin "${CI_REGISTRY}"'
@@ -28,10 +31,29 @@ linting:
     - "apt-get update && apt-get install -y libgdal-dev"
     - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"
     - "export C_INCLUDE_PATH=/usr/include/gdal"
-    - "pip install poetry"
-    - "poetry install"
+    - "pip install uv"
+    - "uv sync"
   script:
-    - "poetry run ruff check ."
+    - "uv run ruff check ."
+
+testing:
+  stage: "test"
+  image: "python:3.13"
+  services:
+    - name: "postgis/postgis:latest"
+      alias: "postgres"
+  before_script:
+    - "apt-get update && apt-get install -y libgdal-dev postgresql-client"
+    - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"
+    - "export C_INCLUDE_PATH=/usr/include/gdal"
+    - "pip install uv"
+    - "uv sync"
+    # Wait for PostgreSQL to be ready
+    - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
+    # Initialize database schema
+    - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
+  script:
+    - "uv run pytest test/test_db_manager.py -v"
 
 build-latest:
   stage: "build"

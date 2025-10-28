@@ -15,7 +15,7 @@ services:
       - ${FLASK_PORT}:${FLASK_PORT}
 
   postgres:
-    image: postgres:17.5
+    image: postgis/postgis:latest
     ports:
       - ${DB_PORT}:${DB_PORT}
     environment:

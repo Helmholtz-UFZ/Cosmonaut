@@ -18,15 +18,15 @@ def test_db_manager():
     data_to_insert = {
         "job_id": job_id,
         "start_date": datetime.date(2024, 5, 27),
-        "input_data": {"param1": 10, "param2": "value"},
-        "files": [b"binary_data1", b"binary_data2"],
-        "file_names": ["file1.txt", "file2.txt"],
+        "end_date": datetime.date(2024, 5, 28),
+        "data_uploaded": True,
         "submitted": True,
         "email": "example@example.com",
         "notified_end": False,
-        "logs": "Some log information",
+        "stage": 3,
         "status": "completed",
         "version": 1.0,
+        "selected_road_tags": ["motorway", "primary"],
     }
     DataBaseManager.add_entry(data_to_insert)
     assert DataBaseManager.check_existence(job_id)

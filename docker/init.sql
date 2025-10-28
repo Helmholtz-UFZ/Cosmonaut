@@ -16,7 +16,6 @@ CREATE TABLE jobs (
     stage INT,
     status VARCHAR,
     version DECIMAL,
-    file_names TEXT[],
     selected_road_tags TEXT[]
 );
 

@@ -22,13 +22,13 @@ fi
 
 cp "$env_file" .env
 
-# Check if the poetry.lock file has changed since the last Docker build
-if [ ! -e ".docker_build_hash" ] || [ "$(sha256sum poetry.lock)" != "$(cat .docker_build_hash)" ]; then
+# Check if the uv.lock file has changed since the last Docker build
+if [ ! -e ".docker_build_hash" ] || [ "$(sha256sum uv.lock)" != "$(cat .docker_build_hash)" ]; then
     # Build the Docker image
     docker compose build cosmonaut
 
-    # Save the hash of the poetry.lock file
-    sha256sum poetry.lock >.docker_build_hash
+    # Save the hash of the uv.lock file
+    sha256sum uv.lock >.docker_build_hash
 fi
 
 if [ "$1" == "prod" ]; then

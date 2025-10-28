@@ -42,7 +42,6 @@ class CosmonautJob:
     stage = None
     status = None
     version = None
-    file_names = []
     selected_road_tags = []
 
     def __init__(
@@ -53,7 +52,8 @@ class CosmonautJob:
         if job_id is not None:
             logging.debug(f"load job with id {job_id}")
             self.job_id = job_id  # Set job_id to the instance variable
-            self.load(download_from_minio)  # Pass the flag to control MinIO downloads
+            # Pass the flag to control MinIO downloads
+            self.load(download_from_minio)
         else:
             logging.debug("create new job")
             self._blank_job()
@@ -123,7 +123,6 @@ class CosmonautJob:
                 "submitted": self.submitted,
                 "email": self.email,
                 "stage": self.stage,
-                "file_names": ",".join(self.file_names),
             }
         )
 

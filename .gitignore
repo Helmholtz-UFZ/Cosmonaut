@@ -19,3 +19,4 @@ cache/*
 .docker_build_hash
 *.ipynb
 .gitmodules
+./.config/
