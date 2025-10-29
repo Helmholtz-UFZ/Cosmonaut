@@ -1,10 +1,13 @@
 """Setup tests."""
 
 import logging
+import threading
+import time
 
 import pytest
 from sqlalchemy.exc import OperationalError
 
+from cosmonaut_app.app import app
 from cosmonaut_app.db_manager import DataBaseManager
 
 
@@ -39,3 +42,21 @@ except Exception as e:
 def logger():
     """Create a logger with suppressed external sources."""
     return create_logger()
+
+
+@pytest.fixture(scope="module")
+def dash_app():
+    """Start the Dash app in a background thread."""
+
+    def run_app():
+        app.run(debug=False, port=8050)
+
+    thread = threading.Thread(target=run_app, daemon=True)
+    thread.start()
+
+    # Give the server time to start
+    time.sleep(3)
+
+    yield app
+
+    # Cleanup is automatic since thread is daemon

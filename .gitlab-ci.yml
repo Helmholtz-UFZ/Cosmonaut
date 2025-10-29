@@ -48,13 +48,16 @@ testing:
     - "export C_INCLUDE_PATH=/usr/include/gdal"
     - "pip install uv"
     - "uv sync"
+    # Install Playwright browsers for headless testing
+    - "uv run playwright install --with-deps chromium"
     # Wait for PostgreSQL to be ready
     - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
     # Initialize database schema
     - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
     - "cp .env_test .env"
   script:
-    - "uv run pytest test/test_db_manager.py -v"
+    # Run all tests in headless mode (default)
+    - "uv run pytest -v"
 
 build-latest:
   stage: "build"
