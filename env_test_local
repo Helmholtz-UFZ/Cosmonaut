@@ -1,0 +1,25 @@
+### Development variables ###
+DOCKER_UID=1000
+DOCKER_GID=1000
+GUNICORN=0
+
+### Webserver ###
+WEB_WORK_DIR="./cosmonaut_app/work_dir"
+FLASK_PORT=8080
+
+### minIO ###
+MINIO_ACCESS_KEY="access_key"
+MINIO_SECRET_KEY="secret_key"
+MINIO_HOST="127.0.0.1"
+MINIO_PORT=9000
+MINIO_BUCKET=cosmic-routing-test
+
+### Postgres DB ###
+DB_NAME="cosmonaut_db"
+DB_PORT="5432"
+DB_USER="cosmonaut"
+DB_PW="password"
+DB_HOST_NAME="localhost"
+
+REDIS_PORT=6379
+REDIS_HOST="redis_cosmonaut"

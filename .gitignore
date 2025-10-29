@@ -15,8 +15,11 @@ README.html
 cosmonaut_app/work_dir/*
 cache/*
 .env
+.env.local
+.env.bak
+env_dev_prod_priv
 .ruff_cache
 .docker_build_hash
 *.ipynb
 .gitmodules
-./.config/
+.config/

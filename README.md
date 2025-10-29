@@ -1,7 +1,8 @@
 # COSMONAUT
+
 # COSmic ray based soil MOisture prediction NAvigation and UTility Tool
 
-This project is a web application built with Dash and Dash Leaflet for transforming and visualizing CSV data for the COSMOPOLITAN Project at UFZ. 
+This project is a web application built with Dash and Dash Leaflet for transforming and visualizing CSV data for the COSMOPOLITAN Project at UFZ.
 It allows users to upload a CSV file, transforms the data, queries OpenStreetMap for a planed navigation feature, and visualizes the csv-data on a map (NOTE: Visualization doesn`t work for bigger files)
 
 ## Features
@@ -13,50 +14,61 @@ It allows users to upload a CSV file, transforms the data, queries OpenStreetMap
 - It makes individual Jobs which are saved into a PostgreSQL DB.
 - (Work) Is triggering a route calculation based on User Input of the best roads.
 
-## WOMBAT
-
-You can find the Docker-Compose Setup in the [docker-compose.yml](docker-compose.yml).
-
 ## Installation
 
-1. Clone this repository.
-2. Start the Service with `./dev_up.sh mock` or `./dev_up.sh prod`
+### Quick Start
 
-# DEV:
+```bash
+# Mock development (no external services)
+./dev_up.sh mock
 
-## TODO`s
+# Production development (requires credentials)
+cp env_dev_prod env_dev_prod_priv
+# Edit credentials in env_dev_prod_priv
+./dev_up.sh prod
+```
 
-- guter commit bevor ich nach valencia gehe. mit note was ich geschafft habe und was ich machen will
+## Usage
 
-### Implement Testing
+### Local Development
 
-- unity test
-- integration test
+```bash
+# Start backend services (Postgres, Redis, MinIO)
+docker compose up postgres redis minio -d
 
-- beides machen
-- höchstes der Gefühle wäre n Bot der die Webiste komplett testet, inklusive file upload etc
+# Option 1: Use the provided script (prepares .env automatically)
+./run_dev.sh
 
-### CAN
+# Option 2: Manual setup
+cp .env.local .env
+uv run python -m cosmonaut_app.app
+```
 
-- small discreption for list of road types - not super important
-- feedback implementation for the agents (ticketsystem?) - not super important
+### Running Tests
 
-### Other:
+```bash
+# Headless mode (default, for CI)
+./run_pytest.sh
 
-- Germany OSM Download ?
-- aws bucket mit miniIoServer connecten
-- GeoServer für WMS optimisieren
-- mockups machen <- für tests gut (Dockerimage)
-- laufen auf ufz infrastruktur
-- erwartungshaltung fürs styling der SLD klarmachen (?)
+# Headed mode (see browser window)
+./run_pytest.sh --headed
+```
 
-## Useful Commands
+## Environment Configuration
 
-`./dev_up.sh mock`
+The application uses different environment files:
 
-`rm -rf cosmonaut_app/work_dir/*`
+- `env_dev_mock` - Enviroment for docker setup where all services are run locally.
+- `env_dev_prod_priv` - Enviroment for docker setup where the production services are
+  used. An can be found `env_dev_prod`.
+- `env_test` - Testing enviroment for ci pipeline
+- `env_test_local` - Testing enviroment for lokal testing
+- `env_prod` - Enviroment for production deployment
 
-`psql -U cosmonaut -p 5432 -h localhost -d cosmonaut_db`
+Key environment variables:
 
-- with gunicorn
-`gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.wsgi:app`, add `--log-level debug` for detailed debuging.
+- `FLASK_DEBUG=1` - Enable debug mode with auto-reload
+- `GUNICORN=0` - Use Flask dev server instead of Gunicorn
+- `WEB_WORK_DIR` - Working directory for job files
+- `MINIO_*` - MinIO/S3 configuration variables
+- `DB_*` - Database connection settings (Postgres)

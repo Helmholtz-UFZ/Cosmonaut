@@ -4,16 +4,16 @@
 HEADED=false
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --headed)
-            HEADED=true
-            shift
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Usage: $0 [--headed]"
-            echo "  --headed: Run browser tests with visible browser window"
-            exit 1
-            ;;
+    --headed)
+        HEADED=true
+        shift
+        ;;
+    *)
+        echo "Unknown option: $1"
+        echo "Usage: $0 [--headed]"
+        echo "  --headed: Run browser tests with visible browser window"
+        exit 1
+        ;;
     esac
 done
 
@@ -21,7 +21,7 @@ if [ -f .env ]; then
     mv .env .env.bak
 fi
 
-cp .env_test .env
+cp env_test_local .env
 
 # Stop and remove any existing postgres container
 docker stop postgres_cosmonaut 2>/dev/null || true
