@@ -34,10 +34,8 @@ TAGS_LAST_SELECTION_STORE_SHARED_ID = "tags-last-selection-store-shared-id"
 UPLOAD_DATA_STORE_SHARED_ID = "upload-data-store-shared-id"
 
 # --- Navigation ---
-HIDDEN_DIV_NAV_SHARED_ID = "hidden-div-nav-shared-id"
 NAVBAR_COLLAPSE_NAV_SHARED_ID = "navbar-collapse-nav-shared-id"
 NAVBAR_TOGGLER_NAV_SHARED_ID = "navbar-toggler-nav-shared-id"
-REDIRECT_INTERVAL_NAV_SHARED_ID = "redirect-interval-nav-shared-id"
 SEARCH_BUTTON_NAV_SHARED_ID = "search-button-nav-shared-id"
 SEARCH_INPUT_NAV_SHARED_ID = "search-input-nav-shared-id"
 SEARCH_RESULTS_DIV_NAV_SHARED_ID = "search-results-div-nav-shared-id"
@@ -48,14 +46,20 @@ DUMMY_OUTPUT_DIV_SHARED_ID = "dummy-output-div-shared-id"
 NONE_DIV_SHARED_ID = "none-div-shared-id"
 
 # --- Map Elements ---
-LC_LAYER_MAP_SHARED_ID = "lc-layer-map-shared-id"
+MAIN_MAP_COMPONENT_MAP_SHARED_ID = "main-map-component-map-shared-id"
 MAIN_MAP_DIV_MAP_SHARED_ID = "main-map-div-map-shared-id"
-MAP_CONTAINER_DIV_MAP_SHARED_ID = "map-container-div-map-shared-id"
+# nocheck dynamically created layer group
+MANAGED_LAYERS_GROUP_MAP_SHARED_ID = "managed-layers"
 OSM_GEOJSON_LAYER_MAP_SHARED_ID = "osm-geojson-layer-map-shared-id"
+# nocheck dynamically created map layer
 ROUTE_GEOJSON_LAYER_MAP_SHARED_ID = "route-geojson-layer-map-shared-id"
+# nocheck dynamically created map layer
 ROUTE_LAYER_LAYER_MAP_SHARED_ID = "route-layer-layer-map-shared-id"
-WMS_LAYER_LAYER_MAP_SHARED_ID = "wms-layer-layer-map-shared-id"
 
+# --- Modals ---
+ERROR_MODAL_TITLE_SHARED_ID = "error-title"
+ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"
+ERROR_MODAL_SHARED_ID = "error-modal"
 
 # ============================================================================
 # PAGE: DATA_UPLOAD
@@ -66,7 +70,7 @@ DATA_UPLOAD_NEXT_BUTTON_DATA_UPLOAD_ID = "data-upload-next-button-data-upload-id
 DATA_UPLOAD_PREV_BUTTON_DATA_UPLOAD_ID = "data-upload-prev-button-data-upload-id"
 
 # --- Divs ---
-DATA_UPLOAD_CONTENT_DIV_DATA_UPLOAD_ID = "data-upload-content-div-data-upload-id"
+# nocheck visual container
 DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID = "data-upload-dropzone-div-data-upload-id"
 DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID = "data-upload-file-info-div-data-upload-id"
 OUTPUT_DATA_UPLOAD_DIV_DATA_UPLOAD_ID = "output-data-upload-div-data-upload-id"
@@ -78,8 +82,13 @@ PLOT_GENERATION_STATUS_DIV_DATA_UPLOAD_ID = "plot-generation-status-div-data-upl
 DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID = "data-upload-epsg-input-data-upload-id"
 
 # --- Other ---
-DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID = "data-upload-epsg-helper-text-data-upload-id"
-DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID = "data-upload-upload-component-data-upload-id"
+DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID = (
+    "data-upload-epsg-helper-text-data-upload-id"
+)
+DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID = (
+    "data-upload-upload-component-data-upload-id"
+)
+# nocheck container for dynamic toasts
 TOAST_STACK_CONTAINER_DATA_UPLOAD_ID = "toast-stack-container-data-upload-id"
 
 
@@ -114,7 +123,6 @@ CFG_AN_INPUT_ROUTING_PARAMS_ID = "cfg-an-input-routing-params-id"
 CFG_IR_INPUT_ROUTING_PARAMS_ID = "cfg-ir-input-routing-params-id"
 CFG_LBF_INPUT_ROUTING_PARAMS_ID = "cfg-lbf-input-routing-params-id"
 CFG_MAI_INPUT_ROUTING_PARAMS_ID = "cfg-mai-input-routing-params-id"
-CFG_MD_INPUT_ROUTING_PARAMS_ID = "cfg-md-input-routing-params-id"
 CFG_OO_INPUT_ROUTING_PARAMS_ID = "cfg-oo-input-routing-params-id"
 CFG_SN_INPUT_ROUTING_PARAMS_ID = "cfg-sn-input-routing-params-id"
 CFG_TL_INPUT_ROUTING_PARAMS_ID = "cfg-tl-input-routing-params-id"
@@ -130,10 +138,6 @@ START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID = "start-route-button-route-download-id"
 
 # --- Divs/Images ---
 QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID = "qr-code-image-route-download-id"
-ROUTE_QRCODE_DIV_ROUTE_DOWNLOAD_ID = "route-qrcode-div-route-download-id"
-
-# --- Links ---
-ROUTE_GPX_LINK_LINK_ROUTE_DOWNLOAD_ID = "route-gpx-link-link-route-download-id"
 
 
 # ============================================================================
@@ -144,25 +148,31 @@ ROUTE_GPX_LINK_LINK_ROUTE_DOWNLOAD_ID = "route-gpx-link-link-route-download-id"
 ACTION_ALERT_ALERT_STREET_SELECTION_ID = "action-alert-alert-street-selection-id"
 
 # --- Buttons ---
-CONFIRM_RESET_BUTTON_STREET_SELECTION_ID = "confirm-reset-button-street-selection-id"
 CANCEL_RESET_BUTTON_STREET_SELECTION_ID = "cancel-reset-button-street-selection-id"
+CONFIRM_RESET_BUTTON_STREET_SELECTION_ID = "confirm-reset-button-street-selection-id"
 LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID = "largest-button-button-street-selection-id"
 REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID = "remove-button-button-street-selection-id"
 RESET_ROADS_BUTTON_STREET_SELECTION_ID = "reset-roads-button-street-selection-id"
-STREET_SELECTION_NEXT_BUTTON_STREET_SELECTION_ID = "street-selection-next-button-street-selection-id"
-STREET_SELECTION_PREV_BUTTON_STREET_SELECTION_ID = "street-selection-prev-button-street-selection-id"
-TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID = "tags-select-all-button-street-selection-id"
-TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID = "tags-select-none-button-street-selection-id"
+TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID = (
+    "tags-select-all-button-street-selection-id"
+)
+TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID = (
+    "tags-select-none-button-street-selection-id"
+)
 UNDO_BUTTON_BUTTON_STREET_SELECTION_ID = "undo-button-button-street-selection-id"
 
 # --- Divs ---
 SELECTION_COUNT_DIV_STREET_SELECTION_ID = "selection-count-div-street-selection-id"
 
 # --- Dropdowns ---
-TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID = "tags-dropdown-dropdown-street-selection-id"
+TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID = (
+    "tags-dropdown-dropdown-street-selection-id"
+)
 
 # --- Modals ---
-RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID = "reset-confirm-modal-modal-street-selection-id"
+RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID = (
+    "reset-confirm-modal-modal-street-selection-id"
+)
 
 
 # ============================================================================
@@ -171,7 +181,6 @@ RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID = "reset-confirm-modal-modal-stree
 
 # --- Buttons ---
 USER_INFO_NEXT_BUTTON_USER_INFO_ID = "user-info-next-button-user-info-id"
-USER_INFO_PREV_BUTTON_USER_INFO_ID = "user-info-prev-button-user-info-id"
 
 # --- Divs ---
 USER_INFO_CONTENT_DIV_USER_INFO_ID = "user-info-content-div-user-info-id"

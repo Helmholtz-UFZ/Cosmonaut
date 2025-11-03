@@ -22,6 +22,7 @@ from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
     MAIN_MAP_DIV_MAP_SHARED_ID,
+    MANAGED_LAYERS_GROUP_MAP_SHARED_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
     REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
     RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
@@ -237,8 +238,12 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
     current_children = list(current_children or [])
 
     # Remove our entire managed group (safer than removing individual layers)
-    managed_group_id = "managed-layers"
-    managed_ids = {OSM_GEOJSON_LAYER_MAP_SHARED_ID, ROUTE_GEOJSON_LAYER_MAP_SHARED_ID, ROUTE_LAYER_LAYER_MAP_SHARED_ID, managed_group_id}
+    managed_ids = {
+        OSM_GEOJSON_LAYER_MAP_SHARED_ID,
+        ROUTE_GEOJSON_LAYER_MAP_SHARED_ID,
+        ROUTE_LAYER_LAYER_MAP_SHARED_ID,
+        MANAGED_LAYERS_GROUP_MAP_SHARED_ID,
+    }
     cleaned_children, removed = [], 0
     for child in current_children:
         comp_id = None
@@ -299,7 +304,11 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
             except Exception as e:
                 logging.warning("Could not add route layer: %s", e)
 
-    elif ctx.triggered_id == TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID and selected_roads is not None and job_id:
+    elif (
+        ctx.triggered_id == TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID
+        and selected_roads is not None
+        and job_id
+    ):
         logging.info("=== OPTIMIZED TAG FILTERING SECTION ===")
         filter_start_time = time.time()
 
@@ -402,7 +411,7 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
 
     # Add/replace our managed group once
     if new_layers:
-        current_children.append(dl.LayerGroup(id=managed_group_id, children=new_layers))
+        current_children.append(dl.LayerGroup(id=MANAGED_LAYERS_GROUP_MAP_SHARED_ID, children=new_layers))
 
     logging.info(
         "=== UPDATE_MAP CALLBACK END === Returning %d children", len(current_children)
@@ -473,9 +482,10 @@ def remove_selected(n, clicked_roads, job_id, epsg_input, selected_roads):
     if not os.path.exists(work_4326):
         # First-time edit: seed from raw
         if os.path.exists(raw_4326):
-            with open(raw_4326, encoding="utf-8") as fsrc, open(
-                work_4326, "w", encoding="utf-8"
-            ) as fdst:
+            with (
+                open(raw_4326, encoding="utf-8") as fsrc,
+                open(work_4326, "w", encoding="utf-8") as fdst,
+            ):
                 fdst.write(fsrc.read())
         else:
             logging.error("Missing baseline file: %s", raw_4326)
@@ -549,9 +559,10 @@ def keep_largest_subnetwork(n, job_id, epsg_input, selected_roads):
     # Load from work; seed from raw if needed
     if not os.path.exists(work_4326):
         if os.path.exists(raw_4326):
-            with open(raw_4326, encoding="utf-8") as fsrc, open(
-                work_4326, "w", encoding="utf-8"
-            ) as fdst:
+            with (
+                open(raw_4326, encoding="utf-8") as fsrc,
+                open(work_4326, "w", encoding="utf-8") as fdst,
+            ):
                 fdst.write(fsrc.read())
         else:
             logging.error("Missing baseline file: %s", raw_4326)
@@ -656,9 +667,10 @@ def reset_edits(n, job_id, epsg_input, selected_roads):
         raise PreventUpdate
 
     # Reset work from raw
-    with open(raw_4326, encoding="utf-8") as fsrc, open(
-        work_4326, "w", encoding="utf-8"
-    ) as fdst:
+    with (
+        open(raw_4326, encoding="utf-8") as fsrc,
+        open(work_4326, "w", encoding="utf-8") as fdst,
+    ):
         fdst.write(fsrc.read())
 
     # Re-export EPSG-specific file
@@ -730,7 +742,9 @@ def tags_select_all_none(n_all, n_none):
 
 # Open/close Reset confirmation modal
 @app.callback(
-    Output(RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID, "is_open", allow_duplicate=True),
+    Output(
+        RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID, "is_open", allow_duplicate=True
+    ),
     Input(RESET_ROADS_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     Input(CANCEL_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
@@ -738,8 +752,16 @@ def tags_select_all_none(n_all, n_none):
     prevent_initial_call=True,
 )
 def toggle_reset_modal(n_open, n_cancel, n_confirm, is_open):
-    if ctx.triggered_id in (RESET_ROADS_BUTTON_STREET_SELECTION_ID, CANCEL_RESET_BUTTON_STREET_SELECTION_ID, CONFIRM_RESET_BUTTON_STREET_SELECTION_ID):
-        return not is_open if ctx.triggered_id == RESET_ROADS_BUTTON_STREET_SELECTION_ID else False
+    if ctx.triggered_id in (
+        RESET_ROADS_BUTTON_STREET_SELECTION_ID,
+        CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
+        CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
+    ):
+        return (
+            not is_open
+            if ctx.triggered_id == RESET_ROADS_BUTTON_STREET_SELECTION_ID
+            else False
+        )
     raise PreventUpdate
 
 

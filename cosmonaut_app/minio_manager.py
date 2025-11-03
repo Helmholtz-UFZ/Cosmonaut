@@ -14,13 +14,6 @@ from cosmonaut_app.config import (
     MINIO_PORT,
 )
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO,
-)
-logger = logging.getLogger(__name__)
-
 
 def _to_bool(val, default=None):
     if val is None:
@@ -210,15 +203,3 @@ class MiniIOManager:
                     logging.info("Downloaded %s to %s", obj.object_name, local_file)
         except Exception as e:
             logging.error("Failed to download directory %s: %s", minio_path, e)
-
-
-if __name__ == "__main__":
-    bucket_name = "cosmic-routing"
-    manager = MiniIOManager(bucket_name)
-    try:
-        manager.minio_client.bucket_exists(bucket_name)
-        manager.upload_file("test_data/no_csv.txt", "no_csv.txt")
-        manager.download_file("no_csv.txt", "test_data/no_csv_downloaded.txt")
-        manager.delete_file("no_csv.txt")
-    except Exception as e:
-        logging.error(f"Bucket {bucket_name} does not exist: {str(e)}")

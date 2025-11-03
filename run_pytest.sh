@@ -23,10 +23,10 @@ fi
 
 cp env_test_local .env
 
-# Stop and remove any existing postgres container
-docker stop postgres_cosmonaut 2>/dev/null || true
-docker rm postgres_cosmonaut 2>/dev/null || true
-docker compose up postgres -d
+# Stop and remove any existing containers
+docker stop postgres_cosmonaut minio_cosmonaut 2>/dev/null || true
+docker rm postgres_cosmonaut minio_cosmonaut 2>/dev/null || true
+docker compose up postgres minio createbuckets -d
 
 echo "Waiting for PostgreSQL to be ready..."
 sleep 3
@@ -37,6 +37,14 @@ until docker exec postgres_cosmonaut pg_isready -q 2>/dev/null; do
 done
 
 echo "PostgreSQL is ready!"
+
+echo "Waiting for MinIO to be ready..."
+until docker exec minio_cosmonaut curl -sf http://localhost:9000/minio/health/ready > /dev/null 2>&1; do
+    echo "Still waiting for MinIO..."
+    sleep 1
+done
+
+echo "MinIO is ready!"
 sleep 1
 
 # Run pytest with or without headed mode

@@ -6,7 +6,6 @@ from cosmonaut_app.constants.html_ids import (
     USER_INFO_CONTENT_DIV_USER_INFO_ID,
     USER_INFO_EMAIL_INPUT_USER_INFO_ID,
     USER_INFO_NEXT_BUTTON_USER_INFO_ID,
-    USER_INFO_PREV_BUTTON_USER_INFO_ID,
 )
 
 
@@ -32,13 +31,7 @@ def layout(job_id=None, **kwargs):
     ]
 
     footer = progress_footer(
-        prev=dbc.Button(
-            [html.I(className="bi bi-arrow-left me-1"), "Previous"],
-            id=USER_INFO_PREV_BUTTON_USER_INFO_ID,
-            color="secondary",
-            outline=True,
-            disabled=True,
-        ),
+        prev=None,
         next_=dbc.Button(
             [html.I(className="bi bi-arrow-right-circle me-1"), "Next"],
             id=USER_INFO_NEXT_BUTTON_USER_INFO_ID,

@@ -4,8 +4,6 @@ from dash import html, register_page
 import dash_bootstrap_components as dbc
 from cosmonaut_app.ui.page import page_layout
 from cosmonaut_app.constants.html_ids import (
-    ROUTE_GPX_LINK_LINK_ROUTE_DOWNLOAD_ID,
-    ROUTE_QRCODE_DIV_ROUTE_DOWNLOAD_ID,
     START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID,
 )
 
@@ -37,7 +35,5 @@ def layout(job_id=None, **kwargs):
             className="me-2",
             n_clicks=0,
         ),
-        html.Div(id=ROUTE_QRCODE_DIV_ROUTE_DOWNLOAD_ID),
-        html.Div(id=ROUTE_GPX_LINK_LINK_ROUTE_DOWNLOAD_ID),
     ]
     return page_layout("Route & Download", body, job_id=job_id, step_index=5)

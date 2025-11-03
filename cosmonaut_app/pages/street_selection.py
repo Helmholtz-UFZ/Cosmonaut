@@ -13,8 +13,6 @@ from cosmonaut_app.constants.html_ids import (
     RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
     SELECTION_COUNT_DIV_STREET_SELECTION_ID,
-    STREET_SELECTION_NEXT_BUTTON_STREET_SELECTION_ID,
-    STREET_SELECTION_PREV_BUTTON_STREET_SELECTION_ID,
     TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
     TAGS_LAST_SELECTION_STORE_SHARED_ID,
     TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
@@ -166,15 +164,9 @@ def layout(job_id=None, **kwargs):
     ]
 
     footer = progress_footer(
-        prev=dbc.Button(
-            [html.I(className="bi bi-arrow-left me-1"), "Previous"],
-            id=STREET_SELECTION_PREV_BUTTON_STREET_SELECTION_ID,
-            color="secondary",
-            outline=True,
-        ),
+        prev=None,
         next_=dbc.Button(
             [html.I(className="bi bi-check2-circle me-1"), "Finish"],
-            id=STREET_SELECTION_NEXT_BUTTON_STREET_SELECTION_ID,
             color="primary",
             href=f"/job/{job_id}/routing-params",
             disabled=not bool(job_id),

@@ -23,3 +23,4 @@ env_dev_prod_priv
 *.ipynb
 .gitmodules
 .config/
+notes*

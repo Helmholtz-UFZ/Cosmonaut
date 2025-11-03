@@ -20,7 +20,7 @@ from cosmonaut_app.constants.html_ids import (
     EPSG_STORE_SHARED_ID,
     FILE_PATH_STORE_SHARED_ID,
     JOB_ID_STORE_SHARED_ID,
-    MAIN_MAP_DIV_MAP_SHARED_ID,
+    MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     OSM_FILE_PATH_STORE_SHARED_ID,
     OUTPUT_DATA_UPLOAD_DIV_DATA_UPLOAD_ID,
     OUTPUT_MINIO_STATUS_DIV_DATA_UPLOAD_ID,
@@ -32,6 +32,7 @@ from cosmonaut_app.minio_manager import MiniIOManager
 from cosmonaut_app.transformation import _get_bounds, get_convex_hull, transform_csv
 from cosmonaut_app.classification_plot import ClassificationPlot
 from cosmonaut_app.flask_routes import app
+from cosmonaut_app.transformation import OsmRoads
 
 import matplotlib
 
@@ -90,7 +91,8 @@ def upload_file(contents, filename, job_id):
 
 
 @app.callback(
-    Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"), Input(FILE_PATH_STORE_SHARED_ID, "children")
+    Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"),
+    Input(FILE_PATH_STORE_SHARED_ID, "children"),
 )
 def show_selected_file(file_path):
     if not file_path:
@@ -99,7 +101,7 @@ def show_selected_file(file_path):
 
 
 @app.callback(
-    Output(MAIN_MAP_DIV_MAP_SHARED_ID, "viewport"),
+    Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport"),
     Input(FILE_PATH_STORE_SHARED_ID, "children"),
     State(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "value"),
     prevent_initial_call=True,
@@ -123,8 +125,6 @@ def run_osm_query(file_path, epsg_input, job_id):
     if not file_path:
         raise PreventUpdate
     logging.info("OSM triggered with file: %s", file_path)
-
-    from cosmonaut_app.transformation import OsmRoads
 
     osm_tags_mapping = {
         "highway": [
@@ -240,7 +240,8 @@ def run_osm_query(file_path, epsg_input, job_id):
                 duration=5000,
                 className="shadow",
             ),
-            work_4326,  # return working file path (anything truthy triggers next step)
+            # return working file path (anything truthy triggers next step)
+            work_4326,
         )
     except Exception as e:
         logging.error("Error in run_osm_query: %s", e, exc_info=True)
@@ -319,6 +320,9 @@ def upload_to_minIO(osm_file_path, job_id):
 def generate_classification_plot(upload_status, file_path, job_id, src_epsg):
     if upload_status is None:
         raise PreventUpdate
+    logging.info(
+        f"Generate classification plot: {upload_status}, {file_path}, {job_id}, {src_epsg}"
+    )
     if src_epsg is None:
         return dbc.Toast(
             "Source EPSG is not set. Please provide a valid EPSG code.",

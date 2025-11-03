@@ -7,7 +7,6 @@ from cosmonaut_app.constants.html_ids import (
     CFG_IR_INPUT_ROUTING_PARAMS_ID,
     CFG_LBF_INPUT_ROUTING_PARAMS_ID,
     CFG_MAI_INPUT_ROUTING_PARAMS_ID,
-    CFG_MD_INPUT_ROUTING_PARAMS_ID,
     CFG_OO_INPUT_ROUTING_PARAMS_ID,
     CFG_SN_INPUT_ROUTING_PARAMS_ID,
     CFG_TL_INPUT_ROUTING_PARAMS_ID,
@@ -43,15 +42,6 @@ def layout(job_id=None, **kwargs):
                         [
                             dbc.InputGroupText("Segments per class"),
                             dbc.Input(id=CFG_SN_INPUT_ROUTING_PARAMS_ID, type="number", min=1, max=10),
-                        ]
-                    ),
-                    md=6,
-                ),
-                dbc.Col(
-                    dbc.InputGroup(
-                        [
-                            dbc.InputGroupText("Max distance [km]"),
-                            dbc.Input(id=CFG_MD_INPUT_ROUTING_PARAMS_ID, type="number", min=1),
                         ]
                     ),
                     md=6,

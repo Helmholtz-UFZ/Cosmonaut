@@ -36,7 +36,11 @@ def layout(job_id=None, **kwargs):
             "Please enter a valid EPSG code and then upload your membership data file.",
             className="text-muted",
         ),
-        dbc.Label("EPSG code", html_for=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, className="mt-2"),
+        dbc.Label(
+            "EPSG code",
+            html_for=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
+            className="mt-2",
+        ),
         dbc.Input(
             id=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
             type="number",
@@ -50,7 +54,9 @@ def layout(job_id=None, **kwargs):
             color="secondary",
             className="mb-1",
         ),
-        dbc.FormText(id=DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID, className="fw-semibold"),
+        dbc.FormText(
+            id=DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID, className="fw-semibold"
+        ),
         html.Div(
             dcc.Upload(
                 id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
