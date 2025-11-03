@@ -9,17 +9,27 @@ import dash_bootstrap_components as dbc
 from flask import current_app
 
 from cosmonaut_app.config import WEB_WORK_DIR
+from cosmonaut_app.constants.html_ids import (
+    CURRENT_STAGE_STORE_SHARED_ID,
+    JOB_ID_STORE_SHARED_ID,
+    JOB_LOADED_FLAG_STORE_SHARED_ID,
+    SEARCH_BUTTON_NAV_SHARED_ID,
+    SEARCH_INPUT_NAV_SHARED_ID,
+    SEARCH_RESULTS_DIV_NAV_SHARED_ID,
+    START_JOB_BUTTON_HOME_ID,
+    URL_DIV_NAV_SHARED_ID,
+)
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.flask_routes import app
 
 
 @app.callback(
-    Output("search-results", "children"),
-    Output("job-id", "data", allow_duplicate=True),
-    Output("url", "pathname", allow_duplicate=True),
-    Input("search-button", "n_clicks"),
-    State("search", "value"),
+    Output(SEARCH_RESULTS_DIV_NAV_SHARED_ID, "children"),
+    Output(JOB_ID_STORE_SHARED_ID, "data", allow_duplicate=True),
+    Output(URL_DIV_NAV_SHARED_ID, "pathname", allow_duplicate=True),
+    Input(SEARCH_BUTTON_NAV_SHARED_ID, "n_clicks"),
+    State(SEARCH_INPUT_NAV_SHARED_ID, "value"),
     prevent_initial_call=True,
 )
 def search_job_id(n_clicks, job_id):
@@ -71,9 +81,9 @@ def search_job_id(n_clicks, job_id):
 
 
 @app.callback(
-    Output("job-id", "data", allow_duplicate=True),
-    Output("url", "pathname", allow_duplicate=True),
-    Input("start-job", "n_clicks"),
+    Output(JOB_ID_STORE_SHARED_ID, "data", allow_duplicate=True),
+    Output(URL_DIV_NAV_SHARED_ID, "pathname", allow_duplicate=True),
+    Input(START_JOB_BUTTON_HOME_ID, "n_clicks"),
     prevent_initial_call=True,
 )
 def start_job(n_clicks):
@@ -206,9 +216,9 @@ def start_job(n_clicks):
 
 
 @app.callback(
-    Output("job-loaded-flag", "data"),
+    Output(JOB_LOADED_FLAG_STORE_SHARED_ID, "data"),
     Input("next-stage-button", "n_clicks"),
-    State("job-loaded-flag", "data"),
+    State(JOB_LOADED_FLAG_STORE_SHARED_ID, "data"),
 )
 def reset_job_loaded_flag(n_clicks, job_loaded_flag):
     if n_clicks is not None and job_loaded_flag:
@@ -217,10 +227,10 @@ def reset_job_loaded_flag(n_clicks, job_loaded_flag):
 
 
 @app.callback(
-    Output("current-stage", "data"),
+    Output(CURRENT_STAGE_STORE_SHARED_ID, "data"),
     Input("next-button", "n_clicks"),
     Input("prev-button", "n_clicks"),
-    State("current-stage", "data"),
+    State(CURRENT_STAGE_STORE_SHARED_ID, "data"),
 )
 def update_current_stage(next_clicks, prev_clicks, current_stage):
     if next_clicks is None and prev_clicks is None:
@@ -235,7 +245,7 @@ def update_current_stage(next_clicks, prev_clicks, current_stage):
 
 @app.callback(
     Output("force-refresh", "children"),
-    Input("user-info-url", "pathname"),
+    Input(URL_DIV_NAV_SHARED_ID, "pathname"),
 )
 def force_user_info_refresh(pathname):
     # Return the pathname or a timestamp to force update

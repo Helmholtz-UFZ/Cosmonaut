@@ -7,6 +7,23 @@ import shutil
 import logging
 from datetime import datetime, timezone
 
+from cosmonaut_app.constants.html_ids import (
+    CFG_AN_INPUT_ROUTING_PARAMS_ID,
+    CFG_IR_INPUT_ROUTING_PARAMS_ID,
+    CFG_LBF_INPUT_ROUTING_PARAMS_ID,
+    CFG_MAI_INPUT_ROUTING_PARAMS_ID,
+    CFG_OO_INPUT_ROUTING_PARAMS_ID,
+    CFG_SN_INPUT_ROUTING_PARAMS_ID,
+    CFG_TL_INPUT_ROUTING_PARAMS_ID,
+    CFG_WD_INPUT_ROUTING_PARAMS_ID,
+    PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID,
+    PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID,
+    ROUTING_COMPLETE_STORE_SHARED_ID,
+    RUN_ROUTING_BUTTON_ROUTING_PARAMS_ID,
+    TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+    TAGS_LAST_SELECTION_STORE_SHARED_ID,
+    URL_DIV_NAV_SHARED_ID,
+)
 from cosmonaut_app.flask_routes import app
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
 from sensor_routing.sensor_routing_cli import (
@@ -20,16 +37,16 @@ log = logging.getLogger(__name__)
 
 
 @app.callback(
-    Output("cfg-sn", "value"),
-    Output("cfg-lbf", "value"),
-    Output("cfg-tl", "value"),
-    Output("cfg-oo", "value"),
-    Output("cfg-mai", "value"),
-    Output("cfg-an", "value"),
-    Output("cfg-ir", "value"),
-    Output("cfg-wd", "value"),
-    Input("params-load", "n_intervals"),
-    State("url", "pathname"),
+    Output(CFG_SN_INPUT_ROUTING_PARAMS_ID, "value"),
+    Output(CFG_LBF_INPUT_ROUTING_PARAMS_ID, "value"),
+    Output(CFG_TL_INPUT_ROUTING_PARAMS_ID, "value"),
+    Output(CFG_OO_INPUT_ROUTING_PARAMS_ID, "value"),
+    Output(CFG_MAI_INPUT_ROUTING_PARAMS_ID, "value"),
+    Output(CFG_AN_INPUT_ROUTING_PARAMS_ID, "value"),
+    Output(CFG_IR_INPUT_ROUTING_PARAMS_ID, "value"),
+    Output(CFG_WD_INPUT_ROUTING_PARAMS_ID, "value"),
+    Input(PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID, "n_intervals"),
+    State(URL_DIV_NAV_SHARED_ID, "pathname"),
     prevent_initial_call=True,
 )
 def init_params(_n, pathname):
@@ -53,20 +70,20 @@ def init_params(_n, pathname):
 
 
 @app.callback(
-    Output("params-alert", "children", allow_duplicate=True),
-    Output("params-alert", "color", allow_duplicate=True),
-    Output("params-alert", "is_open", allow_duplicate=True),
-    Output("routing-complete", "data", allow_duplicate=True),
-    Input("run-routing", "n_clicks"),
-    State("cfg-sn", "value"),
-    State("cfg-lbf", "value"),
-    State("cfg-tl", "value"),
-    State("cfg-oo", "value"),
-    State("cfg-mai", "value"),
-    State("cfg-an", "value"),
-    State("cfg-ir", "value"),
-    State("cfg-wd", "value"),
-    State("url", "pathname"),
+    Output(PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID, "children", allow_duplicate=True),
+    Output(PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID, "color", allow_duplicate=True),
+    Output(PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID, "is_open", allow_duplicate=True),
+    Output(ROUTING_COMPLETE_STORE_SHARED_ID, "data", allow_duplicate=True),
+    Input(RUN_ROUTING_BUTTON_ROUTING_PARAMS_ID, "n_clicks"),
+    State(CFG_SN_INPUT_ROUTING_PARAMS_ID, "value"),
+    State(CFG_LBF_INPUT_ROUTING_PARAMS_ID, "value"),
+    State(CFG_TL_INPUT_ROUTING_PARAMS_ID, "value"),
+    State(CFG_OO_INPUT_ROUTING_PARAMS_ID, "value"),
+    State(CFG_MAI_INPUT_ROUTING_PARAMS_ID, "value"),
+    State(CFG_AN_INPUT_ROUTING_PARAMS_ID, "value"),
+    State(CFG_IR_INPUT_ROUTING_PARAMS_ID, "value"),
+    State(CFG_WD_INPUT_ROUTING_PARAMS_ID, "value"),
+    State(URL_DIV_NAV_SHARED_ID, "pathname"),
     prevent_initial_call=True,
 )
 def run_routing(n, sn, lbf, tl, oo, mai, an, ir_list, wd, pathname):
@@ -250,9 +267,9 @@ def run_routing(n, sn, lbf, tl, oo, mai, an, ir_list, wd, pathname):
 
 # Hydrate hidden tags-dropdown so the same streets stay visible
 @app.callback(
-    Output("tags-dropdown", "value", allow_duplicate=True),
-    Input("params-load", "n_intervals"),
-    State("tags-last-selection", "data"),
+    Output(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
+    Input(PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID, "n_intervals"),
+    State(TAGS_LAST_SELECTION_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def _hydrate_tags_for_params(_n, last_selection):

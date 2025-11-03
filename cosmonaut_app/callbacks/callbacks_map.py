@@ -13,6 +13,29 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
+from cosmonaut_app.constants.html_ids import (
+    ACTION_ALERT_ALERT_STREET_SELECTION_ID,
+    CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
+    CLICKED_ROADS_STORE_SHARED_ID,
+    CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
+    EPSG_STORE_SHARED_ID,
+    JOB_ID_STORE_SHARED_ID,
+    LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
+    MAIN_MAP_DIV_MAP_SHARED_ID,
+    OSM_GEOJSON_LAYER_MAP_SHARED_ID,
+    REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
+    RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
+    RESET_ROADS_BUTTON_STREET_SELECTION_ID,
+    ROUTE_GEOJSON_LAYER_MAP_SHARED_ID,
+    ROUTE_LAYER_LAYER_MAP_SHARED_ID,
+    ROUTING_COMPLETE_STORE_SHARED_ID,
+    SELECTION_COUNT_DIV_STREET_SELECTION_ID,
+    TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+    TAGS_LAST_SELECTION_STORE_SHARED_ID,
+    TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
+    TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
+    UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
+)
 from cosmonaut_app.transformation import (
     transform_solution,
     transform_geojson,
@@ -195,12 +218,12 @@ def _load_geojson(path: str):
 
 
 @app.callback(
-    Output("map", "children"),
-    Input("tags-dropdown", "value"),
-    State("job-id", "data"),
-    Input("routing-complete", "data"),
-    State("map", "children"),
-    State("epsg-store", "data"),
+    Output(MAIN_MAP_DIV_MAP_SHARED_ID, "children"),
+    Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    Input(ROUTING_COMPLETE_STORE_SHARED_ID, "data"),
+    State(MAIN_MAP_DIV_MAP_SHARED_ID, "children"),
+    State(EPSG_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
     allow_duplicate=True,
 )
@@ -215,7 +238,7 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
 
     # Remove our entire managed group (safer than removing individual layers)
     managed_group_id = "managed-layers"
-    managed_ids = {"osm-geojson", "route-geojson", "route-layer", managed_group_id}
+    managed_ids = {OSM_GEOJSON_LAYER_MAP_SHARED_ID, ROUTE_GEOJSON_LAYER_MAP_SHARED_ID, ROUTE_LAYER_LAYER_MAP_SHARED_ID, managed_group_id}
     cleaned_children, removed = [], 0
     for child in current_children:
         comp_id = None
@@ -254,7 +277,7 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
         route_geojson = dl.GeoJSON(
             data=transformed_solution,
             options={"style": {"color": "blue", "weight": 5}},
-            id="route-geojson",
+            id=ROUTE_GEOJSON_LAYER_MAP_SHARED_ID,
             zoomToBounds=True,
         )
         new_layers.append(route_geojson)
@@ -267,7 +290,7 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
                 route_fc = _load_geojson(route_path)
                 route_layer = dl.GeoJSON(
                     data=route_fc,
-                    id="route-layer",
+                    id=ROUTE_LAYER_LAYER_MAP_SHARED_ID,
                     zoomToBounds=True,
                     options=dict(style=dict(color="#0066ff", weight=5, opacity=0.9)),
                 )
@@ -276,7 +299,7 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
             except Exception as e:
                 logging.warning("Could not add route layer: %s", e)
 
-    elif ctx.triggered_id == "tags-dropdown" and selected_roads is not None and job_id:
+    elif ctx.triggered_id == TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID and selected_roads is not None and job_id:
         logging.info("=== OPTIMIZED TAG FILTERING SECTION ===")
         filter_start_time = time.time()
 
@@ -364,7 +387,7 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
             data=filtered_data,
             options={"style": style_handle},
             hideout=dict(selected=[], zoom=10),
-            id="osm-geojson",
+            id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,
             zoomToBounds=True,
         )
         new_layers.append(osm_layer)
@@ -374,7 +397,7 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
             time.time() - filter_start_time,
         )
 
-    elif ctx.triggered_id == "tags-dropdown" and not job_id:
+    elif ctx.triggered_id == TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID and not job_id:
         logging.warning("Tag dropdown triggered but no job ID available")
 
     # Add/replace our managed group once
@@ -388,10 +411,10 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
 
 
 @app.callback(
-    Output("osm-geojson", "hideout", allow_duplicate=True),
-    Input("osm-geojson", "n_clicks"),
-    State("osm-geojson", "clickData"),
-    State("osm-geojson", "hideout"),
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout", allow_duplicate=True),
+    Input(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "n_clicks"),
+    State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "clickData"),
+    State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
     prevent_initial_call=True,
 )
 def toggle_select(_, clickData, hideout):
@@ -408,9 +431,9 @@ def toggle_select(_, clickData, hideout):
 
 
 @app.callback(
-    Output("clicked-roads", "data", allow_duplicate=True),
-    [Input("osm-geojson", "clickData")],
-    [State("clicked-roads", "data")],
+    Output(CLICKED_ROADS_STORE_SHARED_ID, "data", allow_duplicate=True),
+    [Input(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "clickData")],
+    [State(CLICKED_ROADS_STORE_SHARED_ID, "data")],
     prevent_initial_call=True,
 )
 def update_clicked_roads(clickData, clicked_roads):
@@ -428,13 +451,13 @@ def remove_selected_legacy_disabled(*_args, **_kwargs):
 
 
 @app.callback(
-    Output("osm-geojson", "data", allow_duplicate=True),
-    [Input("remove-button", "n_clicks")],
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    [Input(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
-        State("clicked-roads", "data"),
-        State("job-id", "data"),
-        State("epsg-store", "data"),
-        State("tags-dropdown", "value"),
+        State(CLICKED_ROADS_STORE_SHARED_ID, "data"),
+        State(JOB_ID_STORE_SHARED_ID, "data"),
+        State(EPSG_STORE_SHARED_ID, "data"),
+        State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     ],
     prevent_initial_call=True,
 )
@@ -508,12 +531,12 @@ def remove_selected(n, clicked_roads, job_id, epsg_input, selected_roads):
 
 
 @app.callback(
-    Output("osm-geojson", "data", allow_duplicate=True),
-    [Input("largest-button", "n_clicks")],
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    [Input(LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
-        State("job-id", "data"),
-        State("epsg-store", "data"),
-        State("tags-dropdown", "value"),
+        State(JOB_ID_STORE_SHARED_ID, "data"),
+        State(EPSG_STORE_SHARED_ID, "data"),
+        State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     ],
     prevent_initial_call=True,
 )
@@ -614,12 +637,12 @@ def keep_largest_subnetwork(n, job_id, epsg_input, selected_roads):
 
 
 @app.callback(
-    Output("osm-geojson", "data", allow_duplicate=True),
-    [Input("confirm-reset", "n_clicks")],
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    [Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
-        State("job-id", "data"),
-        State("epsg-store", "data"),
-        State("tags-dropdown", "value"),
+        State(JOB_ID_STORE_SHARED_ID, "data"),
+        State(EPSG_STORE_SHARED_ID, "data"),
+        State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     ],
     prevent_initial_call=True,
 )
@@ -671,8 +694,8 @@ def reset_edits(n, job_id, epsg_input, selected_roads):
 
 
 @app.callback(
-    Output("selection-count", "children", allow_duplicate=True),
-    Input("clicked-roads", "data"),
+    Output(SELECTION_COUNT_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True),
+    Input(CLICKED_ROADS_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def _update_selection_badge(clicked):
@@ -681,8 +704,8 @@ def _update_selection_badge(clicked):
 
 
 @app.callback(
-    Output("remove-button", "disabled", allow_duplicate=True),
-    Input("clicked-roads", "data"),
+    Output(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "disabled", allow_duplicate=True),
+    Input(CLICKED_ROADS_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def _toggle_remove_disabled(clicked):
@@ -691,43 +714,43 @@ def _toggle_remove_disabled(clicked):
 
 # Select all / none tags
 @app.callback(
-    Output("tags-dropdown", "value", allow_duplicate=True),
-    Input("tags-select-all", "n_clicks"),
-    Input("tags-select-none", "n_clicks"),
+    Output(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
+    Input(TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     prevent_initial_call=True,
 )
 def tags_select_all_none(n_all, n_none):
     trig = ctx.triggered_id
-    if trig == "tags-select-all":
+    if trig == TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID:
         return list(osm_tags_mapping.keys())
-    elif trig == "tags-select-none":
+    elif trig == TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID:
         return []
     raise PreventUpdate
 
 
 # Open/close Reset confirmation modal
 @app.callback(
-    Output("reset-confirm-modal", "is_open", allow_duplicate=True),
-    Input("reset-roads", "n_clicks"),
-    Input("cancel-reset", "n_clicks"),
-    Input("confirm-reset", "n_clicks"),
-    State("reset-confirm-modal", "is_open"),
+    Output(RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID, "is_open", allow_duplicate=True),
+    Input(RESET_ROADS_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(CANCEL_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    State(RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID, "is_open"),
     prevent_initial_call=True,
 )
 def toggle_reset_modal(n_open, n_cancel, n_confirm, is_open):
-    if ctx.triggered_id in ("reset-roads", "cancel-reset", "confirm-reset"):
-        return not is_open if ctx.triggered_id == "reset-roads" else False
+    if ctx.triggered_id in (RESET_ROADS_BUTTON_STREET_SELECTION_ID, CANCEL_RESET_BUTTON_STREET_SELECTION_ID, CONFIRM_RESET_BUTTON_STREET_SELECTION_ID):
+        return not is_open if ctx.triggered_id == RESET_ROADS_BUTTON_STREET_SELECTION_ID else False
     raise PreventUpdate
 
 
 # Clear selections after actions (use confirm-reset instead of reset-roads)
 @app.callback(
-    Output("clicked-roads", "data", allow_duplicate=True),
-    Output("osm-geojson", "hideout", allow_duplicate=True),
-    Input("remove-button", "n_clicks"),
-    Input("largest-button", "n_clicks"),
-    Input("confirm-reset", "n_clicks"),
-    State("osm-geojson", "hideout"),
+    Output(CLICKED_ROADS_STORE_SHARED_ID, "data", allow_duplicate=True),
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout", allow_duplicate=True),
+    Input(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
     prevent_initial_call=True,
 )
 def clear_selections(n_remove, n_largest, n_reset_confirm, hideout):
@@ -740,25 +763,25 @@ def clear_selections(n_remove, n_largest, n_reset_confirm, hideout):
 
 # Toast notifications
 @app.callback(
-    Output("action-alert", "children", allow_duplicate=True),
-    Output("action-alert", "color", allow_duplicate=True),
-    Output("action-alert", "is_open", allow_duplicate=True),
-    Input("remove-button", "n_clicks"),
-    Input("largest-button", "n_clicks"),
-    Input("confirm-reset", "n_clicks"),
-    Input("undo-button", "n_clicks"),
-    State("clicked-roads", "data"),
+    Output(ACTION_ALERT_ALERT_STREET_SELECTION_ID, "children", allow_duplicate=True),
+    Output(ACTION_ALERT_ALERT_STREET_SELECTION_ID, "color", allow_duplicate=True),
+    Output(ACTION_ALERT_ALERT_STREET_SELECTION_ID, "is_open", allow_duplicate=True),
+    Input(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(UNDO_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    State(CLICKED_ROADS_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def show_action_alert(n_remove, n_largest, n_reset, n_undo, clicked):
     trig = ctx.triggered_id
-    if trig == "remove-button":
+    if trig == REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID:
         return f"Removed {len(clicked or [])} road(s).", "danger", True
-    if trig == "largest-button":
+    if trig == LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID:
         return "Kept largest subnetwork (within current filter).", "primary", True
-    if trig == "confirm-reset":
+    if trig == CONFIRM_RESET_BUTTON_STREET_SELECTION_ID:
         return "Edits reset to original OSM.", "secondary", True
-    if trig == "undo-button":
+    if trig == UNDO_BUTTON_BUTTON_STREET_SELECTION_ID:
         return "Last change undone.", "info", True
     raise PreventUpdate
 
@@ -780,11 +803,11 @@ def _snapshot_work_copy(in_dir, work_4326):
 
 # Undo: restore last snapshot from history
 @app.callback(
-    Output("osm-geojson", "data", allow_duplicate=True),
-    Input("undo-button", "n_clicks"),
-    State("job-id", "data"),
-    State("epsg-store", "data"),
-    State("tags-dropdown", "value"),
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Input(UNDO_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    State(EPSG_STORE_SHARED_ID, "data"),
+    State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     prevent_initial_call=True,
 )
 def undo_last(n, job_id, epsg_input, selected_roads):
@@ -836,8 +859,8 @@ def undo_last(n, job_id, epsg_input, selected_roads):
 
 # Persist chosen tags to session so the next page shows the same roads
 @app.callback(
-    Output("tags-last-selection", "data", allow_duplicate=True),
-    Input("tags-dropdown", "value"),
+    Output(TAGS_LAST_SELECTION_STORE_SHARED_ID, "data", allow_duplicate=True),
+    Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     prevent_initial_call=True,
 )
 def _persist_tags_selection(value):

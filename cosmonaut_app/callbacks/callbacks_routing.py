@@ -8,16 +8,22 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.config import WEB_WORK_DIR
+from cosmonaut_app.constants.html_ids import (
+    JOB_ID_STORE_SHARED_ID,
+    QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID,
+    ROUTING_COMPLETE_STORE_SHARED_ID,
+    START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID,
+)
 from sensor_routing import sensor_routing_cli
 from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.flask_routes import app
 
 
 @app.callback(
-    Output("routing-complete", "data"),
+    Output(ROUTING_COMPLETE_STORE_SHARED_ID, "data"),
     Input("confirm-button", "n_clicks"),
-    State("routing-complete", "data"),
-    State("job-id", "data"),
+    State(ROUTING_COMPLETE_STORE_SHARED_ID, "data"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
     allow_duplicate=True,
 )
@@ -57,9 +63,9 @@ def routing_callback(n_clicks, routing_complete, job_id):
 
 
 @app.callback(
-    Output("qr-code", "src"),
-    Input("start-route", "n_clicks"),
-    State("job-id", "data"),
+    Output(QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID, "src"),
+    Input(START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID, "n_clicks"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def update_qr_code(n_clicks, job_id):

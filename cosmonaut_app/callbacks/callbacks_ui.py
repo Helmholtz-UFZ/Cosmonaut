@@ -6,12 +6,25 @@ from dash import no_update
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
+from cosmonaut_app.constants.html_ids import (
+    CURRENT_STAGE_STORE_SHARED_ID,
+    DUMMY_OUTPUT_DIV_SHARED_ID,
+    EMAIL_STORE_SHARED_ID,
+    JOB_ID_STORE_SHARED_ID,
+    NAVBAR_COLLAPSE_NAV_SHARED_ID,
+    NAVBAR_TOGGLER_NAV_SHARED_ID,
+    NONE_DIV_SHARED_ID,
+    TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+    UPLOAD_DATA_STORE_SHARED_ID,
+    URL_DIV_NAV_SHARED_ID,
+    USER_INFO_EMAIL_INPUT_USER_INFO_ID,
+)
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.flask_routes import app
 
 
 @app.callback(
-    Output("upload-data-store", "children"),
+    Output(UPLOAD_DATA_STORE_SHARED_ID, "children"),
     Input("upload-data-dcc", "contents"),
 )
 def store_upload_data(contents):
@@ -21,8 +34,8 @@ def store_upload_data(contents):
 @app.callback(
     Output("next-button", "disabled"),
     Input("upload-data-dcc", "filename"),
-    Input("email-input", "value"),
-    State("current-stage", "data"),
+    Input(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "value"),
+    State(CURRENT_STAGE_STORE_SHARED_ID, "data"),
 )
 def update_next_button(filename, email, current_stage):
     email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
@@ -41,8 +54,8 @@ def update_next_button(filename, email, current_stage):
 
 
 @app.callback(
-    Output("email-store", "data"),
-    Input("email-input", "value"),
+    Output(EMAIL_STORE_SHARED_ID, "data"),
+    Input(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "value"),
     prevent_initial_call=True,
 )
 def store_email(email):
@@ -50,10 +63,10 @@ def store_email(email):
 
 
 @app.callback(
-    Output("dummy-output", "children"),
+    Output(DUMMY_OUTPUT_DIV_SHARED_ID, "children"),
     Input("next-button", "n_clicks"),
-    State("email-store", "data"),
-    State("job-id", "data"),
+    State(EMAIL_STORE_SHARED_ID, "data"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def update_database_on_next(n_clicks, email, job_id):
@@ -69,9 +82,9 @@ def update_database_on_next(n_clicks, email, job_id):
 
 
 @app.callback(
-    Output("navbar-collapse", "is_open"),
-    [Input("navbar-toggler", "n_clicks")],
-    [State("navbar-collapse", "is_open")],
+    Output(NAVBAR_COLLAPSE_NAV_SHARED_ID, "is_open"),
+    [Input(NAVBAR_TOGGLER_NAV_SHARED_ID, "n_clicks")],
+    [State(NAVBAR_COLLAPSE_NAV_SHARED_ID, "is_open")],
 )
 def toggle_navbar_collapse(n, is_open):
     if n:
@@ -80,9 +93,9 @@ def toggle_navbar_collapse(n, is_open):
 
 
 @app.callback(
-    Output("url", "pathname", allow_duplicate=True),
+    Output(URL_DIV_NAV_SHARED_ID, "pathname", allow_duplicate=True),
     [Input("confirm-button", "n_clicks")],
-    [State("job-id", "data")],
+    [State(JOB_ID_STORE_SHARED_ID, "data")],
     prevent_initial_call=True,
 )
 def navigate_to_job_page(n_clicks, job_id):
@@ -93,7 +106,7 @@ def navigate_to_job_page(n_clicks, job_id):
 
 
 @app.callback(
-    Output("url", "pathname", allow_duplicate=True),
+    Output(URL_DIV_NAV_SHARED_ID, "pathname", allow_duplicate=True),
     [Input("navbar-brand", "n_clicks")],
     prevent_initial_call=True,
 )
@@ -104,9 +117,9 @@ def navigate_to_home(n_clicks):
 
 
 @app.callback(
-    Output("none", "children"),
-    Input("tags-dropdown", "value"),
-    State("job-id", "data"),
+    Output(NONE_DIV_SHARED_ID, "children"),
+    Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def update_tags_dropdown(tags, job_id):

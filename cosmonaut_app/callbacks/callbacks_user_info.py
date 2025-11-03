@@ -3,6 +3,13 @@ import re
 import logging
 from dash.exceptions import PreventUpdate
 
+from cosmonaut_app.constants.html_ids import (
+    URL_DIV_NAV_SHARED_ID,
+    USER_INFO_CONTENT_DIV_USER_INFO_ID,
+    USER_INFO_EMAIL_INPUT_USER_INFO_ID,
+    USER_INFO_NEXT_BUTTON_USER_INFO_ID,
+)
+
 EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 
 
@@ -21,8 +28,8 @@ def render_user_info(job_id):
 
 
 @callback(
-    Output("user-info-content", "children"),
-    Input("url", "pathname"),
+    Output(USER_INFO_CONTENT_DIV_USER_INFO_ID, "children"),
+    Input(URL_DIV_NAV_SHARED_ID, "pathname"),
 )
 def update_user_info_content(pathname):
     if not pathname or not pathname.endswith("/user-info"):
@@ -33,10 +40,10 @@ def update_user_info_content(pathname):
 
 # Live email validation -> toggles input valid/invalid and enables Next button
 @callback(
-    Output("user-info-email", "valid"),
-    Output("user-info-email", "invalid"),
-    Output("user-info-next", "disabled"),
-    Input("user-info-email", "value"),
+    Output(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "valid"),
+    Output(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "invalid"),
+    Output(USER_INFO_NEXT_BUTTON_USER_INFO_ID, "disabled"),
+    Input(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "value"),
 )
 def validate_email(value):
     if not value:
@@ -46,10 +53,10 @@ def validate_email(value):
 
 
 @callback(
-    Output("url", "pathname", allow_duplicate=True),
-    Input("user-info-next", "n_clicks"),
-    State("user-info-email", "value"),
-    State("url", "pathname"),
+    Output(URL_DIV_NAV_SHARED_ID, "pathname", allow_duplicate=True),
+    Input(USER_INFO_NEXT_BUTTON_USER_INFO_ID, "n_clicks"),
+    State(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "value"),
+    State(URL_DIV_NAV_SHARED_ID, "pathname"),
     prevent_initial_call=True,
 )
 def go_to_upload_page(n_clicks: int | None, email: str | None, pathname: str | None):

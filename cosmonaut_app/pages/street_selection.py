@@ -4,6 +4,23 @@ from dash import html, register_page, dcc  # add dcc
 import dash_bootstrap_components as dbc
 from cosmonaut_app.config import osm_tags_mapping
 from cosmonaut_app.ui.page import page_layout, progress_footer
+from cosmonaut_app.constants.html_ids import (
+    ACTION_ALERT_ALERT_STREET_SELECTION_ID,
+    CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
+    CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
+    LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
+    REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
+    RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
+    RESET_ROADS_BUTTON_STREET_SELECTION_ID,
+    SELECTION_COUNT_DIV_STREET_SELECTION_ID,
+    STREET_SELECTION_NEXT_BUTTON_STREET_SELECTION_ID,
+    STREET_SELECTION_PREV_BUTTON_STREET_SELECTION_ID,
+    TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+    TAGS_LAST_SELECTION_STORE_SHARED_ID,
+    TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
+    TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
+    UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
+)
 
 register_page(
     __name__,
@@ -28,7 +45,7 @@ def layout(job_id=None, **kwargs):
             [
                 dbc.Col(
                     dbc.Label(
-                        "Straßenauswahl", html_for="tags-dropdown", className="mt-2"
+                        "Straßenauswahl", html_for=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, className="mt-2"
                     ),
                     width="auto",
                 ),
@@ -37,13 +54,13 @@ def layout(job_id=None, **kwargs):
                         [
                             dbc.Button(
                                 "Select all",
-                                id="tags-select-all",
+                                id=TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
                                 size="sm",
                                 color="link",
                             ),
                             dbc.Button(
                                 "Select none",
-                                id="tags-select-none",
+                                id=TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
                                 size="sm",
                                 color="link",
                             ),
@@ -58,7 +75,7 @@ def layout(job_id=None, **kwargs):
             className="g-0",
         ),
         dbc.Checklist(
-            id="tags-dropdown",
+            id=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
             options=[{"label": tag, "value": tag} for tag in osm_tags_mapping.keys()],
             value=[],  # will be initialized via callback
             switch=True,
@@ -74,7 +91,7 @@ def layout(job_id=None, **kwargs):
                                     html.I(className="bi bi-eraser me-1"),
                                     "Remove selected",
                                 ],
-                                id="remove-button",
+                                id=REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
                                 color="danger",
                                 outline=True,
                             ),
@@ -83,7 +100,7 @@ def layout(job_id=None, **kwargs):
                                     html.I(className="bi bi-diagram-3 me-1"),
                                     "Keep largest",
                                 ],
-                                id="largest-button",
+                                id=LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
                                 color="primary",
                                 outline=True,
                             ),
@@ -94,7 +111,7 @@ def layout(job_id=None, **kwargs):
                                     ),
                                     "Reset edits",
                                 ],
-                                id="reset-roads",
+                                id=RESET_ROADS_BUTTON_STREET_SELECTION_ID,
                                 color="secondary",
                                 outline=True,
                             ),
@@ -103,7 +120,7 @@ def layout(job_id=None, **kwargs):
                                     html.I(className="bi bi-arrow-90deg-left me-1"),
                                     "Undo",
                                 ],
-                                id="undo-button",
+                                id=UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
                                 color="secondary",
                                 outline=True,
                             ),
@@ -115,7 +132,7 @@ def layout(job_id=None, **kwargs):
                 dbc.Col(
                     dbc.Badge(
                         "Selected: 0",
-                        id="selection-count",
+                        id=SELECTION_COUNT_DIV_STREET_SELECTION_ID,
                         color="info",
                         className="ms-2",
                     ),
@@ -135,13 +152,13 @@ def layout(job_id=None, **kwargs):
                 dbc.ModalFooter(
                     [
                         dbc.Button(
-                            "Cancel", id="cancel-reset", color="secondary", outline=True
+                            "Cancel", id=CANCEL_RESET_BUTTON_STREET_SELECTION_ID, color="secondary", outline=True
                         ),
-                        dbc.Button("Reset", id="confirm-reset", color="danger"),
+                        dbc.Button("Reset", id=CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, color="danger"),
                     ]
                 ),
             ],
-            id="reset-confirm-modal",
+            id=RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
             is_open=False,
             backdrop="static",
             keyboard=False,
@@ -151,13 +168,13 @@ def layout(job_id=None, **kwargs):
     footer = progress_footer(
         prev=dbc.Button(
             [html.I(className="bi bi-arrow-left me-1"), "Previous"],
-            id="street-selection-prev",
+            id=STREET_SELECTION_PREV_BUTTON_STREET_SELECTION_ID,
             color="secondary",
             outline=True,
         ),
         next_=dbc.Button(
             [html.I(className="bi bi-check2-circle me-1"), "Finish"],
-            id="street-selection-next",
+            id=STREET_SELECTION_NEXT_BUTTON_STREET_SELECTION_ID,
             color="primary",
             href=f"/job/{job_id}/routing-params",
             disabled=not bool(job_id),
@@ -165,7 +182,7 @@ def layout(job_id=None, **kwargs):
     )
 
     below = dbc.Alert(
-        id="action-alert",
+        id=ACTION_ALERT_ALERT_STREET_SELECTION_ID,
         children="",
         color="info",
         is_open=False,
@@ -174,7 +191,7 @@ def layout(job_id=None, **kwargs):
     )
 
     # Persist selected tags across pages
-    body.append(dcc.Store(id="tags-last-selection", storage_type="session"))
+    body.append(dcc.Store(id=TAGS_LAST_SELECTION_STORE_SHARED_ID, storage_type="session"))
 
     return page_layout(
         title="Street Selection",

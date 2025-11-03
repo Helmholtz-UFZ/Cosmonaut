@@ -3,6 +3,7 @@
 from dash import html, register_page
 import dash_bootstrap_components as dbc
 from cosmonaut_app.ui.page import progress_steps
+from cosmonaut_app.constants.html_ids import START_JOB_BUTTON_HOME_ID
 
 register_page(
     __name__,
@@ -48,7 +49,7 @@ def layout():
                                     html.I(className="bi bi-rocket-takeoff me-2"),
                                     "Create new job",
                                 ],
-                                id="start-job",
+                                id=START_JOB_BUTTON_HOME_ID,
                                 color="primary",
                                 size="lg",
                             ),

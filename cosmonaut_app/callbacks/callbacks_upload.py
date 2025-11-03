@@ -10,6 +10,24 @@ from pyproj.exceptions import CRSError
 from pyproj import CRS
 
 from cosmonaut_app.config import WEB_WORK_DIR
+from cosmonaut_app.constants.html_ids import (
+    DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID,
+    DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
+    DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
+    DATA_UPLOAD_NEXT_BUTTON_DATA_UPLOAD_ID,
+    DATA_UPLOAD_PREV_BUTTON_DATA_UPLOAD_ID,
+    DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+    EPSG_STORE_SHARED_ID,
+    FILE_PATH_STORE_SHARED_ID,
+    JOB_ID_STORE_SHARED_ID,
+    MAIN_MAP_DIV_MAP_SHARED_ID,
+    OSM_FILE_PATH_STORE_SHARED_ID,
+    OUTPUT_DATA_UPLOAD_DIV_DATA_UPLOAD_ID,
+    OUTPUT_MINIO_STATUS_DIV_DATA_UPLOAD_ID,
+    OUTPUT_OSM_QUERY_DIV_DATA_UPLOAD_ID,
+    PLOT_GENERATION_STATUS_DIV_DATA_UPLOAD_ID,
+    URL_DIV_NAV_SHARED_ID,
+)
 from cosmonaut_app.minio_manager import MiniIOManager
 from cosmonaut_app.transformation import _get_bounds, get_convex_hull, transform_csv
 from cosmonaut_app.classification_plot import ClassificationPlot
@@ -23,12 +41,12 @@ matplotlib.use("Agg")
 
 
 @app.callback(
-    Output("data-upload-upload", "contents"),  # reset dropzone
-    Output("output-data-upload", "children"),  # status message
-    Output("file-path", "children"),  # saved path
-    Input("data-upload-upload", "contents"),
-    State("data-upload-upload", "filename"),
-    State("job-id", "data"),
+    Output(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),  # reset dropzone
+    Output(OUTPUT_DATA_UPLOAD_DIV_DATA_UPLOAD_ID, "children"),  # status message
+    Output(FILE_PATH_STORE_SHARED_ID, "children"),  # saved path
+    Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
+    State(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def upload_file(contents, filename, job_id):
@@ -72,7 +90,7 @@ def upload_file(contents, filename, job_id):
 
 
 @app.callback(
-    Output("data-upload-file-info", "children"), Input("file-path", "children")
+    Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"), Input(FILE_PATH_STORE_SHARED_ID, "children")
 )
 def show_selected_file(file_path):
     if not file_path:
@@ -81,9 +99,9 @@ def show_selected_file(file_path):
 
 
 @app.callback(
-    Output("map", "viewport"),
-    Input("file-path", "children"),
-    State("data-upload-epsg", "value"),
+    Output(MAIN_MAP_DIV_MAP_SHARED_ID, "viewport"),
+    Input(FILE_PATH_STORE_SHARED_ID, "children"),
+    State(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "value"),
     prevent_initial_call=True,
 )
 def update_map_center(file_path, epsg_input):
@@ -95,11 +113,11 @@ def update_map_center(file_path, epsg_input):
 
 
 @app.callback(
-    Output("output-osm-query", "children"),
-    Output("osm-file-path", "children"),
-    Input("file-path", "children"),
-    State("data-upload-epsg", "value"),
-    State("job-id", "data"),  # NEW: pass job id
+    Output(OUTPUT_OSM_QUERY_DIV_DATA_UPLOAD_ID, "children"),
+    Output(OSM_FILE_PATH_STORE_SHARED_ID, "children"),
+    Input(FILE_PATH_STORE_SHARED_ID, "children"),
+    State(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "value"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),  # NEW: pass job id
 )
 def run_osm_query(file_path, epsg_input, job_id):
     if not file_path:
@@ -245,9 +263,9 @@ def run_osm_query(file_path, epsg_input, job_id):
 
 
 @app.callback(
-    Output("output-minIO-status", "children"),
-    Input("osm-file-path", "children"),
-    State("job-id", "data"),
+    Output(OUTPUT_MINIO_STATUS_DIV_DATA_UPLOAD_ID, "children"),
+    Input(OSM_FILE_PATH_STORE_SHARED_ID, "children"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
 )
 def upload_to_minIO(osm_file_path, job_id):
     ALLOWED_EXTENSIONS = {".tif", ".geojson", ".json", ".csv", ".gpx"}
@@ -291,11 +309,11 @@ def upload_to_minIO(osm_file_path, job_id):
 
 
 @app.callback(
-    Output("plot-generation-status", "children"),
-    Input("output-data-upload", "children"),
-    State("file-path", "children"),
-    State("job-id", "data"),
-    State("epsg-store", "data"),
+    Output(PLOT_GENERATION_STATUS_DIV_DATA_UPLOAD_ID, "children"),
+    Input(OUTPUT_DATA_UPLOAD_DIV_DATA_UPLOAD_ID, "children"),
+    State(FILE_PATH_STORE_SHARED_ID, "children"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    State(EPSG_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def generate_classification_plot(upload_status, file_path, job_id, src_epsg):
@@ -334,11 +352,11 @@ def generate_classification_plot(upload_status, file_path, job_id, src_epsg):
 
 
 @app.callback(
-    Output("data-upload-epsg-helper", "children"),
-    Output("data-upload-epsg", "valid"),
-    Output("data-upload-epsg", "invalid"),
-    Output("epsg-store", "data"),
-    Input("data-upload-epsg", "value"),
+    Output(DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID, "children"),
+    Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "valid"),
+    Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "invalid"),
+    Output(EPSG_STORE_SHARED_ID, "data"),
+    Input(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "value"),
 )
 def validate_and_store_epsg(epsg):
     # Reset when empty/cleared
@@ -363,17 +381,17 @@ def validate_and_store_epsg(epsg):
 
 # Enable/disable controls based on store
 @app.callback(
-    Output("data-upload-upload", "disabled"),
-    Input("epsg-store", "data"),
+    Output(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled"),
+    Input(EPSG_STORE_SHARED_ID, "data"),
 )
 def toggle_upload_disabled(epsg):
     return epsg is None
 
 
 @app.callback(
-    Output("data-upload-next", "disabled"),
-    Input("file-path", "children"),
-    Input("epsg-store", "data"),
+    Output(DATA_UPLOAD_NEXT_BUTTON_DATA_UPLOAD_ID, "disabled"),
+    Input(FILE_PATH_STORE_SHARED_ID, "children"),
+    Input(EPSG_STORE_SHARED_ID, "data"),
 )
 def enable_next(file_path, epsg):
     return not (file_path and epsg)
@@ -381,9 +399,9 @@ def enable_next(file_path, epsg):
 
 # Navigation: prev/next (SPA)
 @app.callback(
-    Output("url", "pathname", allow_duplicate=True),
-    Input("data-upload-next", "n_clicks"),
-    State("url", "pathname"),
+    Output(URL_DIV_NAV_SHARED_ID, "pathname", allow_duplicate=True),
+    Input(DATA_UPLOAD_NEXT_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
+    State(URL_DIV_NAV_SHARED_ID, "pathname"),
     prevent_initial_call=True,
 )
 def go_to_street_selection(n_clicks, pathname):
@@ -393,9 +411,9 @@ def go_to_street_selection(n_clicks, pathname):
 
 
 @app.callback(
-    Output("url", "pathname", allow_duplicate=True),
-    Input("data-upload-prev", "n_clicks"),
-    State("url", "pathname"),
+    Output(URL_DIV_NAV_SHARED_ID, "pathname", allow_duplicate=True),
+    Input(DATA_UPLOAD_PREV_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
+    State(URL_DIV_NAV_SHARED_ID, "pathname"),
     prevent_initial_call=True,
 )
 def back_to_user_info(n_clicks, pathname):
