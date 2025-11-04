@@ -1,6 +1,5 @@
 """Test the MinIO manager class."""
 
-import os
 import pytest
 from cosmonaut_app.minio_manager import MiniIOManager
 

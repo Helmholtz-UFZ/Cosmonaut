@@ -21,7 +21,7 @@ from cosmonaut_app.constants.html_ids import (
     EPSG_STORE_SHARED_ID,
     JOB_ID_STORE_SHARED_ID,
     LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
-    MAIN_MAP_DIV_MAP_SHARED_ID,
+    MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MANAGED_LAYERS_GROUP_MAP_SHARED_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
     REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
@@ -219,11 +219,11 @@ def _load_geojson(path: str):
 
 
 @app.callback(
-    Output(MAIN_MAP_DIV_MAP_SHARED_ID, "children"),
+    Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children"),
     Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     Input(ROUTING_COMPLETE_STORE_SHARED_ID, "data"),
-    State(MAIN_MAP_DIV_MAP_SHARED_ID, "children"),
+    State(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children"),
     State(EPSG_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
     allow_duplicate=True,
