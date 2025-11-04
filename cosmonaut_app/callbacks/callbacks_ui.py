@@ -20,7 +20,7 @@ from cosmonaut_app.constants.html_ids import (
     USER_INFO_EMAIL_INPUT_USER_INFO_ID,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
-from cosmonaut_app.flask_routes import app
+from cosmonaut_app.app import app
 
 
 @app.callback(

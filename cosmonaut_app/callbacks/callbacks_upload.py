@@ -31,7 +31,7 @@ from cosmonaut_app.constants.html_ids import (
 from cosmonaut_app.minio_manager import MiniIOManager
 from cosmonaut_app.transformation import _get_bounds, get_convex_hull, transform_csv
 from cosmonaut_app.classification_plot import ClassificationPlot
-from cosmonaut_app.flask_routes import app
+from cosmonaut_app.app import app
 from cosmonaut_app.transformation import OsmRoads
 
 import matplotlib

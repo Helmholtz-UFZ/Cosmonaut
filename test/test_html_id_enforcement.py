@@ -69,7 +69,7 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
     with open(file_path, "r") as f:
         lines = f.readlines()
 
-    # Common Dash component prefixes
+    # Common Dash component prefixes and callback patterns
     component_prefixes = [
         "html\\.",
         "dcc\\.",
@@ -80,6 +80,9 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
         "State\\(",
     ]
 
+    # Track if we're inside a component definition (multi-line)
+    in_component = False
+
     for line_num, line in enumerate(lines, start=1):
         # Skip comment lines
         if is_comment_or_docstring(line):
@@ -89,9 +92,22 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
         if re.search(r"\bid\s+=\s+", line):
             continue
 
-        # Skip if line doesn't contain Dash component or callback Input/Output/State
-        has_component = any(re.search(prefix, line) for prefix in component_prefixes)
-        if not has_component:
+        # Check if this line starts or continues a component
+        has_component_start = any(
+            re.search(prefix, line) for prefix in component_prefixes
+        )
+
+        # Start component context when we see a component prefix with opening paren
+        if has_component_start and "(" in line:
+            in_component = True
+
+        # End component context when we see a closing paren at the start (dedented)
+        if in_component and re.match(r"^\s*\)", line):
+            in_component = False
+            continue
+
+        # Only check lines that are in a component context OR have a component prefix
+        if not (in_component or has_component_start):
             continue
 
         # Now find id= patterns in this component line

@@ -24,7 +24,7 @@ from cosmonaut_app.constants.html_ids import (
     TAGS_LAST_SELECTION_STORE_SHARED_ID,
     URL_DIV_NAV_SHARED_ID,
 )
-from cosmonaut_app.flask_routes import app
+from cosmonaut_app.app import app
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
 from sensor_routing.sensor_routing_cli import (
     Config,

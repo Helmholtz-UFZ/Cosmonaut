@@ -36,6 +36,7 @@ UPLOAD_DATA_STORE_SHARED_ID = "upload-data-store-shared-id"
 # --- Navigation ---
 NAVBAR_COLLAPSE_NAV_SHARED_ID = "navbar-collapse-nav-shared-id"
 NAVBAR_TOGGLER_NAV_SHARED_ID = "navbar-toggler-nav-shared-id"
+REDIRECT_INTERVAL_NAV_SHARED_ID = "redirect-interval"  # nocheck not used in callbacks
 SEARCH_BUTTON_NAV_SHARED_ID = "search-button-nav-shared-id"
 SEARCH_INPUT_NAV_SHARED_ID = "search-input-nav-shared-id"
 SEARCH_RESULTS_DIV_NAV_SHARED_ID = "search-results-div-nav-shared-id"

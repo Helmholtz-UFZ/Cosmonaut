@@ -21,7 +21,7 @@ from cosmonaut_app.constants.html_ids import (
 )
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.flask_routes import app
+from cosmonaut_app.app import app
 
 
 @app.callback(

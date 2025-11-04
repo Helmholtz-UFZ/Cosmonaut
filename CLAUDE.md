@@ -105,9 +105,8 @@ cosmonaut_app/
 │   ├── routing_params.py
 │   ├── street_selection.py
 │   └── user_info.py
-├── app.py             # Main application entry point
+├── app.py             # Main application: Flask/Dash setup, layout, and entry point
 ├── config.py          # Configuration and environment variables
-├── flask_routes.py    # Flask integration and route setup
 └── layout.py          # Shared layout components
 ```
 

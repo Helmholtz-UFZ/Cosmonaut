@@ -15,8 +15,12 @@ from cosmonaut_app.constants.html_ids import (
     NONE_DIV_SHARED_ID,
     OSM_FILE_PATH_STORE_SHARED_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
+    REDIRECT_INTERVAL_NAV_SHARED_ID,
     ROUTE_GEOJSON_LAYER_MAP_SHARED_ID,
     ROUTING_COMPLETE_STORE_SHARED_ID,
+    SEARCH_BUTTON_NAV_SHARED_ID,
+    SEARCH_INPUT_NAV_SHARED_ID,
+    SEARCH_RESULTS_DIV_NAV_SHARED_ID,
     TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
     UPLOAD_DATA_STORE_SHARED_ID,
 )
@@ -130,7 +134,7 @@ search_bar = dbc.Row(
             dbc.Input(
                 type="search",
                 placeholder="Job_ID",
-                id="search",
+                id=SEARCH_INPUT_NAV_SHARED_ID,
             ),
             width=6,
         ),
@@ -138,7 +142,7 @@ search_bar = dbc.Row(
             dbc.Button(
                 "Search",
                 color="primary",
-                id="search-button",
+                id=SEARCH_BUTTON_NAV_SHARED_ID,
             ),
             width="auto",
         ),
@@ -181,7 +185,7 @@ navbar = dbc.Navbar(
             ),
             # Fixed-position container for toast notifications (does not affect layout)
             html.Div(
-                id="search-results",
+                id=SEARCH_RESULTS_DIV_NAV_SHARED_ID,
                 style={
                     "position": "fixed",
                     "top": "1rem",
@@ -191,7 +195,10 @@ navbar = dbc.Navbar(
                 },
             ),
             dcc.Interval(
-                id="redirect-interval", interval=3000, n_intervals=0, disabled=True
+                id=REDIRECT_INTERVAL_NAV_SHARED_ID,
+                interval=3000,
+                n_intervals=0,
+                disabled=True,
             ),
         ],
     ),

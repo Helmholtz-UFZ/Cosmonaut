@@ -50,7 +50,7 @@ from cosmonaut_app.road_network_utils import (
 
 import geojson
 
-from cosmonaut_app.flask_routes import app
+from cosmonaut_app.app import app
 
 # Define a JavaScript function for styling the GeoJSON features
 from dash_extensions.javascript import assign

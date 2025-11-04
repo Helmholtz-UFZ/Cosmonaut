@@ -16,7 +16,7 @@ from cosmonaut_app.constants.html_ids import (
 )
 from sensor_routing import sensor_routing_cli
 from cosmonaut_app.navigation_routing import RouteCreator
-from cosmonaut_app.flask_routes import app
+from cosmonaut_app.app import app
 
 
 @app.callback(
