@@ -30,14 +30,14 @@ def load_html_ids_constants() -> Dict[str, bool]:
     html_ids_file = get_html_ids_path()
     constants = {}
 
-    with open(html_ids_file, 'r') as f:
+    with open(html_ids_file, "r") as f:
         for line in f:
             # Match pattern: CONSTANT_NAME = "value"
             match = re.match(r'^([A-Z_]+_ID)\s*=\s*"[^"]*"(.*)$', line)
             if match:
                 const_name = match.group(1)
                 rest_of_line = match.group(2)
-                has_nocheck = '# nocheck' in rest_of_line or '#nocheck' in rest_of_line
+                has_nocheck = "# nocheck" in rest_of_line or "#nocheck" in rest_of_line
                 constants[const_name] = has_nocheck
 
     return constants
@@ -51,7 +51,11 @@ def find_python_files(directory: Path) -> List[Path]:
 def is_comment_or_docstring(line: str) -> bool:
     """Check if line is a comment or likely in docstring."""
     stripped = line.strip()
-    return stripped.startswith('#') or stripped.startswith('"""') or stripped.startswith("'''")
+    return (
+        stripped.startswith("#")
+        or stripped.startswith('"""')
+        or stripped.startswith("'''")
+    )
 
 
 def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
@@ -62,11 +66,19 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
     """
     violations = []
 
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         lines = f.readlines()
 
     # Common Dash component prefixes
-    component_prefixes = ['html\\.', 'dcc\\.', 'dbc\\.', 'dl\\.', 'Input\\(', 'Output\\(', 'State\\(']
+    component_prefixes = [
+        "html\\.",
+        "dcc\\.",
+        "dbc\\.",
+        "dl\\.",
+        "Input\\(",
+        "Output\\(",
+        "State\\(",
+    ]
 
     for line_num, line in enumerate(lines, start=1):
         # Skip comment lines
@@ -74,7 +86,7 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
             continue
 
         # Skip variable assignments (id = something with spaces around =)
-        if re.search(r'\bid\s+=\s+', line):
+        if re.search(r"\bid\s+=\s+", line):
             continue
 
         # Skip if line doesn't contain Dash component or callback Input/Output/State
@@ -87,9 +99,9 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
         patterns = [
             r'id\s*=\s*"([^"]+)"',  # id="string"
             r"id\s*=\s*'([^']+)'",  # id='string'
-            r'id\s*=\s*f"([^"]+)"', # id=f"string"
-            r"id\s*=\s*f'([^']+)'", # id=f'string'
-            r'id\s*=\s*([a-z_][a-zA-Z0-9_]*)',  # id=variable (lowercase start = not constant)
+            r'id\s*=\s*f"([^"]+)"',  # id=f"string"
+            r"id\s*=\s*f'([^']+)'",  # id=f'string'
+            r"id\s*=\s*([a-z_][a-zA-Z0-9_]*)",  # id=variable (lowercase start = not constant)
         ]
 
         for pattern in patterns:
@@ -102,12 +114,14 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
     return violations
 
 
-def check_if_constant_from_html_ids(id_value: str, html_ids_constants: Set[str]) -> bool:
+def check_if_constant_from_html_ids(
+    id_value: str, html_ids_constants: Set[str]
+) -> bool:
     """Check if an ID value is a constant from html_ids.py."""
     # Constant names are uppercase with underscores
     if not id_value.isupper():
         return False
-    if not id_value.endswith('_ID'):
+    if not id_value.endswith("_ID"):
         return False
     return id_value in html_ids_constants
 
@@ -121,7 +135,7 @@ def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
     used_constants = set()
 
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             content = f.read()
 
         # Parse the file as AST
@@ -136,9 +150,15 @@ def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
                     # Pattern 2: @callback (ast.Name)
                     is_callback = False
                     if isinstance(decorator, ast.Call):
-                        if isinstance(decorator.func, ast.Attribute) and decorator.func.attr == 'callback':
+                        if (
+                            isinstance(decorator.func, ast.Attribute)
+                            and decorator.func.attr == "callback"
+                        ):
                             is_callback = True
-                        elif isinstance(decorator.func, ast.Name) and decorator.func.id == 'callback':
+                        elif (
+                            isinstance(decorator.func, ast.Name)
+                            and decorator.func.id == "callback"
+                        ):
                             is_callback = True
 
                     if is_callback:
@@ -146,7 +166,9 @@ def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
                         for arg in decorator.args:
                             used_constants.update(extract_constants_from_ast(arg))
                         for keyword in decorator.keywords:
-                            used_constants.update(extract_constants_from_ast(keyword.value))
+                            used_constants.update(
+                                extract_constants_from_ast(keyword.value)
+                            )
 
     except SyntaxError:
         # If file has syntax errors, skip it
@@ -164,7 +186,7 @@ def extract_constants_from_ast(node: ast.AST) -> Set[str]:
 
     if isinstance(node, ast.Name):
         # Check if this looks like an ID constant
-        if node.id.isupper() and node.id.endswith('_ID'):
+        if node.id.isupper() and node.id.endswith("_ID"):
             constants.add(node.id)
     elif isinstance(node, ast.Call):
         # For Input(...), Output(...), State(...)
@@ -210,7 +232,7 @@ def test_no_string_literal_ids():
         error_msg = "\n\nVIOLATIONS: Found id= usages with string literals or non-html_ids constants:\n\n"
         error_msg += "\n".join(f"  {v}" for v in all_violations)
         error_msg += "\n\nAll id= usages must use constants from cosmonaut_app/constants/html_ids.py"
-        error_msg += "\nExample: id=START_JOB_BUTTON_HOME_ID (not id=\"start-job\")"
+        error_msg += '\nExample: id=START_JOB_BUTTON_HOME_ID (not id="start-job")'
         assert False, error_msg
 
 

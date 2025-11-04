@@ -41,7 +41,12 @@ def layout(job_id=None, **kwargs):
                     dbc.InputGroup(
                         [
                             dbc.InputGroupText("Segments per class"),
-                            dbc.Input(id=CFG_SN_INPUT_ROUTING_PARAMS_ID, type="number", min=1, max=10),
+                            dbc.Input(
+                                id=CFG_SN_INPUT_ROUTING_PARAMS_ID,
+                                type="number",
+                                min=1,
+                                max=10,
+                            ),
                         ]
                     ),
                     md=6,
@@ -55,7 +60,9 @@ def layout(job_id=None, **kwargs):
                     dbc.InputGroup(
                         [
                             dbc.InputGroupText("Time limit [h]"),
-                            dbc.Input(id=CFG_TL_INPUT_ROUTING_PARAMS_ID, type="number", min=1),
+                            dbc.Input(
+                                id=CFG_TL_INPUT_ROUTING_PARAMS_ID, type="number", min=1
+                            ),
                         ]
                     ),
                     md=6,
@@ -65,7 +72,11 @@ def layout(job_id=None, **kwargs):
                         [
                             dbc.InputGroupText("Lower benefit limit"),
                             dbc.Input(
-                                id=CFG_LBF_INPUT_ROUTING_PARAMS_ID, type="number", min=0, max=1, step=0.05
+                                id=CFG_LBF_INPUT_ROUTING_PARAMS_ID,
+                                type="number",
+                                min=0,
+                                max=1,
+                                step=0.05,
                             ),
                         ]
                     ),
@@ -95,7 +106,9 @@ def layout(job_id=None, **kwargs):
                     dbc.InputGroup(
                         [
                             dbc.InputGroupText("Max ACO iteration"),
-                            dbc.Input(id=CFG_MAI_INPUT_ROUTING_PARAMS_ID, type="number", min=1),
+                            dbc.Input(
+                                id=CFG_MAI_INPUT_ROUTING_PARAMS_ID, type="number", min=1
+                            ),
                         ]
                     ),
                     md=6,
@@ -109,7 +122,9 @@ def layout(job_id=None, **kwargs):
                     dbc.InputGroup(
                         [
                             dbc.InputGroupText("Ant number"),
-                            dbc.Input(id=CFG_AN_INPUT_ROUTING_PARAMS_ID, type="number", min=1),
+                            dbc.Input(
+                                id=CFG_AN_INPUT_ROUTING_PARAMS_ID, type="number", min=1
+                            ),
                         ]
                     ),
                     md=6,
@@ -136,7 +151,11 @@ def layout(job_id=None, **kwargs):
                     dbc.InputGroup(
                         [
                             dbc.InputGroupText("Working dir"),
-                            dbc.Input(id=CFG_WD_INPUT_ROUTING_PARAMS_ID, type="text", disabled=True),
+                            dbc.Input(
+                                id=CFG_WD_INPUT_ROUTING_PARAMS_ID,
+                                type="text",
+                                disabled=True,
+                            ),
                         ]
                     ),
                     md=12,
@@ -144,7 +163,12 @@ def layout(job_id=None, **kwargs):
             ],
             className="g-2 mt-1",
         ),
-        dcc.Interval(id=PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID, interval=100, n_intervals=0, max_intervals=1),
+        dcc.Interval(
+            id=PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID,
+            interval=100,
+            n_intervals=0,
+            max_intervals=1,
+        ),
         dcc.Store(id=ROUTING_COMPLETE_STORE_SHARED_ID, data=False),
         dcc.Store(id=TAGS_LAST_SELECTION_STORE_SHARED_ID, storage_type="session"),
         dcc.Dropdown(

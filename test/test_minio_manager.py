@@ -171,7 +171,9 @@ def test_get_file_url(minio_manager, test_files):
     # Get URL
     url = minio_manager.get_file_url(object_key)
     assert url is not None, "Failed to get file URL"
-    assert "cosmic-routing" in url or object_key in url, "URL doesn't contain expected components"
+    assert (
+        "cosmic-routing" in url or object_key in url
+    ), "URL doesn't contain expected components"
 
     # Cleanup
     minio_manager.delete_file(object_key)

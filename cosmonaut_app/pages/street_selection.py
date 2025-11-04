@@ -43,7 +43,9 @@ def layout(job_id=None, **kwargs):
             [
                 dbc.Col(
                     dbc.Label(
-                        "Straßenauswahl", html_for=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, className="mt-2"
+                        "Straßenauswahl",
+                        html_for=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+                        className="mt-2",
                     ),
                     width="auto",
                 ),
@@ -150,9 +152,16 @@ def layout(job_id=None, **kwargs):
                 dbc.ModalFooter(
                     [
                         dbc.Button(
-                            "Cancel", id=CANCEL_RESET_BUTTON_STREET_SELECTION_ID, color="secondary", outline=True
+                            "Cancel",
+                            id=CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
+                            color="secondary",
+                            outline=True,
                         ),
-                        dbc.Button("Reset", id=CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, color="danger"),
+                        dbc.Button(
+                            "Reset",
+                            id=CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
+                            color="danger",
+                        ),
                     ]
                 ),
             ],
@@ -183,7 +192,9 @@ def layout(job_id=None, **kwargs):
     )
 
     # Persist selected tags across pages
-    body.append(dcc.Store(id=TAGS_LAST_SELECTION_STORE_SHARED_ID, storage_type="session"))
+    body.append(
+        dcc.Store(id=TAGS_LAST_SELECTION_STORE_SHARED_ID, storage_type="session")
+    )
 
     return page_layout(
         title="Street Selection",

@@ -15,7 +15,11 @@ def layout(job_id=None, **kwargs):
             "Enter your email to receive notifications for this job.",
             className="text-muted",
         ),
-        dbc.Label("Email address", html_for=USER_INFO_EMAIL_INPUT_USER_INFO_ID, className="mt-2"),
+        dbc.Label(
+            "Email address",
+            html_for=USER_INFO_EMAIL_INPUT_USER_INFO_ID,
+            className="mt-2",
+        ),
         dbc.Input(
             id=USER_INFO_EMAIL_INPUT_USER_INFO_ID,
             type="email",
@@ -45,7 +49,9 @@ def layout(job_id=None, **kwargs):
         body=body,
         job_id=job_id,
         footer=footer,
-        below=html.Div(id=USER_INFO_CONTENT_DIV_USER_INFO_ID, style={"display": "none"}),
+        below=html.Div(
+            id=USER_INFO_CONTENT_DIV_USER_INFO_ID, style={"display": "none"}
+        ),
         step_index=1,
     )
 

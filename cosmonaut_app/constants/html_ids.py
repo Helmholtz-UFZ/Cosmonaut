@@ -48,10 +48,16 @@ NONE_DIV_SHARED_ID = "none-div-shared-id"
 # --- Map Elements ---
 MAIN_MAP_COMPONENT_MAP_SHARED_ID = "main-map-component-map-shared-id"
 MAIN_MAP_DIV_MAP_SHARED_ID = "main-map-div-map-shared-id"  # nocheck only used in layout
-MANAGED_LAYERS_GROUP_MAP_SHARED_ID = "managed-layers"  # nocheck dynamically created layer group
+MANAGED_LAYERS_GROUP_MAP_SHARED_ID = (
+    "managed-layers"  # nocheck dynamically created layer group
+)
 OSM_GEOJSON_LAYER_MAP_SHARED_ID = "osm-geojson-layer-map-shared-id"
-ROUTE_GEOJSON_LAYER_MAP_SHARED_ID = "route-geojson-layer-map-shared-id"  # nocheck dynamically created map layer
-ROUTE_LAYER_LAYER_MAP_SHARED_ID = "route-layer-layer-map-shared-id"  # nocheck dynamically created map layer
+ROUTE_GEOJSON_LAYER_MAP_SHARED_ID = (
+    "route-geojson-layer-map-shared-id"  # nocheck dynamically created map layer
+)
+ROUTE_LAYER_LAYER_MAP_SHARED_ID = (
+    "route-layer-layer-map-shared-id"  # nocheck dynamically created map layer
+)
 
 # --- Modals ---
 ERROR_MODAL_TITLE_SHARED_ID = "error-title"  # nocheck used in error_handling.py
@@ -67,7 +73,9 @@ DATA_UPLOAD_NEXT_BUTTON_DATA_UPLOAD_ID = "data-upload-next-button-data-upload-id
 DATA_UPLOAD_PREV_BUTTON_DATA_UPLOAD_ID = "data-upload-prev-button-data-upload-id"
 
 # --- Divs ---
-DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID = "data-upload-dropzone-div-data-upload-id"  # nocheck visual container
+DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID = (
+    "data-upload-dropzone-div-data-upload-id"  # nocheck visual container
+)
 DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID = "data-upload-file-info-div-data-upload-id"
 OUTPUT_DATA_UPLOAD_DIV_DATA_UPLOAD_ID = "output-data-upload-div-data-upload-id"
 OUTPUT_MINIO_STATUS_DIV_DATA_UPLOAD_ID = "output-minio-status-div-data-upload-id"
@@ -84,7 +92,9 @@ DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID = (
 DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID = (
     "data-upload-upload-component-data-upload-id"
 )
-TOAST_STACK_CONTAINER_DATA_UPLOAD_ID = "toast-stack-container-data-upload-id"  # nocheck container for dynamic toasts
+TOAST_STACK_CONTAINER_DATA_UPLOAD_ID = (
+    "toast-stack-container-data-upload-id"  # nocheck container for dynamic toasts
+)
 
 
 # ============================================================================

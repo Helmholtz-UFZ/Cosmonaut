@@ -411,7 +411,9 @@ def update_map(selected_roads, job_id, routing_complete, current_children, epsg_
 
     # Add/replace our managed group once
     if new_layers:
-        current_children.append(dl.LayerGroup(id=MANAGED_LAYERS_GROUP_MAP_SHARED_ID, children=new_layers))
+        current_children.append(
+            dl.LayerGroup(id=MANAGED_LAYERS_GROUP_MAP_SHARED_ID, children=new_layers)
+        )
 
     logging.info(
         "=== UPDATE_MAP CALLBACK END === Returning %d children", len(current_children)

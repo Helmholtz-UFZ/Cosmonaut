@@ -25,10 +25,11 @@ def check_all_errors(page):
 
     # Filter severe/error console messages
     console_errors = [
-        log for log in console_logs
-        if isinstance(log, dict) and
-           log.get("level") in ["SEVERE", "ERROR"] and
-           "favicon" not in str(log.get("message", "")).lower()
+        log
+        for log in console_logs
+        if isinstance(log, dict)
+        and log.get("level") in ["SEVERE", "ERROR"]
+        and "favicon" not in str(log.get("message", "")).lower()
     ]
     if console_errors:
         errors.extend([f"Console: {log['message']}" for log in console_errors])
