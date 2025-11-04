@@ -86,49 +86,43 @@ IDs are organized in a **three-level hierarchy**:
 
 ```
 cosmonaut_app/
-├── callbacks/          # Callback functions (separated by concern)
-│   ├── callbacks_job.py
-│   ├── callbacks_map.py
-│   ├── callbacks_routing_params.py
-│   ├── callbacks_routing.py
-│   ├── callbacks_ui.py
-│   ├── callbacks_upload.py
-│   └── callbacks_user_info.py
 ├── constants/          # Application constants
 │   ├── __init__.py
 │   └── html_ids.py    # HTML element ID constants
-├── pages/             # Page layouts (one file per page)
-│   ├── data_upload.py
-│   ├── home.py
-│   ├── map.py
-│   ├── route_download.py
-│   ├── routing_params.py
-│   ├── street_selection.py
-│   └── user_info.py
-├── app.py             # Main application: Flask/Dash setup, layout, and entry point
+├── pages/             # Page layouts AND callbacks (one file per page)
+│   ├── data_upload.py      # Data upload page + 11 callbacks
+│   ├── home.py             # Home page + 1 callback
+│   ├── route_download.py   # Route download page + 1 callback
+│   ├── routing_params.py   # Routing parameters page + 3 callbacks
+│   ├── street_selection.py # Street selection page + 12 callbacks
+│   └── user_info.py        # User info page + 3 callbacks
+├── app.py             # Main application: Flask/Dash setup and entry point
 ├── config.py          # Configuration and environment variables
-└── layout.py          # Shared layout components
+└── layout.py          # Shared layout components + shared callbacks (6 callbacks)
 ```
 
 ### Key Architectural Principles
 
-1. **Separation of Concerns**:
+1. **Colocated Layouts and Callbacks**:
 
-   - Layouts in `pages/`
-   - Callbacks in `callbacks/`
+   - Each page file contains both layout definition and page-specific callbacks
+   - Shared callbacks (navbar, map interactions) are in `layout.py`
    - Constants in `constants/`
    - Configuration in `config.py`
 
 2. **Callback Organization**:
 
-   - Group by functional area (job management, map, routing, UI, upload, user info)
-   - Each callback file focuses on one concern
-   - Callbacks reference page elements via ID constants
+   - **Page-specific callbacks**: Placed at the bottom of their page file (e.g., `pages/user_info.py` contains email validation callbacks)
+   - **Shared callbacks**: Placed at the bottom of `layout.py` (e.g., navbar search, map updates, email store)
+   - Standard structure: Layout definition → Helper functions → Callbacks section
+   - Page callbacks use `@callback` decorator (auto-registered via Dash pages plugin)
+   - Shared callbacks use `@app.callback` decorator (registered when layout.py is imported in app.py)
 
 3. **Page Independence**:
-   - Each page is self-contained in its layout definition
+   - Each page is self-contained with its layout and callbacks
    - Pages don't directly import from each other
    - Shared elements use `SHARED` or `COMMON` naming
+   - Pages auto-register via `use_pages=True` in app.py
 
 ---
 

@@ -1,9 +1,16 @@
 """Landing page for starting a new job."""
 
-from dash import html, register_page
+import logging
+from dash import html, register_page, callback, Input, Output
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
+
 from cosmonaut_app.ui.page import progress_steps
-from cosmonaut_app.constants.html_ids import START_JOB_BUTTON_HOME_ID
+from cosmonaut_app.constants.html_ids import (
+    START_JOB_BUTTON_HOME_ID,
+    URL_DIV_NAV_SHARED_ID,
+)
+from cosmonaut_app.cosmonaut_job import CosmonautJob
 
 register_page(
     __name__,
@@ -67,3 +74,25 @@ def layout():
         tabIndex=0,
         className="p-3 p-md-4",
     )
+
+
+# ============================================================================
+# Callbacks
+# ============================================================================
+
+
+@callback(
+    Output(URL_DIV_NAV_SHARED_ID, "pathname", allow_duplicate=True),
+    Input(START_JOB_BUTTON_HOME_ID, "n_clicks"),
+    prevent_initial_call=True,
+)
+def start_job(n_clicks):
+    if not n_clicks:
+        logging.debug("No clicks detected, preventing update")
+        raise PreventUpdate
+
+    logging.info("Initializing new CosmonautJob")
+    job = CosmonautJob()
+
+    target = f"/job/{job.job_id}/user-info"
+    return job.job_id, target

@@ -22,33 +22,31 @@ Organization:
 
 # --- Stores ---
 CLICKED_ROADS_STORE_SHARED_ID = "clicked-roads-store-shared-id"
-CURRENT_STAGE_STORE_SHARED_ID = "current-stage-store-shared-id"
 EMAIL_STORE_SHARED_ID = "email-store-shared-id"
 EPSG_STORE_SHARED_ID = "epsg-store-shared-id"
 FILE_PATH_STORE_SHARED_ID = "file-path-store-shared-id"
 JOB_ID_STORE_SHARED_ID = "job-id-store-shared-id"
-JOB_LOADED_FLAG_STORE_SHARED_ID = "job-loaded-flag-store-shared-id"
 OSM_FILE_PATH_STORE_SHARED_ID = "osm-file-path-store-shared-id"
 ROUTING_COMPLETE_STORE_SHARED_ID = "routing-complete-store-shared-id"
 TAGS_LAST_SELECTION_STORE_SHARED_ID = "tags-last-selection-store-shared-id"
-UPLOAD_DATA_STORE_SHARED_ID = "upload-data-store-shared-id"
 
 # --- Navigation ---
 NAVBAR_COLLAPSE_NAV_SHARED_ID = "navbar-collapse-nav-shared-id"
 NAVBAR_TOGGLER_NAV_SHARED_ID = "navbar-toggler-nav-shared-id"
-REDIRECT_INTERVAL_NAV_SHARED_ID = "redirect-interval"  # nocheck not used in callbacks
+# nocheck not used in callbacks
+REDIRECT_INTERVAL_NAV_SHARED_ID = "redirect-interval"
 SEARCH_BUTTON_NAV_SHARED_ID = "search-button-nav-shared-id"
 SEARCH_INPUT_NAV_SHARED_ID = "search-input-nav-shared-id"
 SEARCH_RESULTS_DIV_NAV_SHARED_ID = "search-results-div-nav-shared-id"
-URL_DIV_NAV_SHARED_ID = "url-div-nav-shared-id"
+URL_SHARED_ID = "url-shared-id"
 
 # --- Utility ---
-DUMMY_OUTPUT_DIV_SHARED_ID = "dummy-output-div-shared-id"
 NONE_DIV_SHARED_ID = "none-div-shared-id"
 
 # --- Map Elements ---
 MAIN_MAP_COMPONENT_MAP_SHARED_ID = "main-map-component-map-shared-id"
-MAIN_MAP_DIV_MAP_SHARED_ID = "main-map-div-map-shared-id"  # nocheck only used in layout
+# nocheck only used in layout
+MAIN_MAP_DIV_MAP_SHARED_ID = "main-map-div-map-shared-id"
 MANAGED_LAYERS_GROUP_MAP_SHARED_ID = (
     "managed-layers"  # nocheck dynamically created layer group
 )
@@ -62,7 +60,8 @@ ROUTE_LAYER_LAYER_MAP_SHARED_ID = (
 
 # --- Modals ---
 ERROR_MODAL_TITLE_SHARED_ID = "error-title"  # nocheck used in error_handling.py
-ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"  # nocheck used in error_handling.py
+# nocheck used in error_handling.py
+ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"
 ERROR_MODAL_SHARED_ID = "error-modal"  # nocheck used in error_handling.py
 
 # ============================================================================

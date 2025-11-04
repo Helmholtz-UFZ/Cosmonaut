@@ -110,6 +110,16 @@ class CosmonautJob:
         self.status = "created"
         self.stage = 0
 
+        job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
+
+        for p in ["", "transient/debug", "input", "plots", "output"]:
+            os.makedirs(os.path.join(job_working_dir, p), exist_ok=True)
+
+        logging.info(
+            "Successfully initialized working directory structure for job %s", job_id
+        )
+        self.save()
+
     def save(self):
         """Save the job to the database."""
         logging.debug(f"save job {self.job_id}")

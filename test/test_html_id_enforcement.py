@@ -145,6 +145,12 @@ def check_if_constant_from_html_ids(
 def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
     """Find all ID constants used in @app.callback or @callback decorators.
 
+    This now also finds callbacks inside registration functions like:
+        def register_navbar_callbacks(app):
+            @app.callback(...)
+            def some_function():
+                pass
+
     Returns:
         Set of constant names used in Input/Output/State.
     """
@@ -157,38 +163,44 @@ def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
         # Parse the file as AST
         tree = ast.parse(content, filename=str(file_path))
 
-        # Find all function decorators
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef):
-                for decorator in node.decorator_list:
-                    # Check if this is a callback decorator
-                    # Pattern 1: @app.callback (ast.Attribute)
-                    # Pattern 2: @callback (ast.Name)
-                    is_callback = False
-                    if isinstance(decorator, ast.Call):
-                        if (
-                            isinstance(decorator.func, ast.Attribute)
-                            and decorator.func.attr == "callback"
-                        ):
-                            is_callback = True
-                        elif (
-                            isinstance(decorator.func, ast.Name)
-                            and decorator.func.id == "callback"
-                        ):
-                            is_callback = True
+        # Recursively find all FunctionDef nodes (including nested ones)
+        def find_all_functions(node):
+            """Recursively find all function definitions."""
+            functions = []
+            for child in ast.walk(node):
+                if isinstance(child, ast.FunctionDef):
+                    functions.append(child)
+            return functions
 
-                    if is_callback:
-                        # Look at all arguments to the decorator
-                        for arg in decorator.args:
-                            used_constants.update(extract_constants_from_ast(arg))
-                        for keyword in decorator.keywords:
-                            used_constants.update(
-                                extract_constants_from_ast(keyword.value)
-                            )
+        # Find all function decorators (top-level and nested)
+        for func_node in find_all_functions(tree):
+            for decorator in func_node.decorator_list:
+                # Check if this is a callback decorator
+                # Pattern 1: @app.callback (ast.Attribute)
+                # Pattern 2: @callback (ast.Name)
+                is_callback = False
+                if isinstance(decorator, ast.Call):
+                    if (
+                        isinstance(decorator.func, ast.Attribute)
+                        and decorator.func.attr == "callback"
+                    ):
+                        is_callback = True
+                    elif (
+                        isinstance(decorator.func, ast.Name)
+                        and decorator.func.id == "callback"
+                    ):
+                        is_callback = True
 
-    except SyntaxError:
-        # If file has syntax errors, skip it
-        pass
+                if is_callback:
+                    # Look at all arguments to the decorator
+                    for arg in decorator.args:
+                        used_constants.update(extract_constants_from_ast(arg))
+                    for keyword in decorator.keywords:
+                        used_constants.update(extract_constants_from_ast(keyword.value))
+
+    except SyntaxError as e:
+        # If file has syntax errors, fail with file name
+        raise SyntaxError(f"Syntax error in {file_path}: {e}") from e
 
     return used_constants
 
