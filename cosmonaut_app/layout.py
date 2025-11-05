@@ -1,5 +1,6 @@
 import os
 import glob
+import math
 import json
 import time
 import logging
@@ -285,41 +286,213 @@ def page_container_fullscreen_layout(content):
     )
 
 
-# Main Map
-main_map = html.Div(
-    dl.Map(
-        [
-            dl.LayersControl(
-                [
-                    dl.BaseLayer(
-                        dl.TileLayer(),
-                        name="OSM Standard",
-                        checked=True,
-                    ),
-                    dl.Overlay(
-                        dl.WMSTileLayer(
-                            url="https://gdi-fs.ufz.de/geoserver/cosmic-routing/ows?service=WMS",  # noqa: E501
-                            layers="20240410_8-col-4326_class-5",
-                            styles="raster",
-                            format="image/jpeg",
-                            transparent=True,
-                            attribution="WMS Layer",
-                            crs="EPSG4326",
-                            opacity=0.5,
+def page_container_split_layout(map, input):
+    """Create a page container with a split layout (sidebar + main map)."""
+    map_container = dbc.Col(
+        map,
+        className="col-7 p-0",
+        id="map-container",
+    )
+    input_container = dbc.Col(
+        input,
+        className="col-5 p-0",
+        id="input_container",
+    )
+    return page_container_fullscreen_layout(
+        dbc.Row(
+            [
+                map_container,
+                input_container,
+            ],
+            className="flex-grow-1 d-flex",
+        ),
+    )
+
+
+def create_card_input(
+    progress_step, progress_variant, title, card_body, card_footer=None, job_id=None
+):
+    if job_id:
+        title = f"{title} (Job: {job_id})"
+
+    card_content = [
+        dbc.CardHeader(
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            html.H4(title, className="mb-0"),
+                            xs=12,
+                            md="auto",
                         ),
-                        name="WMS Layer",
-                        checked=False,
+                    ],
+                    className="g-2 align-items-center",
+                    justify="between",
+                ),
+                html.Div(
+                    progress_steps(current=progress_step, variant=progress_variant),
+                    className="mt-2",
+                ),
+            ]
+        ),
+        dbc.CardBody(card_body),
+    ]
+
+    if card_footer:
+        card_content.append(card_footer)
+
+    return dbc.Card(
+        card_content,
+        className="shadow-sm modern-card m-3",
+    )
+
+
+def progress_footer(
+    prev=None,
+    next=None,
+):
+    """Modern footer: just actions; optional progress bar if explicitly provided."""
+    prev_button = html.Span()
+    if prev is not None:
+        prev_button = dbc.Button(
+            [html.I(className="bi bi-arrow-right-circle me-1"), "Previous"],
+            id=prev,
+            color="primary",
+            disabled=True,
+        )
+
+    next_button = html.Span()
+    if next is not None:
+        next_button = dbc.Button(
+            [html.I(className="bi bi-arrow-right-circle me-1"), "Next"],
+            id=next,
+            color="primary",
+            disabled=True,
+        )
+
+    actions = html.Div(
+        [prev_button, next_button],
+        className="footer-actions d-flex gap-2 justify-content-end align-items-center flex-wrap",
+    )
+    return dbc.CardFooter(actions)
+
+
+def page_layout(
+    title: str,
+    body,
+    job_id: str | None = None,
+    footer=None,
+    below=None,
+    step_index: int | None = None,
+) -> html.Main:
+    """Standard page layout used by all job pages.
+
+    step_index is 1-based and, when provided, will render a 5-step progress
+    header across the app (User Info → Data Upload → Street Selection →
+    Navigation Selection → QR Code Navigation). Completed steps are shown in
+    green (light), current in primary, upcoming in secondary outline.
+    """
+
+    # use shared renderer; include optional stepper in header for consistent placement
+    header_children = [
+        dbc.Row(
+            [
+                dbc.Col(html.H4(title, className="mb-0"), xs=12, md="auto"),
+                dbc.Col(
+                    dbc.Badge(
+                        f"Job: {job_id or '—'}", color="primary", className="ms-md-3"
                     ),
-                ],
+                    xs=12,
+                    md="auto",
+                ),
+            ],
+            className="g-2 align-items-center",
+            justify="between",
+        )
+    ]
+    if step_index is not None:
+        header_children.append(html.Div(progress_steps(step_index), className="mt-2"))
+    header = dbc.CardHeader(header_children)
+
+    # Build card children; include stepper (if any) at the top of the body
+    body_children = []
+    body_children.extend(body if isinstance(body, list) else [body])
+
+    card_children = [header, dbc.CardBody(body_children)]
+    if footer is not None:
+        card_children.append(footer)  # footer is a CardFooter (see below)
+
+    content = [dbc.Card(card_children, className="shadow-sm modern-card")]
+    if below is not None:
+        content.append(below)
+
+    return html.Main(content, role="main", tabIndex=0, className="p-3 p-md-4 page-main")
+
+
+def progress_steps(current: int, variant: str = "default") -> html.Div:
+    """Render a 5-step progress rail with labeled nodes.
+
+    variant: 'default' (in-flow) or 'home' (pre-start: no fill, all upcoming).
+    """
+    steps = [
+        ("User information", "bi-1-circle"),
+        ("Data upload", "bi-2-circle"),
+        ("Street selection", "bi-3-circle"),
+        ("Navigation", "bi-4-circle"),
+        ("QR code", "bi-5-circle"),
+    ]
+
+    total = len(steps)
+    # Use internal points: positions at k/(n+1) for k=1..n (exclude 0 and 1).
+    if variant == "home" or total <= 1:
+        width_value = "0%"
+    else:
+        # Cosine-spaced internal points: x_i = ((1 - cos(i*pi/(n+1))) / 2) * 100
+        widths = [
+            (1 - math.cos(math.pi * i / (total + 1))) * 50.0
+            for i in range(1, total + 1)
+        ]
+        width_value = f"{widths[current - 1]:.6f}%"
+
+    nodes = []
+    for i, (label, _icon) in enumerate(steps, start=1):
+        if variant == "home":
+            state_cls = "upcoming"
+        else:
+            state_cls = (
+                "done" if i < current else ("current" if i == current else "upcoming")
+            )
+        nodes.append(
+            html.Div(
+                [html.Span(className="dot"), html.Span(label, className="label")],
+                className=f"node {state_cls}",
+                role="listitem",
+            )
+        )
+
+    return html.Div(
+        [
+            html.Div(
+                [html.Div(className="rail-fill", style={"width": width_value})],
+                className="rail",
             ),
-            dl.FullScreenControl(),
-            dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
-            dl.ScaleControl(position="bottomleft"),
-            dl.GeoJSON(id=OSM_GEOJSON_LAYER_MAP_SHARED_ID),
-            dl.GeoJSON(id=ROUTE_GEOJSON_LAYER_MAP_SHARED_ID),
-            dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[]),
-            dcc.Store(id=ROUTING_COMPLETE_STORE_SHARED_ID, data=False),
+            html.Div(nodes, className="nodes", role="list"),
         ],
+        className=f"progress-steps{' home' if variant == 'home' else ''}",
+        role="group",
+        **{"aria-label": "Progress steps"},
+    )
+
+
+# Main Map
+osm_layer = dl.TileLayer(
+    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution="© OpenStreetMap contributors",
+)
+default_map_layers = [osm_layer, dl.FullScreenControl()]
+default_map = html.Div(
+    dl.Map(
+        default_map_layers,
         id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
         center=[51.70, 11.20],
         zoom=10,
@@ -329,25 +502,18 @@ main_map = html.Div(
     style={"height": "100%", "width": "100%"},
 )
 
-# Initial Sidebar for the Job Start
-side_bar = dbc.Col(
-    [
-        html.Div(),
-    ],
-    style={
-        "width": "500px",
-        "backgroundColor": "#DBE2EF",
-        "border": "2px solid #dee2e6",
-        # "position": "fixed",
-        # "top": "10vh",
-        # "right": 0,
-        # "bottom": 0,
-        "padding": "2rem 1rem",
-        "overflow": "auto",
-    },
-    className="responsive-sidebar",
+# TODO
+main_map = html.Div(
+    dl.Map(
+        default_map_layers,
+        id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+        center=[51.70, 11.20],
+        zoom=10,
+        style={"height": "100%"},
+    ),
+    id=MAIN_MAP_DIV_MAP_SHARED_ID,
+    style={"height": "100%", "width": "100%"},
 )
-
 # Search Bar
 search_bar = dbc.Row(
     [
@@ -372,6 +538,24 @@ search_bar = dbc.Row(
     align="center",
 )
 
+# Initial Sidebar for the Job Start
+side_bar = dbc.Col(
+    [
+        html.Div(),
+    ],
+    style={
+        "width": "500px",
+        "backgroundColor": "#DBE2EF",
+        "border": "2px solid #dee2e6",
+        # "position": "fixed",
+        # "top": "10vh",
+        # "right": 0,
+        # "bottom": 0,
+        "padding": "2rem 1rem",
+        "overflow": "auto",
+    },
+    className="responsive-sidebar",
+)
 # ============================================================================
 # Callback Registration Functions
 # ============================================================================
