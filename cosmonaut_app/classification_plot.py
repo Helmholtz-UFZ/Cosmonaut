@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import rasterio
 from osgeo import gdal
 from contextlib import contextmanager
+from typing import Optional, Tuple, List
+import csv
 
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 gdal.DontUseExceptions()
@@ -37,46 +39,204 @@ class ClassificationPlot:
             logging.error(f"File not found: {csv_path}")
             raise FileNotFoundError(f"File not found: {csv_path}")
         self.csv_path = csv_path
-        self.df = pd.read_csv(self.csv_path)
+        # Read CSV with automatic delimiter and header detection
+        self.df = self._read_csv_auto(self.csv_path)
         self.src_epsg = src_epsg
         self.base_dir = os.path.join(
             os.getcwd(), "cosmonaut_app/work_dir", str(job_id), "plots"
         )
         self._prepare_data()
 
+    def _sniff_csv(self, path: str) -> Tuple[str, bool]:
+        """Detect delimiter and header presence using csv.Sniffer with fallbacks.
+
+        Returns (delimiter, has_header)
+        """
+        with open(path, "r", newline="", encoding="utf-8") as f:
+            sample = f.read(4096)
+            f.seek(0)
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
+                delimiter = dialect.delimiter
+            except Exception:
+                delimiter = ","
+            try:
+                # Sniffer can be unreliable with all-numeric rows; use additional check later
+                has_header = csv.Sniffer().has_header(sample)
+            except Exception:
+                has_header = False
+        return delimiter, has_header
+
+    def _first_row_all_numeric(self, path: str, delimiter: str) -> bool:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                line = f.readline().strip()
+                if not line:
+                    return False
+                tokens = [t.strip() for t in line.split(delimiter)]
+                for t in tokens:
+                    # Allow empty tokens to be treated as non-numeric
+                    if t == "":
+                        return False
+                    float(t)
+                return True
+        except Exception:
+            return False
+
+    def _read_csv_auto(self, path: str) -> pd.DataFrame:
+        """Read CSV whether it has a header or not, with delimiter auto-detection."""
+        delimiter, has_header = self._sniff_csv(path)
+        # If sniffer said header but first row is all numeric, override
+        if has_header and self._first_row_all_numeric(path, delimiter):
+            logging.debug(
+                "CSV Sniffer indicated header but first row is numeric; treating as no header."
+            )
+            has_header = False
+
+        logging.info(
+            f"Reading CSV with delimiter='{delimiter}' and has_header={has_header} from {os.path.basename(path)}"
+        )
+        df = pd.read_csv(
+            path,
+            sep=delimiter,
+            header=0 if has_header else None,
+            engine="python",
+            skipinitialspace=True,
+        )
+        # Ensure columns have string names for downstream processing
+        df.columns = [str(c).strip() for c in df.columns]
+        return df
+
+    def _guess_coord_columns_by_name(
+        self, columns: List[str]
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Try to guess coordinate columns from their names.
+
+        Returns (easting_col, northing_col) or (None, None) if not found.
+        """
+        lowered = [c.lower() for c in columns]
+        # Preference order for projected coordinates
+        easting_candidates = [
+            "easting (m)",
+            "easting",
+            "x (m)",
+            "x",
+            "lon",
+            "longitude",
+        ]
+        northing_candidates = [
+            "northing (m)",
+            "northing",
+            "y (m)",
+            "y",
+            "lat",
+            "latitude",
+        ]
+        east_idx = None
+        north_idx = None
+        for cand in easting_candidates:
+            if cand in lowered:
+                east_idx = lowered.index(cand)
+                break
+        for cand in northing_candidates:
+            if cand in lowered:
+                north_idx = lowered.index(cand)
+                break
+        easting_col = columns[east_idx] if east_idx is not None else None
+        northing_col = columns[north_idx] if north_idx is not None else None
+        return easting_col, northing_col
+
+    def _guess_coord_columns_by_values(self, df: pd.DataFrame) -> Tuple[int, int]:
+        """Fallback heuristic: assume first two columns are coordinates.
+
+        Returns column indices (easting_idx, northing_idx).
+        Also attempts to determine which is Easting vs Northing based on value ranges
+        typical for EPSG:25832 (Easting ~ 100k-900k, Northing ~ millions).
+        """
+        if df.shape[1] < 2:
+            raise ValueError("CSV must contain at least two columns for coordinates.")
+        c0 = pd.to_numeric(df.iloc[:, 0], errors="coerce")
+        c1 = pd.to_numeric(df.iloc[:, 1], errors="coerce")
+        # Heuristic: larger magnitude likely Northing in UTM; Easting typically < 1,000,000
+        c0_med = np.nanmedian(c0.values)
+        c1_med = np.nanmedian(c1.values)
+        # Prefer to assign Easting to the one with smaller median
+        if np.isnan(c0_med) or np.isnan(c1_med):
+            # If NaNs, just default to first=Easting, second=Northing
+            return 0, 1
+        if c0_med <= c1_med:
+            return 0, 1
+        else:
+            return 1, 0
+
     def _prepare_data(self):
         logging.info("Preparing data.")
-        # Dynamically rename columns that are not 'Easting (m)' or 'Northing (m)' to 'class_i'
-        non_coordinate_columns = [
-            col for col in self.df.columns if col not in ["Easting (m)", "Northing (m)"]
-        ]
-        for i, col in enumerate(non_coordinate_columns, start=1):
-            self.df.rename(columns={col: f"class_{i}"}, inplace=True)
 
-        # Dynamically identify all numeric columns as class columns
-        self.classes = [
-            col
-            for col in self.df.columns
-            if col.startswith("class_") and pd.api.types.is_numeric_dtype(self.df[col])
-        ]
+        easting_col_name: Optional[str] = None
+        northing_col_name: Optional[str] = None
 
-        # Ensure 'Easting (m)' and 'Northing (m)' are numeric
-        self.df["Easting (m)"] = pd.to_numeric(self.df["Easting (m)"], errors="coerce")
-        self.df["Northing (m)"] = pd.to_numeric(
-            self.df["Northing (m)"], errors="coerce"
+        # Try name-based detection when there are string headers
+        try:
+            easting_col_name, northing_col_name = self._guess_coord_columns_by_name(
+                list(self.df.columns)
+            )
+        except Exception:
+            easting_col_name, northing_col_name = None, None
+
+        if easting_col_name is None or northing_col_name is None:
+            # Fallback to value-based heuristic on first two columns
+            e_idx, n_idx = self._guess_coord_columns_by_values(self.df)
+            # Build a working copy with guaranteed standard names
+            cols = list(self.df.columns)
+            easting_col_name = cols[e_idx]
+            northing_col_name = cols[n_idx]
+
+        logging.debug(
+            f"Detected coordinate columns: Easting='{easting_col_name}', Northing='{northing_col_name}'"
         )
 
-        # Drop rows with NaN values
+        self.easting_col = easting_col_name
+        self.northing_col = northing_col_name
+
+        self.df[self.easting_col] = pd.to_numeric(
+            self.df[self.easting_col], errors="coerce"
+        )
+        self.df[self.northing_col] = pd.to_numeric(
+            self.df[self.northing_col], errors="coerce"
+        )
+
+        coord_set = {self.easting_col, self.northing_col}
+        candidate_class_cols = [c for c in self.df.columns if c not in coord_set]
+        # Keep only numeric
+        numeric_class_cols = [
+            c for c in candidate_class_cols if pd.api.types.is_numeric_dtype(self.df[c])
+        ]
+        # If dtypes aren't numeric yet (because of header=None), coerce to numeric
+        coerced_numeric_cols = []
+        for c in numeric_class_cols:
+            # Already numeric
+            coerced_numeric_cols.append(c)
+        # Also consider non-numeric candidates and try to coerce
+        for c in candidate_class_cols:
+            if c in numeric_class_cols:
+                continue
+            coerced = pd.to_numeric(self.df[c], errors="coerce")
+            if coerced.notna().any():
+                self.df[c] = coerced
+                coerced_numeric_cols.append(c)
+
+        self.classes = sorted(coerced_numeric_cols, key=lambda x: str(x))
+
         self.df.dropna(
-            subset=["Easting (m)", "Northing (m)"] + self.classes, inplace=True
+            subset=[self.easting_col, self.northing_col] + self.classes, inplace=True
         )
 
         # Get the highest class per point
         self.df["highest_class"] = self.df[self.classes].idxmax(axis=1)
 
-        # Extract coordinates and bounds
-        self.x = self.df["Northing (m)"].values
-        self.y = self.df["Easting (m)"].values
+        # Extract coordinates and bounds (use detected column names)
+        self.x = self.df[self.northing_col].values
+        self.y = self.df[self.easting_col].values
         self.x_unique = np.unique(self.x)
         self.y_unique = np.unique(self.y)
         self.x_min, self.x_max = self.x.min(), self.x.max()
