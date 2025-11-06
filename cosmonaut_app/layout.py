@@ -215,6 +215,14 @@ def _load_geojson(path: str):
 # Layout Components
 # ============================================================================
 
+steps_jobs = {
+    "user_info": "User information",
+    "data_upload": "Data upload",
+    "street_selection": "Street selection",
+    "routing_params": "Routing Parameters",
+    "rout_download": "Route",
+}
+
 
 def create_navbar():
     """Create a navbar layout."""
@@ -310,71 +318,161 @@ def page_container_split_layout(map, input):
 
 
 def create_card_input(
-    progress_step, progress_variant, title, card_body, card_footer=None, job_id=None
+    card_body, card_footer=None, name_step=None, title=None, job_id=None
 ):
-    if job_id:
-        title = f"{title} (Job: {job_id})"
+    """Create a modern card input layout with optional progress steps."""
+    if name_step is not None:
+        if job_id is None:
+            raise ValueError("job_id must be provided when name_step is used.")
+        title = f"{steps_jobs[name_step]}({job_id})"
 
+    if title is None:
+        raise ValueError("Either title or name_step must be provided.")
+
+    card_header = [html.H3(title)]
+
+    if name_step is not None:
+        card_header.append(steps_tab(name_step))
+
+    logging.info(card_header)
     card_content = [
-        dbc.CardHeader(
-            [
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            html.H4(title, className="mb-0"),
-                            xs=12,
-                            md="auto",
-                        ),
-                    ],
-                    className="g-2 align-items-center",
-                    justify="between",
-                ),
-                html.Div(
-                    progress_steps(current=progress_step, variant=progress_variant),
-                    className="mt-2",
-                ),
-            ]
-        ),
+        dbc.CardHeader(card_header),
         dbc.CardBody(card_body),
     ]
 
     if card_footer:
         card_content.append(card_footer)
 
+    logging.info(
+        dbc.Card(
+            card_content,
+            className="shadow-sm m-3 me-4",
+        )
+    )
+
     return dbc.Card(
         card_content,
-        className="shadow-sm modern-card m-3",
+        className="shadow-sm m-3 me-4",
     )
 
 
-def progress_footer(
-    prev=None,
-    next=None,
-):
-    """Modern footer: just actions; optional progress bar if explicitly provided."""
-    prev_button = html.Span()
-    if prev is not None:
-        prev_button = dbc.Button(
-            [html.I(className="bi bi-arrow-right-circle me-1"), "Previous"],
-            id=prev,
-            color="primary",
-            disabled=True,
-        )
+def build_url_step(step, job_id):
+    base_path = dash.page_registry[f"pages.{step}"]["path_template"]
+    return base_path.replace("<job_id>", job_id)
 
-    next_button = html.Span()
-    if next is not None:
-        next_button = dbc.Button(
-            [html.I(className="bi bi-arrow-right-circle me-1"), "Next"],
-            id=next,
-            color="primary",
-            disabled=True,
-        )
+
+def progress_footer(
+    prev_id=None,
+    prev_url=None,
+    prev_disabled=False,
+    next_url=None,
+    next_id=None,
+    next_disabled=False,
+):
+    """Create a footer with Previous and Next buttons for navigation between steps."""
+
+    args_prev = [html.I(className="bi bi-arrow-right-circle me-1"), "Previous"]
+    kwargs_prev = dict(color="primary", disabled=prev_disabled)
+    if prev_id is None and prev_url is None:
+        prev_button = html.Span()
+    else:
+        if prev_url is not None:
+            kwargs_prev["href"] = prev_url
+        if prev_id is not None:
+            kwargs_prev["id"] = prev_id
+        prev_button = dbc.Button(args_prev, **kwargs_prev)
+
+    args_next = [html.I(className="bi bi-arrow-right-circle me-1"), "Next"]
+    kwargs_next = dict(color="primary", disabled=next_disabled)
+    if next_id is None and next_url is None:
+        next_button = html.Span()
+    else:
+        if next_url is not None:
+            kwargs_next["href"] = next_url
+        if next_id is not None:
+            kwargs_next["id"] = next_id
+        logging.info(kwargs_next)
+        next_button = dbc.Button(args_next, **kwargs_next)
 
     actions = html.Div(
         [prev_button, next_button],
         className="footer-actions d-flex gap-2 justify-content-end align-items-center flex-wrap",
     )
     return dbc.CardFooter(actions)
+
+
+def steps_tab(name_step):
+    """Create a progress steps component for the job steps."""
+    # TODO dynamic enabling based on job progress
+    list_tabs = []
+    for step_name, step_label in steps_jobs.items():
+        list_tabs.append(
+            dbc.Tab(
+                label=step_label,
+                tab_id=step_name,
+                disabled=True,
+            )
+        )
+
+    return dbc.Tabs(
+        list_tabs,
+        active_tab=name_step,
+    )
+
+
+def progress_steps(current: int, variant: str = "default") -> html.Div:
+    """Render a 5-step progress rail with labeled nodes.
+
+    variant: 'default' (in-flow) or 'home' (pre-start: no fill, all upcoming).
+    """
+
+    steps = [
+        ("User information", "user_info"),
+        ("Data upload", "data_upload"),
+        ("Street selection", "street_selection"),
+        ("Routing Parameters", "routing_params"),
+        ("Route", "rout_download"),
+    ]
+    total = len(steps)
+    # Use internal points: positions at k/(n+1) for k=1..n (exclude 0 and 1).
+    if variant == "home" or total <= 1:
+        width_value = "0%"
+    else:
+        # Cosine-spaced internal points: x_i = ((1 - cos(i*pi/(n+1))) / 2) * 100
+        widths = [
+            (1 - math.cos(math.pi * i / (total + 1))) * 50.0
+            for i in range(1, total + 1)
+        ]
+        width_value = f"{widths[current - 1]:.6f}%"
+
+    nodes = []
+    for i, (label, _icon) in enumerate(steps, start=1):
+        if variant == "home":
+            state_cls = "upcoming"
+        else:
+            state_cls = (
+                "done" if i < current else ("current" if i == current else "upcoming")
+            )
+        nodes.append(
+            html.Div(
+                [html.Span(className="dot"), html.Span(label, className="label")],
+                className=f"node {state_cls}",
+                role="listitem",
+            )
+        )
+
+    return html.Div(
+        [
+            html.Div(
+                [html.Div(className="rail-fill", style={"width": width_value})],
+                className="rail",
+            ),
+            html.Div(nodes, className="nodes", role="list"),
+        ],
+        className=f"progress-steps{' home' if variant == 'home' else ''}",
+        role="group",
+        **{"aria-label": "Progress steps"},
+    )
 
 
 def page_layout(
@@ -427,61 +525,6 @@ def page_layout(
         content.append(below)
 
     return html.Main(content, role="main", tabIndex=0, className="p-3 p-md-4 page-main")
-
-
-def progress_steps(current: int, variant: str = "default") -> html.Div:
-    """Render a 5-step progress rail with labeled nodes.
-
-    variant: 'default' (in-flow) or 'home' (pre-start: no fill, all upcoming).
-    """
-    steps = [
-        ("User information", "bi-1-circle"),
-        ("Data upload", "bi-2-circle"),
-        ("Street selection", "bi-3-circle"),
-        ("Navigation", "bi-4-circle"),
-        ("QR code", "bi-5-circle"),
-    ]
-
-    total = len(steps)
-    # Use internal points: positions at k/(n+1) for k=1..n (exclude 0 and 1).
-    if variant == "home" or total <= 1:
-        width_value = "0%"
-    else:
-        # Cosine-spaced internal points: x_i = ((1 - cos(i*pi/(n+1))) / 2) * 100
-        widths = [
-            (1 - math.cos(math.pi * i / (total + 1))) * 50.0
-            for i in range(1, total + 1)
-        ]
-        width_value = f"{widths[current - 1]:.6f}%"
-
-    nodes = []
-    for i, (label, _icon) in enumerate(steps, start=1):
-        if variant == "home":
-            state_cls = "upcoming"
-        else:
-            state_cls = (
-                "done" if i < current else ("current" if i == current else "upcoming")
-            )
-        nodes.append(
-            html.Div(
-                [html.Span(className="dot"), html.Span(label, className="label")],
-                className=f"node {state_cls}",
-                role="listitem",
-            )
-        )
-
-    return html.Div(
-        [
-            html.Div(
-                [html.Div(className="rail-fill", style={"width": width_value})],
-                className="rail",
-            ),
-            html.Div(nodes, className="nodes", role="list"),
-        ],
-        className=f"progress-steps{' home' if variant == 'home' else ''}",
-        role="group",
-        **{"aria-label": "Progress steps"},
-    )
 
 
 # Main Map
@@ -556,6 +599,7 @@ side_bar = dbc.Col(
     },
     className="responsive-sidebar",
 )
+
 # ============================================================================
 # Callback Registration Functions
 # ============================================================================

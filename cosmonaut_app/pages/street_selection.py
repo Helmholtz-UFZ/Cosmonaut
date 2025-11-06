@@ -22,7 +22,6 @@ import dash_bootstrap_components as dbc
 import geojson
 
 from cosmonaut_app.config import osm_tags_mapping, WEB_WORK_DIR
-from cosmonaut_app.ui.page import page_layout, progress_footer
 from cosmonaut_app.constants.html_ids import (
     ACTION_ALERT_ALERT_STREET_SELECTION_ID,
     CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
@@ -42,6 +41,7 @@ from cosmonaut_app.constants.html_ids import (
     TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
     UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
+    NEXT_BUTTON_STREET_SELECTION_ID,
 )
 from cosmonaut_app.transformation import transform_geojson
 from cosmonaut_app.road_network_utils import (
@@ -51,10 +51,17 @@ from cosmonaut_app.road_network_utils import (
     remove_disconnected_roads,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
+from cosmonaut_app.layout import (
+    page_container_split_layout,
+    create_card_input,
+    progress_footer,
+    default_map,
+    build_url_step,
+)
 
 register_page(
     __name__,
-    path_template="/job/<job_id>/street-selection",
+    path_template="/job/<job_id>/street_selection",
     name="Street Selection",
     title="Street Selection",
     description="Select streets for the routing process.",
@@ -62,8 +69,9 @@ register_page(
 )
 
 
-def layout(job_id=None, **kwargs):
-    body = [
+def layout(job_id):
+    card_body = [
+        dcc.Store(id=TAGS_LAST_SELECTION_STORE_SHARED_ID, storage_type="session"),
         html.P(
             "Wählen Sie die gewünschten Straßen im linken Kartenbereich aus. "
             "Klicken Sie eine Straße an, um sie zu markieren. Mit dem Button "
@@ -204,38 +212,24 @@ def layout(job_id=None, **kwargs):
         ),
     ]
 
+    user_info_path = build_url_step("data_upload", job_id)
+    street_selection_path = build_url_step("routing_params", job_id)
+
     footer = progress_footer(
-        prev=None,
-        next_=dbc.Button(
-            [html.I(className="bi bi-check2-circle me-1"), "Finish"],
-            color="primary",
-            href=f"/job/{job_id}/routing-params",
-            disabled=not bool(job_id),
-        ),
+        prev_url=user_info_path,
+        next_url=street_selection_path,
+        next_id=NEXT_BUTTON_STREET_SELECTION_ID,
+        next_disabled=True,
     )
 
-    below = dbc.Alert(
-        id=ACTION_ALERT_ALERT_STREET_SELECTION_ID,
-        children="",
-        color="info",
-        is_open=False,
-        dismissable=True,
-        className="mt-3",
-    )
-
-    # Persist selected tags across pages
-    body.append(
-        dcc.Store(id=TAGS_LAST_SELECTION_STORE_SHARED_ID, storage_type="session")
-    )
-
-    return page_layout(
-        title="Street Selection",
-        body=body,
+    map = default_map
+    input_container = create_card_input(
+        card_body,
+        card_footer=footer,
+        name_step=__name__.replace("pages.", ""),
         job_id=job_id,
-        footer=footer,
-        below=below,
-        step_index=3,
     )
+    return page_container_split_layout(map, input_container)
 
 
 # ============================================================================

@@ -2,6 +2,7 @@
 
 import os
 import logging
+import dash
 from dash import html, register_page, dcc, callback, Input, Output, State
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
@@ -14,15 +15,13 @@ from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID,
     DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
     DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
-    DATA_UPLOAD_NEXT_BUTTON_DATA_UPLOAD_ID,
-    DATA_UPLOAD_PREV_BUTTON_DATA_UPLOAD_ID,
+    NEXT_BUTTON_DATA_UPLOAD_ID,
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     EPSG_STORE_SHARED_ID,
     FILE_PATH_STORE_SHARED_ID,
     JOB_ID_STORE_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     OSM_FILE_PATH_STORE_SHARED_ID,
-    URL_SHARED_ID,
 )
 from cosmonaut_app.transformation import (
     get_bounds,
@@ -34,6 +33,7 @@ from cosmonaut_app.layout import (
     create_card_input,
     progress_footer,
     default_map,
+    build_url_step,
 )
 
 register_page(
@@ -113,14 +113,22 @@ def layout(job_id):
         html.Div(id=OSM_FILE_PATH_STORE_SHARED_ID, style={"display": "none"}),
     ]
 
+    user_info_path = build_url_step("user_info", job_id)
+    street_selection_path = build_url_step("street_selection", job_id)
+
     footer = progress_footer(
-        prev=DATA_UPLOAD_PREV_BUTTON_DATA_UPLOAD_ID,
-        next=DATA_UPLOAD_PREV_BUTTON_DATA_UPLOAD_ID,
+        prev_url=user_info_path,
+        next_url=street_selection_path,
+        next_id=NEXT_BUTTON_DATA_UPLOAD_ID,
+        next_disabled=True,
     )
 
     map = default_map
     input_container = create_card_input(
-        2, "default", "User Information", card_body, footer, job_id
+        card_body,
+        card_footer=footer,
+        name_step=__name__.replace("pages.", ""),
+        job_id=job_id,
     )
     return page_container_split_layout(map, input_container)
 
@@ -133,6 +141,8 @@ def layout(job_id):
 @callback(
     Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport"),
     Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"),
+    Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled"),
+    Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled"),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     State(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
@@ -146,13 +156,18 @@ def upload_file(contents, filename, job_id, epsg_input):
 
     epsg_input, epsg_valid = is_epsg_valid(epsg_input)
     if not epsg_valid:
-        return "Please enter a valid EPSG code before uploading a file."
+        return (
+            dash.no_upadte,
+            "Please enter a valid EPSG code before uploading a file.",
+            True,
+            False,
+        )
 
     job = CosmonautJob(job_id=job_id)
     try:
         file_path = job.upload_file(filename, contents, epsg_input)
     except ValueError as e:
-        return str(e)
+        return dash.no_update, str(e), True, False
     # TODO
     # job.epsg_source = epsg_input
 
@@ -168,7 +183,7 @@ def upload_file(contents, filename, job_id, epsg_input):
     plot.generate_plots()
 
     job.save()
-    return reposition_map, f"Selected file: {os.path.basename(file_path)}"
+    return reposition_map, f"Selected file: {os.path.basename(file_path)}", False, True
 
 
 @callback(
@@ -196,37 +211,3 @@ def validate_epsg(epsg):
             False,
             True,
         )
-
-
-@callback(
-    Output(DATA_UPLOAD_NEXT_BUTTON_DATA_UPLOAD_ID, "disabled"),
-    Input(FILE_PATH_STORE_SHARED_ID, "children"),
-    Input(EPSG_STORE_SHARED_ID, "data"),
-)
-def enable_next(file_path, epsg):
-    return not (file_path and epsg)
-
-
-# Navigation: prev/next (SPA)
-@callback(
-    Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
-    Input(DATA_UPLOAD_NEXT_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
-    State(URL_SHARED_ID, "pathname"),
-    prevent_initial_call=True,
-)
-def go_to_street_selection(n_clicks, pathname):
-    if not n_clicks or not pathname or not pathname.endswith("/data-upload"):
-        raise PreventUpdate
-    return pathname.rsplit("/data-upload", 1)[0] + "/street-selection"
-
-
-@callback(
-    Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
-    Input(DATA_UPLOAD_PREV_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
-    State(URL_SHARED_ID, "pathname"),
-    prevent_initial_call=True,
-)
-def back_to_user_info(n_clicks, pathname):
-    if not n_clicks or not pathname or not pathname.endswith("/data-upload"):
-        raise PreventUpdate
-    return pathname.rsplit("/data-upload", 1)[0] + "/user-info"

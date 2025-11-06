@@ -18,7 +18,7 @@ app = Dash(
     use_pages=True,
     suppress_callback_exceptions=True,
     assets_url_path="/assets",
-    external_stylesheets=[dbc.themes.FLATLY],
+    external_stylesheets=[dbc.themes.BOOTSTRAP],
     title="COSMONAUT",
     on_error=handle_error,
 )

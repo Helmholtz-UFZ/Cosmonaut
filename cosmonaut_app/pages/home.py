@@ -37,7 +37,6 @@ card_body = [
         ],
         id=START_JOB_BUTTON_HOME_ID,
         color="primary",
-        size="lg",
     ),
     html.Div(
         "Or load an existing job using the search bar in the navbar.",
@@ -46,7 +45,7 @@ card_body = [
 ]
 
 map = default_map
-input_container = create_card_input(1, "home", "Welcome to COSMONAUT", card_body)
+input_container = create_card_input(card_body, title="Welcome to COSMONAUT")
 
 layout = page_container_split_layout(map, input_container)
 

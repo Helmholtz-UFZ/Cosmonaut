@@ -1,5 +1,4 @@
 import re
-import dash
 
 import logging
 from dash import html, register_page, callback, Input, Output, State
@@ -16,6 +15,7 @@ from cosmonaut_app.layout import (
     create_card_input,
     progress_footer,
     default_map,
+    build_url_step,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 
@@ -59,13 +59,16 @@ def layout(job_id):
     ]
 
     footer = progress_footer(
-        prev=None,
-        next=USER_INFO_NEXT_BUTTON_USER_INFO_ID,
+        next_id=USER_INFO_NEXT_BUTTON_USER_INFO_ID,
     )
     map = default_map
     input_container = create_card_input(
-        1, "default", "User Information", card_body, footer, job_id
+        card_body,
+        card_footer=footer,
+        name_step=__name__.replace("pages.", ""),
+        job_id=job_id,
     )
+
     return page_container_split_layout(map, input_container)
 
 
@@ -104,7 +107,4 @@ def go_to_upload_page(n_clicks: int | None, email: str | None, pathname: str | N
 
     logging.info(f"Storing email {email} for job {job_id}")
 
-    data_upload_base_path = dash.page_registry["pages.data_upload"]["path_template"]
-    data_upload_path = data_upload_base_path.replace("<job_id>", job_id)
-
-    return data_upload_path
+    return build_url_step("data_upload", job_id)

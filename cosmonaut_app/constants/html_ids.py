@@ -69,8 +69,7 @@ ERROR_MODAL_SHARED_ID = "error-modal"  # nocheck used in error_handling.py
 # ============================================================================
 
 # --- Buttons ---
-DATA_UPLOAD_NEXT_BUTTON_DATA_UPLOAD_ID = "data-upload-next-button-data-upload-id"
-DATA_UPLOAD_PREV_BUTTON_DATA_UPLOAD_ID = "data-upload-prev-button-data-upload-id"
+NEXT_BUTTON_DATA_UPLOAD_ID = "next-button-data-upload-id"
 
 # --- Divs ---
 DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID = (
@@ -153,6 +152,7 @@ QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID = "qr-code-image-route-download-id"
 ACTION_ALERT_ALERT_STREET_SELECTION_ID = "action-alert-alert-street-selection-id"
 
 # --- Buttons ---
+NEXT_BUTTON_STREET_SELECTION_ID = "next-button-street-selection-id"
 CANCEL_RESET_BUTTON_STREET_SELECTION_ID = "cancel-reset-button-street-selection-id"
 CONFIRM_RESET_BUTTON_STREET_SELECTION_ID = "confirm-reset-button-street-selection-id"
 LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID = "largest-button-button-street-selection-id"
