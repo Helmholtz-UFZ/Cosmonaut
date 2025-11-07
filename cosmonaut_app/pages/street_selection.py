@@ -1,11 +1,10 @@
-"""Street Selection page: select streets for routing."""
+"""Street Selection page: UI-only (logic moved to utils/callback modules)."""
 
 import os
 import json
-import time
 import logging
-import shutil
-import re
+import shutil  # required for undo
+from typing import Any, Dict, List, Optional, Tuple
 from dash import (
     html,
     register_page,
@@ -18,12 +17,12 @@ from dash import (
     no_update,
 )
 from dash.exceptions import PreventUpdate
+import dash_leaflet as dl
 import dash_bootstrap_components as dbc
 import geojson
 
-from cosmonaut_app.config import osm_tags_mapping, WEB_WORK_DIR
+from cosmonaut_app.config import osm_tags_mapping
 from cosmonaut_app.constants.html_ids import (
-    ACTION_ALERT_ALERT_STREET_SELECTION_ID,
     CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
     CLICKED_ROADS_STORE_SHARED_ID,
     CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
@@ -32,6 +31,7 @@ from cosmonaut_app.constants.html_ids import (
     LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
     NONE_DIV_SHARED_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
+    ROUTING_COMPLETE_STORE_SHARED_ID,
     REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
     RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
@@ -42,21 +42,32 @@ from cosmonaut_app.constants.html_ids import (
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
     UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
     NEXT_BUTTON_STREET_SELECTION_ID,
+    MAIN_MAP_COMPONENT_MAP_SHARED_ID,
 )
-from cosmonaut_app.transformation import transform_geojson
+from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.road_network_utils import (
     build_graph,
     get_largest_subnetwork,
     remove_dead_roads,
     remove_disconnected_roads,
 )
-from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
+from cosmonaut_app.transformation import transform_geojson
 from cosmonaut_app.layout import (
     page_container_split_layout,
     create_card_input,
     progress_footer,
-    default_map,
     build_url_step,
+    style_handle,  # reuse dynamic style so colors stay consistent after filtering
+)
+from cosmonaut_app.utils.street_selection_utils import (
+    paths as _paths,
+    ensure_feature_ids as _ensure_feature_ids,
+    filter_by_tags as _filter_by_tags,
+    load_fc as _load_fc,
+    coerce_nodes_list as _coerce_nodes_list,
+    safe_projected_export as _safe_export,
+    save_fc_4326_no_crs as _save,
+    snapshot_work_copy as _snapshot,
 )
 
 register_page(
@@ -69,8 +80,24 @@ register_page(
 )
 
 
-def layout(job_id):
+def layout(job_id: str):
+    """Build the Street Selection UI.
+
+    Args:
+        job_id: Current job identifier from the URL.
+
+    Returns:
+        A composed layout with the map on the left and controls on the right.
+    """
     card_body = [
+        # Shared stores required by cross-page callbacks (map, routing, etc.)
+        dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
+        dcc.Store(
+            id=ROUTING_COMPLETE_STORE_SHARED_ID, data=False, storage_type="session"
+        ),
+        dcc.Store(id=EPSG_STORE_SHARED_ID, storage_type="session"),
+        dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
+        # Local store to remember last tag selection
         dcc.Store(id=TAGS_LAST_SELECTION_STORE_SHARED_ID, storage_type="session"),
         html.P(
             "Wählen Sie die gewünschten Straßen im linken Kartenbereich aus. "
@@ -117,7 +144,8 @@ def layout(job_id):
         dbc.Checklist(
             id=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
             options=[{"label": tag, "value": tag} for tag in osm_tags_mapping.keys()],
-            value=[],  # will be initialized via callback
+            # Initialize with all tags so we immediately render the network once data exists
+            value=list(osm_tags_mapping.keys()),
             switch=True,
             inline=True,
         ),
@@ -219,10 +247,52 @@ def layout(job_id):
         prev_url=user_info_path,
         next_url=street_selection_path,
         next_id=NEXT_BUTTON_STREET_SELECTION_ID,
-        next_disabled=True,
+        next_disabled=False,
     )
 
-    map = default_map
+    # Build map with a pre-mounted empty (or preloaded) GeoJSON layer we will update via callbacks.
+    # Attempt initial data load so user sees network immediately if files exist.
+    initial_fc = {"type": "FeatureCollection", "features": []}
+    try:
+        in_dir, raw_path, work_path = _paths(job_id)
+        source = work_path if os.path.exists(work_path) else raw_path
+        if source and os.path.exists(source):
+            with open(source, encoding="utf-8") as f:
+                data = json.load(f)
+            feats = data.get("features", [])
+            _ensure_feature_ids(feats)
+            feats = _filter_by_tags(feats, list(osm_tags_mapping.keys()))
+            for feat in feats:
+                p = feat.setdefault("properties", {})
+                name = p.get("name") or p.get("ref")
+                hw = p.get("highway")
+                p["tooltip"] = f"{name}, {hw}" if name else f"{hw}"
+            initial_fc = {"type": "FeatureCollection", "features": feats}
+    except Exception as e:
+        logging.warning("Initial OSM preload failed: %s", e)
+
+    map = html.Div(
+        dl.Map(
+            [
+                dl.TileLayer(url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"),
+                dl.FullScreenControl(),
+                dl.GeoJSON(
+                    id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,
+                    data=initial_fc,
+                    # Use same dynamic style function used after first interaction for consistency
+                    options={"style": style_handle},
+                    hideout=dict(selected=[], zoom=10),
+                    # Set zoomToBounds on initial layout; later we will disable on updates
+                    zoomToBounds=True if initial_fc.get("features") else False,
+                ),
+            ],
+            id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+            center=[51.70, 11.20],
+            zoom=10,
+            style={"height": "100%"},
+        ),
+        style={"height": "100%", "width": "100%"},
+    )
     input_container = create_card_input(
         card_body,
         card_footer=footer,
@@ -232,124 +302,11 @@ def layout(job_id):
     return page_container_split_layout(map, input_container)
 
 
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
-
-def _coerce_nodes_list(features):
-    """Coerce nodes from str representation back to list."""
-    for f in features:
-        nodes = f.get("properties", {}).get("nodes")
-        if isinstance(nodes, str):
-            try:
-                nodes = json.loads(nodes)
-            except Exception:
-                nodes = []
-            f["properties"]["nodes"] = nodes
-
-
-def _normalize_for_sensor_routing(features):
-    """Ensure fields required by sensor-routing exist with expected types."""
-
-    def _coerce_osmid(props, fallback_id, fallback):
-        for c in (props.get("osmid"), props.get("id"), fallback_id):
-            if isinstance(c, int):
-                return c
-        return fallback
-
-    missing = 0
-    for i, feat in enumerate(features):
-        props = feat.get("properties") or {}
-        # osmid: single int
-        osmid = _coerce_osmid(props, feat.get("id"), fallback=i + 1)
-        if "osmid" not in props:
-            missing += 1
-        props["osmid"] = osmid
-        # nodes: list[int]
-        nodes = props.get("nodes")
-        if isinstance(nodes, str):
-            try:
-                nodes = json.loads(nodes)
-            except Exception:
-                nodes = [int(n) for n in re.findall(r"-?\d+", nodes)]
-            props["nodes"] = nodes
-        if isinstance(props.get("nodes"), (list, tuple)):
-            try:
-                props["nodes"] = [int(n) for n in props["nodes"]]
-            except Exception:
-                pass
-        # oneway: normalize to "yes"/"no" strings
-        ow = props.get("oneway")
-        if isinstance(ow, bool):
-            props["oneway"] = "yes" if ow else "no"
-        elif ow is not None:
-            s = str(ow).lower()
-            if s in ("1", "true", "yes"):
-                props["oneway"] = "yes"
-            elif s in ("0", "false", "no", "-1"):
-                props["oneway"] = "no"
-        feat["properties"] = props
-    logging.info(
-        "Normalized %d features; added osmid to %d features", len(features), missing
-    )
-
-
-def _filter_by_tags(features, selected_roads):
-    # Default to all available tags if none are selected so we render a network
-    if not selected_roads:
-        selected_roads = list(osm_tags_mapping.keys())
-    osm_highway_types = set()
-    for german_type in selected_roads:
-        if german_type in osm_tags_mapping:
-            osm_highway_types.update(osm_tags_mapping[german_type])
-    return [
-        f
-        for f in features
-        if (f.get("properties") or {}).get("highway") in osm_highway_types
-    ]
-
-
-def _paths(job_id):
-    in_dir = os.path.join(WEB_WORK_DIR, job_id, "input")
-    return (
-        in_dir,
-        os.path.join(in_dir, "osm_data_raw_4326.geojson"),
-        os.path.join(in_dir, "osm_data_work_4326.geojson"),
-    )
-
-
-def _load_fc(path):
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _save_fc_4326_no_crs(path, feature_collection):
-    # ensure no 'crs' member (RFC 7946)
-    data = dict(feature_collection)
-    data.pop("crs", None)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-
-
-def _snapshot_work_copy(in_dir, work_4326):
-    """Save timestamped backup before modifying work file."""
-    try:
-        if os.path.exists(work_4326):
-            hist_dir = os.path.join(in_dir, "history")
-            os.makedirs(hist_dir, exist_ok=True)
-            ts = time.strftime("%Y%m%d-%H%M%S")
-            dst = os.path.join(hist_dir, f"osm_data_work_4326_{ts}.geojson")
-            shutil.copy2(work_4326, dst)
-            return dst
-    except Exception as e:
-        logging.warning("Snapshot failed: %s", e)
-    return None
-
-
-# ============================================================================
-# Callbacks
-# ============================================================================
+"""
+Callbacks with business logic are intentionally kept minimal here. Complex
+operations (filtering, id assignment, normalization, exports) live in
+cosmonaut_app/utils/street_selection_utils.py and shared map callback lives in layout.
+"""
 
 
 @callback(
@@ -363,7 +320,25 @@ def _snapshot_work_copy(in_dir, work_4326):
     ],
     prevent_initial_call=True,
 )
-def remove_selected(n, clicked_roads, job_id, epsg_input, selected_roads):
+def remove_selected(
+    n: Optional[int],
+    clicked_roads: Optional[List[int]],
+    job_id: Optional[str],
+    epsg_input: Optional[int | str],
+    selected_roads: Optional[List[str]],
+) -> Dict[str, Any]:
+    """Remove the currently selected roads and update the working GeoJSON.
+
+    Args:
+        n: Click count for the Remove button.
+        clicked_roads: Road ids selected on the map.
+        job_id: Current job id.
+        epsg_input: Optional target EPSG code for projected export.
+        selected_roads: Current tag selection used to filter visible features.
+
+    Returns:
+        FeatureCollection dict with filtered visible features after removal.
+    """
     if not n or not job_id:
         raise PreventUpdate
     if not clicked_roads:
@@ -371,7 +346,7 @@ def remove_selected(n, clicked_roads, job_id, epsg_input, selected_roads):
         raise PreventUpdate
 
     in_dir, raw_4326, work_4326 = _paths(job_id)
-    _snapshot_work_copy(in_dir, work_4326)
+    # snapshot handled by lower-level utils in dedicated service (left out here for simplicity)
     if not os.path.exists(work_4326):
         # First-time edit: seed from raw
         if os.path.exists(raw_4326):
@@ -384,8 +359,10 @@ def remove_selected(n, clicked_roads, job_id, epsg_input, selected_roads):
             logging.error("Missing baseline file: %s", raw_4326)
             raise PreventUpdate
 
+    _snapshot(in_dir, work_4326)
     data = _load_fc(work_4326)
     all_roads = data.get("features", [])
+    _ensure_feature_ids(all_roads)
     _coerce_nodes_list(all_roads)
 
     # Build graph and remove roads idempotently
@@ -401,32 +378,10 @@ def remove_selected(n, clicked_roads, job_id, epsg_input, selected_roads):
 
     # Persist updated working copy (4326, no crs)
     updated_fc = {"type": "FeatureCollection", "features": all_roads}
-    _save_fc_4326_no_crs(work_4326, updated_fc)
+    _save(work_4326, updated_fc)
 
-    # Re-export EPSG-specific file for downstream steps
-    try:
-        if epsg_input:
-            transformed = transform_geojson(work_4326, 4326, epsg_input)
-            # Ensure required fields for sensor-routing
-            feats = transformed.get("features", [])
-            _coerce_nodes_list(feats)
-            _normalize_for_sensor_routing(feats)
-            transformed = {
-                "type": "FeatureCollection",
-                "crs": {
-                    "type": "name",
-                    "properties": {"name": f"urn:ogc:def:crs:EPSG::{epsg_input}"},
-                },
-                "features": feats,
-            }
-            with open(
-                os.path.join(in_dir, f"osm_data_{epsg_input}.geojson"),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                geojson.dump(transformed, f)
-    except Exception as e:
-        logging.warning("Failed to write projected export: %s", e)
+    # Re-export projected file (wrapped helper handles internal errors)
+    _safe_export(in_dir, work_4326, epsg_input)
 
     # Return filtered view according to current tag selection
     visible = _filter_by_tags(all_roads, selected_roads)
@@ -443,12 +398,20 @@ def remove_selected(n, clicked_roads, job_id, epsg_input, selected_roads):
     ],
     prevent_initial_call=True,
 )
-def keep_largest_subnetwork(n, job_id, epsg_input, selected_roads):
+def keep_largest_subnetwork(
+    n: Optional[int],
+    job_id: Optional[str],
+    epsg_input: Optional[int | str],
+    selected_roads: Optional[List[str]],
+) -> Dict[str, Any]:
+    """Keep the largest connected subnetwork within the current tag filter.
+
+    Returns a filtered FeatureCollection representing the updated working set.
+    """
     if not n or not job_id:
         raise PreventUpdate
 
     in_dir, raw_4326, work_4326 = _paths(job_id)
-    _snapshot_work_copy(in_dir, work_4326)
     # Load from work; seed from raw if needed
     if not os.path.exists(work_4326):
         if os.path.exists(raw_4326):
@@ -461,8 +424,10 @@ def keep_largest_subnetwork(n, job_id, epsg_input, selected_roads):
             logging.error("Missing baseline file: %s", raw_4326)
             raise PreventUpdate
 
+    _snapshot(in_dir, work_4326)
     data = _load_fc(work_4326)
     all_roads = data.get("features", [])
+    _ensure_feature_ids(all_roads)
     _coerce_nodes_list(all_roads)
 
     # Work within the current tag filter for a user-friendly result
@@ -501,32 +466,10 @@ def keep_largest_subnetwork(n, job_id, epsg_input, selected_roads):
 
     # Persist working copy (4326, no crs)
     updated_fc = {"type": "FeatureCollection", "features": new_all_roads}
-    _save_fc_4326_no_crs(work_4326, updated_fc)
+    _save(work_4326, updated_fc)
 
-    # Re-export EPSG-specific file for downstream steps
-    try:
-        if epsg_input:
-            transformed = transform_geojson(work_4326, 4326, epsg_input)
-            # Ensure required fields for sensor-routing
-            feats = transformed.get("features", [])
-            _coerce_nodes_list(feats)
-            _normalize_for_sensor_routing(feats)
-            transformed = {
-                "type": "FeatureCollection",
-                "crs": {
-                    "type": "name",
-                    "properties": {"name": f"urn:ogc:def:crs:EPSG::{epsg_input}"},
-                },
-                "features": feats,
-            }
-            with open(
-                os.path.join(in_dir, f"osm_data_{epsg_input}.geojson"),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                geojson.dump(transformed, f)
-    except Exception as e:
-        logging.warning("Failed to write projected export: %s", e)
+    # Re-export projected file
+    _safe_export(in_dir, work_4326, epsg_input)
 
     # Return the currently-filtered view from the new working set
     visible = _filter_by_tags(new_all_roads, selected_roads)
@@ -544,7 +487,16 @@ def keep_largest_subnetwork(n, job_id, epsg_input, selected_roads):
     ],
     prevent_initial_call=True,
 )
-def reset_edits(n, job_id, epsg_input, selected_roads):
+def reset_edits(
+    n: Optional[int],
+    job_id: Optional[str],
+    epsg_input: Optional[int | str],
+    selected_roads: Optional[List[str]],
+) -> Dict[str, Any]:
+    """Reset edits by restoring the working file from the raw baseline.
+
+    Returns the baseline filtered by the current tag selection.
+    """
     if not n or not job_id:
         raise PreventUpdate
 
@@ -560,71 +512,71 @@ def reset_edits(n, job_id, epsg_input, selected_roads):
     ):
         fdst.write(fsrc.read())
 
-    # Re-export EPSG-specific file
-    try:
-        if epsg_input:
-            transformed = transform_geojson(work_4326, 4326, epsg_input)
-            # Ensure required fields for sensor-routing
-            feats = transformed.get("features", [])
-            _coerce_nodes_list(feats)
-            _normalize_for_sensor_routing(feats)
-            transformed = {
-                "type": "FeatureCollection",
-                "crs": {
-                    "type": "name",
-                    "properties": {"name": f"urn:ogc:def:crs:EPSG::{epsg_input}"},
-                },
-                "features": feats,
-            }
-            with open(
-                os.path.join(in_dir, f"osm_data_{epsg_input}.geojson"),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                geojson.dump(transformed, f)
-    except Exception as e:
-        logging.warning("Failed to write projected export on reset: %s", e)
+    # Re-export projected file
+    _safe_export(in_dir, work_4326, epsg_input)
 
     # Return filtered raw view
     data = _load_fc(work_4326)
     all_roads = data.get("features", [])
+    _ensure_feature_ids(all_roads)
     visible = _filter_by_tags(all_roads, selected_roads)
     return {"type": "FeatureCollection", "features": visible}
-
-
-@callback(
-    Output(SELECTION_COUNT_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True),
-    Input(CLICKED_ROADS_STORE_SHARED_ID, "data"),
-    prevent_initial_call=True,
-)
-def _update_selection_badge(clicked):
-    n = len(clicked) if clicked else 0
-    return f"Selected: {n}"
-
-
-@callback(
-    Output(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "disabled", allow_duplicate=True),
-    Input(CLICKED_ROADS_STORE_SHARED_ID, "data"),
-    prevent_initial_call=True,
-)
-def _toggle_remove_disabled(clicked):
-    return not bool(clicked)
 
 
 # Select all / none tags
 @callback(
     Output(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
     Input(TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     Input(TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def tags_select_all_none(n_all, n_none):
+def tags_select_all_none(
+    n_all: Optional[int],
+    n_none: Optional[int],
+    job_id: Optional[str],
+    current_geojson: Optional[Dict[str, Any]],
+) -> Tuple[List[str], Dict[str, Any]]:
+    """Update tag selection to all or none and refresh the visible FeatureCollection."""
     trig = ctx.triggered_id
+    if trig not in (
+        TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
+        TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
+    ):
+        raise PreventUpdate
+
+    # Determine new selection list
     if trig == TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID:
-        return list(osm_tags_mapping.keys())
-    elif trig == TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID:
-        return []
-    raise PreventUpdate
+        new_selection = list(osm_tags_mapping.keys())
+    else:
+        new_selection = []  # show no roads
+
+    # Reload source data (raw or work) to apply fresh filter; avoids cumulative filtering artifacts
+    initial_fc = {"type": "FeatureCollection", "features": []}
+    try:
+        if job_id:
+            in_dir, raw_path, work_path = _paths(job_id)
+            source = work_path if os.path.exists(work_path) else raw_path
+            if source and os.path.exists(source):
+                with open(source, encoding="utf-8") as f:
+                    data = json.load(f)
+                feats = data.get("features", [])
+                _ensure_feature_ids(feats)
+                feats = _filter_by_tags(feats, new_selection)
+                for feat in feats:
+                    p = feat.setdefault("properties", {})
+                    name = p.get("name") or p.get("ref")
+                    hw = p.get("highway")
+                    p["tooltip"] = (
+                        f"{name}, {hw}" if name else f"{hw}" if hw else name or ""
+                    )
+                initial_fc = {"type": "FeatureCollection", "features": feats}
+    except Exception as e:
+        logging.warning("Tag select all/none preload failed: %s", e)
+
+    return new_selection, initial_fc
 
 
 # Open/close Reset confirmation modal
@@ -638,7 +590,13 @@ def tags_select_all_none(n_all, n_none):
     State(RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID, "is_open"),
     prevent_initial_call=True,
 )
-def toggle_reset_modal(n_open, n_cancel, n_confirm, is_open):
+def toggle_reset_modal(
+    n_open: Optional[int],
+    n_cancel: Optional[int],
+    n_confirm: Optional[int],
+    is_open: Optional[bool],
+) -> bool:
+    """Open/close the reset confirmation modal based on the triggering control."""
     if ctx.triggered_id in (
         RESET_ROADS_BUTTON_STREET_SELECTION_ID,
         CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
@@ -662,37 +620,18 @@ def toggle_reset_modal(n_open, n_cancel, n_confirm, is_open):
     State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
     prevent_initial_call=True,
 )
-def clear_selections(n_remove, n_largest, n_reset_confirm, hideout):
+def clear_selections(
+    n_remove: Optional[int],
+    n_largest: Optional[int],
+    n_reset_confirm: Optional[int],
+    hideout: Optional[Dict[str, Any]],
+) -> Tuple[List[int], Dict[str, Any]]:
+    """Clear current selections after destructive operations for a clean state."""
     if not any([n_remove, n_largest, n_reset_confirm]):
         raise PreventUpdate
     new_hideout = dict(hideout or {})
     new_hideout["selected"] = []
     return [], new_hideout
-
-
-# Toast notifications
-@callback(
-    Output(ACTION_ALERT_ALERT_STREET_SELECTION_ID, "children", allow_duplicate=True),
-    Output(ACTION_ALERT_ALERT_STREET_SELECTION_ID, "color", allow_duplicate=True),
-    Output(ACTION_ALERT_ALERT_STREET_SELECTION_ID, "is_open", allow_duplicate=True),
-    Input(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
-    Input(LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
-    Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
-    Input(UNDO_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
-    State(CLICKED_ROADS_STORE_SHARED_ID, "data"),
-    prevent_initial_call=True,
-)
-def show_action_alert(n_remove, n_largest, n_reset, n_undo, clicked):
-    trig = ctx.triggered_id
-    if trig == REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID:
-        return f"Removed {len(clicked or [])} road(s).", "danger", True
-    if trig == LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID:
-        return "Kept largest subnetwork (within current filter).", "primary", True
-    if trig == CONFIRM_RESET_BUTTON_STREET_SELECTION_ID:
-        return "Edits reset to original OSM.", "secondary", True
-    if trig == UNDO_BUTTON_BUTTON_STREET_SELECTION_ID:
-        return "Last change undone.", "info", True
-    raise PreventUpdate
 
 
 # Undo: restore last snapshot from history
@@ -704,7 +643,13 @@ def show_action_alert(n_remove, n_largest, n_reset, n_undo, clicked):
     State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     prevent_initial_call=True,
 )
-def undo_last(n, job_id, epsg_input, selected_roads):
+def undo_last(
+    n: Optional[int],
+    job_id: Optional[str],
+    epsg_input: Optional[int | str],
+    selected_roads: Optional[List[str]],
+) -> Dict[str, Any]:
+    """Restore the most recent snapshot from history and re-filter by tags."""
     if not n or not job_id:
         raise PreventUpdate
     in_dir, raw_4326, work_4326 = _paths(job_id)
@@ -745,21 +690,9 @@ def undo_last(n, job_id, epsg_input, selected_roads):
     except Exception as e:
         logging.warning("Undo failed: %s", e)
         raise PreventUpdate
-    # return filtered view after undo
     data = _load_fc(work_4326)
     visible = _filter_by_tags(data.get("features", []), selected_roads)
     return {"type": "FeatureCollection", "features": visible}
-
-
-# Persist chosen tags to session so the next page shows the same roads
-@callback(
-    Output(TAGS_LAST_SELECTION_STORE_SHARED_ID, "data", allow_duplicate=True),
-    Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
-    prevent_initial_call=True,
-)
-def _persist_tags_selection(value):
-    # If user clears, store "all" so map won't be empty on next page
-    return value or list(osm_tags_mapping.keys())
 
 
 # Update database with selected tags
@@ -769,7 +702,11 @@ def _persist_tags_selection(value):
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def update_tags_dropdown(tags, job_id):
+def update_tags_dropdown(tags: Optional[List[str]], job_id: Optional[str]):
+    """Persist selected tag values to the database.
+
+    Returns no_update; the effect is stored server-side.
+    """
     if tags is None:
         raise PreventUpdate
 

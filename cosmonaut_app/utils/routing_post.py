@@ -168,6 +168,7 @@ def build_solution_route_4326(workdir: str) -> str | None:
             "osm_data_25832.geojson",
             "osm_data_work_4326.geojson",
             "osm_data_4326.geojson",
+            "osm_data.geojson",
         ):
             p = os.path.join(input_dir, candidate)
             if os.path.isfile(p):

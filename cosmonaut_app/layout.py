@@ -52,11 +52,22 @@ style_handle = assign(
     """
 function(feature, context){
     const {selected, zoom} = context.hideout;
-    const lineWeight = zoom ? Math.max(1, 5 / zoom) : 2;
-    if(selected.includes(feature.id)){
-        return {color: 'yellow', weight: lineWeight};
-    }
-    return {color: 'red', weight: lineWeight};
+    // Increase base weight to make lines easier to click. Keep adaptive thinning on zoom in.
+    const lineWeight = zoom ? Math.max(3, 18 / zoom) : 4; // at zoom=10 -> ~3
+    const color = selected.includes(feature.id) ? 'yellow' : 'red';
+    return {color: color, weight: lineWeight, opacity: 0.85};
+}
+"""
+)
+
+# Separate hover style with slight highlight and thicker stroke for better affordance
+hover_style_handle = assign(
+    """
+function(feature, context){
+    const {selected, zoom} = context.hideout;
+    const lineWeight = zoom ? Math.max(4, 22 / zoom) : 5;
+    const color = selected.includes(feature.id) ? 'orange' : '#ff6666';
+    return {color: color, weight: lineWeight, opacity: 1.0};
 }
 """
 )
@@ -190,6 +201,7 @@ def _paths(job_id):
         in_dir,
         os.path.join(in_dir, "osm_data_raw_4326.geojson"),
         os.path.join(in_dir, "osm_data_work_4326.geojson"),
+        os.path.join(in_dir, "osm_data.geojson"),
     )
 
 
@@ -784,9 +796,14 @@ def register_map_callbacks(app):
             logging.info("=== OPTIMIZED TAG FILTERING SECTION ===")
             filter_start_time = time.time()
 
-            if not selected_roads:
+            # Distinguish between None (no value yet -> show all) and empty list (user explicitly selected none -> show none)
+            if selected_roads is None:
                 selected_roads = list(osm_tags_mapping.keys())
-                logging.info("No selection; defaulting to all tags: %s", selected_roads)
+                logging.info(
+                    "Selection is None; defaulting to all tags: %s", selected_roads
+                )
+            elif selected_roads == []:
+                logging.info("Empty selection provided; will show zero features.")
 
             logging.info("Converting German road types: %s", selected_roads)
             osm_highway_types = set()
@@ -801,6 +818,7 @@ def register_map_callbacks(app):
             preferred_candidates = [
                 os.path.join(in_dir, "osm_data_work_4326.geojson"),
                 os.path.join(in_dir, "osm_data_raw_4326.geojson"),
+                os.path.join(in_dir, "osm_data.geojson"),
             ]
             timeout = 30
             start_wait = time.time()
@@ -868,10 +886,11 @@ def register_map_callbacks(app):
 
             osm_layer = dl.GeoJSON(
                 data=filtered_data,
-                options={"style": style_handle},
+                options={"style": style_handle, "hoverStyle": hover_style_handle},
                 hideout=dict(selected=[], zoom=10),
                 id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,
-                zoomToBounds=True,
+                # Do not re-zoom on tag changes; initial page load already zooms
+                zoomToBounds=False,
             )
             new_layers.append(osm_layer)
 
