@@ -17,12 +17,11 @@ from sqlalchemy import (
     ARRAY,
     Boolean,
     Column,
-    Date,
-    Float,
     Integer,
     String,
     create_engine,
 )
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
@@ -291,13 +290,12 @@ class JobTable(Base):
     __tablename__ = "jobs"
 
     job_id = Column(String, primary_key=True)
-    start_date = Column("start_date", Date)
-    end_date = Column("end_date", Date)
-    data_uploaded = Column("data_uploaded", Boolean)
-    submitted = Column("submitted", Boolean)
     email = Column("email", String)
+    classification_upload = Column("classification_upload", JSON)
+    selected_road_tags = Column("selected_road_tags", ARRAY(String))
+    submitted = Column("submitted", Boolean)
     notified_end = Column("notified_end", Boolean)
     stage = Column("stage", Integer)
     status = Column("status", String)
-    version = Column("version", Float)
-    selected_road_tags = Column("selected_road_tags", ARRAY(String))
+    version = Column("version", String)
+    config = Column("config", JSON)

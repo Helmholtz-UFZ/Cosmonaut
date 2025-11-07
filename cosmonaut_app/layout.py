@@ -334,7 +334,6 @@ def create_card_input(
     if name_step is not None:
         card_header.append(steps_tab(name_step))
 
-    logging.info(card_header)
     card_content = [
         dbc.CardHeader(card_header),
         dbc.CardBody(card_body),
@@ -342,13 +341,6 @@ def create_card_input(
 
     if card_footer:
         card_content.append(card_footer)
-
-    logging.info(
-        dbc.Card(
-            card_content,
-            className="shadow-sm m-3 me-4",
-        )
-    )
 
     return dbc.Card(
         card_content,

@@ -7,16 +7,15 @@ DROP TABLE IF EXISTS jobs;
 
 CREATE TABLE jobs (
     job_id VARCHAR PRIMARY KEY,
-    start_date DATE,
-    end_date DATE,
-    data_uploaded BOOL DEFAULT FALSE,
-    submitted BOOL,
     email VARCHAR,
+    classification_upload JSONB,
+    selected_road_tags TEXT[],
+    submitted BOOL,
     notified_end BOOL,
     stage INT,
     status VARCHAR,
-    version DECIMAL,
-    selected_road_tags TEXT[]
+    version VARCHAR,
+    config JSONB
 );
 
 -- psql -U cosmonaut -p 5432 -h localhost -d cosmonaut_db
