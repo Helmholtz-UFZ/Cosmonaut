@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import uuid
 from datetime import date
@@ -12,10 +13,9 @@ from cosmonaut_app.config import (
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.minio_manager import MiniIOManager
-
-from cosmonaut_app.transformation import transform_csv
-from cosmonaut_app.pydantic_models import JobModel
-from sensor_routing.sensor_routing_cli import Config
+from cosmonaut_app.navigation_routing import RouteCreator
+from cosmonaut_app.transformation import get_bounds, transform_csv
+from cosmonaut_app.pydantic_models import JobModel, FullPipelineConfig
 
 
 class CosmonautJob:
@@ -100,7 +100,7 @@ class CosmonautJob:
         data = self.model.model_dump(mode="json")
 
         # Separate Config fields from JobModel fields
-        config_field_names = set(Config.model_fields.keys())
+        config_field_names = set(FullPipelineConfig.model_fields.keys())
 
         # Extract config fields into separate dict
         config_data = {}
@@ -127,7 +127,7 @@ class CosmonautJob:
         data = self.model.model_dump(mode="json")
 
         # Extract only Config fields
-        config_field_names = set(Config.model_fields.keys())
+        config_field_names = set(FullPipelineConfig.model_fields.keys())
         config_data = {
             field_name: data[field_name]
             for field_name in data.keys()
@@ -140,6 +140,43 @@ class CosmonautJob:
             json.dump(config_data, f, indent=2)
 
         logging.info(f"Routing parameters written to {parameters_file}")
+
+    def _calculate_map_position_from_bounds(self, bounds):
+        """
+        Calculate center position and zoom level from bounds.
+
+        Args:
+            bounds: [[min_lat, min_lon], [max_lat, max_lon]]
+
+        Returns:
+            tuple: (position [lat, lon], zoom level)
+        """
+        min_lat, min_lon = bounds[0]
+        max_lat, max_lon = bounds[1]
+
+        # Calculate center
+        center_lat = (min_lat + max_lat) / 2
+        center_lon = (min_lon + max_lon) / 2
+        position = [center_lat, center_lon]
+
+        # Calculate zoom level
+        lat_diff = max_lat - min_lat
+        lon_diff = max_lon - min_lon
+
+        # Leaflet zoom calculation: fit the larger dimension
+        # Each zoom level doubles the map scale
+        # At zoom 0, the world is 256 pixels wide
+        # World width in degrees is 360, height is ~170 (Web Mercator)
+        lat_zoom = math.log2(170 * 800 / (lat_diff * 256)) if lat_diff > 0 else 15
+        lon_zoom = math.log2(360 * 1000 / (lon_diff * 256)) if lon_diff > 0 else 15
+
+        # Use the smaller zoom to ensure everything fits
+        zoom = int(min(lat_zoom, lon_zoom, 18))  # Cap at zoom 18
+
+        # Ensure minimum zoom of 5
+        zoom = max(5, zoom)
+
+        return position, zoom
 
     def delete(self):
         """Delete the job from the database and MinIO."""
@@ -160,6 +197,16 @@ class CosmonautJob:
             return DAYS_DELETE_NOT_SUBMITTED - days_passed
 
     def upload_file(self, file_name, content, epsg_input):
+        """Upload and process classification CSV file."""
+        logging.info(f"Upload classification file {file_name} with EPSG {epsg_input}")
+
+        # Check if previously a file was uploaded and remove it
+        previous_file = self.model.classification_upload.get("file_name")
+        previous_file_path = os.path.join(self.input_dir, previous_file)
+        if os.path.exists(previous_file_path):
+            os.remove(previous_file_path)
+            logging.info(f"Removed previous classification file {previous_file}")
+
         _content_type, content_string = content.split(",", 1)
         decoded = base64.b64decode(content_string)
 
@@ -176,14 +223,32 @@ class CosmonautJob:
             os.remove(file_path)
             raise e
 
+        # Calculate bounds, position, and zoom
+        bounds = get_bounds(classification_data)
+        position, zoom = self._calculate_map_position_from_bounds(bounds)
+
+        # Store EPSG as model attribute
+        self.model.epsg = epsg_input
+
         # Store information about the classification upload
         self.model.classification_upload = {
             "file_name": safe_name,
             "len": len(classification_data),
-            "epsg": epsg_input,
+            "center": position,
+            "zoom": zoom,
         }
         self.save()
-        return classification_data
+        return classification_data, file_path, bounds
+
+    def create_qr_code_routing(self):
+        # TODO the name "solution_transformed.json" should be abstracted somewhere. Who
+        # is responsible for writing it?
+        geojson_path = os.path.join(self.output_dir, "solution_transformed.json")
+
+        route_creator = RouteCreator(geojson_path, self.output_dir)
+        qr_code_url = route_creator.create_gpx()
+        self.save()
+        return qr_code_url
 
     # TODO: Implement the submit method like John did it.
     def submit(self):

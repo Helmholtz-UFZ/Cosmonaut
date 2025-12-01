@@ -23,7 +23,8 @@ def test_db_manager():
         "status": "completed",
         "version": "1.0",
         "selected_road_tags": ["motorway", "primary"],
-        "classification_upload": {"file_name": "test.csv", "epsg": "4326"},
+        "classification_upload": {"file_name": "test.csv"},
+        "epsg": 4326,
         "config": {},
     }
     DataBaseManager.add_entry(data_to_insert)

@@ -5,14 +5,16 @@ services:
     build:
       context: .
       dockerfile: ./docker/dev.Dockerfile
-      args:
-        - REQUIREMENTS_SHA=${REQUIREMENTS_SHA-}
-    env_file: .env
     volumes:
       - "./:/python_docker/cosmonaut"
+    env_file: .env
     user: "${DOCKER_UID}:${DOCKER_GID}"
     ports:
       - ${FLASK_PORT}:${FLASK_PORT}
+    depends_on:
+      - postgres
+      - minio
+      - redis
 
   postgres:
     image: postgis/postgis:latest
@@ -27,10 +29,11 @@ services:
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   redis:
-    image: redis:7.4
+    image: redis:7-alpine
     container_name: redis_cosmonaut
     ports:
-      - ${REDIS_PORT}:${REDIS_PORT}
+      - "6379:6379"
+    command: redis-server --appendonly yes
 
   minio:
     image: minio/minio:latest
@@ -48,15 +51,21 @@ services:
       timeout: 3s
       retries: 10
 
-  createbuckets:
-    image: minio/mc
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
-      /usr/bin/mc mb myminio/${MINIO_BUCKET};
-      /usr/bin/mc policy set public ${MINIO_BUCKET};
-      exit 0;
-      "
+  tileserver:
+    image: ghcr.io/developmentseed/titiler:latest
+    container_name: cosmonaut-tileserver
+    platform: linux/amd64
+    ports:
+      - "8001:80"
+    volumes:
+      - "./cosmonaut_app/work_dir:/data:ro"
+    environment:
+      CPL_TMPDIR: /tmp
+      GDAL_CACHEMAX: 75%
+      GDAL_INGESTED_BYTES_AT_OPEN: 32768
+      GDAL_DISABLE_READDIR_ON_OPEN: EMPTY_DIR
+      GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: YES
+      GDAL_HTTP_MULTIPLEX: YES
+      GDAL_HTTP_VERSION: 2
+      VSI_CACHE: TRUE
+      VSI_CACHE_SIZE: 5000000

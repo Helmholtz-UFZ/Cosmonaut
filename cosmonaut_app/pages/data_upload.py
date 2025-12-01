@@ -24,7 +24,6 @@ from cosmonaut_app.constants.html_ids import (
     OSM_FILE_PATH_STORE_SHARED_ID,
 )
 from cosmonaut_app.transformation import (
-    get_bounds,
     OsmRoads,
 )
 from cosmonaut_app.classification_plot import ClassificationPlot
@@ -32,7 +31,7 @@ from cosmonaut_app.layout import (
     page_container_split_layout,
     create_card_input,
     progress_footer,
-    default_map,
+    create_map,
     build_url_step,
 )
 
@@ -64,8 +63,7 @@ def is_epsg_valid(epsg):
 
 
 def layout(job_id):
-    # Test if job exists
-    CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id)
     card_body = [
         dcc.Store(id=EPSG_STORE_SHARED_ID),
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
@@ -81,7 +79,7 @@ def layout(job_id):
         dbc.Input(
             id=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
             type="text",
-            value="25832",
+            value=job.model.epsg,
         ),
         dbc.FormText(
             "Common choices: 4326, 25832, 3857, …",
@@ -107,7 +105,11 @@ def layout(job_id):
             ),
             className="my-3",
         ),
-        html.Div(id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, className="text-muted"),
+        html.Div(
+            job.model.classification_upload["file_name"],
+            id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
+            className="text-muted",
+        ),
         # hidden holders required by callbacks
         html.Div(id=FILE_PATH_STORE_SHARED_ID, style={"display": "none"}),
         html.Div(id=OSM_FILE_PATH_STORE_SHARED_ID, style={"display": "none"}),
@@ -116,14 +118,18 @@ def layout(job_id):
     user_info_path = build_url_step("user_info", job_id)
     street_selection_path = build_url_step("street_selection", job_id)
 
+    classification_file = job.model.classification_upload["file_name"]
+    classification_file_path = os.path.join(job.input_dir, classification_file)
+    next_disabled = not os.path.exists(classification_file_path)
+
     footer = progress_footer(
         prev_url=user_info_path,
         next_url=street_selection_path,
         next_id=NEXT_BUTTON_DATA_UPLOAD_ID,
-        next_disabled=True,
+        next_disabled=next_disabled,
     )
 
-    map = default_map
+    map = create_map(job=job)
     input_container = create_card_input(
         card_body,
         card_footer=footer,
@@ -131,11 +137,6 @@ def layout(job_id):
         job_id=job_id,
     )
     return page_container_split_layout(map, input_container)
-
-
-# ============================================================================
-# Callbacks
-# ============================================================================
 
 
 @callback(
@@ -165,18 +166,19 @@ def upload_file(contents, filename, job_id, epsg_input):
 
     job = CosmonautJob(job_id=job_id)
     try:
-        file_path = job.upload_file(filename, contents, epsg_input)
+        classification_data, file_path, bounds = job.upload_file(
+            filename, contents, epsg_input
+        )
     except ValueError as e:
         return dash.no_update, str(e), True, False
-    # TODO
-    # job.epsg_source = epsg_input
 
     reposition_map = {
-        "bounds": get_bounds(job.classification_data),
+        "bounds": bounds,
         "transition": "flyTo",
     }
+    logging.info(reposition_map)
 
-    osm = OsmRoads(job.classification_data, epsg_output=epsg_input)
+    osm = OsmRoads(classification_data, epsg_output=epsg_input)
     osm.run_osm_query(job.input_dir)
 
     plot = ClassificationPlot(file_path, job_id, src_epsg=f"EPSG:{epsg_input}")

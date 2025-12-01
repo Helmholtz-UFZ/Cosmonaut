@@ -31,7 +31,6 @@ from cosmonaut_app.constants.html_ids import (
     LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
     NONE_DIV_SHARED_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
-    ROUTING_COMPLETE_STORE_SHARED_ID,
     REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
     RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
@@ -42,7 +41,6 @@ from cosmonaut_app.constants.html_ids import (
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
     UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
     NEXT_BUTTON_STREET_SELECTION_ID,
-    MAIN_MAP_COMPONENT_MAP_SHARED_ID,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.road_network_utils import (
@@ -52,7 +50,9 @@ from cosmonaut_app.road_network_utils import (
     remove_disconnected_roads,
 )
 from cosmonaut_app.transformation import transform_geojson
+from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
+    create_map,
     page_container_split_layout,
     create_card_input,
     progress_footer,
@@ -60,6 +60,7 @@ from cosmonaut_app.layout import (
     style_handle,  # reuse dynamic style so colors stay consistent after filtering
 )
 from cosmonaut_app.utils.street_selection_utils import (
+    initial_features,
     paths as _paths,
     ensure_feature_ids as _ensure_feature_ids,
     filter_by_tags as _filter_by_tags,
@@ -89,12 +90,10 @@ def layout(job_id: str):
     Returns:
         A composed layout with the map on the left and controls on the right.
     """
+    job = CosmonautJob(job_id=job_id)
     card_body = [
         # Shared stores required by cross-page callbacks (map, routing, etc.)
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
-        dcc.Store(
-            id=ROUTING_COMPLETE_STORE_SHARED_ID, data=False, storage_type="session"
-        ),
         dcc.Store(id=EPSG_STORE_SHARED_ID, storage_type="session"),
         dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
         # Local store to remember last tag selection
@@ -250,49 +249,20 @@ def layout(job_id: str):
         next_disabled=False,
     )
 
-    # Build map with a pre-mounted empty (or preloaded) GeoJSON layer we will update via callbacks.
-    # Attempt initial data load so user sees network immediately if files exist.
-    initial_fc = {"type": "FeatureCollection", "features": []}
-    try:
-        in_dir, raw_path, work_path = _paths(job_id)
-        source = work_path if os.path.exists(work_path) else raw_path
-        if source and os.path.exists(source):
-            with open(source, encoding="utf-8") as f:
-                data = json.load(f)
-            feats = data.get("features", [])
-            _ensure_feature_ids(feats)
-            feats = _filter_by_tags(feats, list(osm_tags_mapping.keys()))
-            for feat in feats:
-                p = feat.setdefault("properties", {})
-                name = p.get("name") or p.get("ref")
-                hw = p.get("highway")
-                p["tooltip"] = f"{name}, {hw}" if name else f"{hw}"
-            initial_fc = {"type": "FeatureCollection", "features": feats}
-    except Exception as e:
-        logging.warning("Initial OSM preload failed: %s", e)
+    initial_fc = initial_features(job_id)
 
-    map = html.Div(
-        dl.Map(
-            [
-                dl.TileLayer(url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"),
-                dl.FullScreenControl(),
-                dl.GeoJSON(
-                    id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,
-                    data=initial_fc,
-                    # Use same dynamic style function used after first interaction for consistency
-                    options={"style": style_handle},
-                    hideout=dict(selected=[], zoom=10),
-                    # Set zoomToBounds on initial layout; later we will disable on updates
-                    zoomToBounds=True if initial_fc.get("features") else False,
-                ),
-            ],
-            id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
-            center=[51.70, 11.20],
-            zoom=10,
-            style={"height": "100%"},
-        ),
-        style={"height": "100%", "width": "100%"},
+    extra_layer = dl.GeoJSON(
+        id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,
+        data=initial_fc,
+        # Use same dynamic style function used after first interaction for consistency
+        options={"style": style_handle},
+        hideout=dict(selected=[], zoom=10),
+        # Set zoomToBounds on initial layout; later we will disable on updates
+        zoomToBounds=True if initial_fc.get("features") else False,
     )
+
+    map = create_map(job=job, extra_layers=[extra_layer])
+
     input_container = create_card_input(
         card_body,
         card_footer=footer,

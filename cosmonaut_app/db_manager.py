@@ -26,6 +26,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from cosmonaut_app.config import DB_HOST_NAME, DB_NAME, DB_PORT, DB_PW, DB_USER
+from cosmonaut_app.error_handling import JobNotFound
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -89,15 +90,6 @@ class Base(DeclarativeBase):
     """Base class for declarative base."""
 
     pass
-
-
-class JobNotFound(Exception):
-    """Custom exception for when a job is not found."""
-
-    def __init__(self, job_id):
-        """Add job id as attribute and format error message."""
-        self.job_id = job_id
-        super().__init__(f"Job with ID '{job_id}' not found")
 
 
 class DataBaseManager:
@@ -298,4 +290,5 @@ class JobTable(Base):
     stage = Column("stage", Integer)
     status = Column("status", String)
     version = Column("version", String)
+    epsg = Column("epsg", Integer)
     config = Column("config", JSON)

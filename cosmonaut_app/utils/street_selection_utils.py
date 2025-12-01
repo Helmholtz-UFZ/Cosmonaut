@@ -76,6 +76,30 @@ def ensure_feature_ids(features: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return features
 
 
+def initial_features(job_id) -> List[Dict[str, Any]]:
+    # Build map with a pre-mounted empty (or preloaded) GeoJSON layer we will update via
+    # callbacks. Attempt initial data load so user sees network immediately if files
+    # exist.
+    initial_fc = {"type": "FeatureCollection", "features": []}
+    # TODO job dirs ar now attributes
+    in_dir, raw_path, work_path = paths(job_id)
+    source = work_path if os.path.exists(work_path) else raw_path
+    if source and os.path.exists(source):
+        with open(source, encoding="utf-8") as f:
+            data = json.load(f)
+        feats = data.get("features", [])
+        ensure_feature_ids(feats)
+        feats = filter_by_tags(feats, list(osm_tags_mapping.keys()))
+        for feat in feats:
+            p = feat.setdefault("properties", {})
+            name = p.get("name") or p.get("ref")
+            hw = p.get("highway")
+            p["tooltip"] = f"{name}, {hw}" if name else f"{hw}"
+        initial_fc = {"type": "FeatureCollection", "features": feats}
+
+    return initial_fc
+
+
 def filter_by_tags(
     features: List[Dict[str, Any]], selected_roads: List[str] | None
 ) -> List[Dict[str, Any]]:

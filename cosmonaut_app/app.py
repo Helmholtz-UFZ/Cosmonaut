@@ -5,6 +5,7 @@ import dash_bootstrap_components as dbc
 
 from cosmonaut_app.error_handling import handle_error
 from cosmonaut_app.config import FLASK_PORT
+from cosmonaut_app.files_route import serve_files
 from cosmonaut_app.layout import (
     app_layout,
     register_navbar_callbacks,
@@ -24,6 +25,10 @@ app = Dash(
 )
 
 app.layout = app_layout()
+
+# Serve files
+serve_files(app)
+
 
 register_navbar_callbacks(app)
 register_shared_store_callbacks(app)

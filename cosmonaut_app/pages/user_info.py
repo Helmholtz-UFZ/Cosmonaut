@@ -14,7 +14,7 @@ from cosmonaut_app.layout import (
     page_container_split_layout,
     create_card_input,
     progress_footer,
-    default_map,
+    create_map,
     build_url_step,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -32,7 +32,6 @@ EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 
 def layout(job_id):
     job = CosmonautJob(job_id=job_id)
-    email_value = job.email if job.email else "you@example.org"
 
     card_body = [
         html.P(
@@ -47,7 +46,7 @@ def layout(job_id):
         dbc.Input(
             id=USER_INFO_EMAIL_INPUT_USER_INFO_ID,
             type="email",
-            value=email_value,
+            value=job.model.email,
             autoFocus=True,
         ),
         dbc.FormText(
@@ -61,7 +60,8 @@ def layout(job_id):
     footer = progress_footer(
         next_id=USER_INFO_NEXT_BUTTON_USER_INFO_ID,
     )
-    map = default_map
+    logging.debug(job.model.dict())
+    map = create_map(job=job)
     input_container = create_card_input(
         card_body,
         card_footer=footer,
@@ -102,7 +102,7 @@ def go_to_upload_page(n_clicks: int | None, email: str | None, pathname: str | N
 
     job_id = pathname.split("/")[2]
     job = CosmonautJob(job_id=job_id)
-    job.email = email
+    job.model.email = email
     job.save()
 
     logging.info(f"Storing email {email} for job {job_id}")

@@ -1,38 +1,32 @@
-import os
-import json
-import glob
-import shutil
 import logging
-from datetime import datetime, timezone
-from dash import html, register_page, dcc, callback, Input, Output, State
-from dash.exceptions import PreventUpdate
+from dash import (
+    register_page,
+    dcc,
+    callback,
+    Output,
+    State,
+    Input,
+    callback_context,
+    no_update,
+)
 import dash_bootstrap_components as dbc
 
-from cosmonaut_app.config import osm_tags_mapping, WEB_WORK_DIR
-from cosmonaut_app.ui.page import page_layout, progress_footer
+from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.constants.html_ids import (
-    CFG_AN_INPUT_ROUTING_PARAMS_ID,
-    CFG_IR_INPUT_ROUTING_PARAMS_ID,
-    CFG_LBF_INPUT_ROUTING_PARAMS_ID,
-    CFG_MAI_INPUT_ROUTING_PARAMS_ID,
-    CFG_OO_INPUT_ROUTING_PARAMS_ID,
-    CFG_SN_INPUT_ROUTING_PARAMS_ID,
-    CFG_TL_INPUT_ROUTING_PARAMS_ID,
-    CFG_WD_INPUT_ROUTING_PARAMS_ID,
-    PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID,
-    PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID,
-    ROUTING_COMPLETE_STORE_SHARED_ID,
-    RUN_ROUTING_BUTTON_ROUTING_PARAMS_ID,
-    TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
-    TAGS_LAST_SELECTION_STORE_SHARED_ID,
+    JOB_ID_STORE_SHARED_ID,
+    NEXT_BUTTON_ROUTING_PARAMS_ID,
     URL_SHARED_ID,
 )
-from sensor_routing.sensor_routing_cli import (
-    Config,
-    load_or_create_parameters,
-    sensor_routing,
+
+from cosmonaut_app.layout import (
+    create_map,
+    page_container_split_layout,
+    create_card_input,
+    progress_footer,
+    build_url_step,
 )
-from cosmonaut_app.utils.routing_post import silence_prints, build_solution_route_4326
+from cosmonaut_app.form_factory import FormFactory, InputField
+from cosmonaut_app.pydantic_models import FullPipelineConfig
 
 log = logging.getLogger(__name__)
 
@@ -46,188 +40,42 @@ register_page(
 )
 
 
-def layout(job_id=None, **kwargs):
-    body = [
-        html.P(
-            "Prüfen und ändern Sie die Parameter. Anschließend startet die Routenberechnung.",
-            className="text-muted",
-        ),
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.InputGroup(
-                        [
-                            dbc.InputGroupText("Segments per class"),
-                            dbc.Input(
-                                id=CFG_SN_INPUT_ROUTING_PARAMS_ID,
-                                type="number",
-                                min=1,
-                                max=10,
-                            ),
-                        ]
-                    ),
-                    md=6,
-                ),
-            ],
-            className="g-2",
-        ),
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.InputGroup(
-                        [
-                            dbc.InputGroupText("Time limit [h]"),
-                            dbc.Input(
-                                id=CFG_TL_INPUT_ROUTING_PARAMS_ID, type="number", min=1
-                            ),
-                        ]
-                    ),
-                    md=6,
-                ),
-                dbc.Col(
-                    dbc.InputGroup(
-                        [
-                            dbc.InputGroupText("Lower benefit limit"),
-                            dbc.Input(
-                                id=CFG_LBF_INPUT_ROUTING_PARAMS_ID,
-                                type="number",
-                                min=0,
-                                max=1,
-                                step=0.05,
-                            ),
-                        ]
-                    ),
-                    md=6,
-                ),
-            ],
-            className="g-2 mt-1",
-        ),
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.InputGroup(
-                        [
-                            dbc.InputGroupText("Objective"),
-                            dbc.Select(
-                                id=CFG_OO_INPUT_ROUTING_PARAMS_ID,
-                                options=[
-                                    {"label": "Distance (d)", "value": "d"},
-                                    {"label": "Time (t)", "value": "t"},
-                                ],
-                            ),
-                        ]
-                    ),
-                    md=6,
-                ),
-                dbc.Col(
-                    dbc.InputGroup(
-                        [
-                            dbc.InputGroupText("Max ACO iteration"),
-                            dbc.Input(
-                                id=CFG_MAI_INPUT_ROUTING_PARAMS_ID, type="number", min=1
-                            ),
-                        ]
-                    ),
-                    md=6,
-                ),
-            ],
-            className="g-2 mt-1",
-        ),
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.InputGroup(
-                        [
-                            dbc.InputGroupText("Ant number"),
-                            dbc.Input(
-                                id=CFG_AN_INPUT_ROUTING_PARAMS_ID, type="number", min=1
-                            ),
-                        ]
-                    ),
-                    md=6,
-                ),
-                dbc.Col(
-                    dbc.InputGroup(
-                        [
-                            dbc.InputGroupText("Reversed network"),
-                            dbc.Checklist(
-                                id=CFG_IR_INPUT_ROUTING_PARAMS_ID,
-                                options=[{"label": " yes", "value": True}],
-                                value=[],
-                            ),
-                        ]
-                    ),
-                    md=6,
-                ),
-            ],
-            className="g-2 mt-1",
-        ),
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.InputGroup(
-                        [
-                            dbc.InputGroupText("Working dir"),
-                            dbc.Input(
-                                id=CFG_WD_INPUT_ROUTING_PARAMS_ID,
-                                type="text",
-                                disabled=True,
-                            ),
-                        ]
-                    ),
-                    md=12,
-                ),
-            ],
-            className="g-2 mt-1",
-        ),
-        dcc.Interval(
-            id=PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID,
-            interval=100,
-            n_intervals=0,
-            max_intervals=1,
-        ),
-        dcc.Store(id=ROUTING_COMPLETE_STORE_SHARED_ID, data=False),
-        dcc.Store(id=TAGS_LAST_SELECTION_STORE_SHARED_ID, storage_type="session"),
-        dcc.Dropdown(
-            id=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
-            options=[{"label": tag, "value": tag} for tag in osm_tags_mapping.keys()],
-            value=[],
-            multi=True,
-            style={"display": "none"},
-        ),
-    ]
+card_body_with_placeholder = []
+fields = list(FullPipelineConfig.model_fields.keys())
+for i in range(0, len(fields), 2):
+    col = [dbc.Col(InputField(fields[i]))]
+    if i + 1 < len(fields):
+        col.append(dbc.Col(InputField(fields[i + 1])))
+    card_body_with_placeholder.append(dbc.Row(col, className="g-2 mt-1"))
+
+form_factory = FormFactory(FullPipelineConfig, card_body_with_placeholder)
+card_body = form_factory.process_layout(form_factory.layout)
+
+
+def layout(job_id):
+    logging.info(f"Routing params layout called with job_id={job_id}")
+    job = CosmonautJob(job_id=job_id)
+    form_factory = FormFactory(job.model, card_body_with_placeholder)
+    card_body = form_factory.process_layout(form_factory.layout)
+    card_body.append(dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id))
+
+    user_info_path = build_url_step("street_selection", job_id)
 
     footer = progress_footer(
-        prev=dbc.Button(
-            [html.I(className="bi bi-arrow-left me-1"), "Back"],
-            color="secondary",
-            outline=True,
-            href=f"/job/{job_id}/street-selection",
-        ),
-        next_=dbc.Button(
-            [html.I(className="bi bi-cpu me-1"), "Run routing"],
-            id=RUN_ROUTING_BUTTON_ROUTING_PARAMS_ID,
-            color="primary",
-        ),
+        prev_url=user_info_path,
+        next_id=NEXT_BUTTON_ROUTING_PARAMS_ID,
+        next_disabled=True,
     )
 
-    below = dbc.Alert(
-        id=PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID,
-        children="",
-        color="info",
-        is_open=False,
-        dismissable=True,
-        className="mt-3",
-    )
+    map = create_map(job=job)
 
-    return page_layout(
-        title="Routing Parameters",
-        body=body,
+    input_container = create_card_input(
+        card_body,
+        card_footer=footer,
+        name_step=__name__.replace("pages.", ""),
         job_id=job_id,
-        footer=footer,
-        below=below,
-        step_index=4,
     )
+    return page_container_split_layout(map, input_container)
 
 
 # ============================================================================
@@ -236,240 +84,43 @@ def layout(job_id=None, **kwargs):
 
 
 @callback(
-    Output(CFG_SN_INPUT_ROUTING_PARAMS_ID, "value"),
-    Output(CFG_LBF_INPUT_ROUTING_PARAMS_ID, "value"),
-    Output(CFG_TL_INPUT_ROUTING_PARAMS_ID, "value"),
-    Output(CFG_OO_INPUT_ROUTING_PARAMS_ID, "value"),
-    Output(CFG_MAI_INPUT_ROUTING_PARAMS_ID, "value"),
-    Output(CFG_AN_INPUT_ROUTING_PARAMS_ID, "value"),
-    Output(CFG_IR_INPUT_ROUTING_PARAMS_ID, "value"),
-    Output(CFG_WD_INPUT_ROUTING_PARAMS_ID, "value"),
-    Input(PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID, "n_intervals"),
-    State(URL_SHARED_ID, "pathname"),
-    prevent_initial_call=True,
+    output={
+        **form_factory.produce_callback_outputs(),
+        "url": Output(URL_SHARED_ID, "pathname"),
+        "next_button": Output(NEXT_BUTTON_ROUTING_PARAMS_ID, "disabled"),
+    },
+    inputs={
+        **form_factory.produce_callback_inputs(),
+        "input_next": Input(NEXT_BUTTON_ROUTING_PARAMS_ID, "n_clicks"),
+    },
+    state={
+        "job_id": State(JOB_ID_STORE_SHARED_ID, "data"),
+    },
+    prevent_initial_call="initial_duplicate",
 )
-def init_params(_n, pathname):
-    # /job/<job_id>/routing-params
-    try:
-        job_id = pathname.split("/job/")[1].split("/")[0]
-    except Exception:
-        raise PreventUpdate
-    workdir = os.path.join(WEB_WORK_DIR, job_id)
-    cfg = load_or_create_parameters(working_dir=workdir)
-    return (
-        cfg.segment_number,
-        cfg.lower_benefit_limit,
-        cfg.time_limit,
-        cfg.optimization_objective,
-        cfg.max_aco_iteration,
-        cfg.ant_no,
-        [True] if cfg.is_reversed else [],
-        cfg.working_directory,
-    )
+def update_routing_params(**inputs):
+    job_id = inputs.pop("job_id")
+    job = CosmonautJob(job_id=job_id)
+    valid, output_dict = form_factory.validate_callback(inputs)
+    triggered_id = callback_context.triggered[0]["prop_id"].split(".")[0]
+    logging.info(f"Routing params callback triggered by {triggered_id}, valid={valid}")
+    if valid and triggered_id == NEXT_BUTTON_ROUTING_PARAMS_ID:
+        for key, value in inputs.items():
+            if hasattr(job.model, key):
+                setattr(job.model, key, value)
+        # TODO submit
+        # job.submit()
+        job.save()
+        return {
+            **output_dict,
+            "url": build_url_step("route_download", job_id),
+            "next_button": False,
+        }
 
+    output_dict["url"] = no_update
+    if valid:
+        output_dict["next_button"] = False
+    else:
+        output_dict["next_button"] = True
 
-@callback(
-    Output(PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID, "children", allow_duplicate=True),
-    Output(PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID, "color", allow_duplicate=True),
-    Output(PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID, "is_open", allow_duplicate=True),
-    Output(ROUTING_COMPLETE_STORE_SHARED_ID, "data", allow_duplicate=True),
-    Input(RUN_ROUTING_BUTTON_ROUTING_PARAMS_ID, "n_clicks"),
-    State(CFG_SN_INPUT_ROUTING_PARAMS_ID, "value"),
-    State(CFG_LBF_INPUT_ROUTING_PARAMS_ID, "value"),
-    State(CFG_TL_INPUT_ROUTING_PARAMS_ID, "value"),
-    State(CFG_OO_INPUT_ROUTING_PARAMS_ID, "value"),
-    State(CFG_MAI_INPUT_ROUTING_PARAMS_ID, "value"),
-    State(CFG_AN_INPUT_ROUTING_PARAMS_ID, "value"),
-    State(CFG_IR_INPUT_ROUTING_PARAMS_ID, "value"),
-    State(CFG_WD_INPUT_ROUTING_PARAMS_ID, "value"),
-    State(URL_SHARED_ID, "pathname"),
-    prevent_initial_call=True,
-)
-def run_routing(n, sn, lbf, tl, oo, mai, an, ir_list, wd, pathname):
-    if not n:
-        raise PreventUpdate
-    try:
-        job_id = pathname.split("/job/")[1].split("/")[0]
-    except Exception:
-        return ("Ungültige URL.", "danger", True, False)
-
-    workdir = wd or os.path.join(WEB_WORK_DIR, job_id)
-    input_dir = os.path.join(workdir, "input")
-    transient_dir = os.path.join(workdir, "transient")
-    os.makedirs(transient_dir, exist_ok=True)
-
-    # simple lock to avoid double runs
-    lock_path = os.path.join(transient_dir, "routing.lock")
-    if os.path.exists(lock_path):
-        return ("Routing läuft bereits. Bitte warten…", "warning", True, False)
-    # acquire lock
-    with open(lock_path, "w", encoding="utf-8") as f:
-        f.write(datetime.now(timezone.utc).isoformat())
-
-    success = False
-    message = "Routing fehlgeschlagen."
-    level = "danger"
-
-    # prepare hiding bookkeeping early so we can always restore in finally
-    tmp_hide_dir = os.path.join(input_dir, "_routing_tmp_hide")
-    moved: list[str] = []
-
-    # Unhide anything left from a previous failed run
-    try:
-        if os.path.isdir(tmp_hide_dir):
-            for p in glob.glob(os.path.join(tmp_hide_dir, "*.geojson")):
-                try:
-                    shutil.move(p, os.path.join(input_dir, os.path.basename(p)))
-                except Exception as e:
-                    log.warning("Could not unhide %s: %s", p, e)
-            try:
-                if not os.listdir(tmp_hide_dir):
-                    os.rmdir(tmp_hide_dir)
-            except Exception:
-                pass
-    except Exception as e:
-        log.warning("Unhide sweep failed: %s", e)
-
-    try:
-        # Build config and persist parameters for THIS job
-        try:
-            cfg = Config(
-                sn=sn,
-                lbf=lbf,
-                tl=tl,
-                oo=oo,
-                mai=mai,
-                an=an,
-                ir=bool(ir_list),
-                wd=workdir,
-            )
-        except Exception as e:
-            return (f"Parameter ungültig: {e}", "danger", True, False)
-
-        params_path = os.path.join(workdir, "parameters.json")
-        params = cfg.model_dump(by_alias=True)
-        with open(params_path, "w", encoding="utf-8") as f:
-            json.dump(params, f, indent=2, ensure_ascii=False)
-        log.info("Parameters written to %s", params_path)
-
-        # Deterministically use the projected file that contains osmid
-        projected_candidates = [
-            p
-            for p in glob.glob(os.path.join(input_dir, "osm_data_*.geojson"))
-            if "_4326" not in os.path.basename(p)
-        ]
-        chosen = projected_candidates[0] if projected_candidates else None
-        if not chosen:
-            any_geo = glob.glob(os.path.join(input_dir, "*.geojson"))
-            if not any_geo:
-                return (
-                    "Kein GeoJSON im input/-Ordner gefunden.",
-                    "danger",
-                    True,
-                    False,
-                )
-            chosen = max(any_geo, key=os.path.getmtime)
-        log.info("Routing uses GeoJSON: %s", chosen)
-
-        # Hide only competing projected (*.geojson) files; keep all *_4326.geojson visible
-        os.makedirs(tmp_hide_dir, exist_ok=True)
-        for p in glob.glob(os.path.join(input_dir, "*.geojson")):
-            base = os.path.basename(p)
-            if os.path.abspath(p) == os.path.abspath(chosen):
-                continue
-            if "_4326" in base:
-                # keep 4326 companions; backend may need them
-                continue
-            try:
-                shutil.move(p, os.path.join(tmp_hide_dir, base))
-                moved.append(base)
-            except Exception as e:
-                log.warning("Could not move %s: %s", p, e)
-
-        log.info("Starting sensor-routing in %s", workdir)
-
-        # Ensure backend reads OUR parameters (stream only key progress)
-        with silence_prints(
-            "sensor-routing",
-            info_patterns=[
-                r"point mapping done",
-                r"benefit_calculation done",
-                r"Paths calculation completed",
-                r"path finding done",
-                r"route finding done",
-                r"Execution time",
-                r"all done",
-            ],
-        ):
-            sensor_routing(
-                params["sn"],  # segments per class
-                params["md"],  # max distance
-                params["wd"],  # working directory
-                params["tl"],  # time limit
-                params["oo"],  # objective
-                params["mai"],  # max ACO iteration
-                params["an"],  # number of ants
-                params["ir"],  # reversed network
-                params["lbf"],  # lower benefit limit
-            )
-
-        # Post-process: create a 4326 route layer if solution exists
-        route_fc = build_solution_route_4326(workdir)
-        if route_fc or os.path.isfile(os.path.join(transient_dir, "solution.json")):
-            success = True
-            message = "Routing abgeschlossen. Route wird angezeigt."
-            level = "success"
-        else:
-            pf_path = os.path.join(transient_dir, "pf_output.json")
-            if os.path.isfile(pf_path):
-                success = True
-                message = "Routing abgeschlossen (pf_output)."
-                level = "success"
-
-    except Exception as e:
-        if os.path.isfile(os.path.join(transient_dir, "solution.json")):
-            success = True
-            message = "Routing abgeschlossen (mit Warnungen)."
-            level = "warning"
-            log.warning("Routing raised but produced solution.json: %s", e)
-        else:
-            message = f"Routing fehlgeschlagen: {e}"
-            level = "danger"
-            log.exception("Routing failed")
-    finally:
-        # Always restore hidden files and release lock
-        try:
-            for base in list(moved):
-                src = os.path.join(tmp_hide_dir, base)
-                dst = os.path.join(input_dir, base)
-                if os.path.exists(src):
-                    try:
-                        shutil.move(src, dst)
-                    except Exception as e:
-                        log.warning("Could not restore %s: %s", src, e)
-            try:
-                if os.path.isdir(tmp_hide_dir) and not os.listdir(tmp_hide_dir):
-                    os.rmdir(tmp_hide_dir)
-            except Exception:
-                pass
-        except Exception:
-            pass
-        try:
-            if os.path.exists(lock_path):
-                os.remove(lock_path)
-        except Exception:
-            pass
-
-    # Signal the map to refresh (routing-complete=True)
-    return (message, level, True, success)
-
-
-# Hydrate hidden tags-dropdown so the same streets stay visible
-@callback(
-    Output(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
-    Input(PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID, "n_intervals"),
-    State(TAGS_LAST_SELECTION_STORE_SHARED_ID, "data"),
-    prevent_initial_call=True,
-)
-def _hydrate_tags_for_params(_n, last_selection):
-    return last_selection or list(osm_tags_mapping.keys())
+    return output_dict

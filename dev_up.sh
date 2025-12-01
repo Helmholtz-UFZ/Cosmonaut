@@ -10,7 +10,7 @@ while [[ $# -gt 0 ]]; do
         DEBUG_MODE=true
         shift
         ;;
-    mock | prod)
+    mock | prod | stage)
         MODE="$1"
         shift
         ;;
@@ -37,8 +37,10 @@ if [ "$MODE" == "mock" ]; then
     env_file="env_dev_mock"
 elif [ "$MODE" == "prod" ]; then
     env_file="env_dev_prod_priv"
+elif [ "$MODE" == "stage" ]; then
+    env_file="env_dev_stage_priv"
 else
-    echo "Invalid mode. Use 'mock' or 'prod'."
+    echo "Invalid mode. Use 'mock', 'prod' or 'stage'."
     exit 1
 fi
 

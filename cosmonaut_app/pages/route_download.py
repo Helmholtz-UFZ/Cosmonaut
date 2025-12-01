@@ -1,21 +1,23 @@
 """Route & Download page: show route, QR code, and GPX download."""
 
-import os
-import time
-import json
 import logging
-from dash import html, register_page, callback, Input, Output, State
+from dash import html, register_page, callback, Input, Output, State, dcc
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
-from cosmonaut_app.ui.page import page_layout
-from cosmonaut_app.config import WEB_WORK_DIR
+from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID,
     START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID,
 )
-from cosmonaut_app.navigation_routing import RouteCreator
+from cosmonaut_app.layout import (
+    create_map,
+    page_container_split_layout,
+    create_card_input,
+    progress_footer,
+    build_url_step,
+)
 
 register_page(
     __name__,
@@ -27,8 +29,10 @@ register_page(
 )
 
 
-def layout(job_id=None, **kwargs):
-    body = [
+def layout(job_id):
+    job = CosmonautJob(job_id=job_id)
+    logging.info(f"Route & Download layout called with job_id={job_id}")
+    card_body = [
         html.P(
             "Bitte haben Sie Geduld, bis die Route berechnet ist.",
             style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
@@ -45,8 +49,32 @@ def layout(job_id=None, **kwargs):
             className="me-2",
             n_clicks=0,
         ),
+        html.Div(
+            html.Img(
+                id=QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID,
+                style={"margin-top": "1rem", "max-width": "100%"},
+            ),
+            style={"textAlign": "center"},
+        ),
+        dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
     ]
-    return page_layout("Route & Download", body, job_id=job_id, step_index=5)
+
+    routing_params_path = build_url_step("routing_params", job_id)
+
+    footer = progress_footer(
+        prev_url=routing_params_path,
+        next_url=None,
+    )
+
+    map = create_map(job=job)
+
+    input_container = create_card_input(
+        card_body,
+        card_footer=footer,
+        name_step=__name__.replace("pages.", ""),
+        job_id=job_id,
+    )
+    return page_container_split_layout(map, input_container)
 
 
 # ============================================================================
@@ -61,24 +89,8 @@ def layout(job_id=None, **kwargs):
     prevent_initial_call=True,
 )
 def update_qr_code(n_clicks, job_id):
+    logging.info(f"Generating QR code for job_id={job_id} on click {n_clicks}")
     if n_clicks is None:
         raise PreventUpdate
-    geojson_path = os.path.join(
-        WEB_WORK_DIR, job_id, "transient", "solution_transformed.json"
-    )
-    with open(geojson_path, encoding="utf-8") as f:
-        geojson_data = json.load(f)
-    route_creator = RouteCreator(geojson_data)
-    output_dir = os.path.join(WEB_WORK_DIR, job_id, "output")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    gpx_filename = f"{job_id}_route_{time.strftime('%Y%m%d')}.gpx"
-    full_path = os.path.join(output_dir, gpx_filename)
-    route_creator.create_gpx(filename=gpx_filename, path=output_dir)
-    logging.debug("GPX file created at %s", full_path)
-    if not os.path.exists(full_path):
-        logging.error("GPX file does not exist: %s", full_path)
-        raise FileNotFoundError(f"GPX file not found: {full_path}")
-    gpx_url = route_creator.upload_gpx(filename=gpx_filename, job_id=job_id)
-    qr_data = route_creator.create_qr_code(gpx_url, path=output_dir)
-    return qr_data["qr_code"]
+    job = CosmonautJob(job_id=job_id)
+    return job.create_qr_code_routing()

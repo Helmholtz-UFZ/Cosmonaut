@@ -1,7 +1,6 @@
 """Landing page for starting a new job."""
 
 import logging
-import dash
 from dash import html, register_page, callback, Input, Output
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
@@ -14,7 +13,8 @@ from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
     page_container_split_layout,
     create_card_input,
-    default_map,
+    create_map,
+    build_url_step,
 )
 
 register_page(
@@ -44,7 +44,7 @@ card_body = [
     ),
 ]
 
-map = default_map
+map = create_map()
 input_container = create_card_input(card_body, title="Welcome to COSMONAUT")
 
 layout = page_container_split_layout(map, input_container)
@@ -68,7 +68,4 @@ def start_job(n_clicks):
     logging.info("Initializing new CosmonautJob")
     job = CosmonautJob()
 
-    user_info_base_path = dash.page_registry["pages.user_info"]["path_template"]
-    user_info_path = user_info_base_path.replace("<job_id>", job.job_id)
-
-    return user_info_path
+    return build_url_step("user_info", job.model.job_id)

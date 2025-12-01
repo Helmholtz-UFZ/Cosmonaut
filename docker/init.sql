@@ -15,6 +15,7 @@ CREATE TABLE jobs (
     stage INT,
     status VARCHAR,
     version VARCHAR,
+    epsg INT,
     config JSONB
 );
 

@@ -26,7 +26,6 @@ from cosmonaut_app.constants.html_ids import (
     NAVBAR_COLLAPSE_NAV_SHARED_ID,
     NAVBAR_TOGGLER_NAV_SHARED_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
-    REDIRECT_INTERVAL_NAV_SHARED_ID,
     ROUTE_GEOJSON_LAYER_MAP_SHARED_ID,
     ROUTE_LAYER_LAYER_MAP_SHARED_ID,
     ROUTING_COMPLETE_STORE_SHARED_ID,
@@ -227,12 +226,18 @@ def _load_geojson(path: str):
 # Layout Components
 # ============================================================================
 
+osm_layer = dl.TileLayer(
+    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution="© OpenStreetMap contributors",
+)
+default_map_layers = [osm_layer, dl.FullScreenControl()]
+# TODO That is a dupliation each page has a name this could be looked up dynamically
 steps_jobs = {
     "user_info": "User information",
     "data_upload": "Data upload",
     "street_selection": "Street selection",
     "routing_params": "Routing Parameters",
-    "rout_download": "Route",
+    "route_download": "Route",
 }
 
 
@@ -275,12 +280,6 @@ def create_navbar():
                         "maxWidth": "28rem",
                     },
                 ),
-                dcc.Interval(
-                    id=REDIRECT_INTERVAL_NAV_SHARED_ID,
-                    interval=3000,
-                    n_intervals=0,
-                    disabled=True,
-                ),
             ],
         ),
     )
@@ -301,7 +300,7 @@ def app_layout():
 
 def page_container_fullscreen_layout(content):
     """Create a page container with a fullscreen layout."""
-    return html.Div(
+    return html.Main(
         className="d-flex flex-column flex-grow-1 bg-white p-0 m-0", children=content
     )
 
@@ -395,7 +394,6 @@ def progress_footer(
             kwargs_next["href"] = next_url
         if next_id is not None:
             kwargs_next["id"] = next_id
-        logging.info(kwargs_next)
         next_button = dbc.Button(args_next, **kwargs_next)
 
     actions = html.Div(
@@ -479,6 +477,31 @@ def progress_steps(current: int, variant: str = "default") -> html.Div:
     )
 
 
+def create_map(job=None, extra_layers=None):
+    map_layers = default_map_layers
+    if extra_layers is not None:
+        map_layers += extra_layers
+
+    if job is not None:
+        zoom = job.model.classification_upload["zoom"]
+        center = job.model.classification_upload["center"]
+    else:
+        zoom = 10
+        center = [51.70, 11.20]
+
+    return html.Div(
+        dl.Map(
+            map_layers,
+            id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+            center=center,
+            zoom=zoom,
+            style={"height": "100%"},
+        ),
+        id=MAIN_MAP_DIV_MAP_SHARED_ID,
+        style={"height": "100%", "width": "100%"},
+    )
+
+
 def page_layout(
     title: str,
     body,
@@ -532,22 +555,6 @@ def page_layout(
 
 
 # Main Map
-osm_layer = dl.TileLayer(
-    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution="© OpenStreetMap contributors",
-)
-default_map_layers = [osm_layer, dl.FullScreenControl()]
-default_map = html.Div(
-    dl.Map(
-        default_map_layers,
-        id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
-        center=[51.70, 11.20],
-        zoom=10,
-        style={"height": "100%"},
-    ),
-    id=MAIN_MAP_DIV_MAP_SHARED_ID,
-    style={"height": "100%", "width": "100%"},
-)
 
 # TODO
 main_map = html.Div(
