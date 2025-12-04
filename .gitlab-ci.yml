@@ -70,7 +70,7 @@ testing:
     - name: "redis:latest"
       alias: "redis"
   before_script:
-    - "apt-get update && apt-get install -y libgdal-dev postgresql-client curl"
+    - "apt-get update && apt-get install -y libgdal-dev postgresql-client curl rclone"
     - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"
     - "export C_INCLUDE_PATH=/usr/include/gdal"
     - "pip install uv"
