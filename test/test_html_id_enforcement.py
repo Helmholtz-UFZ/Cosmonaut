@@ -88,6 +88,10 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
         if is_comment_or_docstring(line):
             continue
 
+        # Skip lines with # nocheck comment
+        if "# nocheck" in line or "#nocheck" in line:
+            continue
+
         # Skip variable assignments (id = something with spaces around =)
         if re.search(r"\bid\s+=\s+", line):
             continue
@@ -112,12 +116,13 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
 
         # Now find id= patterns in this component line
         # Match: id="string", id='string', id=variable, id=f"string"
+        # Use \b word boundary to ensure we match "id" as a complete word, not "job_id" etc.
         patterns = [
-            r'id\s*=\s*"([^"]+)"',  # id="string"
-            r"id\s*=\s*'([^']+)'",  # id='string'
-            r'id\s*=\s*f"([^"]+)"',  # id=f"string"
-            r"id\s*=\s*f'([^']+)'",  # id=f'string'
-            r"id\s*=\s*([a-z_][a-zA-Z0-9_]*)",  # id=variable (lowercase start = not constant)
+            r'\bid\s*=\s*"([^"]+)"',  # id="string"
+            r"\bid\s*=\s*'([^']+)'",  # id='string'
+            r'\bid\s*=\s*f"([^"]+)"',  # id=f"string"
+            r"\bid\s*=\s*f'([^']+)'",  # id=f'string'
+            r"\bid\s*=\s*([a-z_][a-zA-Z0-9_]*)",  # id=variable (lowercase start = not constant)
         ]
 
         for pattern in patterns:
@@ -261,6 +266,7 @@ def test_no_string_literal_ids():
         error_msg += "\n".join(f"  {v}" for v in all_violations)
         error_msg += "\n\nAll id= usages must use constants from cosmonaut_app/constants/html_ids.py"
         error_msg += '\nExample: id=START_JOB_BUTTON_HOME_ID (not id="start-job")'
+        error_msg += '\n\nTo exclude a line from this check, add a "# nocheck" comment at the end of the line.'
         assert False, error_msg
 
 

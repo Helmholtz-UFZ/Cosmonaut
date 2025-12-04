@@ -2,14 +2,13 @@
 
 FROM python:3.13-slim
 
-ARG REQUIREMENTS_SHA
-
 ENV MPLCONFIGDIR=/python_docker/cosmonaut/.config/matplotlib
 
 RUN useradd -m -u 1000 appuser && \
     apt-get update && \
     apt-get -y upgrade && \
-    apt-get -y install git libpq-dev gcc g++ libgdal-dev gdal-bin && \
+    apt-get -y install git libpq-dev gcc g++ libgdal-dev gdal-bin rclone && \
+    rm -rf /var/lib/apt/lists/* && \
     pip install --upgrade pip wheel setuptools && \
     pip install uv && \
     mkdir -p $MPLCONFIGDIR && chmod 777 $MPLCONFIGDIR && \

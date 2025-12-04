@@ -12,7 +12,11 @@ from cosmonaut_app.config import (
     WEB_WORK_DIR,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
-from cosmonaut_app.minio_manager import MiniIOManager
+from cosmonaut_app.object_storage_manager import (
+    get_files,
+    save_files,
+    delete_directory_from_storage,
+)
 from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.transformation import get_bounds, transform_csv
 from cosmonaut_app.pydantic_models import JobModel, FullPipelineConfig
@@ -30,21 +34,21 @@ class CosmonautJob:
     Filesystem paths are stored as direct instance attributes.
     """
 
-    def __init__(self, job_id=None, download_from_minio=False):
+    def __init__(self, job_id=None):
         """Init class by id or make a new one."""
         if job_id is not None:
             logging.info(f"Load job with id {job_id}")
             if not DataBaseManager.check_existence(job_id):
                 raise JobNotFound(job_id)
-            self.load(job_id, download_from_minio)
+            self.load(job_id)
         else:
             logging.info("Create new job")
             self._blank_job()
 
-    def load(self, job_id, download_from_minio=False):
+    def load(self, job_id):
         """
         Get job information from the database,
-        load the data from MinIO (if specified),
+        load the data from object storage,
         and store files in the working directory.
         """
         logging.debug(f"load job with id {job_id}")
@@ -63,10 +67,8 @@ class CosmonautJob:
         # Set up filesystem paths
         self._create_working_dir()
 
-        # Download entire job directory from MinIO only if the flag is True
-        if download_from_minio:
-            minio_job_dir = f"{self.model.job_id}/"
-            MiniIOManager.download_directory(minio_job_dir, self.working_dir)
+        # Always download files from object storage when loading existing job
+        get_files(self.model.job_id)
 
     def _blank_job(self):
         """Create a new job with a unique ID."""
@@ -93,7 +95,7 @@ class CosmonautJob:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def save(self):
-        """Save the job to the database."""
+        """Save the job to the database and sync files to object storage."""
         logging.info(f"Save job {self.model.job_id}")
 
         # Get all data from model
@@ -113,6 +115,9 @@ class CosmonautJob:
 
         # Save to database
         DataBaseManager.add_entry(data)
+
+        # Auto-sync files to object storage
+        save_files(self.model.job_id)
 
     def dump_routing_params(self):
         """
@@ -179,12 +184,12 @@ class CosmonautJob:
         return position, zoom
 
     def delete(self):
-        """Delete the job from the database and MinIO."""
+        """Delete the job from the database and object storage."""
         logging.debug(f"delete job {self.model.job_id}")
         # delete job from database
         DataBaseManager.delete_job(self.model.job_id)
-        # delete files from MinIO
-        MiniIOManager.delete_file(self.model.job_id)
+        # delete files from object storage
+        delete_directory_from_storage(self.model.job_id)
 
     def time_to_life(self):
         """Return the time to life of the job."""

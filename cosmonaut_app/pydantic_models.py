@@ -55,7 +55,7 @@ class FullPipelineConfig(BaseModel):
             le=10,
             description="Must be between 1 and 10",
             title="Segments per class",
-            type="integer",
+            json_schema_extra={"type": "integer"},
         ),
     ]
     lower_benefit_limit: Annotated[
@@ -67,7 +67,7 @@ class FullPipelineConfig(BaseModel):
             le=1.0,
             description="Must be between 0.0 and 1.0",
             title="Lower benefit limit",
-            type="float",
+            json_schema_extra={"type": "float"},
         ),
     ]
     time_limit: Annotated[
@@ -78,7 +78,7 @@ class FullPipelineConfig(BaseModel):
             gt=0,
             description="Must be a positive number",
             title="Time limit [h]",
-            type="integer",
+            json_schema_extra={"type": "integer"},
         ),
     ]
     optimization_objective: Annotated[
@@ -89,7 +89,7 @@ class FullPipelineConfig(BaseModel):
             pattern="^(d|t|i)$",
             description="Must be 'd' (distance) or 't' (time)",
             title="Objective",
-            type="text",
+            json_schema_extra={"type": "text"},
         ),
     ]
     max_aco_iteration: Annotated[
@@ -100,7 +100,7 @@ class FullPipelineConfig(BaseModel):
             gt=0,
             description="Must be a positive integer",
             title="Max ACO iteration",
-            type="integer",
+            json_schema_extra={"type": "integer"},
         ),
     ]
     ant_no: Annotated[
@@ -111,7 +111,7 @@ class FullPipelineConfig(BaseModel):
             gt=0,
             description="Must be a positive integer",
             title="Ant number",
-            type="integer",
+            json_schema_extra={"type": "integer"},
         ),
     ]
     is_reversed: Annotated[
@@ -121,7 +121,7 @@ class FullPipelineConfig(BaseModel):
             alias="ir",
             description="Must be true or false",
             title="Reversed network",
-            type="checkbox",
+            json_schema_extra={"type": "checkbox"},
         ),
     ]
     working_directory: Annotated[
@@ -131,7 +131,7 @@ class FullPipelineConfig(BaseModel):
             alias="wd",
             description="Working directory path",
             title="Working directory",
-            type="text",
+            json_schema_extra={"type": "text"},
         ),
     ]
     max_distance: Annotated[
@@ -142,7 +142,7 @@ class FullPipelineConfig(BaseModel):
             gt=0,
             description="Must be a positive integer",
             title="Max distance",
-            type="integer",
+            json_schema_extra={"type": "integer"},
         ),
     ]
     benefit_type: Annotated[
@@ -153,7 +153,7 @@ class FullPipelineConfig(BaseModel):
             pattern="^(t|m)$",
             description="Must be 't' (total) or 'm' (max)",
             title="Benefit type",
-            type="text",
+            json_schema_extra={"type": "text"},
         ),
     ]
     route_type: Annotated[
@@ -164,7 +164,7 @@ class FullPipelineConfig(BaseModel):
             pattern="^(g|b)$",
             description="Must be 'g' (good) or 'b' (bad)",
             title="Route type",
-            type="text",
+            json_schema_extra={"type": "text"},
         ),
     ]
 
@@ -177,7 +177,7 @@ class FullPipelineConfig(BaseModel):
             gt=0,
             description="Number of points for HPE optimization",
             title="Number of points",
-            type="integer",
+            json_schema_extra={"type": "integer"},
         ),
     ]
     goal_ratio: Annotated[
@@ -188,7 +188,7 @@ class FullPipelineConfig(BaseModel):
             gt=0,
             description="Goal ratio for HPE optimization",
             title="Goal ratio",
-            type="float",
+            json_schema_extra={"type": "float"},
         ),
     ]
     use_fixed_seeds: Annotated[
@@ -198,7 +198,7 @@ class FullPipelineConfig(BaseModel):
             alias="ufs",
             description="Use fixed seeds for reproducible results",
             title="Use fixed seeds",
-            type="checkbox",
+            json_schema_extra={"type": "checkbox"},
         ),
     ]
     debug_seed: Annotated[
@@ -209,7 +209,7 @@ class FullPipelineConfig(BaseModel):
             gt=0,
             description="Debug seed value",
             title="Debug seed",
-            type="integer",
+            json_schema_extra={"type": "integer"},
         ),
     ]
     allow_fewer_points: Annotated[
@@ -219,7 +219,7 @@ class FullPipelineConfig(BaseModel):
             alias="afp",
             description="Allow fewer points than requested",
             title="Allow fewer points",
-            type="checkbox",
+            json_schema_extra={"type": "checkbox"},
         ),
     ]
 
@@ -234,7 +234,7 @@ class UserModel(FullPipelineConfig):
             "test@test.com",
             description="Email address to be notified when job submission is complete.",
             title="Email",
-            type="email",
+            json_schema_extra={"type": "email"},
         ),
         AfterValidator(check_email),
     ]
@@ -244,7 +244,7 @@ class UserModel(FullPipelineConfig):
             "poised_python_of_wonder",
             description='Identifier for your submission. Only letters, numbers and "_".',  # noqa
             title="Job ID",
-            type="text",
+            json_schema_extra={"type": "text"},
         ),
         AfterValidator(validate_job_id),
     ]
@@ -260,7 +260,7 @@ class UserModel(FullPipelineConfig):
             },
             description=("Upload a file with the crns data"),
             title="Crns upload",
-            type="file-upload",
+            json_schema_extra={"type": "file-upload"},
         ),
     ]
     selected_road_tags: Annotated[
@@ -269,7 +269,7 @@ class UserModel(FullPipelineConfig):
             [],
             description="Selected road tags from OpenStreetMap.",
             title="Selected road tags",
-            type="list",
+            json_schema_extra={"type": "list"},
         ),
     ]
     epsg: Annotated[
@@ -278,7 +278,7 @@ class UserModel(FullPipelineConfig):
             25832,
             description="EPSG code of the uploaded classification data.",
             title="EPSG code",
-            type="text",
+            json_schema_extra={"type": "text"},
         ),
     ]
 

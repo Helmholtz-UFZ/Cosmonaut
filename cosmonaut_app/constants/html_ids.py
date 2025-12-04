@@ -22,19 +22,12 @@ Organization:
 
 # --- Stores ---
 CLICKED_ROADS_STORE_SHARED_ID = "clicked-roads-store-shared-id"
-EMAIL_STORE_SHARED_ID = "email-store-shared-id"
 EPSG_STORE_SHARED_ID = "epsg-store-shared-id"
-FILE_PATH_STORE_SHARED_ID = "file-path-store-shared-id"
 JOB_ID_STORE_SHARED_ID = "job-id-store-shared-id"
-OSM_FILE_PATH_STORE_SHARED_ID = "osm-file-path-store-shared-id"
-ROUTING_COMPLETE_STORE_SHARED_ID = "routing-complete-store-shared-id"
-TAGS_LAST_SELECTION_STORE_SHARED_ID = "tags-last-selection-store-shared-id"
 
 # --- Navigation ---
 NAVBAR_COLLAPSE_NAV_SHARED_ID = "navbar-collapse-nav-shared-id"
 NAVBAR_TOGGLER_NAV_SHARED_ID = "navbar-toggler-nav-shared-id"
-# nocheck not used in callbacks
-REDIRECT_INTERVAL_NAV_SHARED_ID = "redirect-interval"
 SEARCH_BUTTON_NAV_SHARED_ID = "search-button-nav-shared-id"
 SEARCH_INPUT_NAV_SHARED_ID = "search-input-nav-shared-id"
 SEARCH_RESULTS_DIV_NAV_SHARED_ID = "search-results-div-nav-shared-id"
@@ -42,27 +35,15 @@ URL_SHARED_ID = "url-shared-id"
 
 # --- Utility ---
 NONE_DIV_SHARED_ID = "none-div-shared-id"
-
 # --- Map Elements ---
 MAIN_MAP_COMPONENT_MAP_SHARED_ID = "main-map-component-map-shared-id"
-# nocheck only used in layout
-MAIN_MAP_DIV_MAP_SHARED_ID = "main-map-div-map-shared-id"
-MANAGED_LAYERS_GROUP_MAP_SHARED_ID = (
-    "managed-layers"  # nocheck dynamically created layer group
-)
 OSM_GEOJSON_LAYER_MAP_SHARED_ID = "osm-geojson-layer-map-shared-id"
-ROUTE_GEOJSON_LAYER_MAP_SHARED_ID = (
-    "route-geojson-layer-map-shared-id"  # nocheck dynamically created map layer
-)
-ROUTE_LAYER_LAYER_MAP_SHARED_ID = (
-    "route-layer-layer-map-shared-id"  # nocheck dynamically created map layer
-)
 
 # --- Modals ---
-ERROR_MODAL_TITLE_SHARED_ID = "error-title"  # nocheck used in error_handling.py
-# nocheck used in error_handling.py
-ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"
-ERROR_MODAL_SHARED_ID = "error-modal"  # nocheck used in error_handling.py
+# used not in normal callbacks, but in error handling callbacks (set_props())
+ERROR_MODAL_TITLE_SHARED_ID = "error-title"  # nocheck
+ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"  # nocheck
+ERROR_MODAL_SHARED_ID = "error-modal"  # nocheck
 
 # ============================================================================
 # PAGE: DATA_UPLOAD
@@ -76,10 +57,6 @@ DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID = (
     "data-upload-dropzone-div-data-upload-id"  # nocheck visual container
 )
 DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID = "data-upload-file-info-div-data-upload-id"
-OUTPUT_DATA_UPLOAD_DIV_DATA_UPLOAD_ID = "output-data-upload-div-data-upload-id"
-OUTPUT_MINIO_STATUS_DIV_DATA_UPLOAD_ID = "output-minio-status-div-data-upload-id"
-OUTPUT_OSM_QUERY_DIV_DATA_UPLOAD_ID = "output-osm-query-div-data-upload-id"
-PLOT_GENERATION_STATUS_DIV_DATA_UPLOAD_ID = "plot-generation-status-div-data-upload-id"
 
 # --- Inputs ---
 DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID = "data-upload-epsg-input-data-upload-id"
@@ -90,9 +67,6 @@ DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID = (
 )
 DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID = (
     "data-upload-upload-component-data-upload-id"
-)
-TOAST_STACK_CONTAINER_DATA_UPLOAD_ID = (
-    "toast-stack-container-data-upload-id"  # nocheck container for dynamic toasts
 )
 
 
@@ -115,23 +89,8 @@ START_JOB_BUTTON_HOME_ID = "start-job-button-home-id"
 # PAGE: ROUTING_PARAMS
 # ============================================================================
 
-# --- Alerts ---
-PARAMS_ALERT_ALERT_ROUTING_PARAMS_ID = "params-alert-alert-routing-params-id"
-
-# --- Buttons ---
-PARAMS_LOAD_BUTTON_ROUTING_PARAMS_ID = "params-load-button-routing-params-id"
-NEXT_BUTTON_ROUTING_PARAMS_ID = "next-button-routing-params-id"
-
-# --- Inputs (Config Parameters) ---
-CFG_AN_INPUT_ROUTING_PARAMS_ID = "cfg-an-input-routing-params-id"
-CFG_IR_INPUT_ROUTING_PARAMS_ID = "cfg-ir-input-routing-params-id"
-CFG_LBF_INPUT_ROUTING_PARAMS_ID = "cfg-lbf-input-routing-params-id"
-CFG_MAI_INPUT_ROUTING_PARAMS_ID = "cfg-mai-input-routing-params-id"
-CFG_OO_INPUT_ROUTING_PARAMS_ID = "cfg-oo-input-routing-params-id"
-CFG_SN_INPUT_ROUTING_PARAMS_ID = "cfg-sn-input-routing-params-id"
-CFG_TL_INPUT_ROUTING_PARAMS_ID = "cfg-tl-input-routing-params-id"
-CFG_WD_INPUT_ROUTING_PARAMS_ID = "cfg-wd-input-routing-params-id"
-
+# Needed for testing purposes
+NEXT_BUTTON_ROUTING_PARAMS_ID = "next-button-routing-params-id"  # nocheck
 
 # ============================================================================
 # PAGE: ROUTE_DOWNLOAD
@@ -148,11 +107,9 @@ QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID = "qr-code-image-route-download-id"
 # PAGE: STREET_SELECTION
 # ============================================================================
 
-# --- Alerts ---
-ACTION_ALERT_ALERT_STREET_SELECTION_ID = "action-alert-alert-street-selection-id"
-
 # --- Buttons ---
-NEXT_BUTTON_STREET_SELECTION_ID = "next-button-street-selection-id"
+# Needed for testing purposes
+NEXT_BUTTON_STREET_SELECTION_ID = "next-button-street-selection-id"  # nocheck
 CANCEL_RESET_BUTTON_STREET_SELECTION_ID = "cancel-reset-button-street-selection-id"
 CONFIRM_RESET_BUTTON_STREET_SELECTION_ID = "confirm-reset-button-street-selection-id"
 LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID = "largest-button-button-street-selection-id"
@@ -165,9 +122,6 @@ TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID = (
     "tags-select-none-button-street-selection-id"
 )
 UNDO_BUTTON_BUTTON_STREET_SELECTION_ID = "undo-button-button-street-selection-id"
-
-# --- Divs ---
-SELECTION_COUNT_DIV_STREET_SELECTION_ID = "selection-count-div-street-selection-id"
 
 # --- Dropdowns ---
 TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID = (
@@ -186,9 +140,6 @@ RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID = (
 
 # --- Buttons ---
 USER_INFO_NEXT_BUTTON_USER_INFO_ID = "user-info-next-button-user-info-id"
-
-# --- Divs ---
-USER_INFO_CONTENT_DIV_USER_INFO_ID = "user-info-content-div-user-info-id"
 
 # --- Inputs ---
 USER_INFO_EMAIL_INPUT_USER_INFO_ID = "user-info-email-input-user-info-id"

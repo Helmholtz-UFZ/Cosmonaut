@@ -47,11 +47,17 @@ uv run python -m cosmonaut_app.app
 ### Running Tests
 
 ```bash
-# Headless mode (default, for CI)
+# Run all tests (headless)
 ./run_pytest.sh
 
-# Headed mode (see browser window)
+# Run all tests with visible browser
 ./run_pytest.sh --headed
+
+# Run specific test file
+./run_pytest.sh test/test_app.py
+
+# Skip service startup (if already running)
+./run_pytest.sh --no-services test/test_app.py
 ```
 
 ## Environment Configuration
@@ -70,5 +76,5 @@ Key environment variables:
 - `FLASK_DEBUG=1` - Enable debug mode with auto-reload
 - `GUNICORN=0` - Use Flask dev server instead of Gunicorn
 - `WEB_WORK_DIR` - Working directory for job files
-- `MINIO_*` - MinIO/S3 configuration variables
+- `OBJECT_STORAGE_*` - Objet storage (minio/S3) configuration variables
 - `DB_*` - Database connection settings (Postgres)

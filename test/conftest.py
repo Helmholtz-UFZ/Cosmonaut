@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy.exc import OperationalError
 
 from cosmonaut_app.app import app
+from cosmonaut_app.config import FLASK_PORT
 from cosmonaut_app.db_manager import DataBaseManager
 
 
@@ -49,7 +50,7 @@ def dash_app():
     """Start the Dash app in a background thread."""
 
     def run_app():
-        app.run(debug=False, port=8050)
+        app.run(debug=False, port=int(FLASK_PORT))
 
     thread = threading.Thread(target=run_app, daemon=True)
     thread.start()

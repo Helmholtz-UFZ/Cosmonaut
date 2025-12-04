@@ -8,10 +8,12 @@ DEBUG=0
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
 FLASK_PORT=8080
 
-### minIO ###
-MINIO_ACCESS_KEY="MrB4LovDjMtWdegRIyOk"
-MINIO_HOST="minio.ufz.de"
-MINIO_PORT=443
+### Object Storage (S3-compatible via rclone) ###
+OBJECT_STORAGE_ACCESS_KEY="MrB4LovDjMtWdegRIyOk"
+OBJECT_STORAGE_SECRET_KEY="<REPLACE IN PRIVATE FILE>"
+OBJECT_STORAGE_HOST="https://minio.ufz.de"
+OBJECT_STORAGE_BUCKET="cosmic-routing"
+OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
 
 ### Postgres DB ###
 DB_NAME="cosmonaut_stage"

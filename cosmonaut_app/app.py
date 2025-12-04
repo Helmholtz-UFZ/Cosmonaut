@@ -1,17 +1,14 @@
-import os
-
 from dash import Dash
 import dash_bootstrap_components as dbc
 
 from cosmonaut_app.error_handling import handle_error
-from cosmonaut_app.config import FLASK_PORT
+from cosmonaut_app.config import FLASK_PORT, DEBUG
 from cosmonaut_app.files_route import serve_files
 from cosmonaut_app.layout import (
     app_layout,
     register_navbar_callbacks,
-    register_shared_store_callbacks,
-    register_map_callbacks,
 )
+from cosmonaut_app.object_storage_manager import setup_remote, create_bucket
 
 # --- Flask + Dash setup ---
 app = Dash(
@@ -28,13 +25,11 @@ app.layout = app_layout()
 
 # Serve files
 serve_files(app)
-
+# Setup object storage
+setup_remote()
+create_bucket()
 
 register_navbar_callbacks(app)
-register_shared_store_callbacks(app)
-register_map_callbacks(app)
 
 if __name__ == "__main__":
-    # Read DEBUG from environment variable (default to False)
-    debug_mode = os.getenv("DEBUG", "0") == "1"
-    app.run(host="0.0.0.0", debug=debug_mode, port=FLASK_PORT)
+    app.run(host="0.0.0.0", debug=DEBUG, port=FLASK_PORT)

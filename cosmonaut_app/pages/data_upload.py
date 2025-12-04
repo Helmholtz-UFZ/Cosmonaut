@@ -18,10 +18,8 @@ from cosmonaut_app.constants.html_ids import (
     NEXT_BUTTON_DATA_UPLOAD_ID,
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     EPSG_STORE_SHARED_ID,
-    FILE_PATH_STORE_SHARED_ID,
     JOB_ID_STORE_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
-    OSM_FILE_PATH_STORE_SHARED_ID,
 )
 from cosmonaut_app.transformation import (
     OsmRoads,
@@ -110,9 +108,6 @@ def layout(job_id):
             id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
             className="text-muted",
         ),
-        # hidden holders required by callbacks
-        html.Div(id=FILE_PATH_STORE_SHARED_ID, style={"display": "none"}),
-        html.Div(id=OSM_FILE_PATH_STORE_SHARED_ID, style={"display": "none"}),
     ]
 
     user_info_path = build_url_step("user_info", job_id)

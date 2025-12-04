@@ -155,30 +155,71 @@ cosmonaut_app/
 
 ### Running Tests
 
-Check regularly that your development process run well with:
+The project uses `run_pytest.sh` for running tests with automatic service management.
+
+**Basic Usage:**
 
 ```bash
+# Run all tests (headless, default for CI)
 ./run_pytest.sh
+
+# Run all tests with visible browser (for debugging)
+./run_pytest.sh --headed
+
+# Run specific test file
+./run_pytest.sh test/test_app.py
+
+# Skip Docker service management (assumes services already running)
+./run_pytest.sh --no-services
+
+# Combine options (except --headed and test path are mutually exclusive)
+./run_pytest.sh --no-services test/test_complete_routing_workflow.py
 ```
 
-For human devs you can use:
+**What the script does:**
+
+1. Backs up and replaces `.env` with `env_test_local`
+2. Starts Docker services (postgres, minio, redis) unless `--no-services` is used
+3. Waits for all services to be healthy (10 retry limit)
+4. Runs pytest with `uv run pytest`
+5. Cleans up: restores `.env`, stops services
+
+**Service Health Checks:**
+
+- PostgreSQL: `pg_isready` check
+- MinIO: Health endpoint check
+- Redis: `ping` command check
+
+**Options:**
+
+- `--headed`: Run Playwright tests with visible browser (all tests)
+- `--no-services`: Skip Docker service management
+- `[TEST_PATH]`: Run specific test file/directory (mutually exclusive with `--headed`)
+- `-h, --help`: Show help message
+
+**Development Tip:** If you're running multiple test iterations, keep services running and use `--no-services` to speed up test execution:
 
 ```bash
-./run_pytest.sh --headed
-```
+# Terminal 1: Start services once
+docker compose up postgres minio redis -d
 
-- Shows browser window during tests
-- Useful for debugging test failures
-- Allows visual inspection of UI behavior
+# Terminal 2: Run tests quickly without service restarts
+./run_pytest.sh --no-services test/test_app.py
+```
 
 ### Test Organization
 
 ```
 test/
-├── test_app.py          # Dash application tests (Playwright)
-├── test_db_manager.py   # Database manager tests
-├── test_debug.py        # DEBUG environment variable tests
-└── test_env.py          # Environment configuration tests
+├── test_app.py                         # Dash application tests (Playwright)
+├── test_complete_routing_workflow.py   # End-to-end routing workflow test
+├── test_db_manager.py                  # Database manager tests
+├── test_debug.py                       # DEBUG environment variable tests
+├── test_env.py                         # Environment configuration tests
+├── test_html_id_enforcement.py         # HTML ID pattern enforcement
+├── help_functions_tests.py             # Test helper functions
+└── test_files/                         # Test data files
+    └── memberships.csv                 # Sample CSV for upload tests
 ```
 
 ## Questions or Improvements?

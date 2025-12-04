@@ -11,3 +11,9 @@ div:has(> #_pages_content) {
   flex-direction: column;
   flex-grow: 1;
 }
+
+/* Fix scrolling in input container (right sidebar) for Playwright compatibility */
+#input_container {
+  overflow-y: auto;
+  min-height: 0; /* Allow flex item to shrink and enable scrolling */
+}

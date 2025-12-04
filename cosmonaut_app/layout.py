@@ -1,8 +1,6 @@
 import os
-import glob
 import math
 import json
-import time
 import logging
 import re
 import dash
@@ -11,34 +9,21 @@ import dash_leaflet as dl
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from dash import ctx
 from dash_extensions.javascript import assign
 
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
 from cosmonaut_app.constants.html_ids import (
-    CLICKED_ROADS_STORE_SHARED_ID,
-    EMAIL_STORE_SHARED_ID,
-    EPSG_STORE_SHARED_ID,
     JOB_ID_STORE_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
-    MAIN_MAP_DIV_MAP_SHARED_ID,
-    MANAGED_LAYERS_GROUP_MAP_SHARED_ID,
     NAVBAR_COLLAPSE_NAV_SHARED_ID,
     NAVBAR_TOGGLER_NAV_SHARED_ID,
-    OSM_GEOJSON_LAYER_MAP_SHARED_ID,
-    ROUTE_GEOJSON_LAYER_MAP_SHARED_ID,
-    ROUTE_LAYER_LAYER_MAP_SHARED_ID,
-    ROUTING_COMPLETE_STORE_SHARED_ID,
     SEARCH_BUTTON_NAV_SHARED_ID,
     SEARCH_INPUT_NAV_SHARED_ID,
     SEARCH_RESULTS_DIV_NAV_SHARED_ID,
-    TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
     URL_SHARED_ID,
-    USER_INFO_EMAIL_INPUT_USER_INFO_ID,
 )
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.transformation import transform_solution
 from cosmonaut_app.error_handling import error_modal
 
 
@@ -310,13 +295,8 @@ def page_container_split_layout(map, input):
     map_container = dbc.Col(
         map,
         className="col-7 p-0",
-        id="map-container",
     )
-    input_container = dbc.Col(
-        input,
-        className="col-5 p-0",
-        id="input_container",
-    )
+    input_container = dbc.Col(input, className="col-5 p-0")
     return page_container_fullscreen_layout(
         dbc.Row(
             [
@@ -411,7 +391,7 @@ def steps_tab(name_step):
         list_tabs.append(
             dbc.Tab(
                 label=step_label,
-                tab_id=step_name,
+                tab_id=step_name,  # nocheck
                 disabled=True,
             )
         )
@@ -489,16 +469,12 @@ def create_map(job=None, extra_layers=None):
         zoom = 10
         center = [51.70, 11.20]
 
-    return html.Div(
-        dl.Map(
-            map_layers,
-            id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
-            center=center,
-            zoom=zoom,
-            style={"height": "100%"},
-        ),
-        id=MAIN_MAP_DIV_MAP_SHARED_ID,
-        style={"height": "100%", "width": "100%"},
+    return dl.Map(
+        map_layers,
+        id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+        center=center,
+        zoom=zoom,
+        style={"height": "100%"},
     )
 
 
@@ -565,7 +541,6 @@ main_map = html.Div(
         zoom=10,
         style={"height": "100%"},
     ),
-    id=MAIN_MAP_DIV_MAP_SHARED_ID,
     style={"height": "100%", "width": "100%"},
 )
 # Search Bar
@@ -632,8 +607,7 @@ def register_navbar_callbacks(app):
             raise PreventUpdate
 
         if DataBaseManager.check_existence(job_id):
-            job = CosmonautJob(job_id=job_id, download_from_minio=True)
-            job.load()
+            CosmonautJob(job_id=job_id)
 
             return (
                 dbc.Toast(
@@ -680,273 +654,3 @@ def register_navbar_callbacks(app):
         if n:
             return not is_open
         return is_open
-
-
-def register_shared_store_callbacks(app):
-    """Register callbacks for shared stores (email, etc.)."""
-
-    @app.callback(
-        Output(EMAIL_STORE_SHARED_ID, "data"),
-        Input(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "value"),
-        prevent_initial_call=True,
-    )
-    def store_email(email):
-        return email
-
-
-def register_map_callbacks(app):
-    """Register callbacks for map display and interaction."""
-
-    @app.callback(
-        Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children"),
-        Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
-        State(JOB_ID_STORE_SHARED_ID, "data"),
-        Input(ROUTING_COMPLETE_STORE_SHARED_ID, "data"),
-        State(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children"),
-        State(EPSG_STORE_SHARED_ID, "data"),
-        prevent_initial_call=True,
-        allow_duplicate=True,
-    )
-    def update_map(
-        selected_roads, job_id, routing_complete, current_children, epsg_input
-    ):
-        logging.info("=== UPDATE_MAP CALLBACK START ===")
-        logging.info("Trigger ID: %s", ctx.triggered_id)
-        logging.info("Selected roads: %s", selected_roads)
-        logging.info("Routing complete: %s", routing_complete)
-
-        # Normalize children
-        current_children = list(current_children or [])
-
-        # Remove our entire managed group (safer than removing individual layers)
-        managed_ids = {
-            OSM_GEOJSON_LAYER_MAP_SHARED_ID,
-            ROUTE_GEOJSON_LAYER_MAP_SHARED_ID,
-            ROUTE_LAYER_LAYER_MAP_SHARED_ID,
-            MANAGED_LAYERS_GROUP_MAP_SHARED_ID,
-        }
-        cleaned_children, removed = [], 0
-        for child in current_children:
-            comp_id = None
-            if isinstance(child, dict):
-                props = child.get("props") or {}
-                comp_id = props.get("id")
-            else:
-                comp_id = getattr(child, "id", None)
-            if comp_id in managed_ids:
-                removed += 1
-                continue
-            cleaned_children.append(child)
-        current_children = cleaned_children
-        logging.info(
-            "Cleaned map children, removed %d managed item(s), remaining: %d",
-            removed,
-            len(current_children),
-        )
-
-        # Collect new managed layers, then add them as one LayerGroup
-        new_layers = []
-
-        if routing_complete:
-            logging.info("=== ROUTING SECTION ===")
-            logging.info("Processing routing solution for job: %s", job_id)
-
-            job_working_dir = os.path.join(WEB_WORK_DIR, job_id)
-            solution_path = os.path.join(job_working_dir, "transient", "solution.json")
-
-            start_transform = time.time()
-            transformed_solution = transform_solution(
-                solution_path, epsg_input, 4326, False
-            )
-            logging.info("Solution transformed in %.3fs", time.time() - start_transform)
-
-            route_geojson = dl.GeoJSON(
-                data=transformed_solution,
-                options={"style": {"color": "blue", "weight": 5}},
-                id=ROUTE_GEOJSON_LAYER_MAP_SHARED_ID,
-                zoomToBounds=True,
-            )
-            new_layers.append(route_geojson)
-
-            workdir = os.path.join(WEB_WORK_DIR, job_id)
-            transient_dir = os.path.join(workdir, "transient")
-            route_path = os.path.join(transient_dir, "solution_route_4326.geojson")
-            if os.path.isfile(route_path):
-                try:
-                    route_fc = _load_geojson(route_path)
-                    route_layer = dl.GeoJSON(
-                        data=route_fc,
-                        id=ROUTE_LAYER_LAYER_MAP_SHARED_ID,
-                        zoomToBounds=True,
-                        options=dict(
-                            style=dict(color="#0066ff", weight=5, opacity=0.9)
-                        ),
-                    )
-                    new_layers.append(route_layer)
-                    logging.info("Added route layer to map.")
-                except Exception as e:
-                    logging.warning("Could not add route layer: %s", e)
-
-        elif (
-            ctx.triggered_id == TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID
-            and selected_roads is not None
-            and job_id
-        ):
-            logging.info("=== OPTIMIZED TAG FILTERING SECTION ===")
-            filter_start_time = time.time()
-
-            # Distinguish between None (no value yet -> show all) and empty list (user explicitly selected none -> show none)
-            if selected_roads is None:
-                selected_roads = list(osm_tags_mapping.keys())
-                logging.info(
-                    "Selection is None; defaulting to all tags: %s", selected_roads
-                )
-            elif selected_roads == []:
-                logging.info("Empty selection provided; will show zero features.")
-
-            logging.info("Converting German road types: %s", selected_roads)
-            osm_highway_types = set()
-            for german_type in selected_roads:
-                if german_type in osm_tags_mapping:
-                    osm_highway_types.update(osm_tags_mapping[german_type])
-                else:
-                    logging.warning("Unknown German road type: %s", german_type)
-            logging.info("Mapped to OSM highway types: %s", list(osm_highway_types))
-
-            in_dir = os.path.join(WEB_WORK_DIR, job_id, "input")
-            preferred_candidates = [
-                os.path.join(in_dir, "osm_data_work_4326.geojson"),
-                os.path.join(in_dir, "osm_data_raw_4326.geojson"),
-                os.path.join(in_dir, "osm_data.geojson"),
-            ]
-            timeout = 30
-            start_wait = time.time()
-            chosen_path = None
-
-            while (time.time() - start_wait) < timeout and chosen_path is None:
-                for candidate in preferred_candidates:
-                    if os.path.exists(candidate):
-                        chosen_path = candidate
-                        break
-                if chosen_path is None:
-                    matches = glob.glob(os.path.join(in_dir, "*_4326.geojson"))
-                    if matches:
-                        chosen_path = matches[0]
-                if chosen_path is None:
-                    time.sleep(0.5)
-
-            if not chosen_path:
-                logging.error("No GeoJSON file found in %s after %ss", in_dir, timeout)
-                raise FileNotFoundError(
-                    f"No GeoJSON file found in {in_dir} after {timeout}s"
-                )
-
-            load_start = time.time()
-            with open(chosen_path, encoding="utf-8") as f:
-                data = json.load(f)
-            logging.info(
-                "Loaded GeoJSON from %s in %.3fs", chosen_path, time.time() - load_start
-            )
-
-            original_count = len(data["features"])
-            filtered_features = [
-                feature
-                for feature in data["features"]
-                if feature.get("properties", {}).get("highway") in osm_highway_types
-            ]
-            logging.info(
-                "Filtering completed in %.3fs: %d -> %d features (%.1f%% reduction)",
-                time.time() - filter_start_time,
-                original_count,
-                len(filtered_features),
-                (
-                    round((1 - len(filtered_features) / original_count) * 100, 1)
-                    if original_count
-                    else 0
-                ),
-            )
-
-            filtered_data = {"type": "FeatureCollection", "features": filtered_features}
-            _coerce_nodes_list(filtered_data["features"])
-
-            tooltip_start = time.time()
-            for feature in filtered_features:
-                highway_type = feature["properties"]["highway"]
-                name = feature["properties"].get("name") or feature["properties"].get(
-                    "ref"
-                )
-                tracktype = feature["properties"].get("tracktype")
-                feature["properties"]["tooltip"] = (
-                    f"{name}, {highway_type}, {tracktype}"
-                    if highway_type == "track" and tracktype
-                    else f"{name}, {highway_type}"
-                )
-            logging.info("Added tooltips in %.3fs", time.time() - tooltip_start)
-
-            osm_layer = dl.GeoJSON(
-                data=filtered_data,
-                options={"style": style_handle, "hoverStyle": hover_style_handle},
-                hideout=dict(selected=[], zoom=10),
-                id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,
-                # Do not re-zoom on tag changes; initial page load already zooms
-                zoomToBounds=False,
-            )
-            new_layers.append(osm_layer)
-
-            logging.info(
-                "Total filtering operation completed in %.3fs",
-                time.time() - filter_start_time,
-            )
-
-        elif (
-            ctx.triggered_id == TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID
-            and not job_id
-        ):
-            logging.warning("Tag dropdown triggered but no job ID available")
-
-        # Add/replace our managed group once
-        if new_layers:
-            current_children.append(
-                dl.LayerGroup(
-                    id=MANAGED_LAYERS_GROUP_MAP_SHARED_ID, children=new_layers
-                )
-            )
-
-        logging.info(
-            "=== UPDATE_MAP CALLBACK END === Returning %d children",
-            len(current_children),
-        )
-        return current_children
-
-    @app.callback(
-        Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout", allow_duplicate=True),
-        Input(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "n_clicks"),
-        State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "clickData"),
-        State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
-        prevent_initial_call=True,
-    )
-    def toggle_select(_, clickData, hideout):
-        if clickData is None or hideout is None or _ is None:
-            raise PreventUpdate
-
-        selected = hideout["selected"]
-        id = clickData["id"]
-        if id in selected:
-            selected.remove(id)
-        else:
-            selected.append(id)
-        return hideout
-
-    @app.callback(
-        Output(CLICKED_ROADS_STORE_SHARED_ID, "data", allow_duplicate=True),
-        [Input(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "clickData")],
-        [State(CLICKED_ROADS_STORE_SHARED_ID, "data")],
-        prevent_initial_call=True,
-    )
-    def update_clicked_roads(clickData, clicked_roads):
-        if clickData is None:
-            raise PreventUpdate
-        id = clickData["id"]
-        if id not in clicked_roads:
-            clicked_roads.append(id)
-        return clicked_roads

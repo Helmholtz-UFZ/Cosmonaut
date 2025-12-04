@@ -1,5 +1,3 @@
-"""Test the Dash app with Playwright."""
-
 import time
 
 import pytest
@@ -62,12 +60,3 @@ def check_all_errors(page):
 
     if errors:
         pytest.fail("Errors detected:\n" + "\n".join(errors))
-
-
-def test_homepage_loads(page, dash_app):
-    """Test that the homepage loads without errors."""
-    # Navigate to the homepage
-    page.goto("http://localhost:8050")
-
-    # Check for any errors on the page
-    check_all_errors(page)

@@ -34,9 +34,7 @@ from cosmonaut_app.constants.html_ids import (
     REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
     RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
-    SELECTION_COUNT_DIV_STREET_SELECTION_ID,
     TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
-    TAGS_LAST_SELECTION_STORE_SHARED_ID,
     TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
     UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
@@ -97,7 +95,6 @@ def layout(job_id: str):
         dcc.Store(id=EPSG_STORE_SHARED_ID, storage_type="session"),
         dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
         # Local store to remember last tag selection
-        dcc.Store(id=TAGS_LAST_SELECTION_STORE_SHARED_ID, storage_type="session"),
         html.P(
             "Wählen Sie die gewünschten Straßen im linken Kartenbereich aus. "
             "Klicken Sie eine Straße an, um sie zu markieren. Mit dem Button "
@@ -199,7 +196,6 @@ def layout(job_id: str):
                 dbc.Col(
                     dbc.Badge(
                         "Selected: 0",
-                        id=SELECTION_COUNT_DIV_STREET_SELECTION_ID,
                         color="info",
                         className="ms-2",
                     ),

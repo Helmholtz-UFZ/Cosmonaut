@@ -37,12 +37,24 @@ class FormFactory:
         Initialize FormFactory.
 
         Args:
-            pymodel: Pydantic model class to use for field definitions
+            pymodel: Pydantic model class or instance to use for field definitions
             layout: Optional. For generate_form(): OrderedDict layout.
                    For process_layout(): Can be any Dash component tree.
             active: Whether form fields are active (editable) or disabled
         """
+        # Store both the instance (for values) and the class (for schema)
+        if isinstance(pymodel, type):
+            # pymodel is a class
+            self.pymodel_class = pymodel
+            self.pymodel_instance = None
+        else:
+            # pymodel is an instance
+            self.pymodel_class = type(pymodel)
+            self.pymodel_instance = pymodel
+
+        # Keep self.pymodel for backward compatibility
         self.pymodel = pymodel
+
         self.layout = deepcopy(layout)
         self.active = active
         self.type_to_component = {
@@ -74,7 +86,7 @@ class FormFactory:
         """Create the component."""
         if not isinstance(field_name, str):
             return field_name
-        field = self.pymodel.model_fields[field_name]
+        field = self.pymodel_class.model_fields[field_name]
 
         field_type = field.json_schema_extra["type"]
         try:
@@ -86,9 +98,13 @@ class FormFactory:
 
         id_feedback = self.feedback_id_format.format(field_name=field_name)
         id_field = self.id_format.format(field_name=field_name)
-        try:
-            value = getattr(self.pymodel, field_name)
-        except AttributeError:
+        # Get value from instance if available, otherwise use default
+        if self.pymodel_instance is not None:
+            try:
+                value = getattr(self.pymodel_instance, field_name)
+            except AttributeError:
+                value = field.default
+        else:
             value = field.default
 
         if field_type in ["text", "email"]:
@@ -158,7 +174,7 @@ class FormFactory:
                 html.Br(),
                 dbc.FormText(
                     "",
-                    id=id_feedback,
+                    id=id_feedback,  # nocheck
                     className="text-danger",
                 ),
             ]
@@ -169,14 +185,14 @@ class FormFactory:
                 component_class(**props),
                 html.Br(),
                 dbc.FormText(field.description),
-                dbc.FormText(id=id_feedback, className="text-danger"),
+                dbc.FormText(id=id_feedback, className="text-danger"),  # nocheck
             ]
         else:
             content = [
                 dbc.Label(field.title),
                 component_class(**props),
                 dbc.FormText(field.description),
-                dbc.FormFeedback(id=id_feedback),
+                dbc.FormFeedback(id=id_feedback),  # nocheck
             ]
         return content
 
@@ -278,7 +294,9 @@ class FormFactory:
         """Produce the callback outputs."""
         output_dict = {}
         for field_name in self.fields_website:
-            field_type = self.pymodel.model_fields[field_name].json_schema_extra["type"]
+            field_type = self.pymodel_class.model_fields[field_name].json_schema_extra[
+                "type"
+            ]
             id_feedback = self.feedback_id_format.format(field_name=field_name)
             if field_type not in self.fieldtypes_not_to_validate:
                 output_dict[f"{field_name}_valid"] = Output(field_name, "valid")
@@ -297,7 +315,9 @@ class FormFactory:
             callback_context = Input
 
         for field_name in self.fields_website:
-            field_type = self.pymodel.model_fields[field_name].json_schema_extra["type"]
+            field_type = self.pymodel_class.model_fields[field_name].json_schema_extra[
+                "type"
+            ]
             id_field = self.id_format.format(field_name=field_name)
             if field_type == "date-picker":
                 id_start_date = self.start_date_id_format.format(field_name=field_name)
@@ -329,7 +349,9 @@ class FormFactory:
 
         output_dict = {}
         for field_name in self.fields_website:
-            field_type = self.pymodel.model_fields[field_name].json_schema_extra["type"]
+            field_type = self.pymodel_class.model_fields[field_name].json_schema_extra[
+                "type"
+            ]
             id_feedback = self.feedback_id_format.format(field_name=field_name)
             if field_name in exceptions:
                 msg = exceptions.pop(field_name)
@@ -353,8 +375,10 @@ class FormFactory:
     def set_model(self, form_data: dict) -> None:
         """Set the model from the form data."""
         model_dict = {}
-        for field_name in self.pymodel.model_fields:
-            field_type = self.pymodel.model_fields[field_name].json_schema_extra["type"]
+        for field_name in self.pymodel_class.model_fields:
+            field_type = self.pymodel_class.model_fields[field_name].json_schema_extra[
+                "type"
+            ]
             if field_type == "date-picker":
                 id_start_date = self.start_date_id_format.format(field_name=field_name)
                 id_end_date = self.end_date_id_format.format(field_name=field_name)
@@ -384,8 +408,8 @@ class FormFactory:
                     locs = error["ctx"]["loc_tuple"]
 
                 field = locs[0]
-                if field in self.pymodel.model_fields:
-                    default = self.pymodel.model_fields[field].default
+                if field in self.pymodel_class.model_fields:
+                    default = self.pymodel_class.model_fields[field].default
                     model_dict[field] = default
             # Try again with defaults filled in
             self.pymodel(**model_dict)

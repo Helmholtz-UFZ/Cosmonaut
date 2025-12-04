@@ -8,12 +8,12 @@ DEBUG=0
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
 FLASK_PORT=8080
 
-### minIO ###
-MINIO_ACCESS_KEY="minioadmin"
-MINIO_SECRET_KEY="minioadmin"
-MINIO_HOST="localhost"
-MINIO_PORT=9000
-MINIO_BUCKET=cosmic-routing
+### Object Storage (S3-compatible via rclone) ###
+OBJECT_STORAGE_ACCESS_KEY="minioadmin"
+OBJECT_STORAGE_SECRET_KEY="minioadmin"
+OBJECT_STORAGE_HOST="http://localhost:9000"
+OBJECT_STORAGE_BUCKET="cosmic-routing"
+OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
 
 ### Postgres DB ###
 DB_NAME="cosmonaut_db"
