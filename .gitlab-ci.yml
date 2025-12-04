@@ -60,9 +60,15 @@ testing:
   services:
     - name: "postgis/postgis:latest"
       alias: "postgres"
+      variables:
+        POSTGRES_DB: cosmonaut_db
+        POSTGRES_USER: cosmonaut
+        POSTGRES_PASSWORD: password
     - name: "minio/minio:latest"
       alias: "minio"
       command: ["server", "/data", "--console-address", ":9001"]
+    - name: "redis:latest"
+      alias: "redis"
   before_script:
     - "apt-get update && apt-get install -y libgdal-dev postgresql-client curl"
     - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"

@@ -23,4 +23,4 @@ DB_PW="password"
 DB_HOST_NAME="postgres"
 
 REDIS_PORT=6379
-REDIS_HOST="redis_cosmonaut"
+REDIS_HOST="redis"
