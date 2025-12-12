@@ -86,6 +86,30 @@ START_JOB_BUTTON_HOME_ID = "start-job-button-home-id"
 
 
 # ============================================================================
+# PAGE: LOGS
+# ============================================================================
+
+# --- Divs ---
+LOG_OUTPUT_DIV_LOGS_ID = "log-output-div-logs-id"
+TIME_ERROR_DIV_LOGS_ID = "time-error-div-logs-id"
+
+# --- Dropdowns ---
+LOG_LEVELS_DROPDOWN_LOGS_ID = "log-levels-dropdown-logs-id"
+
+# --- Inputs ---
+END_HOUR_INPUT_LOGS_ID = "end-hour-input-logs-id"
+END_MINUTE_INPUT_LOGS_ID = "end-minute-input-logs-id"
+LOG_PID_INPUT_LOGS_ID = "log-pid-input-logs-id"
+START_HOUR_INPUT_LOGS_ID = "start-hour-input-logs-id"
+START_MINUTE_INPUT_LOGS_ID = "start-minute-input-logs-id"
+
+# --- Other ---
+LOG_DATE_PICKER_LOGS_ID = "log-date-picker-logs-id"
+PID_CHECKLIST_LOGS_ID = "pid-checklist-logs-id"
+TIME_INPUT_GROUP_LOGS_ID = "time-input-group-logs-id"
+
+
+# ============================================================================
 # PAGE: ROUTING_PARAMS
 # ============================================================================
 
@@ -143,3 +167,56 @@ USER_INFO_NEXT_BUTTON_USER_INFO_ID = "user-info-next-button-user-info-id"
 
 # --- Inputs ---
 USER_INFO_EMAIL_INPUT_USER_INFO_ID = "user-info-email-input-user-info-id"
+
+
+# ============================================================================
+# PAGE: WORKER_MANAGEMENT
+# ============================================================================
+
+# --- Buttons ---
+WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID = "worker-cancel-btn-worker-management-id"
+WORKER_CANCEL_MODAL_CANCEL_BTN_WORKER_MANAGEMENT_ID = (
+    "worker-cancel-modal-cancel-btn-worker-management-id"
+)
+WORKER_CANCEL_MODAL_CONFIRM_BTN_WORKER_MANAGEMENT_ID = (
+    "worker-cancel-modal-confirm-btn-worker-management-id"
+)
+WORKER_KILL_BTN_WORKER_MANAGEMENT_ID = "worker-kill-btn-worker-management-id"
+WORKER_KILL_MODAL_CANCEL_BTN_WORKER_MANAGEMENT_ID = (
+    "worker-kill-modal-cancel-btn-worker-management-id"
+)
+WORKER_KILL_MODAL_CONFIRM_BTN_WORKER_MANAGEMENT_ID = (
+    "worker-kill-modal-confirm-btn-worker-management-id"
+)
+WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID = "worker-refresh-btn-worker-management-id"
+
+# --- Divs ---
+WORKER_CANCEL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID = (
+    "worker-cancel-modal-task-info-div-worker-management-id"
+)
+WORKER_KILL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID = (
+    "worker-kill-modal-task-info-div-worker-management-id"
+)
+WORKER_LAST_REFRESH_DIV_WORKER_MANAGEMENT_ID = (
+    "worker-last-refresh-div-worker-management-id"
+)
+WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID = (
+    "worker-stats-card-div-worker-management-id"
+)
+
+# --- Modals ---
+WORKER_CANCEL_MODAL_WORKER_MANAGEMENT_ID = "worker-cancel-modal-worker-management-id"
+WORKER_KILL_MODAL_WORKER_MANAGEMENT_ID = "worker-kill-modal-worker-management-id"
+
+# --- Other ---
+WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID = (
+    "worker-management-dummy-component-worker-management-id"
+)
+
+# --- Tables ---
+ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID = "active-tasks-table-worker-management-id"
+RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID = "reserved-tasks-table-worker-management-id"
+REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID = "revoked-tasks-table-worker-management-id"
+SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID = (
+    "scheduled-tasks-table-worker-management-id"
+)

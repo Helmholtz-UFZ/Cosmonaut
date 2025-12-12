@@ -11,16 +11,19 @@ FLASK_PORT=8080
 ### Object Storage (S3-compatible via rclone) ###
 OBJECT_STORAGE_ACCESS_KEY="minioadmin"
 OBJECT_STORAGE_SECRET_KEY="minioadmin"
-OBJECT_STORAGE_HOST="http://127.0.0.1:9000"
+OBJECT_STORAGE_HOST="http://127.0.0.1:9010"
 OBJECT_STORAGE_BUCKET="cosmic-routing"
 OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
 
 ### Postgres DB ###
-DB_NAME="cosmonaut_db"
-DB_PORT="5432"
-DB_USER="cosmonaut"
-DB_PW="password"
-DB_HOST_NAME="localhost"
+POSTGRES_NAME="cosmonaut_db"
+POSTGRES_PORT="5433"
+POSTGRES_USER="cosmonaut"
+POSTGRES_PW="password"
+POSTGRES_HOST_NAME="localhost"
 
-REDIS_PORT=6379
+### Redis ###
+REDIS_PORT=6380
 REDIS_HOST="redis_cosmonaut"
+REDIS_DB=0
+REDIS_PASSWORD=

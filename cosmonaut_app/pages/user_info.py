@@ -60,7 +60,6 @@ def layout(job_id):
     footer = progress_footer(
         next_id=USER_INFO_NEXT_BUTTON_USER_INFO_ID,
     )
-    logging.debug(job.model.model_dump())
     map = create_map(job=job)
     input_container = create_card_input(
         card_body,

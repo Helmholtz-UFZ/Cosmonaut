@@ -5,15 +5,15 @@ stages:
   # - "deploy"
 
 variables:
-  # Postgres
+  # Postgres (service configuration)
   POSTGRES_DB: cosmonaut_db
   POSTGRES_USER: cosmonaut
   POSTGRES_PASSWORD: password
-  DB_HOST_NAME: postgres
-  DB_NAME: cosmonaut_db
-  DB_PORT: "5432"
-  DB_USER: cosmonaut
-  DB_PW: password
+  # Postgres (app connection)
+  POSTGRES_HOST_NAME: postgres
+  POSTGRES_NAME: cosmonaut_db
+  POSTGRES_PORT: "5432"
+  POSTGRES_PW: password
   # MinIO
   MINIO_ROOT_USER: minioadmin
   MINIO_ROOT_PASSWORD: minioadmin

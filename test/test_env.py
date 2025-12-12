@@ -56,7 +56,7 @@ def test_all_env_files(logger):
     additional_lines_map = {
         "env_prod": [
             "CLUSTER_TOKEN='password'",
-            "DB_PW='password'",
+            "POSTGRES_PW='password'",
             "MINIO_SECRET_KEY='password'",
         ]
     }

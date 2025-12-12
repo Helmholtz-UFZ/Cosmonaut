@@ -1,3 +1,6 @@
+import logging
+import logging.config
+
 from dash import Dash
 import dash_bootstrap_components as dbc
 
@@ -9,6 +12,12 @@ from cosmonaut_app.layout import (
     register_navbar_callbacks,
 )
 from cosmonaut_app.object_storage_manager import setup_remote, create_bucket
+from cosmonaut_app.logger import get_logger_config
+
+# Configure application-wide logging
+logging.config.dictConfig(get_logger_config(DEBUG))
+logger = logging.getLogger(__name__)
+logger.info("COSMONAUT application starting")
 
 # --- Flask + Dash setup ---
 app = Dash(

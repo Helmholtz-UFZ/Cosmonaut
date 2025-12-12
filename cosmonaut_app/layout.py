@@ -249,7 +249,30 @@ def create_navbar():
                 ),
                 dbc.NavbarToggler(id=NAVBAR_TOGGLER_NAV_SHARED_ID, n_clicks=0),
                 dbc.Collapse(
-                    search_bar,
+                    dbc.Nav(
+                        className="navbar-nav me-auto mb-2 mb-lg-0",
+                        children=[
+                            dbc.NavItem(
+                                dbc.NavLink(
+                                    "Logs",
+                                    href=dash.page_registry["pages.logs"][
+                                        "relative_path"
+                                    ],
+                                )
+                            ),
+                            dbc.NavItem(
+                                dbc.NavLink(
+                                    "Worker manager",
+                                    href=dash.page_registry["pages.worker_management"][
+                                        "relative_path"
+                                    ],
+                                )
+                            ),
+                            dbc.NavItem(
+                                search_bar,
+                            ),
+                        ],
+                    ),
                     id=NAVBAR_COLLAPSE_NAV_SHARED_ID,
                     navbar=True,
                     is_open=False,
@@ -342,6 +365,25 @@ def create_card_input(
 def build_url_step(step, job_id):
     base_path = dash.page_registry[f"pages.{step}"]["path_template"]
     return base_path.replace("<job_id>", job_id)
+
+
+def create_header(title, subtitle, bg_color="bg-info", id="", rounded=True):
+    """Create a header layout."""
+    className = f"{bg_color} rounded-top py-2" if rounded else f"{bg_color} py-2"
+    layout = html.Div(
+        className=className,
+        children=[
+            html.H2(title, className="text-center", id=f"{id}-title"),
+            (
+                html.H3(subtitle, className="text-center", id=f"{id}-subtitle")
+                if subtitle != ""
+                else None
+            ),
+        ],
+        id=id,
+    )
+
+    return layout
 
 
 def progress_footer(

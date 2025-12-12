@@ -108,9 +108,7 @@ def update_routing_params(**inputs):
         for key, value in inputs.items():
             if hasattr(job.model, key):
                 setattr(job.model, key, value)
-        # TODO submit
-        # job.submit()
-        job.save()
+        job.submit()
         return {
             **output_dict,
             "url": build_url_step("route_download", job_id),

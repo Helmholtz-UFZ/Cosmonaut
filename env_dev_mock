@@ -16,11 +16,14 @@ OBJECT_STORAGE_BUCKET="cosmic-routing"
 OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
 
 ### Postgres DB ###
-DB_NAME="cosmonaut_db"
-DB_PORT="5432"
-DB_USER="cosmonaut"
-DB_PW="password"
-DB_HOST_NAME="postgres_cosmonaut" 
+POSTGRES_NAME="cosmonaut_db"
+POSTGRES_PORT="5432"
+POSTGRES_USER="cosmonaut"
+POSTGRES_PW="password"
+POSTGRES_HOST_NAME="postgres_cosmonaut" 
 
+### Redis ###
 REDIS_PORT=6379
 REDIS_HOST="localhost"
+REDIS_DB=0
+REDIS_PASSWORD=

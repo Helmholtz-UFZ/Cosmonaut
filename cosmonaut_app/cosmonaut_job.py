@@ -116,6 +116,8 @@ class CosmonautJob:
         # Save to database
         DataBaseManager.add_entry(data)
 
+        self.dump_routing_params()
+
         # Auto-sync files to object storage
         save_files(self.model.job_id)
 
@@ -255,9 +257,34 @@ class CosmonautJob:
         self.save()
         return qr_code_url
 
-    # TODO: Implement the submit method like John did it.
     def submit(self):
-        """Submit the job."""
-        self.model.submitted = True
-        self.save()
-        return self.model.job_id
+        """Submit the job to background worker."""
+        try:
+            # Lazy import to avoid circular imports
+            from cosmonaut_app.background_job_manager import get_background_job_manager
+
+            # Mark as submitted and save (this will dump routing params via save())
+            self.model.submitted = True
+            self.save()  # This calls dump_routing_params() automatically
+
+            # Get the singleton manager and submit the job
+            job_manager = get_background_job_manager()
+            celery_task_id, failed = job_manager.submit_routing_job(self)
+
+            if failed:
+                logging.error(f"Failed to submit job {self.model.job_id}")
+                return None
+
+            # Store task ID and save again
+            self.model.celery_task_id = celery_task_id
+            self.save()
+
+            logging.info(
+                f"Job {self.model.job_id} submitted with task_id={celery_task_id}"
+            )
+            return celery_task_id
+
+        except Exception as e:
+            # Fail hard per user preference - no graceful fallback
+            logging.error(f"Failed to submit job {self.model.job_id}: {str(e)}")
+            raise

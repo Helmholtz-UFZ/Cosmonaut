@@ -24,3 +24,4 @@ env_dev_prod_priv
 .gitmodules
 .config/
 notes*
+assets/

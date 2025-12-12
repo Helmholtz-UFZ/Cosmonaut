@@ -12,28 +12,31 @@ Classes:
 
 import logging
 import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     ARRAY,
     Boolean,
     Column,
+    DateTime,
     Integer,
     String,
+    Text,
     create_engine,
 )
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
-from cosmonaut_app.config import DB_HOST_NAME, DB_NAME, DB_PORT, DB_PW, DB_USER
-from cosmonaut_app.error_handling import JobNotFound
-
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.DEBUG,
+from cosmonaut_app.config import (
+    POSTGRES_HOST_NAME,
+    POSTGRES_NAME,
+    POSTGRES_PORT,
+    POSTGRES_PW,
+    POSTGRES_USER,
 )
-logger = logging.getLogger(__name__)
+from cosmonaut_app.error_handling import JobNotFound
 
 
 class SessionScope:
@@ -113,9 +116,7 @@ class DataBaseManager:
     on its job ID.
     """
 
-    database_url = (
-        f"postgresql+psycopg2://{DB_USER}:{DB_PW}@{DB_HOST_NAME}:{DB_PORT}/{DB_NAME}"
-    )
+    database_url = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PW}@{POSTGRES_HOST_NAME}:{POSTGRES_PORT}/{POSTGRES_NAME}"
     engine = create_engine(
         database_url,
         pool_pre_ping=True,
@@ -275,6 +276,72 @@ class DataBaseManager:
                 job_info[job_row.job_id] = (job_row.start_date, job_row.submitted)
             return job_info
 
+    @classmethod
+    def query_logs(
+        cls,
+        date: str,
+        sh: int,
+        sm: int,
+        eh: int,
+        em: int,
+        levels: List[str],
+        pid: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Query logs from the database with specified filters.
+
+        Parameters:
+        -----------
+        date : str
+            Date in the format 'YYYY-MM-DD'
+        sh : int
+            Start hour (0-23)
+        sm : int
+            Start minute (0-59)
+        eh : int
+            End hour (0-23)
+        em : int
+            End minute (0-59)
+        levels : list
+            List of log levels to include (e.g., ['INFO', 'ERROR'])
+        pid : int, optional
+            Process ID to filter logs by
+
+        Returns:
+        --------
+        list
+            List of dictionaries containing log records
+        """
+        logging.debug(f"Querying logs from {date} {sh}:{sm} to {date} {eh}:{em}")
+
+        start_datetime = datetime.strptime(
+            f"{date} {sh:02d}:{sm:02d}:00", "%Y-%m-%d %H:%M:%S"
+        )
+        end_datetime = datetime.strptime(
+            f"{date} {eh:02d}:{em:02d}:59", "%Y-%m-%d %H:%M:%S"
+        )
+
+        # Create session directly (not using SessionScope)
+        session = cls.Session()
+        try:
+            query = session.query(LogTable).filter(
+                LogTable.timestamp >= start_datetime,
+                LogTable.timestamp <= end_datetime,
+                LogTable.level.in_(levels),
+            )
+
+            if pid is not None:
+                query = query.filter(LogTable.pid == pid)
+
+            # Order results by timestamp
+            query = query.order_by(LogTable.timestamp)
+
+            # Execute query and convert results to dictionaries
+            logs = [log.to_dict() for log in query.all()]
+
+            return logs
+        finally:
+            session.close()
+
 
 class JobTable(Base):
     """Represents the 'jobs' table in the database."""
@@ -292,3 +359,27 @@ class JobTable(Base):
     version = Column("version", String)
     epsg = Column("epsg", Integer)
     config = Column("config", JSON)
+    celery_task_id = Column("celery_task_id", String, nullable=True)
+
+
+class LogTable(Base):
+    """SQLAlchemy model for the logs table."""
+
+    __tablename__ = "logs"
+
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime(timezone=False), nullable=False)
+    pid = Column(Integer, nullable=False)
+    level = Column(String(10), nullable=False)
+    module = Column(String(50), nullable=False)
+    message = Column(Text, nullable=False)
+
+    def to_dict(self):
+        """Convert log record to dictionary format."""
+        return {
+            "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "pid": self.pid,
+            "level": self.level,
+            "message": self.message,
+            "module": self.module,
+        }
