@@ -27,6 +27,15 @@ class JobNotFound(Exception):
         super().__init__(f"Job with ID '{job_id}' not found")
 
 
+class WrongCeleryTaskId(Exception):
+    """Custom exception for when an invalid Celery task ID is provided."""
+
+    def __init__(self, task_id):
+        """Add task_id as attribute and format error message."""
+        self.task_id = task_id
+        super().__init__(f"Invalid Celery task ID format: '{task_id}'")
+
+
 database_error_title = "Database Connection Error"
 database_error_message = "Unfortunately, it is not possible to connect to the job database. Please try again later."  # noqa
 error_responds_dict = {
@@ -47,6 +56,10 @@ error_responds_dict = {
     JobNotFound: (
         "Job Not Found",
         "Could not find the job '{job_id}'. Visit input to make a new submission.",
+    ),
+    WrongCeleryTaskId: (
+        "Invalid Task ID",
+        "The task ID '{task_id}' is not a valid Celery task ID format. Task IDs must be UUIDs.",
     ),
 }
 error_modal = dbc.Modal(
@@ -95,7 +108,7 @@ def handle_error(error):
     # Define here the error that should be not reported
     if not isinstance(
         error,
-        (JobNotFound),
+        (JobNotFound, WrongCeleryTaskId),
     ):
         callback_context = dash.ctx
         # email_subject = f"Error {str(error)}"
@@ -120,6 +133,12 @@ def handle_error(error):
         error_message = error_message.format(job_id=error.job_id)
     except AttributeError:
         # If the error does not have a job_id attribute, we just use the message as is.
+        pass
+
+    try:
+        error_message = error_message.format(task_id=error.task_id)
+    except AttributeError:
+        # If the error does not have a task_id attribute, we just use the message as is.
         pass
 
     logging.error(f"{error_title}: {error_message}")

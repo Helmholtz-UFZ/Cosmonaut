@@ -1,5 +1,3 @@
-import re
-
 import logging
 from dash import html, register_page, callback, Input, Output, State
 from dash.exceptions import PreventUpdate
@@ -18,6 +16,7 @@ from cosmonaut_app.layout import (
     build_url_step,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.pydantic_models import check_email
 
 register_page(
     __name__,
@@ -26,8 +25,6 @@ register_page(
     title="User Info",
     description="Enter your email address for this job.",
 )
-
-EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 
 
 def layout(job_id):
@@ -79,10 +76,12 @@ def layout(job_id):
 )
 def validate_email(value):
     """Live email validation -> toggles input valid/invalid and enables Next button."""
-    if not value:
-        return False, False, True
-    is_valid = re.match(EMAIL_REGEX, value) is not None
-    return (True, False, False) if is_valid else (False, True, True)
+    logging.debug(f"Validating email: {value}")
+    try:
+        check_email(value)
+        return True, False, False
+    except ValueError:
+        return False, True, True
 
 
 @callback(
@@ -96,7 +95,9 @@ def go_to_upload_page(n_clicks: int | None, email: str | None, pathname: str | N
     if not n_clicks or not pathname:
         raise PreventUpdate
 
-    if not email or not re.match(EMAIL_REGEX, email):
+    try:
+        check_email(email)
+    except ValueError:
         raise PreventUpdate
 
     job_id = pathname.split("/")[2]

@@ -43,7 +43,7 @@ check_service() {
 
 # Help message
 show_help() {
-    echo "Usage: ./run_pytest.sh [OPTIONS]"
+    echo "Usage: ./run_pytest.sh [OPTIONS] [TEST_PATH]"
     echo ""
     echo "Pytest runner with service management and test selection"
     echo ""
@@ -52,15 +52,16 @@ show_help() {
     echo "  --no-services     Skip Docker service management (assume already running)"
     echo "  -h, --help        Show this help message"
     echo ""
-    echo "Test Selection (mutually exclusive with --headed):"
-    echo "  [TEST_PATH]       Specific test file or directory to run"
+    echo "Test Selection:"
+    echo "  [TEST_PATH]       Specific test file or directory to run (optional)"
     echo ""
     echo "Examples:"
-    echo "  ./run_pytest.sh                         # Run all tests headless"
-    echo "  ./run_pytest.sh --headed                # Run all tests with browser visible"
-    echo "  ./run_pytest.sh test/test_app.py        # Run specific test file"
-    echo "  ./run_pytest.sh --no-services           # Run tests, assume services running"
-    echo "  ./run_pytest.sh --no-services test/test_app.py"
+    echo "  ./run_pytest.sh                                      # Run all tests headless"
+    echo "  ./run_pytest.sh --headed                             # Run all tests with browser visible"
+    echo "  ./run_pytest.sh test/test_app.py                     # Run specific test file"
+    echo "  ./run_pytest.sh --no-services test/test_env.py       # Run specific test without services"
+    echo "  ./run_pytest.sh --headed test/test_complete_routing_workflow.py  # Run specific test with visible browser"
+    echo "  ./run_pytest.sh --headed --no-services test/test_env.py          # Combine all flags"
     exit 0
 }
 
@@ -89,12 +90,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate mutually exclusive options
-if [ "$HEADED" = true ] && [ -n "$TEST_PATH" ]; then
-    echo "Error: --headed and TEST_PATH are mutually exclusive"
-    echo "Use either --headed for all tests OR specify a test path"
-    exit 1
-fi
+# No validation needed - flags can be combined
 
 # Backup existing .env
 if [ -f .env ]; then
@@ -109,9 +105,7 @@ source .env
 
 if [ "$START_SERVICES" -eq 1 ]; then
     # Clean up existing containers
-    docker stop postgres_cosmonaut minio_cosmonaut redis_cosmonaut 2>/dev/null || true
-    docker rm postgres_cosmonaut minio_cosmonaut redis_cosmonaut 2>/dev/null || true
-
+    docker compose down 2>/dev/null
     # Start services
     echo "Starting services: postgres, minio, redis"
     docker compose up postgres minio redis -d
@@ -124,17 +118,27 @@ else
     echo "Skipping service management (assuming services already running)"
 fi
 
-# Run pytest based on options
-if [ "$HEADED" = true ]; then
-    echo "Running tests in HEADED mode (browser visible)..."
-    uv run pytest --headed
-elif [ -n "$TEST_PATH" ]; then
-    echo "Running tests: $TEST_PATH"
-    uv run pytest "$TEST_PATH"
-else
-    echo "Running all tests in HEADLESS mode..."
-    uv run pytest
+# Build pytest command dynamically based on flags
+PYTEST_CMD="uv run pytest"
+
+# Add --no-services flag if needed
+if [ "$START_SERVICES" -eq 0 ]; then
+    PYTEST_CMD="$PYTEST_CMD --no-services"
 fi
+
+# Add --headed flag if needed
+if [ "$HEADED" = true ]; then
+    PYTEST_CMD="$PYTEST_CMD --headed"
+fi
+
+# Add test path if specified
+if [ -n "$TEST_PATH" ]; then
+    PYTEST_CMD="$PYTEST_CMD $TEST_PATH"
+fi
+
+# Run pytest with all accumulated flags
+echo "Running: $PYTEST_CMD"
+$PYTEST_CMD
 
 # Always cleanup, regardless of test success/failure
 cleaning_up

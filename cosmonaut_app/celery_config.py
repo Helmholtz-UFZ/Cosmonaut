@@ -1,6 +1,16 @@
 """Celery configuration for COSMONAUT App."""
 
-from cosmonaut_app.config import REDIS_HOST, REDIS_DB, REDIS_PASSWORD
+from cosmonaut_app.config import REDIS_HOST, REDIS_DB, REDIS_PASSWORD, REDIS_PORT
+
+
+def _get_redis_port():
+    """Get Redis port, handling GitLab CI service link format."""
+    port = REDIS_PORT
+    # GitLab CI may set REDIS_PORT as 'tcp://redis:6379' format
+    if port and port.startswith("tcp://"):
+        # Extract port from URL format
+        port = port.split(":")[-1]
+    return port
 
 
 class CeleryConfig:
@@ -11,16 +21,9 @@ class CeleryConfig:
     """
 
     # Build Redis URL with optional password
-    # Handle GitLab CI service link format (tcp://redis:6379)
-    _redis_host = REDIS_HOST
-    if _redis_host.startswith("tcp://"):
-        _redis_host = _redis_host.replace("tcp://", "")
-        if ":" in _redis_host:
-            _redis_host, _port = _redis_host.split(":")
-            REDIS_PORT = _port
-
     _redis_auth = f":{REDIS_PASSWORD}@" if REDIS_PASSWORD else ""
-    _redis_url = f"redis://{_redis_auth}{_redis_host}:{REDIS_PORT}/{REDIS_DB}"
+    _redis_port = _get_redis_port()
+    _redis_url = f"redis://{_redis_auth}{REDIS_HOST}:{_redis_port}/{REDIS_DB}"
 
     # Broker and result backend
     broker_url = _redis_url
@@ -43,5 +46,6 @@ class CeleryConfig:
     # Worker settings for better performance and reliability
     worker_prefetch_multiplier = 1  # Fair distribution of tasks
     task_acks_late = True  # Acknowledge task after completion, not before
-    worker_max_tasks_per_child = 50  # Restart worker after 50 tasks (memory cleanup)
+    # Restart worker after 50 tasks (memory cleanup)
+    worker_max_tasks_per_child = 50
     worker_max_memory_per_child = 512000  # 512MB per worker process

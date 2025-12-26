@@ -21,6 +21,7 @@ from cosmonaut_app.constants.html_ids import (
     SEARCH_INPUT_NAV_SHARED_ID,
     SEARCH_RESULTS_DIV_NAV_SHARED_ID,
     URL_SHARED_ID,
+    LOADING_OVERLAY_SHARED_ID,
 )
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -226,6 +227,20 @@ steps_jobs = {
 }
 
 
+loading_overlay = dbc.Modal(
+    dbc.ModalBody(
+        [dbc.Spinner(size="lg"), html.H4("Loading...", className="text-center mt-3")],
+        className="text-center",
+    ),
+    id=LOADING_OVERLAY_SHARED_ID,
+    is_open=False,
+    backdrop="static",  # Prevents closing by clicking outside
+    keyboard=False,  # Prevents closing with escape key
+    centered=True,
+    size="sm",
+)
+
+
 def create_navbar():
     """Create a navbar layout."""
     return dbc.Navbar(
@@ -299,6 +314,7 @@ def app_layout():
         className="d-flex flex-column min-vh-100 bg-light",
         children=[
             dcc.Location(id=URL_SHARED_ID, refresh=True),
+            loading_overlay,
             error_modal,
             create_navbar(),
             dash.page_container,

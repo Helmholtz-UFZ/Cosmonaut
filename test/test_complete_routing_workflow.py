@@ -24,7 +24,7 @@ from cosmonaut_app.constants.html_ids import (
 )
 
 
-def test_complete_routing_workflow(page, dash_app) -> None:
+def test_complete_routing_workflow(page, dash_app, celery_worker) -> None:
     """Test the complete routing workflow from job creation to route start."""
     # === Home Page ===
     page.goto(f"http://localhost:{FLASK_PORT}/")

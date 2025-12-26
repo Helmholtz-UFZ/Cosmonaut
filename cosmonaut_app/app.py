@@ -24,6 +24,7 @@ app = Dash(
     __name__,
     use_pages=True,
     suppress_callback_exceptions=True,
+    prevent_initial_callbacks="initial_duplicate",
     assets_url_path="/assets",
     external_stylesheets=[dbc.themes.BOOTSTRAP],
     title="COSMONAUT",

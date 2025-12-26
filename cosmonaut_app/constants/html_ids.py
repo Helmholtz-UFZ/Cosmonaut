@@ -44,6 +44,7 @@ OSM_GEOJSON_LAYER_MAP_SHARED_ID = "osm-geojson-layer-map-shared-id"
 ERROR_MODAL_TITLE_SHARED_ID = "error-title"  # nocheck
 ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"  # nocheck
 ERROR_MODAL_SHARED_ID = "error-modal"  # nocheck
+LOADING_OVERLAY_SHARED_ID = "loading-overlay-shared-id"
 
 # ============================================================================
 # PAGE: DATA_UPLOAD
@@ -175,38 +176,22 @@ USER_INFO_EMAIL_INPUT_USER_INFO_ID = "user-info-email-input-user-info-id"
 
 # --- Buttons ---
 WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID = "worker-cancel-btn-worker-management-id"
-WORKER_CANCEL_MODAL_CANCEL_BTN_WORKER_MANAGEMENT_ID = (
-    "worker-cancel-modal-cancel-btn-worker-management-id"
-)
-WORKER_CANCEL_MODAL_CONFIRM_BTN_WORKER_MANAGEMENT_ID = (
-    "worker-cancel-modal-confirm-btn-worker-management-id"
-)
 WORKER_KILL_BTN_WORKER_MANAGEMENT_ID = "worker-kill-btn-worker-management-id"
-WORKER_KILL_MODAL_CANCEL_BTN_WORKER_MANAGEMENT_ID = (
-    "worker-kill-modal-cancel-btn-worker-management-id"
-)
-WORKER_KILL_MODAL_CONFIRM_BTN_WORKER_MANAGEMENT_ID = (
-    "worker-kill-modal-confirm-btn-worker-management-id"
-)
 WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID = "worker-refresh-btn-worker-management-id"
+TEST_TASK_BUTTON_WORKER_MANAGEMENT_ID = "test-task-button-worker-management-id"
+
+# --- Inputs ---
+SELECTED_TASK_ID_INPUT_WORKER_MANAGEMENT_ID = (
+    "selected-task-id-input-worker-management-id"
+)
 
 # --- Divs ---
-WORKER_CANCEL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID = (
-    "worker-cancel-modal-task-info-div-worker-management-id"
-)
-WORKER_KILL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID = (
-    "worker-kill-modal-task-info-div-worker-management-id"
-)
 WORKER_LAST_REFRESH_DIV_WORKER_MANAGEMENT_ID = (
     "worker-last-refresh-div-worker-management-id"
 )
 WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID = (
     "worker-stats-card-div-worker-management-id"
 )
-
-# --- Modals ---
-WORKER_CANCEL_MODAL_WORKER_MANAGEMENT_ID = "worker-cancel-modal-worker-management-id"
-WORKER_KILL_MODAL_WORKER_MANAGEMENT_ID = "worker-kill-modal-worker-management-id"
 
 # --- Other ---
 WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID = (

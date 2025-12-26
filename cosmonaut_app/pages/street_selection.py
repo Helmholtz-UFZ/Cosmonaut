@@ -89,6 +89,8 @@ def layout(job_id: str):
         A composed layout with the map on the left and controls on the right.
     """
     job = CosmonautJob(job_id=job_id)
+    logging.info(f"Street selection layout called with job_id={job_id}")
+    logging.info(job.model.classification_upload)
     card_body = [
         # Shared stores required by cross-page callbacks (map, routing, etc.)
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
@@ -246,6 +248,29 @@ def layout(job_id: str):
     )
 
     initial_fc = initial_features(job_id)
+
+    # TEMPORARY DIAGNOSTIC LOGGING - TODO: REMOVE
+    logging.info(f"initial_fc type: {type(initial_fc)}")
+    logging.info(
+        f"initial_fc keys: {initial_fc.keys() if isinstance(initial_fc, dict) else 'NOT A DICT'}"
+    )
+    logging.info(f"Number of features: {len(initial_fc.get('features', []))}")
+    if initial_fc.get("features"):
+        first_feature = initial_fc["features"][0]
+        logging.info(f"First feature keys: {first_feature.keys()}")
+        logging.info(f"First feature id: {first_feature.get('id')}")
+        logging.info(f"First feature id type: {type(first_feature.get('id'))}")
+        # Check all features have IDs
+        features_without_ids = [
+            i for i, f in enumerate(initial_fc.get("features", [])) if "id" not in f
+        ]
+        if features_without_ids:
+            logging.error(
+                f"Features missing IDs at indices: {features_without_ids[:10]}"
+            )
+        else:
+            logging.info("All features have IDs")
+    # END TEMPORARY LOGGING
 
     extra_layer = dl.GeoJSON(
         id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,

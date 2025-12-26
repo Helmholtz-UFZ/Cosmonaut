@@ -54,8 +54,8 @@ services:
     image: minio/minio:latest
     container_name: minio_cosmonaut
     ports:
-      - "${MINIO_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001" # Web-based admin console
+      - "${OBJECT_STORAGE_PORT}:9000"
+      - "${OBJECT_STORAGE_CONSOLE_PORT}:9001" # Web-based admin console
     environment:
       MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${OBJECT_STORAGE_SECRET_KEY}

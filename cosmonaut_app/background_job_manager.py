@@ -10,8 +10,12 @@ from celery import Celery
 
 from cosmonaut_app.celery_config import CeleryConfig
 from cosmonaut_app.tasks.routing_tasks import RoutingTask, process_routing_job
+from cosmonaut_app.tasks.test_tasks import TestTask, test_sleep_task
 
 log = logging.getLogger(__name__)
+
+NAME_ROUTING_TASK = "cosmonaut_app.tasks.routing_tasks.process_routing"
+NAME_TEST_TASK = "cosmonaut_app.tasks.test_tasks.test_sleep"
 
 
 class BackgroundJobManager:
@@ -41,8 +45,14 @@ class BackgroundJobManager:
         self.routing_task = self.app.task(
             bind=True,
             base=RoutingTask,
-            name="cosmonaut_app.tasks.routing_tasks.process_routing",
+            name=NAME_ROUTING_TASK,
         )(process_routing_job)
+
+        self.test_sleep_task = self.app.task(
+            bind=True,
+            base=TestTask,
+            name=NAME_TEST_TASK,
+        )(test_sleep_task)
 
     def submit_routing_job(self, job):
         """Submit a routing job to the Celery queue.
@@ -56,7 +66,8 @@ class BackgroundJobManager:
         """
         try:
             result = self.routing_task.apply_async(
-                args=[job.job_id],  # Pass job_id, not job object (serialization)
+                # Pass job_id, not job object (serialization)
+                args=[job.job_id],
                 queue="routing",
                 retry=True,
                 retry_policy={
@@ -65,6 +76,12 @@ class BackgroundJobManager:
                     "interval_step": 60,  # Increment by 60s each retry
                     "interval_max": 300,  # Max 300s between retries
                 },
+            )
+            # Store task name in Redis for revoked task retrieval
+            self.app.backend.client.set(
+                f"task_name:{result.id}",
+                NAME_ROUTING_TASK,
+                ex=86400,  # 24 hour TTL
             )
             log.info(f"Submitted routing job {job.job_id} with task_id={result.id}")
             return result.id, False
@@ -105,40 +122,51 @@ class BackgroundJobManager:
                   - scheduled: List of future-scheduled tasks
                   - revoked: List of revoked task IDs
                   - workers: List of online worker names
+
+        Raises:
+            ConnectionError: If unable to connect to Redis/Celery broker
         """
-        inspect = self.app.control.inspect()
+        from kombu.exceptions import OperationalError
 
-        # Get task data from all workers
-        active = inspect.active() or {}
-        reserved = inspect.reserved() or {}
-        scheduled = inspect.scheduled() or {}
-        revoked_dict = inspect.revoked() or {}
+        try:
+            inspect = self.app.control.inspect()
 
-        # Flatten task lists (they come grouped by worker)
-        def flatten_tasks(task_dict):
-            """Flatten task dict from {worker: [tasks]} to [tasks]."""
-            flattened = []
-            for worker, tasks in (task_dict or {}).items():
-                for task in tasks:
-                    task["worker"] = worker
-                    flattened.append(task)
-            return flattened
+            # Get task data from all workers
+            active = inspect.active() or {}
+            reserved = inspect.reserved() or {}
+            scheduled = inspect.scheduled() or {}
+            revoked_dict = inspect.revoked() or {}
 
-        # Flatten revoked task IDs
-        revoked_ids = []
-        for worker, task_ids in revoked_dict.items():
-            revoked_ids.extend(task_ids)
+            # Flatten task lists (they come grouped by worker)
+            def flatten_tasks(task_dict):
+                """Flatten task dict from {worker: [tasks]} to [tasks]."""
+                flattened = []
+                for worker, tasks in (task_dict or {}).items():
+                    for task in tasks:
+                        task["worker"] = worker
+                        flattened.append(task)
+                return flattened
 
-        # Get list of online workers
-        workers = list(inspect.ping().keys()) if inspect.ping() else []
+            # Flatten revoked task IDs
+            revoked_ids = []
+            for worker, task_ids in revoked_dict.items():
+                revoked_ids.extend(task_ids)
 
-        return {
-            "active": flatten_tasks(active),
-            "reserved": flatten_tasks(reserved),
-            "scheduled": flatten_tasks(scheduled),
-            "revoked": revoked_ids,
-            "workers": workers,
-        }
+            # Get list of online workers
+            workers = list(inspect.ping().keys()) if inspect.ping() else []
+
+            return {
+                "active": flatten_tasks(active),
+                "reserved": flatten_tasks(reserved),
+                "scheduled": flatten_tasks(scheduled),
+                "revoked": revoked_ids,
+                "workers": workers,
+            }
+        except (OperationalError, ConnectionError) as e:
+            log.warning(f"Failed to connect to Celery broker: {str(e)}")
+            raise ConnectionError(
+                "Unable to connect to Celery broker. Ensure Redis is running and accessible."
+            ) from e
 
     def revoke_job(self, task_id, terminate=False):
         """Revoke/cancel a running or queued task.
@@ -150,6 +178,29 @@ class BackgroundJobManager:
         """
         self.app.control.revoke(task_id, terminate=terminate)
         log.info(f"{'Killed' if terminate else 'Cancelled'} task {task_id}")
+
+    def submit_test_task(self):
+        """Submit a test sleep task to the Celery queue.
+
+        Returns:
+            tuple: (celery_task_id, failed_boolean)
+                   celery_task_id is None if submission failed
+        """
+        try:
+            result = self.test_sleep_task.apply_async(
+                queue="default",
+            )
+            # Store task name in Redis for revoked task retrieval
+            self.app.backend.client.set(
+                f"task_name:{result.id}",
+                NAME_TEST_TASK,
+                ex=86400,  # 24 hour TTL
+            )
+            log.info(f"Submitted test task with task_id={result.id}")
+            return result.id, False
+        except Exception as e:
+            log.error(f"Failed to submit test task: {str(e)}")
+            return None, True
 
 
 # Lazy initialization pattern - singleton instance
