@@ -1,6 +1,10 @@
-# COSMONAUT
-
-# COSmic ray based soil MOisture prediction NAvigation and UTility Tool
+<div>
+<h1 align="center">COSMONAUT</h1>
+<h2 align="center"><strong>COS</strong><small>mic ray based soil </small><strong>MO</strong><small>isture </small><strong>P</strong><small>rediction </small><strong>NA</strong><small>vigation and </small><strong>UT</strong><small>ility </small><strong>T</strong><small>ool</small></h2>
+<p align="center">
+	<img src="cosmonaut_app/static/large_banner.jpg" alt="Welcome" width="30%">
+</p>
+</div>
 
 This project is a web application built with Dash and Dash Leaflet for transforming and visualizing CSV data for the COSMOPOLITAN Project at UFZ.
 It allows users to upload a CSV file, transforms the data, queries OpenStreetMap for a planed navigation feature, and visualizes the csv-data on a map (NOTE: Visualization doesn`t work for bigger files)
