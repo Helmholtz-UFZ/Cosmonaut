@@ -1,12 +1,36 @@
+"""Collect user email for job notifications.
+
+This page allows you to provide an email address to receive notifications about
+your routing job. Email notifications will be sent when:
+
+- Your job has been successfully submitted for processing
+- Your routing calculation has completed
+- Any errors occur during processing
+
+The email field includes live validation to ensure proper formatting before you
+can proceed. Your email is stored securely with your job data and is never shared
+with third parties. Providing an email is optional but recommended for tracking
+long-running jobs that process in the background.
+
+Once you enter a valid email address (or skip this step by proceeding without one),
+click "Next" to continue to the data upload page where you'll provide your
+membership locations for route planning.
+
+NOTE: Email validation uses pydantic's check_email function for format verification.
+The email is stored in the job model and accessible throughout the workflow.
+"""
+
 import logging
-from dash import html, register_page, callback, Input, Output, State
+from dash import html, register_page, callback, Input, Output, State, dcc
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
+from cosmonaut_app.constants import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     URL_SHARED_ID,
     USER_INFO_EMAIL_INPUT_USER_INFO_ID,
     USER_INFO_NEXT_BUTTON_USER_INFO_ID,
+    JOB_ID_STORE_SHARED_ID,
 )
 from cosmonaut_app.layout import (
     page_container_split_layout,
@@ -14,6 +38,8 @@ from cosmonaut_app.layout import (
     progress_footer,
     create_map,
     build_url_step,
+    create_reset_banner,
+    create_reset_modal,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.pydantic_models import check_email
@@ -29,30 +55,52 @@ register_page(
 
 def layout(job_id):
     job = CosmonautJob(job_id=job_id)
+    status = job.get_status()
+    is_active = status == JOB_STATUS_PENDING
 
-    card_body = [
-        html.P(
-            "Enter your email to receive notifications for this job.",
-            className="text-muted",
-        ),
-        dbc.Label(
-            "Email address",
-            html_for=USER_INFO_EMAIL_INPUT_USER_INFO_ID,
-            className="mt-2",
-        ),
-        dbc.Input(
-            id=USER_INFO_EMAIL_INPUT_USER_INFO_ID,
-            type="email",
-            value=job.model.email,
-            autoFocus=True,
-        ),
-        dbc.FormText(
-            [html.I(className="bi bi-shield-check me-1"), "We never share your email."],
-            color="secondary",
-        ),
-        dbc.FormFeedback("Looks good!", type="valid"),
-        dbc.FormFeedback("Please enter a valid email.", type="invalid"),
-    ]
+    card_body = []
+
+    # Add reset banner if not PENDING
+    if not is_active:
+        card_body.append(create_reset_banner(job_id, status))
+
+    # Add form components
+    card_body.extend(
+        [
+            html.P(
+                "Enter your email to receive notifications for this job.",
+                className="text-muted",
+            ),
+            dbc.Label(
+                "Email address",
+                html_for=USER_INFO_EMAIL_INPUT_USER_INFO_ID,
+                className="mt-2",
+            ),
+            dbc.Input(
+                id=USER_INFO_EMAIL_INPUT_USER_INFO_ID,
+                type="email",
+                value=job.model.email,
+                autoFocus=True,
+                disabled=not is_active,
+                style={"background-color": "#e9ecef"} if not is_active else {},
+            ),
+            dbc.FormText(
+                [
+                    html.I(className="bi bi-shield-check me-1"),
+                    "We never share your email.",
+                ],
+                color="secondary",
+            ),
+            dbc.FormFeedback("Looks good!", type="valid"),
+            dbc.FormFeedback("Please enter a valid email.", type="invalid"),
+        ]
+    )
+
+    # Add reset modal
+    card_body.append(create_reset_modal())
+
+    # Add store
+    card_body.append(dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id))
 
     footer = progress_footer(
         next_id=USER_INFO_NEXT_BUTTON_USER_INFO_ID,

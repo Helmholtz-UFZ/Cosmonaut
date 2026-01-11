@@ -67,7 +67,7 @@ class BackgroundJobManager:
         try:
             result = self.routing_task.apply_async(
                 # Pass job_id, not job object (serialization)
-                args=[job.job_id],
+                args=[job.model.job_id],
                 queue="routing",
                 retry=True,
                 retry_policy={
@@ -83,10 +83,12 @@ class BackgroundJobManager:
                 NAME_ROUTING_TASK,
                 ex=86400,  # 24 hour TTL
             )
-            log.info(f"Submitted routing job {job.job_id} with task_id={result.id}")
+            log.info(
+                f"Submitted routing job {job.model.job_id} with task_id={result.id}"
+            )
             return result.id, False
         except Exception as e:
-            log.error(f"Failed to submit routing job {job.job_id}: {str(e)}")
+            log.error(f"Failed to submit routing job {job.model.job_id}: {str(e)}")
             return None, True
 
     def get_job_status(self, task_id):
@@ -188,7 +190,7 @@ class BackgroundJobManager:
         """
         try:
             result = self.test_sleep_task.apply_async(
-                queue="default",
+                queue="test",
             )
             # Store task name in Redis for revoked task retrieval
             self.app.backend.client.set(

@@ -38,7 +38,7 @@ CMD echo "Starting Celery worker..."; \
     exec celery -A cosmonaut_app.background_job_manager.celery worker \
         --loglevel=info \
         --concurrency=4 \
-        --queues=default,routing \
+        --queues=default,routing,test \
         --hostname=worker@%h \
         --without-gossip \
         --without-mingle;

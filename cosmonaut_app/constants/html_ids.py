@@ -46,6 +46,13 @@ ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"  # nocheck
 ERROR_MODAL_SHARED_ID = "error-modal"  # nocheck
 LOADING_OVERLAY_SHARED_ID = "loading-overlay-shared-id"
 
+# --- Reset Components (Shared) ---
+RESET_BANNER_ALERT_SHARED_ID = "reset-banner-alert-shared-id"
+RESET_BUTTON_SHARED_ID = "reset-button-shared-id"
+RESET_MODAL_SHARED_ID = "reset-modal-shared-id"
+RESET_MODAL_CANCEL_BUTTON_SHARED_ID = "reset-modal-cancel-button-shared-id"
+RESET_MODAL_CONFIRM_BUTTON_SHARED_ID = "reset-modal-confirm-button-shared-id"
+
 # ============================================================================
 # PAGE: DATA_UPLOAD
 # ============================================================================
@@ -116,6 +123,26 @@ TIME_INPUT_GROUP_LOGS_ID = "time-input-group-logs-id"
 
 # Needed for testing purposes
 NEXT_BUTTON_ROUTING_PARAMS_ID = "next-button-routing-params-id"  # nocheck
+
+# ============================================================================
+# PAGE: ROUTE_COMPUTATION
+# ============================================================================
+
+# --- Buttons ---
+START_BUTTON_ROUTE_COMPUTATION_ID = "start-button-route-computation-id"
+CANCEL_BUTTON_ROUTE_COMPUTATION_ID = "cancel-button-route-computation-id"
+RESTART_BUTTON_ROUTE_COMPUTATION_ID = "restart-button-route-computation-id"
+
+# --- Displays ---
+STATUS_BADGE_ROUTE_COMPUTATION_ID = "status-badge-route-computation-id"
+CELERY_INFO_CARD_ROUTE_COMPUTATION_ID = "celery-info-card-route-computation-id"
+WORKER_STATUS_TEXT_ROUTE_COMPUTATION_ID = "worker-status-text-route-computation-id"
+TASK_STATUS_TEXT_ROUTE_COMPUTATION_ID = "task-status-text-route-computation-id"
+WORKER_NAME_TEXT_ROUTE_COMPUTATION_ID = "worker-name-text-route-computation-id"
+LOG_VIEWER_ROUTE_COMPUTATION_ID = "log-viewer-route-computation-id"
+
+# --- Intervals ---
+STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID = "status-poll-interval-route-computation-id"
 
 # ============================================================================
 # PAGE: ROUTE_DOWNLOAD

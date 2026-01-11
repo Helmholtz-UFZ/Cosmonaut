@@ -1,17 +1,21 @@
 import os
-import math
 import json
 import logging
 import re
 import dash
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
-from dash import dcc, html, no_update
+from dash import dcc, html, no_update, ctx
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from dash_extensions.javascript import assign
+from dash_extensions.javascript import assign, _default_name_space
 
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
+from cosmonaut_app.constants import (
+    JOB_STATUS_RUNNING,
+    JOB_STATUS_COMPLETED,
+    JOB_STATUS_FAILED,
+)
 from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
@@ -22,6 +26,11 @@ from cosmonaut_app.constants.html_ids import (
     SEARCH_RESULTS_DIV_NAV_SHARED_ID,
     URL_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
+    RESET_BANNER_ALERT_SHARED_ID,
+    RESET_BUTTON_SHARED_ID,
+    RESET_MODAL_SHARED_ID,
+    RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
+    RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
 )
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -31,6 +40,13 @@ from cosmonaut_app.error_handling import error_modal
 # ============================================================================
 # Helper Functions and Constants
 # ============================================================================
+
+# Configure assign() to write to cosmonaut_app/assets/ instead of root assets/
+_assets_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+_original_dump = _default_name_space.dump
+_default_name_space.dump = lambda assets_folder=_assets_folder: _original_dump(
+    assets_folder
+)
 
 # Define a JavaScript function for styling the GeoJSON features
 style_handle = assign(
@@ -217,13 +233,13 @@ osm_layer = dl.TileLayer(
     attribution="© OpenStreetMap contributors",
 )
 default_map_layers = [osm_layer, dl.FullScreenControl()]
-# TODO That is a dupliation each page has a name this could be looked up dynamically
 steps_jobs = {
-    "user_info": "User information",
-    "data_upload": "Data upload",
-    "street_selection": "Street selection",
-    "routing_params": "Routing Parameters",
-    "route_download": "Route",
+    "user_info": ["Information", "Provide user information"],
+    "data_upload": ["Upload", "Upload classification data"],
+    "street_selection": ["Selection", "Select streets for routing"],
+    "routing_params": ["Parameters", "Set routing parameters"],
+    "route_computation": ["Computation", "Monitor routing computation"],
+    "route_download": ["Download", "Download the computed route"],
 }
 
 
@@ -239,6 +255,104 @@ loading_overlay = dbc.Modal(
     centered=True,
     size="sm",
 )
+
+
+def create_reset_banner(job_id: str, status: str) -> dbc.Alert:
+    """Create status banner with reset button for non-PENDING jobs.
+
+    Args:
+        job_id: Job ID for display
+        status: Current job status
+
+    Returns:
+        dbc.Alert component with status info and reset button
+    """
+    # Color mapping
+    color_map = {
+        JOB_STATUS_RUNNING: "primary",
+        JOB_STATUS_COMPLETED: "success",
+        JOB_STATUS_FAILED: "danger",
+    }
+
+    # Status message
+    message_map = {
+        JOB_STATUS_RUNNING: "This job is currently running. Reset to cancel and restart.",
+        JOB_STATUS_COMPLETED: "This job has been completed. Reset to clear results and restart.",
+        JOB_STATUS_FAILED: "This job has failed. Reset to clear results and try again.",
+    }
+
+    return dbc.Alert(
+        [
+            dbc.Row(
+                [
+                    dbc.Col(
+                        html.Span(message_map[status]),
+                        width="auto",
+                        className="d-flex align-items-center",
+                    ),
+                    dbc.Col(
+                        dbc.Button(
+                            "Reset Job",
+                            id=RESET_BUTTON_SHARED_ID,
+                            color="warning",
+                            size="sm",
+                        ),
+                        width="auto",
+                    ),
+                ],
+                className="align-items-center justify-content-between",
+            )
+        ],
+        id=RESET_BANNER_ALERT_SHARED_ID,
+        color=color_map.get(status, "secondary"),
+        className="mb-3",
+    )
+
+
+def create_reset_modal() -> dbc.Modal:
+    """Create confirmation modal for job reset.
+
+    Returns:
+        dbc.Modal component with confirmation dialog
+    """
+    return dbc.Modal(
+        [
+            dbc.ModalHeader(dbc.ModalTitle("Reset Job?")),
+            dbc.ModalBody(
+                [
+                    html.P(
+                        "This will delete all computation results (logs, routes, GPX files) "
+                        "and reset the job status to PENDING. You will need to restart the "
+                        "computation."
+                    ),
+                    html.P(
+                        "Your uploaded data and selected streets will be preserved.",
+                        className="text-muted mb-0",
+                    ),
+                ]
+            ),
+            dbc.ModalFooter(
+                [
+                    dbc.Button(
+                        "Cancel",
+                        id=RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
+                        color="secondary",
+                        outline=True,
+                    ),
+                    dbc.Button(
+                        "Reset Job",
+                        id=RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
+                        color="danger",
+                    ),
+                ]
+            ),
+        ],
+        id=RESET_MODAL_SHARED_ID,
+        is_open=False,
+        backdrop="static",
+        keyboard=False,
+        centered=True,
+    )
 
 
 def create_navbar():
@@ -354,7 +468,7 @@ def create_card_input(
     if name_step is not None:
         if job_id is None:
             raise ValueError("job_id must be provided when name_step is used.")
-        title = f"{steps_jobs[name_step]}({job_id})"
+        title = f"{steps_jobs[name_step][1]}({job_id})"
 
     if title is None:
         raise ValueError("Either title or name_step must be provided.")
@@ -445,10 +559,10 @@ def steps_tab(name_step):
     """Create a progress steps component for the job steps."""
     # TODO dynamic enabling based on job progress
     list_tabs = []
-    for step_name, step_label in steps_jobs.items():
+    for step_name, step_info in steps_jobs.items():
         list_tabs.append(
             dbc.Tab(
-                label=step_label,
+                label=step_info[0],
                 tab_id=step_name,  # nocheck
                 disabled=True,
             )
@@ -457,61 +571,6 @@ def steps_tab(name_step):
     return dbc.Tabs(
         list_tabs,
         active_tab=name_step,
-    )
-
-
-def progress_steps(current: int, variant: str = "default") -> html.Div:
-    """Render a 5-step progress rail with labeled nodes.
-
-    variant: 'default' (in-flow) or 'home' (pre-start: no fill, all upcoming).
-    """
-
-    steps = [
-        ("User information", "user_info"),
-        ("Data upload", "data_upload"),
-        ("Street selection", "street_selection"),
-        ("Routing Parameters", "routing_params"),
-        ("Route", "rout_download"),
-    ]
-    total = len(steps)
-    # Use internal points: positions at k/(n+1) for k=1..n (exclude 0 and 1).
-    if variant == "home" or total <= 1:
-        width_value = "0%"
-    else:
-        # Cosine-spaced internal points: x_i = ((1 - cos(i*pi/(n+1))) / 2) * 100
-        widths = [
-            (1 - math.cos(math.pi * i / (total + 1))) * 50.0
-            for i in range(1, total + 1)
-        ]
-        width_value = f"{widths[current - 1]:.6f}%"
-
-    nodes = []
-    for i, (label, _icon) in enumerate(steps, start=1):
-        if variant == "home":
-            state_cls = "upcoming"
-        else:
-            state_cls = (
-                "done" if i < current else ("current" if i == current else "upcoming")
-            )
-        nodes.append(
-            html.Div(
-                [html.Span(className="dot"), html.Span(label, className="label")],
-                className=f"node {state_cls}",
-                role="listitem",
-            )
-        )
-
-    return html.Div(
-        [
-            html.Div(
-                [html.Div(className="rail-fill", style={"width": width_value})],
-                className="rail",
-            ),
-            html.Div(nodes, className="nodes", role="list"),
-        ],
-        className=f"progress-steps{' home' if variant == 'home' else ''}",
-        role="group",
-        **{"aria-label": "Progress steps"},
     )
 
 
@@ -534,58 +593,6 @@ def create_map(job=None, extra_layers=None):
         zoom=zoom,
         style={"height": "100%"},
     )
-
-
-def page_layout(
-    title: str,
-    body,
-    job_id: str | None = None,
-    footer=None,
-    below=None,
-    step_index: int | None = None,
-) -> html.Main:
-    """Standard page layout used by all job pages.
-
-    step_index is 1-based and, when provided, will render a 5-step progress
-    header across the app (User Info → Data Upload → Street Selection →
-    Navigation Selection → QR Code Navigation). Completed steps are shown in
-    green (light), current in primary, upcoming in secondary outline.
-    """
-
-    # use shared renderer; include optional stepper in header for consistent placement
-    header_children = [
-        dbc.Row(
-            [
-                dbc.Col(html.H4(title, className="mb-0"), xs=12, md="auto"),
-                dbc.Col(
-                    dbc.Badge(
-                        f"Job: {job_id or '—'}", color="primary", className="ms-md-3"
-                    ),
-                    xs=12,
-                    md="auto",
-                ),
-            ],
-            className="g-2 align-items-center",
-            justify="between",
-        )
-    ]
-    if step_index is not None:
-        header_children.append(html.Div(progress_steps(step_index), className="mt-2"))
-    header = dbc.CardHeader(header_children)
-
-    # Build card children; include stepper (if any) at the top of the body
-    body_children = []
-    body_children.extend(body if isinstance(body, list) else [body])
-
-    card_children = [header, dbc.CardBody(body_children)]
-    if footer is not None:
-        card_children.append(footer)  # footer is a CardFooter (see below)
-
-    content = [dbc.Card(card_children, className="shadow-sm modern-card")]
-    if below is not None:
-        content.append(below)
-
-    return html.Main(content, role="main", tabIndex=0, className="p-3 p-md-4 page-main")
 
 
 # Main Map
@@ -712,3 +719,61 @@ def register_navbar_callbacks(app):
         if n:
             return not is_open
         return is_open
+
+
+def register_reset_callbacks(app):
+    """Register callbacks for job reset functionality."""
+
+    @app.callback(
+        Output(RESET_MODAL_SHARED_ID, "is_open", allow_duplicate=True),
+        Input(RESET_BUTTON_SHARED_ID, "n_clicks"),
+        Input(RESET_MODAL_CANCEL_BUTTON_SHARED_ID, "n_clicks"),
+        Input(RESET_MODAL_CONFIRM_BUTTON_SHARED_ID, "n_clicks"),
+        State(RESET_MODAL_SHARED_ID, "is_open"),
+        prevent_initial_call=True,
+    )
+    def toggle_reset_modal(n_open, n_cancel, n_confirm, is_open):
+        """Toggle reset confirmation modal."""
+        triggered_id = ctx.triggered_id
+
+        if triggered_id == RESET_BUTTON_SHARED_ID:
+            return True  # Open modal
+        elif triggered_id in (
+            RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
+            RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
+        ):
+            return False  # Close modal
+
+        return is_open
+
+    @app.callback(
+        Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
+        Input(RESET_MODAL_CONFIRM_BUTTON_SHARED_ID, "n_clicks"),
+        State(URL_SHARED_ID, "pathname"),
+        prevent_initial_call=True,
+    )
+    def perform_reset(n_clicks, pathname):
+        """Perform job reset and reload page."""
+        if n_clicks is None:
+            raise PreventUpdate
+
+        # Extract job_id from pathname
+        # Expected format: /job/{job_id}/{page_name}
+        path_parts = pathname.split("/")
+        if len(path_parts) >= 3 and path_parts[1] == "job":
+            job_id = path_parts[2]
+        else:
+            logging.error(f"Could not extract job_id from pathname: {pathname}")
+            raise PreventUpdate
+
+        # Load job and reset
+        try:
+            job = CosmonautJob(job_id=job_id)
+            job.reset()
+            logging.info(f"Job {job_id} reset successfully from {pathname}")
+        except Exception as e:
+            logging.error(f"Failed to reset job {job_id}: {e}")
+            raise PreventUpdate
+
+        # Return same pathname to reload page with new state
+        return pathname

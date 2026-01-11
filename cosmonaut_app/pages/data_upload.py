@@ -1,4 +1,40 @@
-"""Data Upload page for a specific job."""
+"""Upload membership data and configure coordinate reference system.
+
+This page is where you upload your cosmic ray neutron sensor measurement locations
+or sampling points that will be used to plan the navigation route. The workflow
+on this page involves two key steps:
+
+1. **Specify EPSG Code**: Enter the coordinate reference system (CRS) of your data.
+   The application validates the EPSG code in real-time and displays the coordinate
+   system description. Common choices include:
+   - 4326 (WGS84 latitude/longitude - global standard)
+   - 25832 (ETRS89 / UTM zone 32N - Germany)
+   - 31468 (DHDN / Gauss-Kruger zone 4 - Germany legacy)
+   - 3857 (Web Mercator - web mapping)
+
+2. **Upload CSV File**: Drag and drop or select a CSV/TXT file containing your
+   membership data with coordinate columns. The system will parse your file,
+   transform coordinates to WGS84 (EPSG:4326) for map display, and visualize
+   your locations on the interactive map.
+
+After uploading, your data is validated and the system automatically queries
+OpenStreetMap for road networks within your data's geographic extent. The buffered
+bounding box of your points determines which street data is retrieved for the next
+step (street selection).
+
+**File Requirements:**
+- Format: CSV or TXT with delimiter-separated values
+- Must include coordinate columns (latitude/longitude or projected coordinates)
+- Coordinates should match the specified EPSG code
+- Files are stored securely in your job's work directory
+
+Once your data is uploaded, validated, and displayed on the map, proceed to the
+street selection page to choose which roads to include in your route.
+
+NOTE: File upload uses dcc.Upload with base64 encoding. The OsmRoads class handles
+OpenStreetMap querying with proper buffering around the data extent. Coordinate
+transformation uses pyproj with CRS validation via the pyproj.CRS class.
+"""
 
 import os
 import logging
@@ -10,6 +46,7 @@ from pyproj.exceptions import CRSError
 from pyproj import CRS
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.constants import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID,
     DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID,
@@ -31,6 +68,8 @@ from cosmonaut_app.layout import (
     progress_footer,
     create_map,
     build_url_step,
+    create_reset_banner,
+    create_reset_modal,
 )
 
 register_page(
@@ -62,53 +101,77 @@ def is_epsg_valid(epsg):
 
 def layout(job_id):
     job = CosmonautJob(job_id=job_id)
-    card_body = [
-        dcc.Store(id=EPSG_STORE_SHARED_ID),
-        dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
-        html.P(
-            "Please enter a valid EPSG code and then upload your membership data file.",
-            className="text-muted",
-        ),
-        dbc.Label(
-            "EPSG code",
-            html_for=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
-            className="mt-2",
-        ),
-        dbc.Input(
-            id=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
-            type="text",
-            value=job.model.epsg,
-        ),
-        dbc.FormText(
-            "Common choices: 4326, 25832, 3857, …",
-            color="secondary",
-            className="mb-1",
-        ),
-        dbc.FormText(
-            id=DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID, className="fw-semibold"
-        ),
-        html.Div(
-            dcc.Upload(
-                id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
-                accept=".csv,.txt",
-                children=html.Div(
-                    [
-                        html.I(className="bi bi-cloud-arrow-up fs-4 me-2"),
-                        "Drag & drop or click to select a .csv or .txt file",
-                    ],
-                    id=DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID,
-                ),
-                multiple=False,
-                disabled=True,  # enabled after valid EPSG
+    status = job.get_status()
+    is_active = status == JOB_STATUS_PENDING
+
+    card_body = []
+
+    # Add reset banner if not PENDING
+    if not is_active:
+        card_body.append(create_reset_banner(job_id, status))
+
+    # Add stores and form components
+    card_body.extend(
+        [
+            dcc.Store(id=EPSG_STORE_SHARED_ID),
+            dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
+            html.P(
+                "Please enter a valid EPSG code and then upload your membership data file.",
+                className="text-muted",
             ),
-            className="my-3",
-        ),
-        html.Div(
-            job.model.classification_upload["file_name"],
-            id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
-            className="text-muted",
-        ),
-    ]
+            dbc.Label(
+                "EPSG code",
+                html_for=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
+                className="mt-2",
+            ),
+            dbc.Input(
+                id=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
+                type="text",
+                value=job.model.epsg,
+                disabled=not is_active,
+                style={"background-color": "#e9ecef"} if not is_active else {},
+            ),
+            dbc.FormText(
+                "Common choices: 4326, 25832, 3857, …",
+                color="secondary",
+                className="mb-1",
+            ),
+            dbc.FormText(
+                id=DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID, className="fw-semibold"
+            ),
+            html.Div(
+                dcc.Upload(
+                    id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+                    accept=".csv,.txt",
+                    children=html.Div(
+                        [
+                            html.I(className="bi bi-cloud-arrow-up fs-4 me-2"),
+                            "Drag & drop or click to select a .csv or .txt file",
+                        ],
+                        id=DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID,
+                    ),
+                    multiple=False,
+                    disabled=True
+                    if not is_active
+                    else True,  # enabled after valid EPSG when active
+                    style=(
+                        {"backgroundColor": "#e9ecef", "cursor": "not-allowed"}
+                        if not is_active
+                        else {}
+                    ),
+                ),
+                className="my-3",
+            ),
+            html.Div(
+                job.model.classification_upload["file_name"],
+                id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
+                className="text-muted",
+            ),
+        ]
+    )
+
+    # Add reset modal
+    card_body.append(create_reset_modal())
 
     user_info_path = build_url_step("user_info", job_id)
     street_selection_path = build_url_step("street_selection", job_id)

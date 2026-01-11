@@ -47,9 +47,11 @@ env_vars = [
     "DOCKER_UID",
     "DOCKER_GID",
     "DEBUG",
+    "WEB_OUTSIDE_URL",
 ]
 
-WEB_WORK_DIR = getenv("WEB_WORK_DIR")
+WEB_WORK_DIR = os.path.abspath(getenv("WEB_WORK_DIR"))
+WEB_OUTSIDE_URL = getenv("WEB_OUTSIDE_URL")
 FLASK_PORT = getenv("FLASK_PORT")
 REDIS_PORT = getenv("REDIS_PORT")
 REDIS_HOST = getenv("REDIS_HOST")
@@ -85,3 +87,20 @@ osm_tags_mapping = {
     "Spielstraße": ["living_street"],
     "Wirtschaftsweg": ["track"],
 }
+
+
+def get_download_url(job_id, filename="route.gpx"):
+    """Construct the full download URL for a GPX file.
+
+    Args:
+        job_id: Job identifier
+        filename: Name of the file to download (default: "route.gpx")
+
+    Returns:
+        str: Full URL to download the file
+    """
+    if "localhost" in WEB_OUTSIDE_URL:
+        url_base = WEB_OUTSIDE_URL + FLASK_PORT
+    else:
+        url_base = WEB_OUTSIDE_URL
+    return f"{url_base}/download/{job_id}/{filename}"

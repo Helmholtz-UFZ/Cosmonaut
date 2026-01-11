@@ -10,6 +10,7 @@ from cosmonaut_app.files_route import serve_files
 from cosmonaut_app.layout import (
     app_layout,
     register_navbar_callbacks,
+    register_reset_callbacks,
 )
 from cosmonaut_app.object_storage_manager import setup_remote, create_bucket
 from cosmonaut_app.logger import get_logger_config
@@ -40,6 +41,7 @@ setup_remote()
 create_bucket()
 
 register_navbar_callbacks(app)
+register_reset_callbacks(app)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=DEBUG, port=FLASK_PORT)

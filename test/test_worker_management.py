@@ -7,6 +7,10 @@ This test validates:
 4. Verifying the task appears in the revoked tasks table
 """
 
+import logging
+
+from time import sleep
+
 from playwright.sync_api import expect
 
 from cosmonaut_app.config import FLASK_PORT
@@ -21,18 +25,23 @@ from cosmonaut_app.constants.html_ids import (
 from test.help_functions_tests import check_all_errors
 
 
-def test_submit_and_kill_task(page, dash_app):
+def test_submit_and_kill_task(page, dash_app, celery_worker):
     """Test submitting a test task, killing it, and verifying it appears in revoked tasks."""
     # Navigate to worker management page
     page.goto(f"http://localhost:{FLASK_PORT}/worker-management")
 
+    logging.info("Visited worker management page, waiting for loading to complete")
     # Wait for initial loading to complete (page load triggers refresh)
     expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
         timeout=5000
     )
 
+    logging.info("Loading complete, submitting test task")
+
     # Submit test task
     page.locator(f"#{TEST_TASK_BUTTON_WORKER_MANAGEMENT_ID}").click()
+
+    logging.info("Submitted test task, waiting for it to appear in active tasks table")
 
     # Verify loading modal appears
     expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).to_be_visible(timeout=5000)
@@ -47,6 +56,7 @@ def test_submit_and_kill_task(page, dash_app):
     first_cell = page.locator(
         f"#{ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID} .dash-cell"
     ).first
+    sleep(10)
     expect(first_cell).to_be_visible(timeout=5000)
 
     # Extract task ID from first cell (task_id column)

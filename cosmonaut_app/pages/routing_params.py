@@ -1,3 +1,43 @@
+"""Configure routing algorithm parameters before calculation.
+
+Fine-tune the routing calculation by adjusting advanced parameters that control
+how your navigation route is optimized. This page presents a dynamically generated
+form with configuration options from the sensor-routing pipeline.
+
+**Available Parameters:**
+
+The form includes various routing optimization settings such as:
+- Route optimization weights and penalties
+- Distance calculation methods and thresholds
+- Network traversal and pathfinding settings
+- Algorithmic tuning options for the routing algorithm
+
+The form is automatically generated from the FullPipelineConfig Pydantic model,
+ensuring all parameters are properly validated and have sensible defaults. Each
+field includes its data type, default value, and valid ranges where applicable.
+
+**Using This Page:**
+
+Most users can proceed with the default values, which are optimized for typical
+CRNS field sampling scenarios. The defaults provide a good balance between route
+efficiency, coverage of measurement points, and practical navigability.
+
+Advanced users can customize parameters for specific use cases:
+- Different vehicle types (car, bicycle, on-foot)
+- Varying terrain requirements
+- Specific measurement density patterns
+- Custom optimization objectives
+
+Simply review the default settings and modify any parameters you wish to customize.
+When satisfied, click "Next" to proceed to the final page where you'll start the
+route calculation and download your GPX navigation file.
+
+NOTE: The form is auto-generated using FormFactory with InputField components.
+All configuration is validated against the FullPipelineConfig pydantic model to
+ensure type safety and value constraints. Parameters are persisted to the job
+model and used during background route calculation.
+"""
+
 import logging
 from dash import (
     register_page,
@@ -9,9 +49,11 @@ from dash import (
     callback_context,
     no_update,
 )
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.constants import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     NEXT_BUTTON_ROUTING_PARAMS_ID,
@@ -24,6 +66,8 @@ from cosmonaut_app.layout import (
     create_card_input,
     progress_footer,
     build_url_step,
+    create_reset_banner,
+    create_reset_modal,
 )
 from cosmonaut_app.form_factory import FormFactory, InputField
 from cosmonaut_app.pydantic_models import FullPipelineConfig
@@ -55,8 +99,22 @@ card_body = form_factory.process_layout(form_factory.layout)
 def layout(job_id):
     logging.info(f"Routing params layout called with job_id={job_id}")
     job = CosmonautJob(job_id=job_id)
-    form_factory = FormFactory(job.model, card_body_with_placeholder)
+    status = job.get_status()
+    is_active = status == JOB_STATUS_PENDING
+
+    # Create form with FormFactory (active parameter controls disabled state and styling)
+    # IDs are always preserved for callbacks regardless of active state
+    form_factory = FormFactory(job.model, card_body_with_placeholder, active=is_active)
     card_body = form_factory.process_layout(form_factory.layout)
+
+    # Add reset banner if not PENDING (insert at beginning)
+    if not is_active:
+        card_body.insert(0, create_reset_banner(job_id, status))
+
+    # Add reset modal
+    card_body.append(create_reset_modal())
+
+    # Add store
     card_body.append(dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id))
 
     user_info_path = build_url_step("street_selection", job_id)
@@ -64,7 +122,7 @@ def layout(job_id):
     footer = progress_footer(
         prev_url=user_info_path,
         next_id=NEXT_BUTTON_ROUTING_PARAMS_ID,
-        next_disabled=True,
+        next_disabled=not is_active,  # Disable next button when not active
     )
 
     map = create_map(job=job)
@@ -101,6 +159,14 @@ def layout(job_id):
 def update_routing_params(**inputs):
     job_id = inputs.pop("job_id")
     job = CosmonautJob(job_id=job_id)
+
+    # Prevent updates if job is not in PENDING state
+    if job.get_status() != JOB_STATUS_PENDING:
+        logging.warning(
+            f"Routing params update prevented: job {job_id} not in PENDING state"
+        )
+        raise PreventUpdate
+
     valid, output_dict = form_factory.validate_callback(inputs)
     triggered_id = callback_context.triggered[0]["prop_id"].split(".")[0]
     logging.info(f"Routing params callback triggered by {triggered_id}, valid={valid}")
@@ -108,10 +174,10 @@ def update_routing_params(**inputs):
         for key, value in inputs.items():
             if hasattr(job.model, key):
                 setattr(job.model, key, value)
-        job.submit()
+        job.save()
         return {
             **output_dict,
-            "url": build_url_step("route_download", job_id),
+            "url": build_url_step("route_computation", job_id),
             "next_button": False,
         }
 

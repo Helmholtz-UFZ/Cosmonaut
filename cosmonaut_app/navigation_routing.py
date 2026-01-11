@@ -6,40 +6,43 @@ import json
 import gpxpy
 import qrcode
 
-# Configure logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO,
-)
-logger = logging.getLogger(__name__)
+from cosmonaut_app.config import get_download_url
 
 
 class RouteCreator:
     """Creates a GPX file and QR code from GeoJSON route data."""
 
-    def __init__(self, geojson_path, output_dir):
+    def __init__(self, geojson_path, output_dir, job_id):
         self.geojson_path = geojson_path
         self.output_dir = output_dir
+        self.job_id = job_id
         self.gpx_filename = "route.gpx"
         self.gpx_path = os.path.join(self.output_dir, self.gpx_filename)
-        # TODO set proper URL base in config
-        # This must be switched to the production URL when deployed
-        # URL_BASE = "https://cosmonaut.web-intern-stage.app.ufz.de"
-        URL_BASE = "http://localhost:8080"
         self.qr_code_filename = "qr_code.png"
         self.qr_code_path = os.path.join(self.output_dir, self.qr_code_filename)
-        self.qr_code_url = f"{URL_BASE}/downloads/{self.gpx_filename}"
-        logger.debug("RouteCreator initialized.")
+        self.qr_code_url = get_download_url(self.job_id, self.gpx_filename)
+        logging.debug("RouteCreator initialized.")
 
     def create_gpx(self):
         """Creates debuga GPX file and QR code based on the provided GeoJSON data."""
+        logging.info("Starting GPX creation process.")
         if os.path.exists(self.qr_code_path):
-            logger.info("GPX file already exists. Skipping creation.")
+            logging.debug("GPX file already exists. Skipping creation.")
             return self.qr_code_url
-        logger.debug("Creating GPX file.")
+        logging.debug("Creating GPX file.")
         with open(self.geojson_path, encoding="utf-8") as f:
             geojson_data = json.load(f)
+
+        # TODO place holder for actual conversion logic
+
+        # Save the GPX file
+        with open(self.gpx_path, "w", encoding="utf-8") as file:
+            json.dump(geojson_data, file)
+        logging.debug(f"Fake GPX file created at {self.gpx_path}.")
+        self._create_qr_code()
+
+        return self.qr_code_url
+        # TODO END place holder for actual conversion logic
         gpx = gpxpy.gpx.GPX()
 
         # Add metadata to GPX
@@ -73,14 +76,14 @@ class RouteCreator:
         # Save the GPX file
         with open(self.gpx_path, "w", encoding="utf-8") as file:
             file.write(gpx.to_xml())
-        logger.debug(f"GPX file created at {self.gpx_path}.")
+        logging.debug(f"GPX file created at {self.gpx_path}.")
         self._create_qr_code()
 
         return self.qr_code_url
 
     def _create_qr_code(self):
         """Creates a QR code image based on the provided URL."""
-        logger.debug("Creating QR code.")
+        logging.debug("Creating QR code.")
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -98,4 +101,4 @@ class RouteCreator:
         with open(self.qr_code_path, "wb") as file:
             file.write(img_io.getvalue())
 
-        logger.debug(f"QR code created and saved at {self.qr_code_path}.")
+        logging.debug(f"QR code created and saved at {self.qr_code_path}.")

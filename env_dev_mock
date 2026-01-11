@@ -7,6 +7,7 @@ DEBUG=0
 ### Webserver ###
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
 FLASK_PORT=8080
+WEB_OUTSIDE_URL="http://localhost"
 
 ### Object Storage (S3-compatible via rclone) ###
 OBJECT_STORAGE_ACCESS_KEY="minioadmin"

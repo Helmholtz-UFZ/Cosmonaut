@@ -5,13 +5,19 @@ Currently implements a placeholder that computes a hash of parameters.
 This will be replaced with actual routing algorithm implementation.
 """
 
-import hashlib
 import json
+from time import sleep
 import logging
 import os
 from logging.config import dictConfig
 
 from celery import Task
+from cosmonaut_app.constants import (
+    SOLUTION_FILE,
+    JOB_STATUS_COMPLETED,
+    JOB_STATUS_FAILED,
+    LOG_FILE_NAME,
+)
 
 
 log = logging.getLogger(__name__)
@@ -28,7 +34,7 @@ class RoutingTask(Task):
             log.error(f"Job {job_id} failed with error: {str(exc)}")
 
 
-def compute_params_hash(job_id):
+def routing_place_holder(output_dir):
     """Compute hash from parameters.json and write to file.
 
     This is a placeholder function that will be replaced with the actual
@@ -40,35 +46,13 @@ def compute_params_hash(job_id):
     Returns:
         str: SHA256 hash of the parameters
     """
-    from cosmonaut_app.cosmonaut_job import CosmonautJob
+    logging.info(f"Starting placeholder routing computation in {output_dir}")
+    sleep(10)  # Simulate computation time
+    result_file = os.path.join(output_dir, SOLUTION_FILE)
+    with open(result_file, "w") as f:
+        json.dump({"status": "completed"}, f)
 
-    # Load job
-    job = CosmonautJob(job_id=job_id)
-
-    # Read parameters.json (already dumped by job.save())
-    params_file = os.path.join(job.input_dir, "parameters.json")
-    with open(params_file, "r") as f:
-        params = json.load(f)
-
-    # Log parameters
-    logging.info(f"Job {job_id} parameters: {json.dumps(params, indent=2)}")
-
-    # Calculate hash
-    params_str = json.dumps(params, sort_keys=True)
-    params_hash = hashlib.sha256(params_str.encode()).hexdigest()
-    logging.info(f"Job {job_id} parameter hash: {params_hash}")
-
-    # Write hash to file (minimal output per user preference)
-    hash_file = os.path.join(job.output_dir, "params_hash.txt")
-    with open(hash_file, "w") as f:
-        f.write(f"{params_hash}\n")
-
-    logging.info(f"Job {job_id} hash written to {hash_file}")
-
-    # Save job (sync to object storage)
-    job.save()
-
-    return params_hash
+    logging.info(f"Written placeholder solution to {result_file}")
 
 
 def flush_all_handlers():
@@ -90,7 +74,7 @@ def process_routing_job(self, job_id):
     Steps:
     1. Load job from database
     2. Switch logging to file in work_dir (mimicking cosmopolitan's computation_tasks)
-    3. Call compute_params_hash() function
+    3. Call routing_place_holder() function
     4. Flush handlers and switch logging back to web config
     """
     from cosmonaut_app.config import DEBUG
@@ -100,8 +84,6 @@ def process_routing_job(self, job_id):
         get_logger_config_web,
     )
 
-    LOG_FILE_NAME = "worker.log"
-
     logging.info(f"Starting routing job task for job_id={job_id}")
 
     # Load job to get work directory
@@ -109,16 +91,21 @@ def process_routing_job(self, job_id):
 
     # Switch logging to file in work directory
     dictConfig(
-        get_logger_config_computation(os.path.join(job.working_dir, LOG_FILE_NAME))
+        get_logger_config_computation(os.path.join(job.output_dir, LOG_FILE_NAME))
     )
 
     try:
         logging.info(f"Starting routing job computation for job_id={job_id}")
 
-        # Call the hash computation function (placeholder for routing algorithm)
-        params_hash = compute_params_hash(job_id)
+        # TODO
+        routing_place_holder(job.output_dir)
 
-        logging.info(f"Job {job_id} completed successfully with hash: {params_hash}")
+        # Post-processing: Create GPX and QR code
+        logging.info(f"Starting post-processing for job {job.model.job_id}")
+        qr_code_url = job.create_qr_code_routing()
+        logging.info(f"Post-processing complete. QR code: {qr_code_url}")
+
+        logging.info(f"Job {job_id} completed successfully")
 
         # Flush all handlers before switching back
         flush_all_handlers()
@@ -128,11 +115,8 @@ def process_routing_job(self, job_id):
 
         logging.info(f"Routing job {job_id} finished")
 
-        return {
-            "status": "completed",
-            "job_id": job_id,
-            "hash": params_hash,
-        }
+        job.model.status = JOB_STATUS_COMPLETED
+        job.save()
 
     except Exception as e:
         logging.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
@@ -140,5 +124,8 @@ def process_routing_job(self, job_id):
         # Flush handlers and switch back even on error
         flush_all_handlers()
         dictConfig(get_logger_config_web(DEBUG))
+
+        job.model.status = JOB_STATUS_FAILED
+        job.save()
 
         raise

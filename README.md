@@ -2,7 +2,7 @@
 <h1 align="center">COSMONAUT</h1>
 <h2 align="center"><strong>COS</strong><small>mic ray based soil </small><strong>MO</strong><small>isture </small><strong>P</strong><small>rediction </small><strong>NA</strong><small>vigation and </small><strong>UT</strong><small>ility </small><strong>T</strong><small>ool</small></h2>
 <p align="center">
-	<img src="cosmonaut_app/static/large_banner.jpg" alt="Welcome" width="30%">
+	<img src="cosmonaut_app/static/front_banner.png" alt="Welcome" width="30%">
 </p>
 </div>
 

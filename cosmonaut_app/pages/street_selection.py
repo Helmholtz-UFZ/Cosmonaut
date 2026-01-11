@@ -1,4 +1,54 @@
-"""Street Selection page: UI-only (logic moved to utils/callback modules)."""
+"""Select and refine street networks for route planning.
+
+This interactive page allows you to choose which OpenStreetMap roads should be
+included in your navigation route. The page provides multiple selection tools to
+help you build an optimal connected road network that covers your measurement
+locations.
+
+**Selection Features:**
+
+- **Tag Filtering**: Select road types using dropdown filters organized by
+  German road classifications:
+  - Autobahn (highways)
+  - Bundesstraßen (federal roads)
+  - Landstraße (country roads)
+  - Kreisstraße (district roads)
+  - Gemeindestraße (municipal roads)
+  - Sonstige (other roads including residential, service, tracks)
+
+  Use "Select All" / "Select None" buttons for quick bulk operations.
+
+- **Interactive Clicking**: Click individual road segments on the map to toggle
+  them in or out of your route network. Selected roads are highlighted in a
+  distinct color for visual feedback.
+
+- **Network Tools**:
+  - **Keep Largest**: Automatically select only the largest connected road network
+    component, removing isolated segments
+  - **Remove Disconnected**: Filter out road segments that aren't connected to
+    your main network
+  - **Undo**: Revert your last selection action using snapshot-based history
+  - **Reset**: Clear all selections and start over with a clean slate
+
+The map displays selected roads with real-time visual feedback as you make
+selections. Your goal is to create a connected network of streets that efficiently
+covers your measurement locations while being traversable by your vehicle.
+
+**Tips for Effective Selection:**
+- Start by selecting appropriate road types for your vehicle and terrain
+- Use "Keep Largest" to remove small disconnected segments automatically
+- Verify all measurement points are reachable from your selected network
+- Click individual segments to fine-tune network boundaries
+- Use Undo if you make a mistake
+
+When satisfied with your street selection, proceed to configure routing parameters
+for the final route calculation.
+
+NOTE: Street selection state is persisted to the job's work directory as GeoJSON.
+Undo functionality uses snapshot files stored in work_dir/snapshots/. Interactive
+callbacks use Dash Leaflet click events with feature_id tracking. The utils module
+handles graph connectivity analysis and road network processing.
+"""
 
 import os
 import json
@@ -22,6 +72,7 @@ import dash_bootstrap_components as dbc
 import geojson
 
 from cosmonaut_app.config import osm_tags_mapping
+from cosmonaut_app.constants import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
     CLICKED_ROADS_STORE_SHARED_ID,
@@ -56,6 +107,8 @@ from cosmonaut_app.layout import (
     progress_footer,
     build_url_step,
     style_handle,  # reuse dynamic style so colors stay consistent after filtering
+    create_reset_banner,
+    create_reset_modal,
 )
 from cosmonaut_app.utils.street_selection_utils import (
     initial_features,
@@ -89,153 +142,185 @@ def layout(job_id: str):
         A composed layout with the map on the left and controls on the right.
     """
     job = CosmonautJob(job_id=job_id)
+    status = job.get_status()
+    is_active = status == JOB_STATUS_PENDING
+
     logging.info(f"Street selection layout called with job_id={job_id}")
     logging.info(job.model.classification_upload)
-    card_body = [
-        # Shared stores required by cross-page callbacks (map, routing, etc.)
-        dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
-        dcc.Store(id=EPSG_STORE_SHARED_ID, storage_type="session"),
-        dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
-        # Local store to remember last tag selection
-        html.P(
-            "Wählen Sie die gewünschten Straßen im linken Kartenbereich aus. "
-            "Klicken Sie eine Straße an, um sie zu markieren. Mit dem Button "
-            "'Remove selected' entfernen Sie die Auswahl. 'Keep largest' behält die größte "
-            "zusammenhängende Teilmenge innerhalb der aktuell gewählten Straßentypen.",
-            className="text-muted",
-        ),
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.Label(
-                        "Straßenauswahl",
-                        html_for=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
-                        className="mt-2",
+
+    card_body = []
+
+    # Add reset banner if not PENDING
+    if not is_active:
+        card_body.append(create_reset_banner(job_id, status))
+
+    # Add form components
+    card_body.extend(
+        [
+            # Shared stores required by cross-page callbacks (map, routing, etc.)
+            dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
+            dcc.Store(id=EPSG_STORE_SHARED_ID, storage_type="session"),
+            dcc.Store(
+                id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"
+            ),
+            # Local store to remember last tag selection
+            html.P(
+                "Wählen Sie die gewünschten Straßen im linken Kartenbereich aus. "
+                "Klicken Sie eine Straße an, um sie zu markieren. Mit dem Button "
+                "'Remove selected' entfernen Sie die Auswahl. 'Keep largest' behält die größte "
+                "zusammenhängende Teilmenge innerhalb der aktuell gewählten Straßentypen.",
+                className="text-muted",
+            ),
+            dbc.Row(
+                [
+                    dbc.Col(
+                        dbc.Label(
+                            "Straßenauswahl",
+                            html_for=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+                            className="mt-2",
+                        ),
+                        width="auto",
                     ),
-                    width="auto",
-                ),
-                dbc.Col(
-                    dbc.ButtonGroup(
+                    dbc.Col(
+                        dbc.ButtonGroup(
+                            [
+                                dbc.Button(
+                                    "Select all",
+                                    id=TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
+                                    size="sm",
+                                    color="link",
+                                    disabled=not is_active,
+                                ),
+                                dbc.Button(
+                                    "Select none",
+                                    id=TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
+                                    size="sm",
+                                    color="link",
+                                    disabled=not is_active,
+                                ),
+                            ],
+                            size="sm",
+                            className="ms-2",
+                        ),
+                        width="auto",
+                        className="d-flex align-items-end",
+                    ),
+                ],
+                className="g-0",
+            ),
+            dbc.Checklist(
+                id=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+                options=[
+                    {"label": tag, "value": tag} for tag in osm_tags_mapping.keys()
+                ],
+                # Initialize with all tags so we immediately render the network once data exists
+                value=list(osm_tags_mapping.keys()),
+                switch=True,
+                inline=True,
+                input_class_name="form-check-input"
+                if is_active
+                else "form-check-input disabled",
+                style={"pointer-events": "none", "opacity": "0.6"}
+                if not is_active
+                else {},
+            ),
+            dbc.Row(
+                [
+                    dbc.Col(
+                        dbc.ButtonGroup(
+                            [
+                                dbc.Button(
+                                    [
+                                        html.I(className="bi bi-eraser me-1"),
+                                        "Remove selected",
+                                    ],
+                                    id=REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
+                                    color="danger",
+                                    outline=True,
+                                    disabled=not is_active,
+                                ),
+                                dbc.Button(
+                                    [
+                                        html.I(className="bi bi-diagram-3 me-1"),
+                                        "Keep largest",
+                                    ],
+                                    id=LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
+                                    color="primary",
+                                    outline=True,
+                                    disabled=not is_active,
+                                ),
+                                dbc.Button(
+                                    [
+                                        html.I(
+                                            className="bi bi-arrow-counterclockwise me-1"
+                                        ),
+                                        "Reset edits",
+                                    ],
+                                    id=RESET_ROADS_BUTTON_STREET_SELECTION_ID,
+                                    color="secondary",
+                                    outline=True,
+                                    disabled=not is_active,
+                                ),
+                                dbc.Button(
+                                    [
+                                        html.I(className="bi bi-arrow-90deg-left me-1"),
+                                        "Undo",
+                                    ],
+                                    id=UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
+                                    color="secondary",
+                                    outline=True,
+                                    disabled=not is_active,
+                                ),
+                            ],
+                            size="md",
+                        ),
+                        width="auto",
+                    ),
+                    dbc.Col(
+                        dbc.Badge(
+                            "Selected: 0",
+                            color="info",
+                            className="ms-2",
+                        ),
+                        width="auto",
+                        className="d-flex align-items-center",
+                    ),
+                ],
+                className="g-2 align-items-center mt-2",
+            ),
+            # Reset confirmation modal (for reset edits button)
+            dbc.Modal(
+                [
+                    dbc.ModalHeader(dbc.ModalTitle("Reset edits?")),
+                    dbc.ModalBody(
+                        "This will restore the roads to the initial OSM state for this job."
+                    ),
+                    dbc.ModalFooter(
                         [
                             dbc.Button(
-                                "Select all",
-                                id=TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
-                                size="sm",
-                                color="link",
+                                "Cancel",
+                                id=CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
+                                color="secondary",
+                                outline=True,
                             ),
                             dbc.Button(
-                                "Select none",
-                                id=TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
-                                size="sm",
-                                color="link",
-                            ),
-                        ],
-                        size="sm",
-                        className="ms-2",
-                    ),
-                    width="auto",
-                    className="d-flex align-items-end",
-                ),
-            ],
-            className="g-0",
-        ),
-        dbc.Checklist(
-            id=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
-            options=[{"label": tag, "value": tag} for tag in osm_tags_mapping.keys()],
-            # Initialize with all tags so we immediately render the network once data exists
-            value=list(osm_tags_mapping.keys()),
-            switch=True,
-            inline=True,
-        ),
-        dbc.Row(
-            [
-                dbc.Col(
-                    dbc.ButtonGroup(
-                        [
-                            dbc.Button(
-                                [
-                                    html.I(className="bi bi-eraser me-1"),
-                                    "Remove selected",
-                                ],
-                                id=REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
+                                "Reset",
+                                id=CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
                                 color="danger",
-                                outline=True,
                             ),
-                            dbc.Button(
-                                [
-                                    html.I(className="bi bi-diagram-3 me-1"),
-                                    "Keep largest",
-                                ],
-                                id=LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
-                                color="primary",
-                                outline=True,
-                            ),
-                            dbc.Button(
-                                [
-                                    html.I(
-                                        className="bi bi-arrow-counterclockwise me-1"
-                                    ),
-                                    "Reset edits",
-                                ],
-                                id=RESET_ROADS_BUTTON_STREET_SELECTION_ID,
-                                color="secondary",
-                                outline=True,
-                            ),
-                            dbc.Button(
-                                [
-                                    html.I(className="bi bi-arrow-90deg-left me-1"),
-                                    "Undo",
-                                ],
-                                id=UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
-                                color="secondary",
-                                outline=True,
-                            ),
-                        ],
-                        size="md",
+                        ]
                     ),
-                    width="auto",
-                ),
-                dbc.Col(
-                    dbc.Badge(
-                        "Selected: 0",
-                        color="info",
-                        className="ms-2",
-                    ),
-                    width="auto",
-                    className="d-flex align-items-center",
-                ),
-            ],
-            className="g-2 align-items-center mt-2",
-        ),
-        # Reset confirmation modal
-        dbc.Modal(
-            [
-                dbc.ModalHeader(dbc.ModalTitle("Reset edits?")),
-                dbc.ModalBody(
-                    "This will restore the roads to the initial OSM state for this job."
-                ),
-                dbc.ModalFooter(
-                    [
-                        dbc.Button(
-                            "Cancel",
-                            id=CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
-                            color="secondary",
-                            outline=True,
-                        ),
-                        dbc.Button(
-                            "Reset",
-                            id=CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
-                            color="danger",
-                        ),
-                    ]
-                ),
-            ],
-            id=RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
-            is_open=False,
-            backdrop="static",
-            keyboard=False,
-        ),
-    ]
+                ],
+                id=RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
+                is_open=False,
+                backdrop="static",
+                keyboard=False,
+            ),
+        ]
+    )
+
+    # Add job reset modal
+    card_body.append(create_reset_modal())
 
     user_info_path = build_url_step("data_upload", job_id)
     street_selection_path = build_url_step("routing_params", job_id)
@@ -332,6 +417,13 @@ def remove_selected(
     """
     if not n or not job_id:
         raise PreventUpdate
+
+    # Prevent interaction if job is not in PENDING state
+    job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
+        logging.warning(f"Remove selected prevented: job {job_id} not in PENDING state")
+        raise PreventUpdate
+
     if not clicked_roads:
         logging.info("No roads selected; nothing to remove.")
         raise PreventUpdate
@@ -400,6 +492,12 @@ def keep_largest_subnetwork(
     Returns a filtered FeatureCollection representing the updated working set.
     """
     if not n or not job_id:
+        raise PreventUpdate
+
+    # Prevent interaction if job is not in PENDING state
+    job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
+        logging.warning(f"Keep largest prevented: job {job_id} not in PENDING state")
         raise PreventUpdate
 
     in_dir, raw_4326, work_4326 = _paths(job_id)
@@ -642,6 +740,12 @@ def undo_last(
 ) -> Dict[str, Any]:
     """Restore the most recent snapshot from history and re-filter by tags."""
     if not n or not job_id:
+        raise PreventUpdate
+
+    # Prevent interaction if job is not in PENDING state
+    job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
+        logging.warning(f"Undo prevented: job {job_id} not in PENDING state")
         raise PreventUpdate
     in_dir, raw_4326, work_4326 = _paths(job_id)
     hist_dir = os.path.join(in_dir, "history")

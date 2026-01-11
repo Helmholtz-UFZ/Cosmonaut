@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import shutil
 import uuid
 from datetime import date
 import base64
@@ -10,6 +11,14 @@ from cosmonaut_app.config import (
     DAYS_DELETE_NOT_SUBMITTED,
     DAYS_DELETE_SUBMITTED,
     WEB_WORK_DIR,
+)
+from cosmonaut_app.constants import (
+    SOLUTION_FILE,
+    JOB_STATUS_RUNNING,
+    JOB_STATUS_COMPLETED,
+    JOB_STATUS_FAILED,
+    JOB_STATUS_PENDING,
+    LOG_FILE_NAME,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.object_storage_manager import (
@@ -248,23 +257,28 @@ class CosmonautJob:
         return classification_data, file_path, bounds
 
     def create_qr_code_routing(self):
-        # TODO the name "solution_transformed.json" should be abstracted somewhere. Who
-        # is responsible for writing it?
-        geojson_path = os.path.join(self.output_dir, "solution_transformed.json")
+        logging.info(f"Creating QR code for routing job {self.model.job_id}")
+        geojson_path = os.path.join(self.output_dir, SOLUTION_FILE)
 
-        route_creator = RouteCreator(geojson_path, self.output_dir)
+        route_creator = RouteCreator(
+            geojson_path=geojson_path,
+            output_dir=self.output_dir,
+            job_id=self.model.job_id,
+        )
         qr_code_url = route_creator.create_gpx()
         self.save()
         return qr_code_url
 
     def submit(self):
         """Submit the job to background worker."""
+        logging.info(f"Submitting job {self.model.job_id} to background worker")
         try:
             # Lazy import to avoid circular imports
             from cosmonaut_app.background_job_manager import get_background_job_manager
 
-            # Mark as submitted and save (this will dump routing params via save())
+            # Mark as submitted and set status to RUNNING
             self.model.submitted = True
+            self.model.status = JOB_STATUS_RUNNING
             self.save()  # This calls dump_routing_params() automatically
 
             # Get the singleton manager and submit the job
@@ -288,3 +302,104 @@ class CosmonautJob:
             # Fail hard per user preference - no graceful fallback
             logging.error(f"Failed to submit job {self.model.job_id}: {str(e)}")
             raise
+
+    def get_status(self) -> str:
+        """Get current job status, syncing from Celery if terminated.
+
+        If job has a Celery task and is currently RUNNING, checks Celery state
+        and updates database status if task has terminated (SUCCESS/FAILURE).
+
+        Returns:
+            str: Current job status (PENDING, RUNNING, COMPLETED, or FAILED)
+        """
+        # Lazy import to avoid circular imports
+        from cosmonaut_app.background_job_manager import get_background_job_manager
+
+        # Only sync if job has a celery task and is currently RUNNING
+        if self.model.celery_task_id and self.model.status == JOB_STATUS_RUNNING:
+            # Query Celery for task status
+            job_manager = get_background_job_manager()
+            celery_status_info = job_manager.get_job_status(self.model.celery_task_id)
+            celery_status = celery_status_info.get("status")
+
+            # Map Celery states to job statuses
+            if celery_status == "SUCCESS":
+                self.model.status = JOB_STATUS_COMPLETED
+                self.save()
+                logging.info(f"Synced job {self.model.job_id} status to COMPLETED")
+            elif celery_status in ["FAILURE", "REVOKED"]:
+                self.model.status = JOB_STATUS_FAILED
+                self.save()
+                logging.warning(
+                    f"Synced job {self.model.job_id} status to FAILED "
+                    f"(Celery: {celery_status})"
+                )
+
+        return self.model.status
+
+    def get_logs(self) -> str:
+        """Retrieve logs for the job from object storage.
+
+        Returns:
+            str: Job logs as a string
+        """
+        logging.info(f"Retrieving logs for job {self.model.job_id}")
+        log_file_path = os.path.join(self.output_dir, LOG_FILE_NAME)
+        if os.path.exists(log_file_path):
+            with open(log_file_path, "r") as f:
+                log_content = f.read()
+            if not log_content.strip():
+                log_content = "Logs empty."
+        else:
+            log_content = "No log file found."
+
+        return log_content
+
+    def reset(self):
+        """Reset job to PENDING state by clearing output directory and task state.
+
+        This method:
+        - Cancels the Celery task if job is currently RUNNING
+        - Deletes all files in output directory (logs, solutions, GPX, QR codes)
+        - Preserves input directory (uploaded data, parameters, OSM data)
+        - Preserves plots directory
+        - Sets status to PENDING
+        - Clears celery_task_id and submitted flag
+        - Saves changes to database and object storage
+
+        Returns:
+            None
+        """
+        logging.info(f"Resetting job {self.model.job_id}")
+
+        # If job is currently running, cancel the Celery task first
+        if self.model.status == JOB_STATUS_RUNNING and self.model.celery_task_id:
+            logging.info(f"Cancelling running task {self.model.celery_task_id}")
+            from cosmonaut_app.background_job_manager import get_background_job_manager
+
+            job_manager = get_background_job_manager()
+            job_manager.revoke_job(self.model.celery_task_id, terminate=True)
+
+        # Delete output directory contents
+        if os.path.exists(self.output_dir):
+            logging.info(f"Deleting output directory contents: {self.output_dir}")
+            for filename in os.listdir(self.output_dir):
+                file_path = os.path.join(self.output_dir, filename)
+                try:
+                    if os.path.isfile(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    logging.error(f"Failed to delete {file_path}: {e}")
+
+        # Reset job state
+        self.model.status = JOB_STATUS_PENDING
+        self.model.celery_task_id = None
+        self.model.submitted = False
+
+        # Save changes
+        self.save()
+
+        logging.info(f"Job {self.model.job_id} reset to PENDING")
+        logging.info(f"Job {self.model.job_id} reset to PENDING")

@@ -1,10 +1,61 @@
-"""Route & Download page: show route, QR code, and GPX download."""
+"""Calculate route and download GPX navigation file.
+
+This is the final page of the workflow where you initiate the routing calculation
+and download your optimized navigation route as a GPX file for use with GPS devices
+or navigation applications.
+
+**Page Features:**
+
+- **Start Route Button**: Initiates the background routing calculation using
+  your selected streets and configured parameters. The calculation runs as a
+  Celery background task, so you can close your browser and check back later
+  for results.
+
+- **QR Code**: After the calculation completes successfully, a QR code is
+  displayed that links directly to the GPX file download. This provides a
+  convenient way to transfer the route to mobile devices - simply scan the
+  code with your smartphone camera.
+
+- **GPX Download**: Download the complete navigation route as a standard GPX
+  (GPS Exchange Format) file compatible with most GPS devices, smartphone
+  navigation apps, and mapping software.
+
+- **Route Visualization**: View the calculated route overlaid on the interactive
+  map with all waypoints, turn-by-turn segments, and your original measurement
+  locations. This allows you to preview the route before using it in the field.
+
+**Processing Time:**
+
+The routing calculation duration depends on several factors:
+- Complexity and size of the selected street network
+- Number of measurement points to visit
+- Configured routing parameters and optimization settings
+- Current system load and available worker capacity
+
+You can monitor the job status and return to this page at any time to check
+for completion and download your results.
+
+**Using Your GPX File:**
+
+The generated GPX file can be used in multiple ways:
+- Transfer to a dedicated GPS device for field navigation
+- Import into smartphone navigation apps (OsmAnd, Maps.me, etc.)
+- Load into mapping software for route preview and analysis
+- Share with field team members for coordinated sampling
+
+The QR code provides the quickest way to get the route onto your mobile device
+for immediate field use.
+
+NOTE: Route calculation is triggered via background_job_manager using Celery tasks.
+The QR code is generated using the qrcode library with an embedded download URL.
+GPX files are stored in MinIO object storage and retrieved via Flask routes.
+"""
 
 import logging
 from dash import html, register_page, callback, Input, Output, State, dcc
 from dash.exceptions import PreventUpdate
-import dash_bootstrap_components as dbc
 
+from cosmonaut_app.config import get_download_url
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
@@ -32,37 +83,46 @@ register_page(
 def layout(job_id):
     job = CosmonautJob(job_id=job_id)
     logging.info(f"Route & Download layout called with job_id={job_id}")
+
+    # Construct full download URL
+    download_url = get_download_url(job_id)
+
     card_body = [
         html.P(
-            "Bitte haben Sie Geduld, bis die Route berechnet ist.",
-            style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
-        ),
-        html.P(
-            "Wenn der 'Start Route'-Button gedrückt wird, erscheint ein QR-Code "
-            "zum Download der GPX-Datei der finalen Route.",
-            style={"margin-bottom": "1rem", "font-size": "1.2rem"},
-        ),
-        dbc.Button(
-            "Start Route",
-            id=START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID,
-            color="success",
-            className="me-2",
-            n_clicks=0,
+            "Scan the QR code to download the GPX file of the final route.",
+            className="mb-3 fs-5",
         ),
         html.Div(
-            html.Img(
-                id=QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID,
-                style={"margin-top": "1rem", "max-width": "100%"},
-            ),
-            style={"textAlign": "center"},
+            [
+                html.Img(
+                    src=f"/pictures/{job_id}/qr_code.png",
+                    className="mt-3 mw-100",
+                ),
+                html.Div(
+                    [
+                        html.A(
+                            "Download GPX File",
+                            href=f"/download/{job_id}/route.gpx",
+                            download="route.gpx",
+                            className="btn btn-primary mt-3",
+                        ),
+                        html.Br(),
+                        html.Code(
+                            download_url,
+                        ),
+                    ],
+                    className="text-center mt-3",
+                ),
+            ],
+            className="text-center",
         ),
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
     ]
 
-    routing_params_path = build_url_step("routing_params", job_id)
+    route_computation_path = build_url_step("route_computation", job_id)
 
     footer = progress_footer(
-        prev_url=routing_params_path,
+        prev_url=route_computation_path,
         next_url=None,
     )
 
