@@ -31,7 +31,7 @@ from cosmonaut_app.constants.html_ids import (
     WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID,
     WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID,
 )
-from cosmonaut_app.layout import create_header, page_container_fullscreen_layout
+from cosmonaut_app.layout import create_header, page_container_column_layout
 from cosmonaut_app.background_job_manager import (
     get_background_job_manager,
     NAME_ROUTING_TASK,
@@ -480,7 +480,7 @@ def layout():
         fluid=True,
     )
 
-    return page_container_fullscreen_layout([header, page_content])
+    return page_container_column_layout([header, page_content])
 
 
 # ============================================================================

@@ -17,7 +17,8 @@ CREATE TABLE jobs (
     version VARCHAR,
     epsg INT,
     config JSONB,
-    celery_task_id VARCHAR
+    celery_task_id VARCHAR,
+    start_date DATE
 );
 
 -- Application logging table

@@ -19,6 +19,7 @@ from cosmonaut_app.constants import (
     LOG_FILE_NAME,
 )
 
+# from sensor_routing.sensor_routing_cli import routing_full_pipeline
 
 log = logging.getLogger(__name__)
 

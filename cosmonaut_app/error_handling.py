@@ -105,7 +105,7 @@ def handle_error(error):
     """Handle the error and return a formatted message."""
     logging.debug(f"Error: {error}", extra={"tag": "frontend"})
 
-    # Define here the error that should be not reported
+    # Define here the error that should be reported
     if not isinstance(
         error,
         (JobNotFound, WrongCeleryTaskId),

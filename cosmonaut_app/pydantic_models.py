@@ -1,13 +1,35 @@
 import logging
 import re
 import sys
+from datetime import date
+from pyproj.exceptions import CRSError
+from pyproj import CRS
 
 
-# from sensor_routing.sensor_routing_cli import Config
+# from sensor_routing.sensor_routing_cli import FullPipelineConfig
 
 from email_validator import EmailNotValidError, validate_email
 from pydantic import AfterValidator, Field, BaseModel, ConfigDict
 from typing import Annotated, Any, Dict, List
+
+
+def check_epsg(epsg: str | int) -> tuple[int | None, bool]:
+    try:
+        if isinstance(epsg, str) and epsg.upper().startswith("EPSG:"):
+            epsg = epsg[5:]
+        epsg = int(epsg)
+    except TypeError:
+        raise ValueError(
+            "EPSG code must be an integer or string representing an integer"
+        )
+
+    # Validate with pyproj
+    try:
+        CRS.from_epsg(epsg)
+    except (CRSError, TypeError):
+        raise ValueError(f"EPSG code {epsg} is not valid")
+
+    return epsg
 
 
 def check_email(email: str) -> str:
@@ -284,6 +306,7 @@ class UserModel(FullPipelineConfig):
             title="EPSG code",
             json_schema_extra={"type": "text"},
         ),
+        AfterValidator(check_epsg),
     ]
 
 
@@ -297,3 +320,4 @@ class JobModel(UserModel):
     # TODO get from sensor_routing version
     version: str = "0.1.5"
     celery_task_id: str | None = None
+    start_date: date | None = None

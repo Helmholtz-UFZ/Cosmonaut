@@ -14,6 +14,24 @@ Organization:
 1. SHARED/COMMON IDs (stores, navigation, map)
 2. Page-specific IDs (alphabetically by page)
    Within each section: grouped by TYPE, then alphabetically by NAME
+
+# nocheck Comment Usage:
+The `# nocheck` comment allows constants to bypass the HTML ID enforcement test.
+**ONLY USE # nocheck FOR THESE TWO SPECIFIC CASES:**
+
+1. IDs accessed via set_props() in error handling (not standard callbacks)
+   Example: ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"  # nocheck
+
+2. IDs used exclusively for testing/automation (not in callbacks)
+   Example: NEXT_BUTTON_ROUTING_PARAMS_ID = "next-button-routing-params-id"  # nocheck
+
+**DO NOT USE # nocheck TO BYPASS THE TEST FOR OTHER REASONS!**
+- If an ID is unused, delete it instead of adding # nocheck
+- If an ID is only a visual container (no callback interaction), remove it
+- The test exists to ensure all IDs serve a purpose
+
+BEFORE ADDING # nocheck: Double-check that one of the two valid cases above applies.
+If uncertain, ask for review rather than adding # nocheck to suppress the test.
 """
 
 # ============================================================================
@@ -47,7 +65,6 @@ ERROR_MODAL_SHARED_ID = "error-modal"  # nocheck
 LOADING_OVERLAY_SHARED_ID = "loading-overlay-shared-id"
 
 # --- Reset Components (Shared) ---
-RESET_BANNER_ALERT_SHARED_ID = "reset-banner-alert-shared-id"
 RESET_BUTTON_SHARED_ID = "reset-button-shared-id"
 RESET_MODAL_SHARED_ID = "reset-modal-shared-id"
 RESET_MODAL_CANCEL_BUTTON_SHARED_ID = "reset-modal-cancel-button-shared-id"
@@ -58,12 +75,10 @@ RESET_MODAL_CONFIRM_BUTTON_SHARED_ID = "reset-modal-confirm-button-shared-id"
 # ============================================================================
 
 # --- Buttons ---
+DELETE_FILE_BUTTON_DATA_UPLOAD_ID = "delete-file-button-data-upload-id"
 NEXT_BUTTON_DATA_UPLOAD_ID = "next-button-data-upload-id"
 
 # --- Divs ---
-DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID = (
-    "data-upload-dropzone-div-data-upload-id"  # nocheck visual container
-)
 DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID = "data-upload-file-info-div-data-upload-id"
 
 # --- Inputs ---
@@ -129,13 +144,13 @@ NEXT_BUTTON_ROUTING_PARAMS_ID = "next-button-routing-params-id"  # nocheck
 # ============================================================================
 
 # --- Buttons ---
-START_BUTTON_ROUTE_COMPUTATION_ID = "start-button-route-computation-id"
 CANCEL_BUTTON_ROUTE_COMPUTATION_ID = "cancel-button-route-computation-id"
+NEXT_BUTTON_ROUTE_COMPUTATION_ID = "next-button-route-computation-id"
 RESTART_BUTTON_ROUTE_COMPUTATION_ID = "restart-button-route-computation-id"
+START_BUTTON_ROUTE_COMPUTATION_ID = "start-button-route-computation-id"
 
 # --- Displays ---
 STATUS_BADGE_ROUTE_COMPUTATION_ID = "status-badge-route-computation-id"
-CELERY_INFO_CARD_ROUTE_COMPUTATION_ID = "celery-info-card-route-computation-id"
 WORKER_STATUS_TEXT_ROUTE_COMPUTATION_ID = "worker-status-text-route-computation-id"
 TASK_STATUS_TEXT_ROUTE_COMPUTATION_ID = "task-status-text-route-computation-id"
 WORKER_NAME_TEXT_ROUTE_COMPUTATION_ID = "worker-name-text-route-computation-id"
@@ -143,6 +158,9 @@ LOG_VIEWER_ROUTE_COMPUTATION_ID = "log-viewer-route-computation-id"
 
 # --- Intervals ---
 STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID = "status-poll-interval-route-computation-id"
+
+# --- Stores ---
+UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID = "update-trigger-store-route-computation-id"
 
 # ============================================================================
 # PAGE: ROUTE_DOWNLOAD
@@ -232,3 +250,16 @@ REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID = "revoked-tasks-table-worker-managemen
 SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID = (
     "scheduled-tasks-table-worker-management-id"
 )
+
+
+# ============================================================================
+# PAGE: JOB_MANAGER
+# ============================================================================
+
+# --- Buttons ---
+CLEAN_UP_BUTTON_JOB_MANAGER_ID = "clean-up-button-job-manager-id"
+DELETE_BUTTON_JOB_MANAGER_ID = "delete-button-job-manager-id"
+REFRESH_BUTTON_JOB_MANAGER_ID = "refresh-button-job-manager-id"
+
+# --- Tables ---
+JOBS_TABLE_JOB_MANAGER_ID = "jobs-table-job-manager-id"

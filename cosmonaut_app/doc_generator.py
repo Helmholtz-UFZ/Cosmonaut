@@ -12,6 +12,11 @@ import tomllib
 from datetime import datetime
 from pathlib import Path
 
+from cosmonaut_app.doc_pages_config import (
+    USER_WORKFLOW_PAGES,
+    ADMIN_PAGES,
+    EXCLUDED_PAGES,
+)
 from cosmonaut_app.screenshot_generator import ScreenshotGenerator
 
 INTRO_TEMPLATE = """# COSMONAUT Documentation
@@ -75,24 +80,6 @@ Administrative pages for system management, monitoring, and debugging.
 """
 
 FOOTER_TEMPLATE = "*Generated automatically from module docstrings*"
-
-# Page organization
-USER_WORKFLOW_PAGES = [
-    ("home", "Home Page"),
-    ("user_info", "User Information"),
-    ("data_upload", "Data Upload"),
-    ("street_selection", "Street Selection"),
-    ("routing_params", "Routing Parameters"),
-    ("route_computation", "Route Computation"),
-    ("route_download", "Route & Download"),
-]
-
-ADMIN_PAGES = [
-    ("logs", "Application Logs"),
-    ("worker_management", "Worker Management"),
-]
-
-EXCLUDED_PAGES = ["map", "__init__"]
 
 
 def get_app_version() -> str:

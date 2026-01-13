@@ -12,13 +12,14 @@ Classes:
 
 import logging
 import time
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     ARRAY,
     Boolean,
     Column,
+    Date,
     DateTime,
     Integer,
     String,
@@ -248,32 +249,31 @@ class DataBaseManager:
                 raise JobNotFound(job_id)
 
     @classmethod
-    def list_jobs(self):
-        """List all jobs in the database with their submission date and status.
+    def list_jobs(cls):
+        """List all jobs in the database with their metadata.
 
-        This method retrieves all job entries from the 'jobs' table in the
-        database and returns a dictionary where the keys are 'job_id', and the
-        values are a tuple containing 'start_date' and 'submitted' status
-        for each job.
-
-        Returns:
-        dict: A dictionary where keys are 'job_id' and values are tuples
-        containing 'start_date' and 'submitted' status.
-
-        Example:
-        {
-        'job1': ('2023-09-01', True),
-        'job2': ('2023-09-02', False),
-        # ...
-        }
-
+        Returns
+        -------
+        dict
+            Dictionary where keys are job_id and values are dicts with:
+            - start_date (date): Job creation date
+            - submitted (bool): Whether job was submitted
+            - status (str): Job status
+            - email (str): User email
+            - celery_task_id (str|None): Celery task ID if submitted
         """
-        with SessionScope(self.Session) as session:
+        with SessionScope(cls.Session) as session:
             job_rows = session.query(JobTable).all()
 
             job_info = {}
             for job_row in job_rows:
-                job_info[job_row.job_id] = (job_row.start_date, job_row.submitted)
+                job_info[job_row.job_id] = {
+                    "start_date": job_row.start_date,
+                    "submitted": job_row.submitted,
+                    "status": job_row.status,
+                    "email": job_row.email or "N/A",
+                    "celery_task_id": job_row.celery_task_id,
+                }
             return job_info
 
     @classmethod
@@ -342,6 +342,36 @@ class DataBaseManager:
         finally:
             session.close()
 
+    @classmethod
+    def delete_logs_older_than(cls, cutoff_datetime):
+        """Delete log entries older than the specified datetime.
+
+        Parameters
+        ----------
+        cutoff_datetime : datetime
+            Delete all logs with timestamp older than this
+
+        Returns
+        -------
+        int
+            Number of log records deleted
+        """
+        logging.info(f"Deleting logs older than {cutoff_datetime}")
+
+        with SessionScope(cls.Session) as session:
+            # Count logs before deletion
+            count_query = session.query(LogTable).filter(
+                LogTable.timestamp < cutoff_datetime
+            )
+            count = count_query.count()
+
+            # Delete logs
+            count_query.delete(synchronize_session=False)
+            session.commit()
+
+            logging.info(f"Deleted {count} log records older than {cutoff_datetime}")
+            return count
+
 
 class JobTable(Base):
     """Represents the 'jobs' table in the database."""
@@ -360,6 +390,7 @@ class JobTable(Base):
     epsg = Column("epsg", Integer)
     config = Column("config", JSON)
     celery_task_id = Column("celery_task_id", String, nullable=True)
+    start_date = Column(Date, nullable=False, default=date.today)
 
 
 class LogTable(Base):

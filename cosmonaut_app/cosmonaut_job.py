@@ -19,6 +19,8 @@ from cosmonaut_app.constants import (
     JOB_STATUS_FAILED,
     JOB_STATUS_PENDING,
     LOG_FILE_NAME,
+    OSM_DATA_FILE,
+    OSM_DATA_TRANSFORMED_FILE,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.object_storage_manager import (
@@ -88,6 +90,7 @@ class CosmonautJob:
                 break
 
         self.model.job_id = job_id
+        self.model.start_date = date.today()
         self._create_working_dir()
 
         self.save()
@@ -256,6 +259,45 @@ class CosmonautJob:
         self.save()
         return classification_data, file_path, bounds
 
+    def delete_upload(self):
+        """Delete uploaded file and reset upload-related attributes."""
+        logging.info(f"Deleting upload data for job {self.model.job_id}")
+
+        # 1. Delete uploaded CSV file
+        file_name = self.model.classification_upload.get("file_name")
+        if file_name and file_name != "No file uploaded":
+            file_path = os.path.join(self.input_dir, file_name)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logging.debug(f"Deleted uploaded file: {file_path}")
+
+        # 2. Delete OSM data files (using constants)
+        osm_geojson = os.path.join(self.input_dir, OSM_DATA_FILE)
+        osm_transformed = os.path.join(self.input_dir, OSM_DATA_TRANSFORMED_FILE)
+        for osm_file in [osm_geojson, osm_transformed]:
+            if os.path.exists(osm_file):
+                os.remove(osm_file)
+                logging.debug(f"Deleted OSM file: {osm_file}")
+
+        # 3. Delete plots directory
+        if os.path.exists(self.plots_dir):
+            shutil.rmtree(self.plots_dir)
+            os.makedirs(self.plots_dir)  # Recreate empty directory
+            logging.debug(f"Cleared plots directory: {self.plots_dir}")
+
+        # 4. Reset classification_upload to default values from JobModel
+        default_classification_upload = JobModel.model_fields[
+            "classification_upload"
+        ].default
+        self.model.classification_upload = default_classification_upload.copy()
+
+        # 5. Reset selected_road_tags (user may have selected based on uploaded data)
+        self.model.selected_road_tags = []
+
+        self.save()
+
+        logging.info(f"Upload data deleted successfully for job {self.model.job_id}")
+
     def create_qr_code_routing(self):
         logging.info(f"Creating QR code for routing job {self.model.job_id}")
         geojson_path = os.path.join(self.output_dir, SOLUTION_FILE)
@@ -299,7 +341,6 @@ class CosmonautJob:
             return celery_task_id
 
         except Exception as e:
-            # Fail hard per user preference - no graceful fallback
             logging.error(f"Failed to submit job {self.model.job_id}: {str(e)}")
             raise
 

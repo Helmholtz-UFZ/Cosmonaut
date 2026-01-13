@@ -11,11 +11,13 @@ from celery import Celery
 from cosmonaut_app.celery_config import CeleryConfig
 from cosmonaut_app.tasks.routing_tasks import RoutingTask, process_routing_job
 from cosmonaut_app.tasks.test_tasks import TestTask, test_sleep_task
+from cosmonaut_app.tasks.maintenance_tasks import MaintenanceTask, cleanup_task
 
 log = logging.getLogger(__name__)
 
 NAME_ROUTING_TASK = "cosmonaut_app.tasks.routing_tasks.process_routing"
 NAME_TEST_TASK = "cosmonaut_app.tasks.test_tasks.test_sleep"
+NAME_MAINTENANCE_CLEANUP_TASK = "cosmonaut_app.tasks.maintenance_tasks.cleanup"
 
 
 class BackgroundJobManager:
@@ -53,6 +55,12 @@ class BackgroundJobManager:
             base=TestTask,
             name=NAME_TEST_TASK,
         )(test_sleep_task)
+
+        self.cleanup_task = self.app.task(
+            bind=True,
+            base=MaintenanceTask,
+            name=NAME_MAINTENANCE_CLEANUP_TASK,
+        )(cleanup_task)
 
     def submit_routing_job(self, job):
         """Submit a routing job to the Celery queue.
@@ -202,6 +210,29 @@ class BackgroundJobManager:
             return result.id, False
         except Exception as e:
             log.error(f"Failed to submit test task: {str(e)}")
+            return None, True
+
+    def submit_cleanup_task(self):
+        """Submit a maintenance cleanup task to the Celery queue.
+
+        Returns:
+            tuple: (celery_task_id, failed_boolean)
+                   celery_task_id is None if submission failed
+        """
+        try:
+            result = self.cleanup_task.apply_async(
+                queue="default",
+            )
+            # Store task name in Redis for revoked task retrieval
+            self.app.backend.client.set(
+                f"task_name:{result.id}",
+                NAME_MAINTENANCE_CLEANUP_TASK,
+                ex=86400,  # 24 hour TTL
+            )
+            log.info(f"Submitted cleanup task with task_id={result.id}")
+            return result.id, False
+        except Exception as e:
+            log.error(f"Failed to submit cleanup task: {str(e)}")
             return None, True
 
 

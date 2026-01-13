@@ -3,6 +3,24 @@
 This test ensures:
 1. All id= usages in cosmonaut_app/ use constants from html_ids.py
 2. All constants in html_ids.py are used in callbacks (or marked with # nocheck)
+
+# nocheck Comment Usage:
+The `# nocheck` comment allows constants to bypass test_no_unused_id_constants.
+**ONLY USE # nocheck FOR THESE TWO SPECIFIC CASES:**
+
+1. IDs accessed via set_props() in error handling (not standard callbacks)
+   Example: ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"  # nocheck
+
+2. IDs used exclusively for testing/automation (not in callbacks)
+   Example: NEXT_BUTTON_ROUTING_PARAMS_ID = "next-button-routing-params-id"  # nocheck
+
+**DO NOT USE # nocheck TO BYPASS THE TEST FOR OTHER REASONS!**
+If a constant has # nocheck, it should match one of the two cases above.
+When reviewing code, double-check all # nocheck comments to ensure they are justified.
+
+If you find a # nocheck that doesn't fit these cases:
+- Remove the ID entirely if it's truly unused
+- Remove just the # nocheck if it should be used in a callback
 """
 
 import ast

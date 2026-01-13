@@ -26,7 +26,6 @@ from cosmonaut_app.constants.html_ids import (
     SEARCH_RESULTS_DIV_NAV_SHARED_ID,
     URL_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
-    RESET_BANNER_ALERT_SHARED_ID,
     RESET_BUTTON_SHARED_ID,
     RESET_MODAL_SHARED_ID,
     RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
@@ -303,7 +302,6 @@ def create_reset_banner(job_id: str, status: str) -> dbc.Alert:
                 className="align-items-center justify-content-between",
             )
         ],
-        id=RESET_BANNER_ALERT_SHARED_ID,
         color=color_map.get(status, "secondary"),
         className="mb-3",
     )
@@ -383,6 +381,17 @@ def create_navbar():
                         children=[
                             dbc.NavItem(
                                 dbc.NavLink(
+                                    [
+                                        html.I(className="bi bi-book me-2"),
+                                        "Documentation",
+                                    ],
+                                    href=dash.page_registry["pages.documentation"][
+                                        "relative_path"
+                                    ],
+                                )
+                            ),
+                            dbc.NavItem(
+                                dbc.NavLink(
                                     "Logs",
                                     href=dash.page_registry["pages.logs"][
                                         "relative_path"
@@ -393,6 +402,14 @@ def create_navbar():
                                 dbc.NavLink(
                                     "Worker manager",
                                     href=dash.page_registry["pages.worker_management"][
+                                        "relative_path"
+                                    ],
+                                )
+                            ),
+                            dbc.NavItem(
+                                dbc.NavLink(
+                                    "Job manager",
+                                    href=dash.page_registry["pages.job_manager"][
                                         "relative_path"
                                     ],
                                 )
@@ -441,6 +458,23 @@ def page_container_fullscreen_layout(content):
     return html.Main(
         className="d-flex flex-column flex-grow-1 bg-white p-0 m-0", children=content
     )
+
+
+def page_container_column_layout(content):
+    """Create a page container with a single column layout."""
+    # Content layout
+    class_names_content = "col-md-11 col-lg-10 col-xl-9 bg-white border border-dark rounded p-0 mb-4 mt-2 d-flex flex-column"  # noqa
+    page = html.Main(
+        dbc.Row(
+            dbc.Col(
+                className=class_names_content,
+                children=content,
+            ),
+            className="flex-grow-1 d-flex justify-content-center",
+        ),
+        className="d-flex flex-column flex-grow-1",
+    )
+    return page
 
 
 def page_container_split_layout(map, input):

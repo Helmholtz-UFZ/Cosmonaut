@@ -339,9 +339,6 @@ class OsmRoads:
         ]
         self.roads = osm_data[columns_to_keep]
 
-        logging.info(self.roads.head())
-        logging.info(list(self.roads.keys()))
-
         # Was once important. Fails with key erro no features.
         # for feature in self.roads["features"]:
         #     # Extract the numeric part of the 'id' field and move it to 'properties["osmid"]'

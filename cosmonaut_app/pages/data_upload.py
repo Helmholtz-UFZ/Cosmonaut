@@ -42,26 +42,30 @@ import dash
 from dash import html, register_page, dcc, callback, Input, Output, State
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
-from pyproj.exceptions import CRSError
-from pyproj import CRS
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.constants import JOB_STATUS_PENDING
+from cosmonaut_app.constants import (
+    JOB_STATUS_PENDING,
+    DEFAULT_MAP_CENTER,
+    DEFAULT_MAP_ZOOM,
+)
 from cosmonaut_app.constants.html_ids import (
-    DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID,
     DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID,
     DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
     DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
+    DELETE_FILE_BUTTON_DATA_UPLOAD_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     EPSG_STORE_SHARED_ID,
     JOB_ID_STORE_SHARED_ID,
+    LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
 )
 from cosmonaut_app.transformation import (
     OsmRoads,
 )
 from cosmonaut_app.classification_plot import ClassificationPlot
+from cosmonaut_app.pydantic_models import check_epsg
 from cosmonaut_app.layout import (
     page_container_split_layout,
     create_card_input,
@@ -82,27 +86,22 @@ register_page(
 )
 
 
-def is_epsg_valid(epsg):
-    try:
-        if isinstance(epsg, str) and epsg.upper().startswith("EPSG:"):
-            epsg = epsg[5:]
-        epsg = int(epsg)
-    except (TypeError, ValueError):
-        return None, False
-
-    # Validate with pyproj
-    try:
-        CRS.from_epsg(epsg)
-    except (CRSError, ValueError, TypeError):
-        return None, False
-
-    return epsg, True
-
-
 def layout(job_id):
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
+
+    # Determine if file is uploaded and EPSG should be disabled
+    file_uploaded = (
+        job.model.classification_upload.get("file_name") != "No file uploaded"
+    )
+    epsg_disabled = (not is_active) or file_uploaded
+
+    # Show delete button only if file uploaded AND job status is PENDING
+    delete_button_visible = file_uploaded and is_active
+    delete_button_style = (
+        {"display": "block"} if delete_button_visible else {"display": "none"}
+    )
 
     card_body = []
 
@@ -128,8 +127,8 @@ def layout(job_id):
                 id=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
                 type="text",
                 value=job.model.epsg,
-                disabled=not is_active,
-                style={"background-color": "#e9ecef"} if not is_active else {},
+                disabled=epsg_disabled,
+                style={"background-color": "#e9ecef"} if epsg_disabled else {},
             ),
             dbc.FormText(
                 "Common choices: 4326, 25832, 3857, …",
@@ -148,7 +147,6 @@ def layout(job_id):
                             html.I(className="bi bi-cloud-arrow-up fs-4 me-2"),
                             "Drag & drop or click to select a .csv or .txt file",
                         ],
-                        id=DATA_UPLOAD_DROPZONE_DIV_DATA_UPLOAD_ID,
                     ),
                     multiple=False,
                     disabled=True
@@ -166,6 +164,15 @@ def layout(job_id):
                 job.model.classification_upload["file_name"],
                 id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
                 className="text-muted",
+            ),
+            dbc.Button(
+                "Delete File",
+                id=DELETE_FILE_BUTTON_DATA_UPLOAD_ID,
+                color="danger",
+                size="sm",
+                className="mt-2",
+                style=delete_button_style,
+                disabled=(not is_active),
             ),
         ]
     )
@@ -202,6 +209,9 @@ def layout(job_id):
     Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"),
     Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled"),
     Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled"),
+    Output(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "style"),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     State(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
@@ -213,28 +223,32 @@ def upload_file(contents, filename, job_id, epsg_input):
     if not contents or not filename:
         raise PreventUpdate
 
-    epsg_input, epsg_valid = is_epsg_valid(epsg_input)
-    if not epsg_valid:
+    try:
+        epsg_input = check_epsg(epsg_input)
+    except ValueError as e:
         return (
-            dash.no_upadte,
-            "Please enter a valid EPSG code before uploading a file.",
+            dash.no_update,
+            str(e),
             True,
             False,
+            None,
+            False,
+            dash.no_update,
         )
 
     job = CosmonautJob(job_id=job_id)
+    job.model.epsg = epsg_input
     try:
         classification_data, file_path, bounds = job.upload_file(
             filename, contents, epsg_input
         )
     except ValueError as e:
-        return dash.no_update, str(e), True, False
+        return dash.no_update, str(e), True, False, None, False, dash.no_update
 
     reposition_map = {
         "bounds": bounds,
         "transition": "flyTo",
     }
-    logging.info(reposition_map)
 
     osm = OsmRoads(classification_data, epsg_output=epsg_input)
     osm.run_osm_query(job.input_dir)
@@ -243,7 +257,89 @@ def upload_file(contents, filename, job_id, epsg_input):
     plot.generate_plots()
 
     job.save()
-    return reposition_map, f"Selected file: {os.path.basename(file_path)}", False, True
+    return (
+        reposition_map,
+        f"Selected file: {os.path.basename(file_path)}",
+        False,  # Enable next button
+        True,  # Disable EPSG input
+        None,  # Clear upload contents
+        False,  # Hide loading overlay
+        {"display": "block"},  # Show delete button
+    )
+
+
+@callback(
+    Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
+    Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "style", allow_duplicate=True),
+    Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True),
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Input(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    prevent_initial_call=True,
+)
+def delete_uploaded_file(n_clicks, job_id):
+    """Delete uploaded file and reset upload state.
+
+    When user clicks delete button:
+    1. Verify job status is PENDING (safety check)
+    2. Call job.delete_upload() to remove file and reset data
+    3. Update UI to show "No file uploaded"
+    4. Re-enable EPSG input field
+    5. Hide delete button
+    6. Disable next button (can't proceed without file)
+    7. Reset map to default view
+
+    Parameters
+    ----------
+    n_clicks : int
+        Number of times delete button clicked
+    job_id : str
+        Current job ID
+
+    Returns
+    -------
+    tuple
+        (file_info_text, epsg_disabled, delete_button_style,
+         next_button_disabled, map_viewport, loading_overlay)
+    """
+    if n_clicks is None:
+        raise PreventUpdate
+
+    logging.info(f"Delete file button clicked for job {job_id}")
+
+    # Load job and verify status
+    job = CosmonautJob(job_id=job_id)
+
+    # Safety check: Only allow deletion if job status is PENDING
+    if job.model.status != JOB_STATUS_PENDING:
+        logging.warning(
+            f"Cannot delete upload - job {job_id} status is {job.model.status}"
+        )
+        raise PreventUpdate
+
+    # Delete upload
+    job.delete_upload()
+
+    # File info text
+    file_info_text = "No file uploaded"
+
+    # Reset map to default view (using constants)
+    default_viewport = {
+        "center": DEFAULT_MAP_CENTER,
+        "zoom": DEFAULT_MAP_ZOOM,
+        "transition": "flyTo",
+    }
+
+    return (
+        file_info_text,
+        False,  # Enable EPSG input
+        {"display": "none"},  # Hide delete button
+        True,  # Disable next button (no file uploaded)
+        default_viewport,  # Reset map
+        False,  # Hide loading overlay
+    )
 
 
 @callback(
@@ -255,19 +351,20 @@ def upload_file(contents, filename, job_id, epsg_input):
 )
 def validate_epsg(epsg):
     # Reset when empty/cleared
-    logging.info("Validating EPSG code: %s", epsg)
-    _epsg, valid = is_epsg_valid(epsg)
-    if valid:
-        return (
-            False,
-            "EPSG accepted",
-            True,
-            False,
-        )
-    else:
+    logging.info(f"Validating EPSG code: {epsg}")
+
+    try:
+        check_epsg(epsg)
+    except ValueError:
         return (
             True,
-            "Invalid EPSG code",
+            "Please enter a valid EPSG code.",
             False,
             True,
         )
+    return (
+        False,
+        "EPSG accepted",
+        True,
+        False,
+    )
