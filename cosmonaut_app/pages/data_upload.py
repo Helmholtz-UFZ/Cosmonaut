@@ -1,16 +1,13 @@
 """Upload membership data and configure coordinate reference system.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 This page is where you upload your cosmic ray neutron sensor measurement locations
 or sampling points that will be used to plan the navigation route. The workflow
 on this page involves two key steps:
 
 1. **Specify EPSG Code**: Enter the coordinate reference system (CRS) of your data.
-   The application validates the EPSG code in real-time and displays the coordinate
-   system description. Common choices include:
-   - 4326 (WGS84 latitude/longitude - global standard)
-   - 25832 (ETRS89 / UTM zone 32N - Germany)
-   - 31468 (DHDN / Gauss-Kruger zone 4 - Germany legacy)
-   - 3857 (Web Mercator - web mapping)
+   The application validates the EPSG code.
 
 2. **Upload CSV File**: Drag and drop or select a CSV/TXT file containing your
    membership data with coordinate columns. The system will parse your file,
@@ -31,7 +28,9 @@ step (street selection).
 Once your data is uploaded, validated, and displayed on the map, proceed to the
 street selection page to choose which roads to include in your route.
 
-NOTE: File upload uses dcc.Upload with base64 encoding. The OsmRoads class handles
+# Notes (This section is for developer notes and will not appear in the user documentation.)
+
+File upload uses dcc.Upload with base64 encoding. The OsmRoads class handles
 OpenStreetMap querying with proper buffering around the data extent. Coordinate
 transformation uses pyproj with CRS validation via the pyproj.CRS class.
 """

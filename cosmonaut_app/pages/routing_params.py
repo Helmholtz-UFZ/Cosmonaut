@@ -1,5 +1,7 @@
 """Configure routing algorithm parameters before calculation.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 Fine-tune the routing calculation by adjusting advanced parameters that control
 how your navigation route is optimized. This page presents a dynamically generated
 form with configuration options from the sensor-routing pipeline.
@@ -32,7 +34,9 @@ Simply review the default settings and modify any parameters you wish to customi
 When satisfied, click "Next" to proceed to the final page where you'll start the
 route calculation and download your GPX navigation file.
 
-NOTE: The form is auto-generated using FormFactory with InputField components.
+# Notes (This section is for developer notes and will not appear in the user documentation.)
+
+The form is auto-generated using FormFactory with InputField components.
 All configuration is validated against the FullPipelineConfig pydantic model to
 ensure type safety and value constraints. Parameters are persisted to the job
 model and used during background route calculation.

@@ -537,9 +537,13 @@ def create_header(title, subtitle, bg_color="bg-info", id="", rounded=True):
     layout = html.Div(
         className=className,
         children=[
-            html.H2(title, className="text-center", id=f"{id}-title"),
+            html.H2(title, className="text-center", id=f"{id}-title"),  # nocheck
             (
-                html.H3(subtitle, className="text-center", id=f"{id}-subtitle")
+                html.H3(
+                    subtitle,
+                    className="text-center",
+                    id=f"{id}-subtitle",  # nocheck
+                )
                 if subtitle != ""
                 else None
             ),

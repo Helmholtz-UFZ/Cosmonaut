@@ -1,5 +1,7 @@
 """Landing page for creating new routing jobs.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 Welcome to COSMONAUT - the starting point for creating optimized navigation routes
 based on cosmic ray neutron sensor measurement locations. This page allows you to
 begin a new routing job by clicking the "Create new job" button.
@@ -13,7 +15,9 @@ From here, you'll proceed through the workflow to provide job information, uploa
 membership data, select streets from OpenStreetMap, configure routing parameters,
 and download your final GPX navigation file for use in the field.
 
-NOTE: This page has no job_id context yet - the job is created on button click
+# Notes (This section is for developer notes and will not appear in the user documentation.)
+
+This page has no job_id context yet - the job is created on button click
 and the user is redirected to the user_info page with the new job_id.
 """
 

@@ -1,5 +1,7 @@
 """Start and monitor the routing computation process.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 This page gives you full control over the routing calculation for your job.
 Unlike the other workflow steps, the actual route computation happens here as a
 background task, allowing you to monitor its progress and manage the process.
@@ -54,18 +56,14 @@ FAILED status), the full worker logs are displayed, containing:
 
 The logs are synced from the worker container after the job finishes.
 
-**Next Step:**
+# Notes (This section is for developer notes and will not appear in the user documentation.)
 
-When the computation completes successfully (COMPLETED status), the "Next" button
-becomes enabled. Click it to proceed to the Route & Download page where you can
-view the calculated route on the map and download the GPX navigation file.
-
-NOTE: Page runs in split layout with map on left (shows data upload locations) and controls on right.
-NOTE: Uses Bootstrap-only styling (no custom CSS except whiteSpace for log wrapping).
-NOTE: Polling interval (3s) only active when job is RUNNING, automatically disabled when complete.
-NOTE: All control callbacks include status checks to prevent duplicate operations from multiple browser tabs.
-NOTE: Worker runs in separate Docker container, so real-time log streaming is not possible.
-NOTE: Celery worker info updates only on page load and after start/restart (performance optimization).
+Page runs in split layout with map on left (shows data upload locations) and controls on right.
+Uses Bootstrap-only styling (no custom CSS except whiteSpace for log wrapping).
+Polling interval (3s) only active when job is RUNNING, automatically disabled when complete.
+All control callbacks include status checks to prevent duplicate operations from multiple browser tabs.
+Worker runs in separate Docker container, so real-time log streaming is not possible.
+Celery worker info updates only on page load and after start/restart (performance optimization).
 """
 
 import logging

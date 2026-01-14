@@ -24,7 +24,7 @@ PAGE_CONFIG = {
     # Admin pages
     "logs": ("/logs", 1),
     "worker_management": ("/worker-management", 2),
-    "job_manager": ("/job-manager", 2),
+    "job_manager": ("/job-manager", 5),
 }
 
 

@@ -1,5 +1,7 @@
 """Collect user email for job notifications.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 This page allows you to provide an email address to receive notifications about
 your routing job. Email notifications will be sent when:
 
@@ -7,16 +9,18 @@ your routing job. Email notifications will be sent when:
 - Your routing calculation has completed
 - Any errors occur during processing
 
-The email field includes live validation to ensure proper formatting before you
-can proceed. Your email is stored securely with your job data and is never shared
-with third parties. Providing an email is optional but recommended for tracking
-long-running jobs that process in the background.
+The email field includes live validation to ensure proper formatting before you can
+proceed. Currently the email service is not enabled and further your email will be able
+to be accessed by anybody from within the UFZ network. Providing an email is optional
+but recommended for tracking long-running jobs that process in the background.
 
 Once you enter a valid email address (or skip this step by proceeding without one),
 click "Next" to continue to the data upload page where you'll provide your
 membership locations for route planning.
 
-NOTE: Email validation uses pydantic's check_email function for format verification.
+# Notes (This section is for developer notes and will not appear in the user documentation.)
+
+Email validation uses pydantic's check_email function for format verification.
 The email is stored in the job model and accessible throughout the workflow.
 """
 
@@ -70,6 +74,10 @@ def layout(job_id):
             html.P(
                 "Enter your email to receive notifications for this job.",
                 className="text-muted",
+            ),
+            dbc.Alert(
+                "Warning: Your email is visible from inside the UFZ network. Currently in beta,  email not enabled.",
+                color="warning",
             ),
             dbc.Label(
                 "Email address",

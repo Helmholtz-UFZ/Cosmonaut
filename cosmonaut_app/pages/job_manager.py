@@ -1,5 +1,7 @@
 """Manage all jobs from a central dashboard.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 This administrative page provides a comprehensive overview of all jobs in the system.
 You can:
 - View all jobs in a table with status, start date, and submission details
@@ -13,7 +15,9 @@ The table uses color coding to quickly identify job statuses. You can select row
 perform bulk operations like deletion. Use the cleanup function to automatically remove
 jobs that exceed retention periods (2 days for unsubmitted, 60 days for submitted jobs).
 
-NOTE: This docstring is displayed on the documentation webpage.
+# Notes (This section is for developer notes and will not appear in the user documentation.)
+
+This docstring is displayed on the documentation webpage.
 """
 
 import logging
@@ -78,12 +82,7 @@ def format_jobs_for_table(jobs_dict):
     """
     rows = []
 
-    # Get user_info page path for job links
-    try:
-        user_info_path_template = dash.page_registry["pages.user_info"]["path_template"]
-    except KeyError:
-        log.warning("Could not find user_info page in registry, using fallback path")
-        user_info_path_template = "/job/<job_id>/user-info"
+    user_info_path_template = dash.page_registry["pages.user_info"]["path_template"]
 
     for job_id, job_data in jobs_dict.items():
         # Create markdown link for job_id
@@ -178,7 +177,7 @@ def layout():
     dash component
         Complete page layout with header, controls, and table
     """
-    # Header
+    log.info("Generating job manager page layout")
     header = create_header(
         "Job Manager",
         "Centralized management of all COSMONAUT jobs",

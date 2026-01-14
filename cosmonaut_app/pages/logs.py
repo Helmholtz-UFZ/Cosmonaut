@@ -1,5 +1,7 @@
 """View and filter application logs for debugging and monitoring.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 This page provides access to the application's logging system, allowing you to track
 system activity, debug issues, and monitor operations. You can:
 
@@ -13,7 +15,9 @@ Logs are stored in the database and include timestamps, log levels, logger names
 and messages. This is the primary tool for understanding system behavior, diagnosing
 problems, and monitoring application execution.
 
-NOTE: This page is publicly accessible without authentication.
+# Notes (This section is for developer notes and will not appear in the user documentation.)
+
+This page is publicly accessible without authentication.
 """
 
 import datetime

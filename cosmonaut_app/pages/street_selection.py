@@ -1,5 +1,7 @@
 """Select and refine street networks for route planning.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 This interactive page allows you to choose which OpenStreetMap roads should be
 included in your navigation route. The page provides multiple selection tools to
 help you build an optimal connected road network that covers your measurement
@@ -44,10 +46,12 @@ covers your measurement locations while being traversable by your vehicle.
 When satisfied with your street selection, proceed to configure routing parameters
 for the final route calculation.
 
-NOTE: Street selection state is persisted to the job's work directory as GeoJSON.
-Undo functionality uses snapshot files stored in work_dir/snapshots/. Interactive
-callbacks use Dash Leaflet click events with feature_id tracking. The utils module
-handles graph connectivity analysis and road network processing.
+# Notes (This section is for developer notes and will not appear in the user documentation.)
+
+Street selection state is persisted to the job's work directory as GeoJSON. Undo
+functionality uses snapshot files stored in work_dir/snapshots/. Interactive callbacks
+use Dash Leaflet click events with feature_id tracking. The utils module handles graph
+connectivity analysis and road network processing.
 """
 
 import os

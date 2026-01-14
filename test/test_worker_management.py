@@ -21,6 +21,7 @@ from cosmonaut_app.constants.html_ids import (
     SELECTED_TASK_ID_INPUT_WORKER_MANAGEMENT_ID,
     TEST_TASK_BUTTON_WORKER_MANAGEMENT_ID,
     WORKER_KILL_BTN_WORKER_MANAGEMENT_ID,
+    WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID,
 )
 from test.help_functions_tests import check_all_errors
 
@@ -51,13 +52,33 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
         timeout=10000
     )
 
-    # Wait for table to have at least one row with data
+    # Wait for task to appear in active tasks table
+    # The task may not be picked up by the worker immediately after submission,
+    # so we need to poll/retry. Use a longer timeout and let Playwright retry.
     # Dash DataTables use .dash-cell class for cells
     first_cell = page.locator(
         f"#{ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID} .dash-cell"
     ).first
-    sleep(10)
-    expect(first_cell).to_be_visible(timeout=5000)
+
+    # Poll until task appears - the page auto-refreshes but we may need to wait
+    # for the worker to actually start executing the task
+    max_attempts = 10
+    for attempt in range(max_attempts):
+        # Click refresh to get latest data
+        page.locator(f"#{WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID}").click()
+        expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
+            timeout=10000
+        )
+
+        # Check if task is now visible
+        if first_cell.is_visible():
+            break
+
+        if attempt < max_attempts - 1:
+            sleep(1)  # Brief wait before next refresh attempt
+    else:
+        # Final assertion to get proper error message if task never appeared
+        expect(first_cell).to_be_visible(timeout=1000)
 
     # Extract task ID from first cell (task_id column)
     task_id = first_cell.text_content().strip()

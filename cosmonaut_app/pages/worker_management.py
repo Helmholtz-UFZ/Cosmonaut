@@ -1,8 +1,14 @@
 """Worker Management Page for COSMONAUT App.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 This page provides real-time monitoring and control of Celery background workers.
 Allows viewing active, reserved, scheduled, and revoked tasks, as well as killing
 or cancelling tasks.
+
+# Notes (This section is for developer notes and will not appear in the user documentation.)
+
+No additional developer notes for this page.
 """
 
 import logging
@@ -150,7 +156,7 @@ def create_task_section(
 
     if task_id_input_id:
         task_id_input = dbc.Input(
-            id=task_id_input_id,
+            id=task_id_input_id,  # nocheck
             placeholder="Select a task from the table above or enter task ID",
             className="mt-3",
         )
@@ -159,7 +165,7 @@ def create_task_section(
     if button_id and button_label:
         button = dbc.Button(
             button_label,
-            id=button_id,
+            id=button_id,  # nocheck
             color="danger" if "Kill" in button_label else "warning",
             className="mt-3",
             disabled=initially_disabled,

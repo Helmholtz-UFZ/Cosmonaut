@@ -170,6 +170,9 @@ UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID = "update-trigger-store-route-computat
 START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID = "start-route-button-route-download-id"
 
 # --- Divs/Images ---
+DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID = (
+    "download-url-code-route-download-id"  # nocheck testing only
+)
 QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID = "qr-code-image-route-download-id"
 
 

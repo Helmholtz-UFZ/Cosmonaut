@@ -1,5 +1,7 @@
 """Calculate route and download GPX navigation file.
 
+# User documentation (This section is for user documentation and will appear in the user documentation.)
+
 This is the final page of the workflow where you initiate the routing calculation
 and download your optimized navigation route as a GPX file for use with GPS devices
 or navigation applications.
@@ -46,7 +48,9 @@ The generated GPX file can be used in multiple ways:
 The QR code provides the quickest way to get the route onto your mobile device
 for immediate field use.
 
-NOTE: Route calculation is triggered via background_job_manager using Celery tasks.
+# Notes (This section is for developer notes and will not appear in the user documentation.)
+
+Route calculation is triggered via background_job_manager using Celery tasks.
 The QR code is generated using the qrcode library with an embedded download URL.
 GPX files are stored in MinIO object storage and retrieved via Flask routes.
 """
@@ -58,6 +62,7 @@ from dash.exceptions import PreventUpdate
 from cosmonaut_app.config import get_download_url
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.constants.html_ids import (
+    DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
     JOB_ID_STORE_SHARED_ID,
     QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID,
     START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID,
@@ -109,6 +114,7 @@ def layout(job_id):
                         html.Br(),
                         html.Code(
                             download_url,
+                            id=DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
                         ),
                     ],
                     className="text-center mt-3",

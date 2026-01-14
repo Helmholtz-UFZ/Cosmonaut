@@ -7,6 +7,7 @@ from page modules and formatting them as markdown with embedded screenshots.
 import argparse
 import ast
 import logging
+import re
 import sys
 import tomllib
 from datetime import datetime
@@ -35,8 +36,9 @@ INTRO_TEMPLATE = """# COSMONAUT Documentation
 <h2 id="introduction">Introduction</h2>
 
 COSMONAUT is a web application for creating optimized navigation routes based on
-cosmic ray neutron sensor (CRNS) measurement locations. The service helps researchers
-plan efficient field sampling routes by:
+regional classification for remote sensing measurements specifically designed for cosmic
+ray neutron sensor (CRNS). The service helps researchers plan efficient field sampling
+routes by:
 
 - Uploading membership data (sample locations)
 - Selecting relevant street networks from OpenStreetMap
@@ -127,13 +129,39 @@ class DocumentationGenerator:
         # Get module docstring
         docstring = ast.get_docstring(tree)
 
-        if docstring:
-            return module_name, docstring.strip()
-        else:
+        if not docstring:
             logging.warning(
                 f"No docstring found in {module_name}.py", extra={"tag": "frontend"}
             )
             return module_name, f"*Documentation pending for {module_name} page.*"
+
+        # Use regex to identify sections at line beginnings only
+        # Match "# User documentation" or "# Notes" at start of line
+        user_doc_pattern = r"^# User documentation.*$"
+        notes_pattern = r"^# Notes.*$"
+
+        # Validate both sections exist
+        if not re.search(user_doc_pattern, docstring, re.MULTILINE):
+            raise ValueError(
+                f"{module_name}.py: Missing '# User documentation' section in docstring"
+            )
+        if not re.search(notes_pattern, docstring, re.MULTILINE):
+            raise ValueError(
+                f"{module_name}.py: Missing '# Notes' section in docstring"
+            )
+
+        # Split by sections using regex
+        # Extract content AFTER "# User documentation" and BEFORE "# Notes"
+        parts = re.split(notes_pattern, docstring, flags=re.MULTILINE)
+        before_notes = parts[0]  # Everything before "# Notes"
+
+        # Remove the "# User documentation" header line itself
+        user_content = re.sub(user_doc_pattern, "", before_notes, flags=re.MULTILINE)
+
+        # Clean up: strip leading/trailing whitespace
+        user_content = user_content.strip()
+
+        return module_name, user_content
 
     def generate_introduction_section(self) -> str:
         """Generate introduction section with service overview and architecture.
@@ -158,12 +186,8 @@ class DocumentationGenerator:
             # Create section header
             workflow += f"### {i}. {page_title}\n\n"
 
-            # Add docstring content (remove the NOTE lines for cleaner display)
-            doc_lines = docstring.split("\n")
-            filtered_lines = [
-                line for line in doc_lines if not line.strip().startswith("NOTE:")
-            ]
-            workflow += "\n".join(filtered_lines).strip() + "\n\n"
+            # Add docstring content
+            workflow += docstring.strip() + "\n\n"
 
             # Add screenshot image with max-width styling
             workflow += (
@@ -193,12 +217,8 @@ class DocumentationGenerator:
             # Create section header
             admin += f"### {page_title}\n\n"
 
-            # Add docstring content (remove the NOTE lines)
-            doc_lines = docstring.split("\n")
-            filtered_lines = [
-                line for line in doc_lines if not line.strip().startswith("NOTE:")
-            ]
-            admin += "\n".join(filtered_lines).strip() + "\n\n"
+            # Add docstring content
+            admin += docstring.strip() + "\n\n"
 
             # Add screenshot image with max-width styling
             admin += (
