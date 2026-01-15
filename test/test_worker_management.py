@@ -9,8 +9,6 @@ This test validates:
 
 import logging
 
-from time import sleep
-
 from playwright.sync_api import expect
 
 from cosmonaut_app.config import FLASK_PORT
@@ -53,32 +51,34 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
     )
 
     # Wait for task to appear in active tasks table
-    # The task may not be picked up by the worker immediately after submission,
-    # so we need to poll/retry. Use a longer timeout and let Playwright retry.
-    # Dash DataTables use .dash-cell class for cells
-    first_cell = page.locator(
-        f"#{ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID} .dash-cell"
-    ).first
+    # The Celery worker may take time to pick up the task, and DataTable cells
+    # render asynchronously after the callback returns with new data.
+    active_task_cell_selector = f"#{ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID} .dash-cell"
+    first_cell = page.locator(active_task_cell_selector).first
 
-    # Poll until task appears - the page auto-refreshes but we may need to wait
-    # for the worker to actually start executing the task
-    max_attempts = 10
+    max_attempts = 15  # Total ~30s budget for worker pickup + render
     for attempt in range(max_attempts):
-        # Click refresh to get latest data
+        # Refresh to poll latest task state from Celery
         page.locator(f"#{WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID}").click()
         expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
             timeout=10000
         )
 
-        # Check if task is now visible
-        if first_cell.is_visible():
+        # Key fix: Use Playwright's async waiting instead of synchronous is_visible()
+        # This properly waits for React to finish rendering after data prop update
+        try:
+            expect(first_cell).to_be_visible(timeout=2000)
             break
-
-        if attempt < max_attempts - 1:
-            sleep(1)  # Brief wait before next refresh attempt
-    else:
-        # Final assertion to get proper error message if task never appeared
-        expect(first_cell).to_be_visible(timeout=1000)
+        except AssertionError:
+            if attempt >= max_attempts - 1:
+                # Re-raise with clear message on final attempt
+                raise AssertionError(
+                    f"Task did not appear in active tasks table after {max_attempts} "
+                    "refresh attempts. Possible causes: Celery worker not processing "
+                    "tasks, or test task not submitted."
+                )
+            # Wait before next refresh attempt
+            page.wait_for_timeout(1500)
 
     # Extract task ID from first cell (task_id column)
     task_id = first_cell.text_content().strip()
