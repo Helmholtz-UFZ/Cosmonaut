@@ -87,8 +87,10 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
     task_id_input = page.locator(f"#{SELECTED_TASK_ID_INPUT_WORKER_MANAGEMENT_ID}")
     task_id_input.fill(task_id)
 
-    # Click kill button (should be enabled now that input has value)
-    page.locator(f"#{WORKER_KILL_BTN_WORKER_MANAGEMENT_ID}").click()
+    # Wait for button to be clickable and click kill button
+    kill_button = page.locator(f"#{WORKER_KILL_BTN_WORKER_MANAGEMENT_ID}")
+    expect(kill_button).to_be_enabled(timeout=5000)
+    kill_button.click()
 
     # Wait for loading modal to appear and disappear
     expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).to_be_visible(timeout=5000)
@@ -97,12 +99,10 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
     )
 
     # Verify task ID appears in revoked tasks table
-    revoked_table_text = page.locator(
-        f"#{REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID}"
-    ).text_content()
-    assert (
-        task_id in revoked_table_text
-    ), f"Task ID {task_id} not found in revoked tasks table"
+    # Use expect().to_contain_text() which retries until text appears or timeout
+    expect(
+        page.locator(f"#{REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID}")
+    ).to_contain_text(task_id, timeout=10000)
 
     # Check for any errors
     check_all_errors(page)

@@ -25,3 +25,4 @@ env_dev_prod_priv
 .config/
 notes*
 /assets/
+*prompt.md

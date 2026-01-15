@@ -5,6 +5,7 @@ It handles task registration, job submission, and status tracking.
 """
 
 import logging
+import time
 
 from celery import Celery
 
@@ -188,6 +189,7 @@ class BackgroundJobManager:
         """
         self.app.control.revoke(task_id, terminate=terminate)
         log.info(f"{'Killed' if terminate else 'Cancelled'} task {task_id}")
+        time.sleep(0.5)
 
     def submit_test_task(self):
         """Submit a test sleep task to the Celery queue.
