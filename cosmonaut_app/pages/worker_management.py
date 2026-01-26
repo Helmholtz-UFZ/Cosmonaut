@@ -314,11 +314,10 @@ def format_revoked_tasks(revoked_list: list, job_manager: BackgroundJobManager):
             task_name_full = job_manager.app.backend.client.get(
                 f"task_name:{task_id}"
             ).decode()
+            task_name = task_name_full.split(".")[-1]
         except AttributeError:
-            # This can happen if user added a revoked task ID manually that doesn't
-            # exist
-            continue
-        task_name = task_name_full.split(".")[-1]
+            logging.warning(f"Task name not found in Redis for revoked task {task_id}")
+            task_name = "Unknown"
 
         tasks.append(
             {
