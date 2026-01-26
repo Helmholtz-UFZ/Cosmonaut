@@ -1,15 +1,36 @@
 stages:
   - "lint"
-  # - "test"
+  - "test"
   - "build"
   # - "deploy"
 
 variables:
-  POSTGRES_DB: somweb_stage
-  POSTGRES_USER: somweb_stage_rw
-  POSTGRES_PASSWORD: test
-  POSTGRES_HOST_AUTH_METHOD: trust
-  DB_HOST_NAME: postgres
+  # Postgres (service configuration)
+  POSTGRES_DB: cosmonaut_db
+  POSTGRES_USER: cosmonaut
+  POSTGRES_PASSWORD: password
+  # Postgres (app connection)
+  POSTGRES_HOST_NAME: postgres
+  POSTGRES_NAME: cosmonaut_db
+  POSTGRES_PORT: "5432"
+  POSTGRES_PW: password
+  # MinIO
+  MINIO_ROOT_USER: minioadmin
+  MINIO_ROOT_PASSWORD: minioadmin
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  MINIO_HOST: minio
+  MINIO_PORT: "9000"
+  MINIO_BUCKET: cosmic-routing
+  # App config
+  WEB_WORK_DIR: "./cosmonaut_app/work_dir"
+  FLASK_PORT: "8080"
+  REDIS_PORT: "6379"
+  REDIS_HOST: "redis"
+  DOCKER_UID: "1000"
+  DOCKER_GID: "1000"
+  GUNICORN: "0"
+  DEBUG: "0"
 
 .docker_login: &docker_login
   - 'echo "${CI_REGISTRY_PASSWORD}" | docker login --username "$CI_REGISTRY_USER" --password-stdin "${CI_REGISTRY}"'
@@ -28,10 +49,49 @@ linting:
     - "apt-get update && apt-get install -y libgdal-dev"
     - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"
     - "export C_INCLUDE_PATH=/usr/include/gdal"
-    - "pip install poetry"
-    - "poetry install"
+    - "pip install uv"
+    - "uv sync"
   script:
-    - "poetry run ruff check ."
+    - "uv run ruff check ."
+
+testing:
+  stage: "test"
+  image: "python:3.13"
+  services:
+    - name: "postgis/postgis:latest"
+      alias: "postgres"
+      variables:
+        POSTGRES_DB: cosmonaut_db
+        POSTGRES_USER: cosmonaut
+        POSTGRES_PASSWORD: password
+    - name: "minio/minio:latest"
+      alias: "minio"
+      command: ["server", "/data", "--console-address", ":9001"]
+    - name: "redis:latest"
+      alias: "redis"
+  before_script:
+    - "apt-get update && apt-get install -y libgdal-dev postgresql-client curl rclone"
+    - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"
+    - "export C_INCLUDE_PATH=/usr/include/gdal"
+    - "pip install uv"
+    - "uv sync"
+    # Install Playwright browsers for headless testing
+    - "uv run playwright install --with-deps chromium"
+    # Wait for PostgreSQL to be ready
+    - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
+    # Initialize database schema
+    - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
+    # Wait for MinIO to be ready
+    - "until curl -sf http://minio:9000/minio/health/ready; do echo 'Waiting for MinIO...'; sleep 2; done"
+    # Create MinIO bucket using mc (MinIO client)
+    - "curl https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc"
+    - "chmod +x /usr/local/bin/mc"
+    - "mc alias set myminio http://minio:9000 minioadmin minioadmin"
+    - "mc mb myminio/cosmic-routing || true"
+    - "cp env_test .env"
+  script:
+    # Run all tests in headless mode (default)
+    - "uv run pytest -v"
 
 build-latest:
   stage: "build"

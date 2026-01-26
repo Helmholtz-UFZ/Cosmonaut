@@ -1,119 +1,651 @@
+import os
+import json
+import logging
+import re
+import dash
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
-from dash import dcc, html
+from dash import dcc, html, no_update, ctx
+from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
+from dash_extensions.javascript import assign, _default_name_space
 
-from cosmonaut_app.config import osm_tags_mapping
+from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
+from cosmonaut_app.constants import (
+    JOB_STATUS_RUNNING,
+    JOB_STATUS_COMPLETED,
+    JOB_STATUS_FAILED,
+)
+from cosmonaut_app.constants.html_ids import (
+    JOB_ID_STORE_SHARED_ID,
+    MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+    NAVBAR_COLLAPSE_NAV_SHARED_ID,
+    NAVBAR_TOGGLER_NAV_SHARED_ID,
+    SEARCH_BUTTON_NAV_SHARED_ID,
+    SEARCH_INPUT_NAV_SHARED_ID,
+    SEARCH_RESULTS_DIV_NAV_SHARED_ID,
+    URL_SHARED_ID,
+    LOADING_OVERLAY_SHARED_ID,
+    RESET_BUTTON_SHARED_ID,
+    RESET_MODAL_SHARED_ID,
+    RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
+    RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
+)
+from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.error_handling import error_modal
 
 
-def not_found_page():
-    # Define the layout for the 404 Not Found page
-    return html.Div(
-        [
-            html.H1("404 Not Found"),
-            html.P("The page you are looking for does not exist."),
-            dcc.Link(html.Button("Go back to the Home Page"), href="/"),
-        ],
-        style={"height": "100vh", "width": "100%"},
+# ============================================================================
+# Helper Functions and Constants
+# ============================================================================
+
+# Configure assign() to write to cosmonaut_app/assets/ instead of root assets/
+_assets_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+_original_dump = _default_name_space.dump
+_default_name_space.dump = lambda assets_folder=_assets_folder: _original_dump(
+    assets_folder
+)
+
+# Define a JavaScript function for styling the GeoJSON features
+style_handle = assign(
+    """
+function(feature, context){
+    const {selected, zoom} = context.hideout;
+    // Increase base weight to make lines easier to click. Keep adaptive thinning on zoom in.
+    const lineWeight = zoom ? Math.max(3, 18 / zoom) : 4; // at zoom=10 -> ~3
+    const color = selected.includes(feature.id) ? 'yellow' : 'red';
+    return {color: color, weight: lineWeight, opacity: 0.85};
+}
+"""
+)
+
+# Separate hover style with slight highlight and thicker stroke for better affordance
+hover_style_handle = assign(
+    """
+function(feature, context){
+    const {selected, zoom} = context.hideout;
+    const lineWeight = zoom ? Math.max(4, 22 / zoom) : 5;
+    const color = selected.includes(feature.id) ? 'orange' : '#ff6666';
+    return {color: color, weight: lineWeight, opacity: 1.0};
+}
+"""
+)
+
+
+def _coerce_nodes_list(features):
+    """
+    Ensure properties['nodes'] is a list[int] for every feature.
+    Handles cases where nodes are stored as a JSON string or other iterables.
+    """
+    fixed = 0
+    for feat in features:
+        props = feat.get("properties") or {}
+        nodes = props.get("nodes")
+        if nodes is None:
+            continue
+
+        # Already a sequence: coerce items to int
+        if isinstance(nodes, (list, tuple)):
+            try:
+                props["nodes"] = [int(n) for n in nodes]
+            except Exception:
+                # leave as-is if coercion fails
+                pass
+            continue
+
+        # String case: try JSON first, then regex fallback
+        if isinstance(nodes, str):
+            parsed = None
+            try:
+                parsed = json.loads(nodes)
+            except Exception:
+                # extract integers from any string like "[1, 2, 3]" or "1,2,3"
+                parsed = [int(m.group(0)) for m in re.finditer(r"-?\d+", nodes)]
+            if isinstance(parsed, list):
+                try:
+                    props["nodes"] = [int(n) for n in parsed]
+                    fixed += 1
+                except Exception:
+                    # leave original if conversion fails
+                    pass
+    logging.info("Normalized nodes lists for %d features", fixed)
+    return features
+
+
+def _coerce_osmid(props, feature_id=None, fallback=None):
+    # Accept osmid, osm_id, id (props), or feature.id; return int if possible.
+    candidates = [
+        props.get("osmid"),
+        props.get("osm_id"),
+        props.get("id"),
+        feature_id,
+    ]
+    for c in candidates:
+        if c is None:
+            continue
+        # If list/tuple, take the first
+        if isinstance(c, (list, tuple)):
+            c = c[0] if c else None
+        if c is None:
+            continue
+        # Extract first integer substring
+        m = re.search(r"-?\d+", str(c))
+        if m:
+            try:
+                return int(m.group(0))
+            except Exception:
+                pass
+        if isinstance(c, int):
+            return c
+    return fallback
+
+
+def _normalize_for_sensor_routing(features):
+    """Ensure fields required by sensor-routing exist with expected types."""
+    missing = 0
+    for i, feat in enumerate(features):
+        props = feat.get("properties") or {}
+        # osmid: single int
+        osmid = _coerce_osmid(props, feat.get("id"), fallback=i + 1)
+        if "osmid" not in props:
+            missing += 1
+        props["osmid"] = osmid
+        # nodes: list[int]
+        nodes = props.get("nodes")
+        if isinstance(nodes, str):
+            try:
+                nodes = json.loads(nodes)
+            except Exception:
+                nodes = [int(n) for n in re.findall(r"-?\d+", nodes)]
+            props["nodes"] = nodes
+        if isinstance(props.get("nodes"), (list, tuple)):
+            try:
+                props["nodes"] = [int(n) for n in props["nodes"]]
+            except Exception:
+                pass
+        # oneway: normalize to "yes"/"no" strings
+        ow = props.get("oneway")
+        if isinstance(ow, bool):
+            props["oneway"] = "yes" if ow else "no"
+        elif ow is not None:
+            s = str(ow).lower()
+            if s in ("1", "true", "yes"):
+                props["oneway"] = "yes"
+            elif s in ("0", "false", "no", "-1"):
+                props["oneway"] = "no"
+        feat["properties"] = props
+    logging.info(
+        "Normalized %d features; added osmid to %d features", len(features), missing
     )
 
 
-def main_page_layout():
-    return html.Div(
+def _filter_by_tags(features, selected_roads):
+    # Default to all available tags if none are selected so we render a network
+    if not selected_roads:
+        selected_roads = list(osm_tags_mapping.keys())
+    osm_highway_types = set()
+    for german_type in selected_roads:
+        if german_type in osm_tags_mapping:
+            osm_highway_types.update(osm_tags_mapping[german_type])
+    return [
+        f
+        for f in features
+        if (f.get("properties") or {}).get("highway") in osm_highway_types
+    ]
+
+
+def _paths(job_id):
+    in_dir = os.path.join(WEB_WORK_DIR, job_id, "input")
+    return (
+        in_dir,
+        os.path.join(in_dir, "osm_data_raw_4326.geojson"),
+        os.path.join(in_dir, "osm_data_work_4326.geojson"),
+        os.path.join(in_dir, "osm_data.geojson"),
+    )
+
+
+def _load_fc(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _save_fc_4326_no_crs(path, feature_collection):
+    # ensure no 'crs' member (RFC 7946)
+    data = dict(feature_collection)
+    data.pop("crs", None)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
+def _load_geojson(path: str):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ============================================================================
+# Layout Components
+# ============================================================================
+
+osm_layer = dl.TileLayer(
+    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution="© OpenStreetMap contributors",
+)
+default_map_layers = [osm_layer, dl.FullScreenControl()]
+steps_jobs = {
+    "user_info": ["Information", "Provide user information"],
+    "data_upload": ["Upload", "Upload classification data"],
+    "street_selection": ["Selection", "Select streets for routing"],
+    "routing_params": ["Parameters", "Set routing parameters"],
+    "route_computation": ["Computation", "Monitor routing computation"],
+    "route_download": ["Download", "Download the computed route"],
+}
+
+
+loading_overlay = dbc.Modal(
+    dbc.ModalBody(
+        [dbc.Spinner(size="lg"), html.H4("Loading...", className="text-center mt-3")],
+        className="text-center",
+    ),
+    id=LOADING_OVERLAY_SHARED_ID,
+    is_open=False,
+    backdrop="static",  # Prevents closing by clicking outside
+    keyboard=False,  # Prevents closing with escape key
+    centered=True,
+    size="sm",
+)
+
+
+def create_reset_banner(job_id: str, status: str) -> dbc.Alert:
+    """Create status banner with reset button for non-PENDING jobs.
+
+    Args:
+        job_id: Job ID for display
+        status: Current job status
+
+    Returns:
+        dbc.Alert component with status info and reset button
+    """
+    # Color mapping
+    color_map = {
+        JOB_STATUS_RUNNING: "primary",
+        JOB_STATUS_COMPLETED: "success",
+        JOB_STATUS_FAILED: "danger",
+    }
+
+    # Status message
+    message_map = {
+        JOB_STATUS_RUNNING: "This job is currently running. Reset to cancel and restart.",
+        JOB_STATUS_COMPLETED: "This job has been completed. Reset to clear results and restart.",
+        JOB_STATUS_FAILED: "This job has failed. Reset to clear results and try again.",
+    }
+
+    return dbc.Alert(
         [
-            navbar,
-            main_map,
-            side_bar,
-            html.Div(id="hidden-div", style={"display": "none"}),
-            dcc.Store(id="current-stage", data=0),
-            dcc.Store(id="job-loaded-flag", data=None),
-            dcc.Store(id="email-store"),
-            dcc.Store(id="epsg-store", data=None),
-            dcc.Store(id="routing-complete"),
-            dcc.Dropdown(
-                id="tags-dropdown",
-                options=[],
-                value=None,
-                disabled=True,
-                style={"display": "none"},
-            ),
-            html.Div(id="upload-data-store", style={"display": "none"}),
-            html.Div(id="dummy-output", style={"display": "none"}),
-            html.Div(id="osm-file-path", style={"display": "none"}),
-            html.Div(id="none", style={"display": "none"}),
+            dbc.Row(
+                [
+                    dbc.Col(
+                        html.Span(message_map[status]),
+                        width="auto",
+                        className="d-flex align-items-center",
+                    ),
+                    dbc.Col(
+                        dbc.Button(
+                            "Reset Job",
+                            id=RESET_BUTTON_SHARED_ID,
+                            color="warning",
+                            size="sm",
+                        ),
+                        width="auto",
+                    ),
+                ],
+                className="align-items-center justify-content-between",
+            )
         ],
-        style={"height": "100vh", "width": "100%"},
+        color=color_map.get(status, "secondary"),
+        className="mb-3",
+    )
+
+
+def create_reset_modal() -> dbc.Modal:
+    """Create confirmation modal for job reset.
+
+    Returns:
+        dbc.Modal component with confirmation dialog
+    """
+    return dbc.Modal(
+        [
+            dbc.ModalHeader(dbc.ModalTitle("Reset Job?")),
+            dbc.ModalBody(
+                [
+                    html.P(
+                        "This will delete all computation results (logs, routes, GPX files) "
+                        "and reset the job status to PENDING. You will need to restart the "
+                        "computation."
+                    ),
+                    html.P(
+                        "Your uploaded data and selected streets will be preserved.",
+                        className="text-muted mb-0",
+                    ),
+                ]
+            ),
+            dbc.ModalFooter(
+                [
+                    dbc.Button(
+                        "Cancel",
+                        id=RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
+                        color="secondary",
+                        outline=True,
+                    ),
+                    dbc.Button(
+                        "Reset Job",
+                        id=RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
+                        color="danger",
+                    ),
+                ]
+            ),
+        ],
+        id=RESET_MODAL_SHARED_ID,
+        is_open=False,
+        backdrop="static",
+        keyboard=False,
+        centered=True,
+    )
+
+
+def create_navbar():
+    """Create a navbar layout."""
+    return dbc.Navbar(
+        color="dark",
+        dark=True,
+        sticky="top",
+        children=dbc.Container(
+            [
+                dbc.NavbarBrand(
+                    href=dash.page_registry["pages.home"]["relative_path"],
+                    children=[
+                        html.Img(
+                            src="/static/sample_logo.svg",
+                            width="30",
+                            height="30",
+                            className="d-inline-block align-text-top",
+                            alt="Cosmopolitan Icon",
+                        ),
+                        " COSMONAUT",
+                    ],
+                ),
+                dbc.NavbarToggler(id=NAVBAR_TOGGLER_NAV_SHARED_ID, n_clicks=0),
+                dbc.Collapse(
+                    dbc.Nav(
+                        className="navbar-nav me-auto mb-2 mb-lg-0",
+                        children=[
+                            dbc.NavItem(
+                                dbc.NavLink(
+                                    [
+                                        html.I(className="bi bi-book me-2"),
+                                        "Documentation",
+                                    ],
+                                    href=dash.page_registry["pages.documentation"][
+                                        "relative_path"
+                                    ],
+                                )
+                            ),
+                            dbc.NavItem(
+                                dbc.NavLink(
+                                    "Logs",
+                                    href=dash.page_registry["pages.logs"][
+                                        "relative_path"
+                                    ],
+                                )
+                            ),
+                            dbc.NavItem(
+                                dbc.NavLink(
+                                    "Worker manager",
+                                    href=dash.page_registry["pages.worker_management"][
+                                        "relative_path"
+                                    ],
+                                )
+                            ),
+                            dbc.NavItem(
+                                dbc.NavLink(
+                                    "Job manager",
+                                    href=dash.page_registry["pages.job_manager"][
+                                        "relative_path"
+                                    ],
+                                )
+                            ),
+                            dbc.NavItem(
+                                search_bar,
+                            ),
+                        ],
+                    ),
+                    id=NAVBAR_COLLAPSE_NAV_SHARED_ID,
+                    navbar=True,
+                    is_open=False,
+                ),
+                # Fixed-position container for toast notifications (does not affect layout)
+                html.Div(
+                    id=SEARCH_RESULTS_DIV_NAV_SHARED_ID,
+                    style={
+                        "position": "fixed",
+                        "top": "1rem",
+                        "right": "1rem",
+                        "zIndex": 1100,
+                        "maxWidth": "28rem",
+                    },
+                ),
+            ],
+        ),
+    )
+
+
+def app_layout():
+    """Create the main page layout with navbar and content."""
+    return html.Div(
+        className="d-flex flex-column min-vh-100 bg-light",
+        children=[
+            dcc.Location(id=URL_SHARED_ID, refresh=True),
+            loading_overlay,
+            error_modal,
+            create_navbar(),
+            dash.page_container,
+        ],
+    )
+
+
+def page_container_fullscreen_layout(content):
+    """Create a page container with a fullscreen layout."""
+    return html.Main(
+        className="d-flex flex-column flex-grow-1 bg-white p-0 m-0", children=content
+    )
+
+
+def page_container_column_layout(content):
+    """Create a page container with a single column layout."""
+    # Content layout
+    class_names_content = "col-md-11 col-lg-10 col-xl-9 bg-white border border-dark rounded p-0 mb-4 mt-2 d-flex flex-column"  # noqa
+    page = html.Main(
+        dbc.Row(
+            dbc.Col(
+                className=class_names_content,
+                children=content,
+            ),
+            className="flex-grow-1 d-flex justify-content-center",
+        ),
+        className="d-flex flex-column flex-grow-1",
+    )
+    return page
+
+
+def page_container_split_layout(map, input):
+    """Create a page container with a split layout (sidebar + main map)."""
+    map_container = dbc.Col(
+        map,
+        className="col-7 p-0",
+    )
+    input_container = dbc.Col(input, className="col-5 p-0")
+    return page_container_fullscreen_layout(
+        dbc.Row(
+            [
+                map_container,
+                input_container,
+            ],
+            className="flex-grow-1 d-flex",
+        ),
+    )
+
+
+def create_card_input(
+    card_body, card_footer=None, name_step=None, title=None, job_id=None
+):
+    """Create a modern card input layout with optional progress steps."""
+    if name_step is not None:
+        if job_id is None:
+            raise ValueError("job_id must be provided when name_step is used.")
+        title = f"{steps_jobs[name_step][1]}({job_id})"
+
+    if title is None:
+        raise ValueError("Either title or name_step must be provided.")
+
+    card_header = [html.H3(title)]
+
+    if name_step is not None:
+        card_header.append(steps_tab(name_step))
+
+    card_content = [
+        dbc.CardHeader(card_header),
+        dbc.CardBody(card_body),
+    ]
+
+    if card_footer:
+        card_content.append(card_footer)
+
+    return dbc.Card(
+        card_content,
+        className="shadow-sm m-3 me-4",
+    )
+
+
+def build_url_step(step, job_id):
+    base_path = dash.page_registry[f"pages.{step}"]["path_template"]
+    return base_path.replace("<job_id>", job_id)
+
+
+def create_header(title, subtitle, bg_color="bg-info", id="", rounded=True):
+    """Create a header layout."""
+    className = f"{bg_color} rounded-top py-2" if rounded else f"{bg_color} py-2"
+    layout = html.Div(
+        className=className,
+        children=[
+            html.H2(title, className="text-center", id=f"{id}-title"),  # nocheck
+            (
+                html.H3(
+                    subtitle,
+                    className="text-center",
+                    id=f"{id}-subtitle",  # nocheck
+                )
+                if subtitle != ""
+                else None
+            ),
+        ],
+        id=id,
+    )
+
+    return layout
+
+
+def progress_footer(
+    prev_id=None,
+    prev_url=None,
+    prev_disabled=False,
+    next_url=None,
+    next_id=None,
+    next_disabled=False,
+):
+    """Create a footer with Previous and Next buttons for navigation between steps."""
+
+    args_prev = [html.I(className="bi bi-arrow-right-circle me-1"), "Previous"]
+    kwargs_prev = dict(color="primary", disabled=prev_disabled)
+    if prev_id is None and prev_url is None:
+        prev_button = html.Span()
+    else:
+        if prev_url is not None:
+            kwargs_prev["href"] = prev_url
+        if prev_id is not None:
+            kwargs_prev["id"] = prev_id
+        prev_button = dbc.Button(args_prev, **kwargs_prev)
+
+    args_next = [html.I(className="bi bi-arrow-right-circle me-1"), "Next"]
+    kwargs_next = dict(color="primary", disabled=next_disabled)
+    if next_id is None and next_url is None:
+        next_button = html.Span()
+    else:
+        if next_url is not None:
+            kwargs_next["href"] = next_url
+        if next_id is not None:
+            kwargs_next["id"] = next_id
+        next_button = dbc.Button(args_next, **kwargs_next)
+
+    actions = html.Div(
+        [prev_button, next_button],
+        className="footer-actions d-flex gap-2 justify-content-end align-items-center flex-wrap",
+    )
+    return dbc.CardFooter(actions)
+
+
+def steps_tab(name_step):
+    """Create a progress steps component for the job steps."""
+    # TODO dynamic enabling based on job progress
+    list_tabs = []
+    for step_name, step_info in steps_jobs.items():
+        list_tabs.append(
+            dbc.Tab(
+                label=step_info[0],
+                tab_id=step_name,  # nocheck
+                disabled=True,
+            )
+        )
+
+    return dbc.Tabs(
+        list_tabs,
+        active_tab=name_step,
+    )
+
+
+def create_map(job=None, extra_layers=None):
+    map_layers = default_map_layers
+    if extra_layers is not None:
+        map_layers += extra_layers
+
+    if job is not None:
+        zoom = job.model.classification_upload["zoom"]
+        center = job.model.classification_upload["center"]
+    else:
+        zoom = 10
+        center = [51.70, 11.20]
+
+    return dl.Map(
+        map_layers,
+        id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+        center=center,
+        zoom=zoom,
+        style={"height": "100%"},
     )
 
 
 # Main Map
+
+# TODO
 main_map = html.Div(
     dl.Map(
-        [
-            dl.LayersControl(
-                [
-                    dl.BaseLayer(
-                        dl.TileLayer(),
-                        name="OSM Standard",
-                        checked=True,
-                    ),
-                    dl.Overlay(
-                        dl.WMSTileLayer(
-                            url="https://gdi-fs.ufz.de/geoserver/cosmic-routing/ows?service=WMS",  # noqa: E501
-                            layers="20240410_8-col-4326_class-5",
-                            styles="raster",
-                            format="image/jpeg",
-                            transparent=True,
-                            attribution="WMS Layer",
-                            crs="EPSG4326",
-                            opacity=0.5,
-                        ),
-                        name="WMS Layer",
-                        checked=False,
-                        id="wms-layer",
-                    ),
-                ],
-                id="lc",
-            ),
-            dl.FullScreenControl(),
-            dl.LocateControl(locateOptions={"enableHighAccuracy": True}),
-            dl.ScaleControl(position="bottomleft"),
-            dl.EasyButton(
-                icon="fa-edit", title="Remove selected road", id="remove-button"
-            ),
-            dl.GeoJSON(id="osm-geojson"),
-            dl.GeoJSON(id="route-geojson"),
-            dcc.Store(id="clicked-roads", data=[]),
-            dcc.Store(id="routing-complete", data=False),
-        ],
+        default_map_layers,
+        id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
         center=[51.70, 11.20],
         zoom=10,
         style={"height": "100%"},
-        id="map",
     ),
-    id="main-map",
-    style={"height": "calc(100% - 10vh)", "width": "calc(100% - 500px)"},
+    style={"height": "100%", "width": "100%"},
 )
-
-# Initial Sidebar for the Job Start
-side_bar = dbc.Col(
-    [
-        html.Div(id="stage-content"),
-    ],
-    id="offcanvas",
-    style={
-        "width": "500px",
-        "backgroundColor": "#DBE2EF",
-        "border": "2px solid #dee2e6",
-        "position": "fixed",
-        "top": "10vh",
-        "right": 0,
-        "bottom": 0,
-        "padding": "2rem 1rem",
-        "overflow": "auto",
-    },
-    className="responsive-sidebar",
-)
-
 # Search Bar
 search_bar = dbc.Row(
     [
@@ -121,7 +653,7 @@ search_bar = dbc.Row(
             dbc.Input(
                 type="search",
                 placeholder="Job_ID",
-                id="search",
+                id=SEARCH_INPUT_NAV_SHARED_ID,
             ),
             width=6,
         ),
@@ -129,7 +661,7 @@ search_bar = dbc.Row(
             dbc.Button(
                 "Search",
                 color="primary",
-                id="search-button",
+                id=SEARCH_BUTTON_NAV_SHARED_ID,
             ),
             width="auto",
         ),
@@ -138,338 +670,148 @@ search_bar = dbc.Row(
     align="center",
 )
 
-navbar = dbc.Navbar(
-    dbc.Container(
-        [
-            html.A(
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            html.Img(
-                                src="/met/wg7/cosmonaut/static/sample_logo.svg",
-                                height="50px",
-                            ),
-                        ),
-                        dbc.Col(
-                            dbc.NavbarBrand(
-                                "COSMONAUT",
-                                className="ml-2",
-                                style={"fontSize": "6vh"},
-                            ),
-                        ),
-                    ],
-                    align="center",
-                ),
-                href="/met/wg7/cosmonaut",
-                className="navbar-link",
-            ),
-            dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
-            dbc.Collapse(
-                search_bar,
-                id="navbar-collapse",
-                navbar=True,
-                is_open=False,
-            ),
-            html.Div(
-                id="search-results",
-                style={"color": "white"},
-            ),
-            dcc.Interval(
-                id="redirect-interval", interval=3000, n_intervals=0, disabled=True
-            ),
-        ],
-    ),
-    color="dark",
-    dark=True,
-    style={"height": "10vh"},
+# Initial Sidebar for the Job Start
+side_bar = dbc.Col(
+    [
+        html.Div(),
+    ],
+    style={
+        "width": "500px",
+        "backgroundColor": "#DBE2EF",
+        "border": "2px solid #dee2e6",
+        # "position": "fixed",
+        # "top": "10vh",
+        # "right": 0,
+        # "bottom": 0,
+        "padding": "2rem 1rem",
+        "overflow": "auto",
+    },
+    className="responsive-sidebar",
 )
 
+# ============================================================================
+# Callback Registration Functions
+# ============================================================================
 
-def stage1(job_id):
-    return (
-        html.Div(
-            [
-                html.H1("Stage 1"),
-                html.H2(f"Job ID: {job_id}"),
-                dbc.Input(id="email-input", type="email", placeholder="Enter email"),
-                dbc.FormFeedback("Please enter a valid email.", id="email-feedback"),
-                dbc.Button(
-                    "Previous Step",
-                    id="prev-button",
-                    className="me-auto",
-                    size="lg",
-                    disabled=True,
-                ),
-                dbc.Button(
-                    "Next Step",
-                    id="next-button",
-                    className="me-auto",
-                    size="lg",
-                    disabled=True,
-                ),
-                dbc.Progress(
-                    id="progress-bar",
-                    label="1/3",
-                    value=33,
-                    style={"margin-top": "1rem"},
-                ),
-                html.Div(id="upload-data-dcc", style={"display": "none"}),
-            ],
-        ),
+
+def register_navbar_callbacks(app):
+    """Register callbacks for the navbar."""
+
+    @app.callback(
+        Output(SEARCH_RESULTS_DIV_NAV_SHARED_ID, "children"),
+        Output(JOB_ID_STORE_SHARED_ID, "data", allow_duplicate=True),
+        Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
+        Input(SEARCH_BUTTON_NAV_SHARED_ID, "n_clicks"),
+        State(SEARCH_INPUT_NAV_SHARED_ID, "value"),
+        prevent_initial_call=True,
     )
+    def search_job_id(n_clicks, job_id):
+        if n_clicks is None:
+            raise PreventUpdate
 
+        if DataBaseManager.check_existence(job_id):
+            CosmonautJob(job_id=job_id)
 
-def stage2(job_id):
-    return (
-        html.Div(
-            [
-                html.H1("Stage 2"),
-                html.P(
-                    "Bitte geben Sie einen gültigen EPSG-Code ein und laden Sie anschließend die Membership-Daten hoch. ",
-                    style={"margin-bottom": "1rem", "font-size": "1.3rem"},
+            return (
+                dbc.Toast(
+                    [html.Div(f"Job {job_id} found and loaded successfully.")],
+                    header="Job loaded",
+                    icon="success",
+                    is_open=True,
+                    duration=3000,
+                    dismissable=True,
+                    style={
+                        "maxWidth": "26rem",
+                        "wordWrap": "break-word",
+                        "whiteSpace": "normal",
+                    },
                 ),
-                html.H2(f"Job ID: {job_id}"),
-                html.H3("Upload"),
-                dbc.InputGroup(
-                    [
-                        dbc.Input(
-                            id="epsg-input",
-                            type="number",
-                            placeholder="Geben Sie einen gültigen EPSG-Code ein",
-                            style={"margin-top": "1rem"},
-                        ),
-                        dbc.InputGroupText(id="epsg-feedback", children=""),
-                    ],
-                    className="mb-3",
+                job_id,
+                f"/job/{job_id}/user-info",
+            )
+        else:
+            return (
+                dbc.Toast(
+                    [html.Div(f"Job {job_id} not found")],
+                    header="Not found",
+                    icon="danger",
+                    is_open=True,
+                    duration=3000,
+                    dismissable=True,
+                    style={
+                        "maxWidth": "26rem",
+                        "wordWrap": "break-word",
+                        "whiteSpace": "normal",
+                    },
                 ),
-                dbc.Form(
-                    [
-                        dcc.Upload(
-                            id="upload-data-dcc",
-                            accept=".csv,.txt",
-                            children=html.Div(
-                                [
-                                    dbc.Button(
-                                        "Click to select a file to upload.",
-                                        color="primary",
-                                        className="mt-2",
-                                        id="upload-button",  # Button ID hinzufügen
-                                        disabled=True,  # Standardmäßig deaktiviert
-                                    )
-                                ]
-                            ),
-                            multiple=False,
-                        ),
-                    ],
-                    className="mt-3 mb-3",
-                ),
-                dbc.Button(
-                    "Previous Step",
-                    id="prev-button",
-                    className="me-auto",
-                    size="lg",
-                    disabled=True,
-                ),
-                dbc.Button(
-                    "Next Step",
-                    id="next-button",
-                    className="me-auto",
-                    size="lg",
-                    disabled=True,
-                ),
-                dbc.Progress(
-                    id="progress-bar",
-                    label="2/3",
-                    value=67,
-                    style={"margin-top": "1rem"},
-                ),
-                html.Div(
-                    dcc.Loading(
-                        id="loading-output-data-upload",
-                        type="default",
-                        children=html.Div(
-                            id="output-data-upload",
-                            style={"padding": "1rem"},
-                        ),
-                    )
-                ),
-                html.Div(
-                    dcc.Loading(
-                        id="loading-output-osm-query",
-                        type="default",
-                        children=html.Div(
-                            id="output-osm-query",
-                            style={"padding": "1rem"},
-                        ),
-                    )
-                ),
-                html.Div(
-                    dcc.Loading(
-                        id="loading-plot-generation-status",
-                        type="default",
-                        children=html.Div(
-                            id="plot-generation-status",
-                            style={"padding": "1rem"},
-                        ),
-                    )
-                ),
-                html.Div(
-                    dcc.Loading(
-                        id="loading-output-minIO-status",
-                        type="default",
-                        children=html.Div(
-                            id="output-minIO-status",
-                            style={"padding": "1rem"},
-                        ),
-                    )
-                ),
-                html.Div(id="file-path", style={"display": "none"}),
-                dbc.Input(id="email-input", type="email", style={"display": "none"}),
-            ],
-        ),
+                no_update,
+                no_update,
+            )
+
+    @app.callback(
+        Output(NAVBAR_COLLAPSE_NAV_SHARED_ID, "is_open"),
+        [Input(NAVBAR_TOGGLER_NAV_SHARED_ID, "n_clicks")],
+        [State(NAVBAR_COLLAPSE_NAV_SHARED_ID, "is_open")],
     )
+    def toggle_navbar_collapse(n, is_open):
+        if n:
+            return not is_open
+        return is_open
 
 
-def stage3(job_id):
-    return (
-        html.Div(
-            [
-                html.H1("Stage 3"),
-                html.H2(f"Job ID: {job_id}"),
-                html.P(
-                    "Wählen Sie die gewünschten Straßen aus.",
-                    style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
-                ),
-                html.P(
-                    "Per Klick auf eine Straße kann diese mit dem Button "
-                    '"Remove selected Roads" entfernt werden. Dieser Button entfernt '
-                    "auch alle nicht angeschlossenen Straßen und behält nur das größte "
-                    "zusammenhängende Straßennetzwerk. Er muss gedrückt werden, bevor "
-                    "es zur nächsten Stage geht.",
-                    style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
-                ),
-                html.P(
-                    "Bitte haben Sie Geduld bei großen Dateien.",
-                    style={"margin-bottom": "1rem", "font-size": "1.2rem"},
-                ),
-                html.H4("Straßenauswahl"),
-                dbc.Checklist(
-                    id="tags-dropdown",
-                    options=[
-                        {"label": tag, "value": tag} for tag in osm_tags_mapping.keys()
-                    ],
-                    value=list(osm_tags_mapping.keys()),
-                    inline=True,
-                ),
-                dbc.Button(
-                    "Previous Step",
-                    id="prev-button",
-                    className="me-auto",
-                    size="lg",
-                    disabled=True,
-                ),
-                dbc.Button(
-                    "Confirm Input",
-                    id="confirm-button",
-                    className="me-auto",
-                    size="lg",
-                ),
-                dbc.Progress(
-                    id="progress-bar",
-                    label="3/3",
-                    value=100,
-                    style={"margin-top": "1rem"},
-                ),
-                dbc.Input(id="email-input", type="email", style={"display": "none"}),
-                html.Div(id="upload-data-dcc", style={"display": "none"}),
-            ],
-        ),
+def register_reset_callbacks(app):
+    """Register callbacks for job reset functionality."""
+
+    @app.callback(
+        Output(RESET_MODAL_SHARED_ID, "is_open", allow_duplicate=True),
+        Input(RESET_BUTTON_SHARED_ID, "n_clicks"),
+        Input(RESET_MODAL_CANCEL_BUTTON_SHARED_ID, "n_clicks"),
+        Input(RESET_MODAL_CONFIRM_BUTTON_SHARED_ID, "n_clicks"),
+        State(RESET_MODAL_SHARED_ID, "is_open"),
+        prevent_initial_call=True,
     )
+    def toggle_reset_modal(n_open, n_cancel, n_confirm, is_open):
+        """Toggle reset confirmation modal."""
+        triggered_id = ctx.triggered_id
 
+        if triggered_id == RESET_BUTTON_SHARED_ID:
+            return True  # Open modal
+        elif triggered_id in (
+            RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
+            RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
+        ):
+            return False  # Close modal
 
-def stage4(job_id):
-    confirm_side_bar = dbc.Col(
-        [
-            dbc.Label(
-                [
-                    html.H1("Stage 4"),
-                    html.H2(f"Job ID: {job_id}"),
-                    html.P(
-                        "Hier sollen später eine Mehrfachauswahl kommen.",
-                        style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
-                    ),
-                    html.P(
-                        "Bitte haben Sie Geduld, bis die Route berechnet ist.",
-                        style={"margin-bottom": "0.5rem", "font-size": "1.2rem"},
-                    ),
-                    html.P(
-                        "Wenn der 'Start Route'-Button gedrückt wird, erscheint ein "
-                        "QR-Code, mit welchem eine GPX-Datei der finalen Route heruntergeladen werden kann.",
-                        style={"margin-bottom": "1rem", "font-size": "1.2rem"},
-                    ),
-                    html.H4(
-                        "Choose a Route on the map.", style={"color": "grey"}
-                    ),  # TODO sollte erst nach kalkulation der Routen erscheinen
-                    dbc.Button(
-                        "Start Route",
-                        id="start-route",
-                        className="me-auto",
-                        size="lg",
-                    ),
-                    dcc.Loading(
-                        id="loading-qr-code",
-                        type="default",
-                        children=html.Img(
-                            id="qr-code",
-                            src="",
-                            style={
-                                "width": "100%",
-                                "padding-top": "1rem",
-                                "padding-bottom": "1rem",
-                            },
-                        ),
-                    ),
-                ],
-                id="welcome-label",
-            ),
-            html.Div(id="stage-content"),
-        ],
-        id="offcanvas",
-        style={
-            "width": "500px",
-            "backgroundColor": "#DBE2EF",
-            "border": "2px solid #dee2e6",
-            "position": "fixed",
-            "top": "10vh",
-            "right": 0,
-            "bottom": 0,
-            "padding": "2rem 1rem",
-            "overflow": "auto",
-        },
-        className="responsive-sidebar",
+        return is_open
+
+    @app.callback(
+        Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
+        Input(RESET_MODAL_CONFIRM_BUTTON_SHARED_ID, "n_clicks"),
+        State(URL_SHARED_ID, "pathname"),
+        prevent_initial_call=True,
     )
+    def perform_reset(n_clicks, pathname):
+        """Perform job reset and reload page."""
+        if n_clicks is None:
+            raise PreventUpdate
 
-    return html.Div(
-        [
-            navbar,
-            main_map,
-            confirm_side_bar,
-            html.Div(id="hidden-div", style={"display": "none"}),
-            dcc.Store(id="current-stage", data=0),
-            # dcc.Store(id="job-id", data=None),
-            dcc.Store(id="job-loaded-flag", data=None),
-            dcc.Store(id="email-store"),
-            dcc.Store(id="epsg-store"),
-            dcc.Dropdown(
-                id="tags-dropdown",
-                options=[],
-                value=list(osm_tags_mapping.keys()),
-                # disabled=True,
-                style={"display": "none"},
-            ),
-            html.Div(id="upload-data-store", style={"display": "none"}),
-            html.Div(id="dummy-output", style={"display": "none"}),
-            html.Div(id="osm-file-path", style={"display": "none"}),
-        ],
-        style={"height": "100vh", "width": "100%"},
-    )
+        # Extract job_id from pathname
+        # Expected format: /job/{job_id}/{page_name}
+        path_parts = pathname.split("/")
+        if len(path_parts) >= 3 and path_parts[1] == "job":
+            job_id = path_parts[2]
+        else:
+            logging.error(f"Could not extract job_id from pathname: {pathname}")
+            raise PreventUpdate
+
+        # Load job and reset
+        try:
+            job = CosmonautJob(job_id=job_id)
+            job.reset()
+            logging.info(f"Job {job_id} reset successfully from {pathname}")
+        except Exception as e:
+            logging.error(f"Failed to reset job {job_id}: {e}")
+            raise PreventUpdate
+
+        # Return same pathname to reload page with new state
+        return pathname

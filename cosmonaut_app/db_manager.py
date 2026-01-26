@@ -12,43 +12,88 @@ Classes:
 
 import logging
 import time
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     ARRAY,
     Boolean,
     Column,
     Date,
-    Float,
+    DateTime,
     Integer,
     String,
+    Text,
     create_engine,
 )
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
-from cosmonaut_app.config import DB_HOST_NAME, DB_NAME, DB_PORT, DB_PW, DB_USER
-
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.DEBUG,
+from cosmonaut_app.config import (
+    POSTGRES_HOST_NAME,
+    POSTGRES_NAME,
+    POSTGRES_PORT,
+    POSTGRES_PW,
+    POSTGRES_USER,
 )
-logger = logging.getLogger(__name__)
+from cosmonaut_app.error_handling import JobNotFound
+
+
+class SessionScope:
+    """Context manager for managing database sessions with retry logic."""
+
+    def __init__(self, session_factory):
+        """Initialize the session scope with a session factory."""
+        self.session_factory = session_factory
+        self.max_retries = 3
+        self.retry_delay = 1
+        self.session = None
+
+    def __enter__(self):
+        """Create a new session and handle retries for database operations."""
+        for attempt in range(self.max_retries + 1):
+            try:
+                self.session = self.session_factory()
+                return self.session  # success
+            except OperationalError as e:
+                if attempt < self.max_retries:
+                    logging.warning(
+                        f"Database OperationalError: {e}", extra={"tag": "database"}
+                    )
+                    logging.warning(
+                        f"Retrying operation (attempt {attempt + 1}/{self.max_retries + 1})",  # noqa
+                        extra={"tag": "database"},
+                    )
+                    time.sleep(self.retry_delay)
+                else:
+                    logging.error(
+                        f"Max retries ({self.max_retries}) exceeded",
+                        extra={"tag": "database"},
+                    )
+                    raise
+            except SQLAlchemyError as e:
+                logging.error(f"Database error: {e}", extra={"tag": "database"})
+                raise
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Commit or rollback the session based on exception type."""
+        try:
+            if exc_type is None:
+                self.session.commit()
+            else:
+                self.session.rollback()
+        finally:
+            self.session.close()
+
+        # False means exceptions are re-raised outside the `with`
+        return False
 
 
 class Base(DeclarativeBase):
     """Base class for declarative base."""
 
     pass
-
-
-class JobNotFound(Exception):
-    """Custom exception for when a job is not found."""
-
-    def __init__(self, job_id):
-        """Add job id as attribute and format error message."""
-        self.job_id = job_id
-        super().__init__(f"Job with ID '{job_id}' not found")
 
 
 class DataBaseManager:
@@ -72,15 +117,19 @@ class DataBaseManager:
     on its job ID.
     """
 
-    database_url = (
-        f"postgresql+psycopg2://{DB_USER}:{DB_PW}@"
-        f"{DB_HOST_NAME}:{DB_PORT}/{DB_NAME}"
+    database_url = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PW}@{POSTGRES_HOST_NAME}:{POSTGRES_PORT}/{POSTGRES_NAME}"
+    engine = create_engine(
+        database_url,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=1800,
     )
-    engine = create_engine(database_url, pool_pre_ping=True)
     Session = sessionmaker(bind=engine)
 
     @classmethod
-    def check_existence(self, job_id, retries=3, delay=5):
+    def check_existence(self, job_id):
         """Check if a job with the given job ID exists in the database.
 
         This method queries the 'jobs' table in the database to determine
@@ -93,18 +142,9 @@ class DataBaseManager:
         bool: True if a job with the given job ID exists, False otherwise.
         """
         logging.debug(f"Check existence of job with ID: {job_id}")
-        for attempt in range(retries):
-            try:
-                with self.Session() as session:
-                    job_row = session.query(JobTable).filter_by(job_id=job_id).first()
-                return job_row is not None
-            except OperationalError as e:
-                logging.error(f"Database connection failed: {e}")
-                if attempt < retries - 1:
-                    logging.info(f"Retrying in {delay} seconds...")
-                    time.sleep(delay)
-                else:
-                    raise
+        with SessionScope(self.Session) as session:
+            job_row = session.query(JobTable).filter_by(job_id=job_id).first()
+            return job_row is not None
 
     @classmethod
     def add_entry(self, data_to_insert):
@@ -116,7 +156,7 @@ class DataBaseManager:
         data_to_insert (dict): A dictionary containing job information with keys
         equivalent to the cloumns ins JobTable.
         """
-        with self.Session() as session:
+        with SessionScope(self.Session) as session:
             job_row = JobTable(**data_to_insert)
             session.merge(job_row)
             session.commit()
@@ -128,7 +168,7 @@ class DataBaseManager:
         Raises:
         JobNotFound: If the job with the provided job ID does not exist.
         """
-        with self.Session() as session:
+        with SessionScope(self.Session) as session:
             job = session.query(JobTable).filter_by(job_id=job_id).first()
             if job is None:
                 raise JobNotFound(job_id)
@@ -153,7 +193,7 @@ class DataBaseManager:
         Raises:
         JobNotFound: If the job with the provided job ID does not exist.
         """
-        with self.Session() as session:
+        with SessionScope(self.Session) as session:
             job_row = session.query(JobTable).filter_by(job_id=job_id).first()
             if job_row:
                 job_columns = {
@@ -180,7 +220,7 @@ class DataBaseManager:
         Raises:
         JobNotFound: If the job with the provided job ID does not exist.
         """
-        with self.Session() as session:
+        with SessionScope(self.Session) as session:
             job_row = session.query(JobTable).filter_by(job_id=job_id).first()
             if job_row:
                 return job_row.stage
@@ -200,7 +240,7 @@ class DataBaseManager:
         Raises:
         JobNotFound: If the job with the provided job ID does not exist.
         """
-        with self.Session() as session:
+        with SessionScope(self.Session) as session:
             job = session.query(JobTable).filter_by(job_id=job_id).first()
             if job:
                 session.delete(job)
@@ -209,87 +249,128 @@ class DataBaseManager:
                 raise JobNotFound(job_id)
 
     @classmethod
-    def list_jobs(self):
-        """List all jobs in the database with their submission date and status.
+    def list_jobs(cls):
+        """List all jobs in the database with their metadata.
 
-        This method retrieves all job entries from the 'jobs' table in the
-        database and returns a dictionary where the keys are 'job_id', and the
-        values are a tuple containing 'start_date' and 'submitted' status
-        for each job.
-
-        Returns:
-        dict: A dictionary where keys are 'job_id' and values are tuples
-        containing 'start_date' and 'submitted' status.
-
-        Example:
-        {
-        'job1': ('2023-09-01', True),
-        'job2': ('2023-09-02', False),
-        # ...
-        }
-
+        Returns
+        -------
+        dict
+            Dictionary where keys are job_id and values are dicts with:
+            - start_date (date): Job creation date
+            - submitted (bool): Whether job was submitted
+            - status (str): Job status
+            - email (str): User email
+            - celery_task_id (str|None): Celery task ID if submitted
         """
-        with self.Session() as session:
+        with SessionScope(cls.Session) as session:
             job_rows = session.query(JobTable).all()
 
             job_info = {}
             for job_row in job_rows:
-                job_info[job_row.job_id] = (job_row.start_date, job_row.submitted)
+                job_info[job_row.job_id] = {
+                    "start_date": job_row.start_date,
+                    "submitted": job_row.submitted,
+                    "status": job_row.status,
+                    "email": job_row.email or "N/A",
+                    "celery_task_id": job_row.celery_task_id,
+                }
             return job_info
 
     @classmethod
-    def get_lock(self, task_type):
-        """Get a lock for a specific backgroung task type.
+    def query_logs(
+        cls,
+        date: str,
+        sh: int,
+        sm: int,
+        eh: int,
+        em: int,
+        levels: List[str],
+        pid: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Query logs from the database with specified filters.
 
-        This method queries the TaskLockTable in the database to retrieve
-        the lock for a specific background task type. If the lock does not exist,
-        it will be created. The lock is used to prevent multiple instances of the
-        same background task type from running concurrently. The lock is released
-        with the method 'release_lock'.
+        Parameters:
+        -----------
+        date : str
+            Date in the format 'YYYY-MM-DD'
+        sh : int
+            Start hour (0-23)
+        sm : int
+            Start minute (0-59)
+        eh : int
+            End hour (0-23)
+        em : int
+            End minute (0-59)
+        levels : list
+            List of log levels to include (e.g., ['INFO', 'ERROR'])
+        pid : int, optional
+            Process ID to filter logs by
+
+        Returns:
+        --------
+        list
+            List of dictionaries containing log records
         """
-        logging.debug(f"Get lock for task type: {task_type}")
-        with self.Session() as session:
-            task_lock = (
-                session.query(TaskLockTable)
-                .filter_by(task_type=task_type)
-                .with_for_update()
-                .first()
+        logging.debug(f"Querying logs from {date} {sh}:{sm} to {date} {eh}:{em}")
+
+        start_datetime = datetime.strptime(
+            f"{date} {sh:02d}:{sm:02d}:00", "%Y-%m-%d %H:%M:%S"
+        )
+        end_datetime = datetime.strptime(
+            f"{date} {eh:02d}:{em:02d}:59", "%Y-%m-%d %H:%M:%S"
+        )
+
+        # Create session directly (not using SessionScope)
+        session = cls.Session()
+        try:
+            query = session.query(LogTable).filter(
+                LogTable.timestamp >= start_datetime,
+                LogTable.timestamp <= end_datetime,
+                LogTable.level.in_(levels),
             )
-            if task_lock is None:
-                task_lock = TaskLockTable(task_type=task_type, is_locked=True)
-                session.add(task_lock)
-            elif task_lock.is_locked:
-                return False
-            else:
-                task_lock.is_locked = True
-            session.commit()
-        return True
+
+            if pid is not None:
+                query = query.filter(LogTable.pid == pid)
+
+            # Order results by timestamp
+            query = query.order_by(LogTable.timestamp)
+
+            # Execute query and convert results to dictionaries
+            logs = [log.to_dict() for log in query.all()]
+
+            return logs
+        finally:
+            session.close()
 
     @classmethod
-    def release_lock(self, task_type):
-        """Release the lock for a specific background task type.
+    def delete_logs_older_than(cls, cutoff_datetime):
+        """Delete log entries older than the specified datetime.
 
-        This method releases the lock for a specific background task type in the
-        TaskLockTable in the database. The lock is used to prevent multiple instances
-        of the same background task type from running concurrently.
+        Parameters
+        ----------
+        cutoff_datetime : datetime
+            Delete all logs with timestamp older than this
+
+        Returns
+        -------
+        int
+            Number of log records deleted
         """
-        logging.debug(f"Release lock for task type: {task_type}")
-        with self.Session() as session:
-            task_lock = (
-                session.query(TaskLockTable).filter_by(task_type=task_type).first()
+        logging.info(f"Deleting logs older than {cutoff_datetime}")
+
+        with SessionScope(cls.Session) as session:
+            # Count logs before deletion
+            count_query = session.query(LogTable).filter(
+                LogTable.timestamp < cutoff_datetime
             )
-            if task_lock:
-                task_lock.is_locked = False
-                session.commit()
+            count = count_query.count()
 
+            # Delete logs
+            count_query.delete(synchronize_session=False)
+            session.commit()
 
-class TaskLockTable(Base):
-    """Represents the 'task_lock' table in the database."""
-
-    __tablename__ = "task_lock"
-
-    task_type = Column(String, primary_key=True)
-    is_locked = Column("is_locked", Boolean)
+            logging.info(f"Deleted {count} log records older than {cutoff_datetime}")
+            return count
 
 
 class JobTable(Base):
@@ -298,18 +379,38 @@ class JobTable(Base):
     __tablename__ = "jobs"
 
     job_id = Column(String, primary_key=True)
-    start_date = Column("start_date", Date)
-    end_date = Column("end_date", Date)
-    data_uploaded = Column("data_uploaded", Boolean)
-    submitted = Column("submitted", Boolean)
     email = Column("email", String)
+    classification_upload = Column("classification_upload", JSON)
+    selected_road_tags = Column("selected_road_tags", ARRAY(String))
+    submitted = Column("submitted", Boolean)
     notified_end = Column("notified_end", Boolean)
     stage = Column("stage", Integer)
     status = Column("status", String)
-    version = Column("version", Float)
-    file_names = Column("file_names", ARRAY(String))
-    selected_road_tags = Column("selected_road_tags", ARRAY(String))
+    version = Column("version", String)
+    epsg = Column("epsg", Integer)
+    config = Column("config", JSON)
+    celery_task_id = Column("celery_task_id", String, nullable=True)
+    start_date = Column(Date, nullable=False, default=date.today)
 
 
-if __name__ == "__main__":
-    DataBaseManager.check_existence("test")
+class LogTable(Base):
+    """SQLAlchemy model for the logs table."""
+
+    __tablename__ = "logs"
+
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime(timezone=False), nullable=False)
+    pid = Column(Integer, nullable=False)
+    level = Column(String(10), nullable=False)
+    module = Column(String(50), nullable=False)
+    message = Column(Text, nullable=False)
+
+    def to_dict(self):
+        """Convert log record to dictionary format."""
+        return {
+            "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "pid": self.pid,
+            "level": self.level,
+            "message": self.message,
+            "module": self.module,
+        }

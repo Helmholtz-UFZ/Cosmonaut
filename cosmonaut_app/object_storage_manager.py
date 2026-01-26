@@ -1,0 +1,291 @@
+"""This module provides a class to manage object storage using rclone."""
+
+import logging
+import subprocess
+import sys
+import time
+
+from cosmonaut_app.config import (
+    JOB_WORK_DIR_TEMPLATE,
+    OBJECT_STORAGE_ACCESS_KEY,
+    OBJECT_STORAGE_BUCKET,
+    OBJECT_STORAGE_HOST,
+    OBJECT_STORAGE_REMOTE_NAME,
+    OBJECT_STORAGE_SECRET_KEY,
+)
+
+
+class ObjectStorageError(Exception):
+    """Exception raised for errors in the ObjectStorageManager class."""
+
+    def __init__(self, message="An error occurred while managing object storage."):
+        """Initialize the ObjectStorageError class."""
+        super().__init__(message)
+
+
+def check_result(params: list, result: subprocess.CompletedProcess) -> None:
+    """Check the result of a subprocess command and raise an error if it failed.
+
+    Args:
+        result: The result of the subprocess command
+
+    Raises:
+        ObjectStorageError: If the command failed
+    """
+    error_msg = result.stderr.replace(OBJECT_STORAGE_SECRET_KEY, "****")
+    error_msg = error_msg.replace(OBJECT_STORAGE_ACCESS_KEY, "****")
+    output = result.stdout.replace(OBJECT_STORAGE_SECRET_KEY, "****")
+    output = output.replace(OBJECT_STORAGE_ACCESS_KEY, "****")
+    call = " ".join(params)
+    call = call.replace(OBJECT_STORAGE_SECRET_KEY, "****")
+    call = call.replace(OBJECT_STORAGE_ACCESS_KEY, "****")
+    if result.returncode != 0:
+        if "QuotaExceeded" in error_msg:
+            logging.error(
+                f"Object storage quota exceeded for command: {call}\n{error_msg}\n{output}"  # noqa
+            )
+        else:
+            logging.error(f"Command failed: {call}\n{error_msg}\n{output}")
+        raise ObjectStorageError
+
+
+def run_rclone_with_retry(
+    params: list, timeout: float = 600
+) -> subprocess.CompletedProcess:
+    """Run rclone command with retry logic for NFS lock file conflicts.
+
+    Args:
+        params: The rclone command parameters
+        timeout: Timeout in seconds for the subprocess (default: 600 seconds = 10 minutes)
+
+    Raises:
+        ObjectStorageError: If all retry attempts fail
+        subprocess.TimeoutExpired: If the command times out
+    """
+    max_retries = 3
+    retry_delay = 2
+
+    for attempt in range(max_retries):
+        try:
+            result = subprocess.run(
+                params,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            check_result(params, result)
+        except subprocess.TimeoutExpired:
+            logging.error(
+                f"Command timed out after {timeout} seconds: {' '.join(params)}"
+            )
+            raise ObjectStorageError(
+                f"Command timed out after {timeout} seconds"
+            ) from None
+        except ObjectStorageError:
+            if attempt < max_retries - 1:
+                logging.warning(
+                    f"{' '.join(params)} failed. Retry attempt {attempt + 1}"
+                )
+                time.sleep(retry_delay)
+            else:
+                raise
+
+    return result
+
+
+def setup_remote() -> None:
+    """Set up rclone remote configuration.
+
+    Args:
+        dirname: Name of the directory (used for error handling)
+    """
+    logging.debug("Setting up rclone remote.")
+    config_params = [
+        "rclone",
+        "config",
+        "create",
+        OBJECT_STORAGE_REMOTE_NAME,
+        "s3",
+        "provider=Other",
+        f"access_key_id={OBJECT_STORAGE_ACCESS_KEY}",
+        f"secret_access_key={OBJECT_STORAGE_SECRET_KEY}",
+        "region=us-east-1",
+        f"endpoint={OBJECT_STORAGE_HOST}",
+        "acl=private",
+        "force_path_style=true",
+    ]
+
+    result = subprocess.run(
+        config_params,
+        capture_output=True,
+        text=True,
+        timeout=10,  # 10 seconds for config operations
+    )
+    check_result(config_params, result)
+
+    logging.debug(f"Successfully created remote {OBJECT_STORAGE_REMOTE_NAME}")
+
+
+def get_files(dirname: str) -> None:
+    """Download files from object storage to local work directory.
+
+    This copies files from remote to local without deleting local files using rclone
+    copy.
+
+    Args:
+        dirname: Name of the directory to download
+
+    Raises:
+        ObjectStorageError: If download fails or verification fails
+    """
+    logging.debug(f"Downloading files from object storage for {dirname}")
+    local_path = JOB_WORK_DIR_TEMPLATE.format(job_id=dirname)
+    remote_path = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}/{dirname}"
+
+    # Download: copy files from remote to local without deleting local files
+    sync_params = [
+        "rclone",
+        "copy",
+        remote_path,
+        local_path,
+        "--checksum",
+    ]
+
+    result = run_rclone_with_retry(sync_params, timeout=600)  # 10 minutes for download
+    logging.debug(f"Rclone sync result: {result.stdout}")
+
+
+def save_files(dirname: str) -> None:
+    """Upload files from local work directory to object storage.
+
+    This overwrites remote files with local files using rclone sync.
+
+    Args:
+        dirname: Name of the directory to upload
+
+    Raises:
+        ObjectStorageError: If upload fails or verification fails
+    """
+    logging.debug(f"Uploading files to object storage for {dirname}")
+    local_path = JOB_WORK_DIR_TEMPLATE.format(job_id=dirname)
+    remote_path = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}/{dirname}"
+
+    # Upload: make remote identical to local
+    sync_params = [
+        "rclone",
+        "sync",
+        local_path,
+        remote_path,
+        "--checksum",
+    ]
+
+    run_rclone_with_retry(sync_params, timeout=600)  # 10 minutes for upload
+
+
+def delete_file_from_storage(filepath: str) -> None:
+    """Delete a file from the object storage using rclone.
+
+    Args:
+        filepath: Path of the file to delete from object storage
+    """
+    logging.debug(f"Deleting file {filepath} from object storage.")
+
+    remote_path = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}/{filepath}"
+
+    delete_params = [
+        "rclone",
+        "delete",
+        remote_path,
+    ]
+
+    run_rclone_with_retry(delete_params, timeout=10)  # 10 seconds for delete
+
+    logging.debug(f"Successfully deleted file {filepath} from object storage")
+
+
+def delete_directory_from_storage(dirpath: str) -> None:
+    """Delete a directory from the object storage using rclone.
+
+    Args:
+        dirpath: Path of the directory to delete from object storage
+    """
+    logging.debug(f"Deleting directory {dirpath} from object storage.")
+
+    remote_path = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}/{dirpath}"
+
+    purge_params = [
+        "rclone",
+        "purge",
+        remote_path,
+    ]
+
+    run_rclone_with_retry(purge_params, timeout=10)  # 10 seconds for purge
+
+    logging.debug(f"Successfully deleted directory {dirpath} from object storage")
+
+
+def create_bucket() -> None:
+    """Create the object storage bucket if it doesn't already exist."""
+    logging.debug(f"Creating bucket {OBJECT_STORAGE_BUCKET}")
+
+    # Check if bucket already exists
+    lsd_params = [
+        "rclone",
+        "lsd",
+        f"{OBJECT_STORAGE_REMOTE_NAME}:",
+    ]
+
+    result = run_rclone_with_retry(lsd_params, timeout=10)  # 10 seconds for list
+
+    # Parse output to check if bucket exists
+    # rclone lsd output format: "-1 2023-01-01 12:00:00        -1 bucket-name"
+    bucket_exists = False
+    for line in result.stdout.strip().split("\n"):
+        if line and OBJECT_STORAGE_BUCKET in line:
+            bucket_exists = True
+            break
+
+    if bucket_exists:
+        return
+
+    # Create bucket if it doesn't exist
+    remote_bucket = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}"
+    bucket_params = [
+        "rclone",
+        "mkdir",
+        remote_bucket,
+    ]
+
+    run_rclone_with_retry(bucket_params, timeout=10)  # 10 seconds for mkdir
+
+
+def main():
+    """Execute setup_remote or create_bucket based on command line argument."""
+    logging.basicConfig(level=logging.DEBUG)
+
+    if len(sys.argv) != 2:
+        print("Usage: python object_storage_manager.py [setup_remote|create_bucket]")
+        sys.exit(1)
+
+    command = sys.argv[1]
+
+    try:
+        if command == "setup_remote":
+            setup_remote()
+            logging.info("Object storage remote setup completed successfully.")
+        elif command == "create_bucket":
+            create_bucket()
+            logging.info("Bucket creation completed successfully.")
+        else:
+            print(f"Unknown command: {command}")
+            print(
+                "Usage: python object_storage_manager.py [setup_remote|create_bucket]"
+            )
+            sys.exit(1)
+    except ObjectStorageError as e:
+        logging.error(f"Failed to execute {command}: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

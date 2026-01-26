@@ -1,0 +1,32 @@
+### Development variables ###
+DOCKER_UID=1000
+DOCKER_GID=1000
+GUNICORN=0
+DEBUG=0
+
+### Webserver ###
+WEB_WORK_DIR="./cosmonaut_app/work_dir"
+FLASK_PORT=8080
+WEB_OUTSIDE_URL="http://localhost"
+
+### Object Storage (S3-compatible via rclone) ###
+OBJECT_STORAGE_ACCESS_KEY="minioadmin"
+OBJECT_STORAGE_SECRET_KEY="minioadmin"
+OBJECT_STORAGE_HOST="http://minio:9000"
+OBJECT_STORAGE_PORT=9000
+OBJECT_STORAGE_CONSOLE_PORT=9001
+OBJECT_STORAGE_BUCKET="cosmic-routing"
+OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
+
+### Postgres DB ###
+POSTGRES_NAME="cosmonaut_db"
+POSTGRES_PORT="5432"
+POSTGRES_USER="cosmonaut"
+POSTGRES_PW="password"
+POSTGRES_HOST_NAME="postgres_cosmonaut" 
+
+### Redis ###
+REDIS_PORT=6379
+REDIS_HOST="redis"
+REDIS_DB=0
+REDIS_PASSWORD=
