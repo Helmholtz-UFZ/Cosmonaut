@@ -16,7 +16,7 @@ from datetime import datetime
 import re
 
 import dash_bootstrap_components as dbc
-from dash import callback, html, register_page
+from dash import callback, html, no_update, register_page
 from dash.exceptions import PreventUpdate
 from dash.dash_table import DataTable
 from dash.dependencies import Input, Output, State
@@ -569,7 +569,7 @@ def update_selected_task_id(selected_rows, table_data):
         if row_index < len(table_data):
             task_id = table_data[row_index]["task_id"]
             return task_id
-    return ""
+    return no_update
 
 
 @callback(
