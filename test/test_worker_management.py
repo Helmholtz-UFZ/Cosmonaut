@@ -98,11 +98,26 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
         timeout=10000
     )
 
-    # Verify task ID appears in revoked tasks table
-    # Use expect().to_contain_text() which retries until text appears or timeout
-    expect(
-        page.locator(f"#{REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID}")
-    ).to_contain_text(task_id, timeout=10000)
+    # Verify task ID appears in revoked tasks table.
+    # The worker may not have registered the revocation by the time the first
+    # refresh completes, so poll with refresh clicks (same pattern as active tasks).
+    revoked_table = page.locator(f"#{REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID}")
+    max_revoke_attempts = 15
+    for attempt in range(max_revoke_attempts):
+        try:
+            expect(revoked_table).to_contain_text(task_id, timeout=2000)
+            break
+        except AssertionError:
+            if attempt >= max_revoke_attempts - 1:
+                raise AssertionError(
+                    f"Task {task_id} did not appear in revoked tasks table after "
+                    f"{max_revoke_attempts} refresh attempts. "
+                    f"Table content: {revoked_table.text_content()}"
+                )
+            page.locator(f"#{WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID}").click()
+            expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
+                timeout=10000
+            )
 
     # Check for any errors
     check_all_errors(page)
