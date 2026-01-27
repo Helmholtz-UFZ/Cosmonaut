@@ -447,6 +447,20 @@ wheels = [
 ]
 
 [[package]]
+name = "dash-form-factory"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dash" },
+    { name = "dash-bootstrap-components" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/db/a2/ef2ca6252784290c579000380092db52cca8115826cda2cbf17df0633fe9/dash_form_factory-0.1.1.tar.gz", hash = "sha256:072fbdbdc30e68610db8996dc768c069e91b47832134f2c6fa771ef70b26a67d", size = 8198, upload-time = "2026-01-27T12:15:12.873Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/18/c3/ab880a62db3dc1ed8e9839ef35878bc6d10d86d02f97b8014d4e00608be6/dash_form_factory-0.1.1-py3-none-any.whl", hash = "sha256:05575f2c1cff4fd78c4a62406806612124182a0315c1813a879e638a171a9f26", size = 9797, upload-time = "2026-01-27T12:15:11.798Z" },
+]
+
+[[package]]
 name = "dash-iconify"
 version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2276,6 +2290,7 @@ dependencies = [
     { name = "dash-ag-grid" },
     { name = "dash-bootstrap-components" },
     { name = "dash-extensions" },
+    { name = "dash-form-factory" },
     { name = "dash-iconify" },
     { name = "dash-leaflet" },
     { name = "dash-mantine-components" },
@@ -2434,6 +2449,7 @@ requires-dist = [
     { name = "dash-ag-grid", specifier = "==32.3.2" },
     { name = "dash-bootstrap-components", specifier = ">=2.0.3" },
     { name = "dash-extensions", specifier = "==2.0.4" },
+    { name = "dash-form-factory", specifier = "==0.1.1" },
     { name = "dash-iconify", specifier = "==0.1.2" },
     { name = "dash-leaflet", specifier = "==1.1.3" },
     { name = "dash-mantine-components", specifier = "==1.1.1" },

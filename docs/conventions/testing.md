@@ -13,7 +13,7 @@ Integration testing using Playwright. No unit tests for Dash callbacks.
 Main test runner with automatic service management.
 
 ```bash
-# Run all tests (headless)
+# Run all tests (headless) — this is the default and recommended command
 ./run_pytest.sh
 
 # Run with visible browser (debugging)
@@ -21,17 +21,25 @@ Main test runner with automatic service management.
 
 # Run specific test file
 ./run_pytest.sh test/test_app.py
+```
 
-# Skip Docker service management
-./run_pytest.sh --no-services
+**`--no-services` flag — use with care:**
 
-# Combine options
+This flag skips Docker service startup. Only use it when you already have
+services running in a separate terminal (see "Development tip" below), or
+when running a test that does not require services. Most tests require
+PostgreSQL, MinIO, or Redis — running them with `--no-services` and no
+background services will produce connection failures, not meaningful results.
+
+```bash
+# These tests DO NOT require services:
 ./run_pytest.sh --no-services test/test_env.py
+./run_pytest.sh --no-services test/test_html_id_enforcement.py
 
-# CAUTION these test will not work as they need background services
-./run_pytest.sh --no-services test/test_complete_routing_workflow.py
-./run_pytest.sh --no-services test/test_db_manager.py
-./run_pytest.sh --no-services test/test_worker_management.py
+# These tests REQUIRE services — they will fail without them:
+# test/test_complete_routing_workflow.py
+# test/test_db_manager.py
+# test/test_worker_management.py
 ```
 
 **What the script does:**

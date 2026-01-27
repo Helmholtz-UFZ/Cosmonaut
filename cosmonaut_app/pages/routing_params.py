@@ -73,7 +73,7 @@ from cosmonaut_app.layout import (
     create_reset_banner,
     create_reset_modal,
 )
-from cosmonaut_app.form_factory import FormFactory, InputField
+from dash_form_factory import FormFactory, InputField
 from cosmonaut_app.pydantic_models import FullPipelineConfig
 
 log = logging.getLogger(__name__)
