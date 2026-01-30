@@ -161,7 +161,7 @@ build-latest-tag:
 .prepare: &prepare
   - "apt-get update -y && apt-get install git openssh-client -yqq"
   - "eval $(ssh-agent -s)"
-  - 'echo "$SSH_PRIVATE_KEY" | base64 -d | ssh-add -'
+  - 'echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -'
   - "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
   - 'echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
   - "git config --global user.email '${GITLAB_USER_EMAIL}'"
