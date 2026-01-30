@@ -1,0 +1,277 @@
+persistence:
+  enabled: true
+  storageClassName: "tanzu-storage-policy-raid5-ftt1"
+  name: "cosmonaut-work-dir-pvc"
+  size: "10G"
+
+frontend:
+  enabled: true
+  image:
+    repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut
+    tag: "0.0.17"
+
+  imagePullSecrets:
+    - name: wombat-docker-registry-codebase
+
+  podAnnotations:
+    rdm.ufz.de/inception-date: "20240110"
+    rdm.ufz.de/duration-in-years: "3"
+
+  environmentVariables:
+    - name: "EMAIL_PORT"
+      value: "587"
+    - name: "EMAIL_SENDER"
+      value: "cosmopolitan@ufz.de"
+    - name: "EMAIL_SERVER"
+      value: "smtp.ufz.de"
+    - name: "EMAIL_USERNAME"
+      value: "soncosmo"
+    - name: "EMAIL_PASSWORD"
+      valueFrom:
+        secretKeyRef:
+          name: "app.secrets"
+          key: "EMAIL_PASSWORD"
+    - name: "FLASK_DEBUG"
+      value: "0"
+    - name: "FLASK_PORT"
+      value: "8080"
+    - name: "MAINTAINER_EMAIL"
+      value: "louis-ferdinand.trinkle@ufz.de"
+    - name: "OBJECT_STORAGE_BUCKET"
+      value: "cosmic-routing"
+    - name: "OBJECT_STORAGE_HOST"
+      value: "https://vip.s3.ufz.de"
+    - name: "OBJECT_STORAGE_REMOTE_NAME"
+      value: "cosmopolitan-remote"
+    - name: "OBJECT_STORAGE_ACCESS_KEY"
+      value: "AKIATCJ4AYK7SU9P73Q1K"
+    - name: "OBJECT_STORAGE_SECRET_KEY"
+      valueFrom:
+        secretKeyRef:
+          name: "app.secrets"
+          key: "S3_SECRET_KEY"
+    - name: "POSTGRES_DB"
+      value: "cosmonaut_prod"
+    - name: "POSTGRES_HOST_NAME"
+      value: "postgres.intranet.ufz.de"
+    - name: "POSTGRES_PORT"
+      value: "5432"
+    - name: "POSTGRES_USER"
+      value: "cosmonaut_prod_adm"
+    - name: "POSTGRES_PASSWORD"
+      valueFrom:
+        secretKeyRef:
+          name: "app.secrets"
+          key: "DB_PW"
+    - name: "WEB_OUTSIDE_URL"
+      value: "https://web-intern.app.ufz.de/met/wg7/cosmonaut"
+    - name: "WEB_WORK_DIR"
+      value: "/python_docker/cosmonaut/cosmonaut_app/work_dir"
+    - name: "TILESERVER_URL"
+      value: "https://cosmonaut-ts.web-intern.app.ufz.de"
+    - name: "REDIS_HOST"
+      value: "cosmonaut-redis"
+    - name: "REDIS_PORT"
+      value: "6379"
+    - name: "REDIS_DB"
+      value: "0"
+    - name: "REDIS_PASSWORD"
+      value: ""
+
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "cert-manager-acme"
+      cert-manager.io/private-key-algorithm: "ECDSA"
+      cert-manager.io/private-key-size: "384"
+      cert-manager.io/private-key-rotation-policy: "Always"
+      nginx.ingress.kubernetes.io/configuration-snippet: |
+        add_header 'X-Content-Type-Options' 'nosniff' always;
+        add_header 'Content-Security-Policy' "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tile.openstreetmap.org https://*.app.ufz.de; style-src 'self' 'unsafe-inline'; font-src 'self' ; frame-src 'self' *.ufz.de ; child-src 'self' *.ufz.de ; object-src 'none' ; frame-ancestors 'self' http://*.ufz.de https://*.ufz.de ;" always;
+        add_header 'X-XSS-Protection' '1';
+    hosts:
+      - host: "web-intern.app.ufz.de"
+        paths:
+          - path: /met/wg7/cosmonaut
+            pathType: Prefix
+    tls:
+      - secretName: web-intern-app-ufz-de
+        hosts:
+          - "web-intern.app.ufz.de"
+
+  resources:
+    limits:
+     cpu: 500m
+     memory: 1Gi
+    requests:
+     cpu: 200m
+     memory: 512Mi
+
+  volumes:
+    - name: cosmonaut-work-dir
+      persistentVolumeClaim:
+        claimName: cosmonaut-work-dir-pvc
+
+  volumeMounts:
+    - mountPath: "/python_docker/cosmonaut/cosmonaut_app/work_dir"
+      name: cosmonaut-work-dir
+
+worker:
+  enabled: true
+  image:
+    repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut/worker
+    pullPolicy: Always
+    tag: "0.0.17"
+
+  imagePullSecrets:
+    - name: wombat-docker-registry-codebase
+
+  nameOverride: ""
+  fullnameOverride: "cosmonaut-worker"
+
+  environmentVariables:
+    - name: "EMAIL_PORT"
+      value: "587"
+    - name: "EMAIL_SENDER"
+      value: "cosmopolitan@ufz.de"
+    - name: "EMAIL_SERVER"
+      value: "smtp.ufz.de"
+    - name: "EMAIL_USERNAME"
+      value: "soncosmo"
+    - name: "EMAIL_PASSWORD"
+      valueFrom:
+        secretKeyRef:
+          name: "app.secrets"
+          key: "EMAIL_PASSWORD"
+    - name: "FLASK_DEBUG"
+      value: "0"
+    - name: "FLASK_PORT"
+      value: "8080"
+    - name: "MAINTAINER_EMAIL"
+      value: "john-eric.anders@ufz.de"
+    - name: "OBJECT_STORAGE_BUCKET"
+      value: "cosmic-routing"
+    - name: "OBJECT_STORAGE_HOST"
+      value: "https://vip.s3.ufz.de"
+    - name: "OBJECT_STORAGE_REMOTE_NAME"
+      value: "cosmopolitan-remote"
+    - name: "OBJECT_STORAGE_ACCESS_KEY"
+      value: "AKIATCJ4AYK7SU9P73Q1K"
+    - name: "OBJECT_STORAGE_SECRET_KEY"
+      valueFrom:
+        secretKeyRef:
+          name: "app.secrets"
+          key: "S3_SECRET_KEY"
+    - name: "POSTGRES_DB"
+      value: "cosmonaut_prod"
+    - name: "POSTGRES_HOST_NAME"
+      value: "postgres.intranet.ufz.de"
+    - name: "POSTGRES_PORT"
+      value: "5432"
+    - name: "POSTGRES_USER"
+      value: "cosmonaut_prod_adm"
+    - name: "POSTGRES_PASSWORD"
+      valueFrom:
+        secretKeyRef:
+          name: "app.secrets"
+          key: "DB_PW"
+    - name: "WEB_OUTSIDE_URL"
+      value: "https://web-intern.app.ufz.de/met/wg7/cosmonaut"
+    - name: "WEB_WORK_DIR"
+      value: "/python_docker/cosmonaut/cosmonaut_app/work_dir"
+    - name: "TILESERVER_URL"
+      value: "https://cosmonaut-ts.web-intern.app.ufz.de"
+    - name: "REDIS_HOST"
+      value: "cosmopolitan-redis"
+    - name: "REDIS_PORT"
+      value: "6379"
+    - name: "REDIS_DB"
+      value: "0"
+    - name: "REDIS_PASSWORD"
+      value: ""
+
+  resources:
+    limits:
+      cpu: 1500m
+      memory: 7000Mi
+    requests:
+      cpu: 500m
+      memory: 2000Mi
+
+  volumes:
+    - name: cosmonaut-work-dir
+      persistentVolumeClaim:
+        claimName: cosmonaut-work-dir-pvc
+
+  volumeMounts:
+    - mountPath: "/python_docker/cosmonaut/cosmonaut_app/work_dir"
+      name: cosmonaut-work-dir
+
+tileserver:
+  enabled: true
+
+  securityContext:
+    allowPrivilegeEscalation: false
+#    capabilities:
+#      drop: [ "ALL" ]
+#    runAsNonRoot: true  # Container läuft leider nicht als Non-Root
+    seccompProfile:
+      type: RuntimeDefault
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1000Mi
+    requests:
+      cpu: 500m
+      memory: 500Mi
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "cert-manager-acme"
+      cert-manager.io/private-key-algorithm: "ECDSA"
+      cert-manager.io/private-key-size: "384"
+      cert-manager.io/private-key-rotation-policy: "Always"
+      nginx.ingress.kubernetes.io/configuration-snippet: |
+        add_header 'X-Content-Type-Options' 'nosniff' always;
+        add_header 'Content-Security-Policy' "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tile.openstreetmap.org; style-src 'self' 'unsafe-inline'; font-src 'self' ; frame-src 'self' *.ufz.de ; child-src 'self' *.ufz.de ; object-src 'none' ; frame-ancestors 'self' http://*.ufz.de https://*.ufz.de ;" always;
+        add_header 'X-XSS-Protection' '1';
+    hosts:
+      - host: "cosmonaut-ts.web-intern.app.ufz.de"
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: cosmonaut--ts-web-intern-app-ufz-de
+        hosts:
+          - "cosmonaut-ts.web-intern.app.ufz.de"
+
+  volumes:
+    - name: cosmonaut-work-dir
+      persistentVolumeClaim:
+        claimName: cosmonaut-work-dir-pvc
+
+  volumeMounts:
+    - mountPath: "/data"
+      name: cosmonaut-work-dir
+
+redis:
+  enabled: true
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  persistence:
+    enabled: true
+    name: "cosmonaut-redis"
+    storageClassName: "tanzu-storage-policy-raid5-ftt1"
+    size: "1Gi"
