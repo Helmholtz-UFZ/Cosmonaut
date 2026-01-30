@@ -2,7 +2,7 @@ stages:
   - "lint"
   - "test"
   - "build"
-  # - "deploy"
+  - "deploy"
 
 variables:
   # Postgres (service configuration)
@@ -36,9 +36,9 @@ variables:
   - 'echo "${CI_REGISTRY_PASSWORD}" | docker login --username "$CI_REGISTRY_USER" --password-stdin "${CI_REGISTRY}"'
 
 .base_before_build_script:
-  image: "docker:24-cli"
+  image: "docker:29-cli"
   services:
-    - "docker:24-dind"
+    - "docker:29-dind"
   tags:
     - "hifis"
 
@@ -96,24 +96,91 @@ testing:
 build-latest:
   stage: "build"
   extends: ".base_before_build_script"
+  before_script:
+    - *docker_login
   script:
-    - "docker build -t $CI_REGISTRY_IMAGE:latest -f docker/prod.Dockerfile ."
-    - "docker push $CI_REGISTRY_IMAGE:latest"
+    - "docker build -t ${CI_REGISTRY_IMAGE}/frontend:latest -f docker/prod.Dockerfile ."
+    - "docker push --all-tags ${CI_REGISTRY_IMAGE}/frontend"
+    - "docker build -t ${CI_REGISTRY_IMAGE}/worker:latest -f docker/worker.Dockerfile ."
+    - "docker push --all-tags ${CI_REGISTRY_IMAGE}/worker"
   rules:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
-    - when: never
+    - when: "never"
 
 build-release:
   stage: "build"
   extends: ".base_before_build_script"
+  before_script:
+    - *docker_login
+    - "apk update && apk add --no-cache jq yq"
   script:
-    - "docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG ."
-    - "docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
-    - 'echo -e "image:\n  tag: ${CI_COMMIT_TAG}" > values.yaml'
+    - "docker build -t ${CI_REGISTRY_IMAGE}/frontend:${CI_COMMIT_TAG} -f docker/prod.Dockerfile ."
+    - "docker push --all-tags ${CI_REGISTRY_IMAGE}/frontend"
+    - "docker build -t ${CI_REGISTRY_IMAGE}/worker:${CI_COMMIT_TAG} -f docker/worker.Dockerfile ."
+    - "docker push --all-tags ${CI_REGISTRY_IMAGE}/worker"
+    - yq -i ".frontend.image.tag = \"${CI_COMMIT_TAG}\"" deployment/ufz/prod/values.yaml
+    - yq -i ".worker.image.tag = \"${CI_COMMIT_TAG}\"" deployment/ufz/prod/values.yaml
   artifacts:
     paths:
-      - "values.yaml"
+      - "deployment/ufz/prod/values.yaml"
   rules:
     - if: '$CI_COMMIT_TAG =~ /^\d+.\d+.\d+/'
       when: "always"
+    - when: "never"
+
+# builds a fresh Docker-Image from the most recent Git-Tag und postfixes the current date
+# e.g. <IMAGE>:<TAG> becomes <IMAGE>:<TAG>-YYYY.MM.DD
+build-latest-tag:
+  stage: "build"
+  extends: ".base_before_build_script"
+  before_script:
+    - *docker_login
+    - "apk update && apk add --no-cache jq yq git"
+    - "git fetch"
+    - "GIT_LATEST_TAG=$(git describe --tags --abbrev=0)"
+    - "git fetch origin ${GIT_LATEST_TAG}"
+    - "git checkout ${GIT_LATEST_TAG}"
+  script:
+    - "GIT_LATEST_TAG=$(git describe --tags --abbrev=0)"
+    - "calver=$(date +'%Y.%m.%d')"
+    - 'docker build -t "${CI_REGISTRY_IMAGE}/frontend:${GIT_LATEST_TAG}-${calver}" -f docker/prod.Dockerfile .'
+    - 'docker push --all-tags "${CI_REGISTRY_IMAGE}/frontend"'
+    - 'docker build -t "${CI_REGISTRY_IMAGE}/worker:${GIT_LATEST_TAG}-${calver}" -f docker/worker.Dockerfile .'
+    - 'docker push --all-tags "${CI_REGISTRY_IMAGE}/worker"'
+    - yq -i ".frontend.image.tag = \"${GIT_LATEST_TAG}-${calver}\"" deployment/ufz/prod/values.yaml
+    - yq -i ".worker.image.tag = \"${GIT_LATEST_TAG}-${calver}\"" deployment/ufz/prod/values.yaml
+  artifacts:
+    paths:
+      - "deployment/ufz/prod/values.yaml"
+  rules:
+    - if: "$CI_PIPELINE_SOURCE == 'schedule'"
+    - if: "$CI_PIPELINE_SOURCE == 'web'"
+    - when: "never"
+
+# preparation for git - so that the job "bump_version_for_cluster"
+.prepare: &prepare
+  - "apt-get update -y && apt-get install git openssh-client -yqq"
+  - "eval $(ssh-agent -s)"
+  - 'echo "$SSH_PRIVATE_KEY" | base64 -d | ssh-add -'
+  - "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
+  - 'echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+  - "git config --global user.email '${GITLAB_USER_EMAIL}'"
+  - "git config --global user.name '${GITLAB_USER_LOGIN}'"
+  - "git config pull.rebase true"
+  - "git remote set-url --push origin git@${CI_SERVER_HOST}:${CI_PROJECT_PATH}"
+
+bump_version_for_cluster:
+  stage: "deploy"
+  variables:
+    BRANCH: "main"
+  script:
+    - *prepare
+    - "git add deployment/ufz/prod/values.yaml"
+    - "git commit -m 'automatically increased tag-version for cluster-deployment'"
+    - "git pull origin ${BRANCH} --strategy-option=ours"
+    - "git push origin HEAD:$BRANCH -o ci.skip"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^\d+.\d+.\d+/'
+    - if: "$CI_PIPELINE_SOURCE == 'schedule'"
+    - if: "$CI_PIPELINE_SOURCE == 'web'"
     - when: "never"

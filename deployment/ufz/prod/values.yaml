@@ -7,7 +7,7 @@ persistence:
 frontend:
   enabled: true
   image:
-    repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut
+    repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut/frontend
     tag: "0.0.17"
 
   imagePullSecrets:
