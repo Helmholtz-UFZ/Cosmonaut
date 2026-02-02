@@ -27,6 +27,8 @@ RUN uv export --format requirements-txt --no-hashes > /tmp/lock-reqs.txt \
 
 COPY --chown=1000:1000 . .
 
+COPY --chown=1000:1000 env_prod .env
+
 RUN chown -R 1000:1000 /python_docker/cosmonaut
 
 USER appuser
