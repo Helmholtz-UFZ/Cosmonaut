@@ -1,19 +1,19 @@
 import logging
 import logging.config
 
-from dash import Dash
 import dash_bootstrap_components as dbc
+from dash import Dash
 
+from cosmonaut_app.config import DEBUG, FLASK_PORT
 from cosmonaut_app.error_handling import handle_error
-from cosmonaut_app.config import FLASK_PORT, DEBUG
 from cosmonaut_app.files_route import serve_files
 from cosmonaut_app.layout import (
     app_layout,
     register_navbar_callbacks,
     register_reset_callbacks,
 )
-from cosmonaut_app.object_storage_manager import setup_remote, create_bucket
 from cosmonaut_app.logger import get_logger_config
+from cosmonaut_app.object_storage_manager import create_bucket, setup_remote
 
 # Configure application-wide logging
 logging.config.dictConfig(get_logger_config(DEBUG))
@@ -42,6 +42,8 @@ create_bucket()
 
 register_navbar_callbacks(app)
 register_reset_callbacks(app)
+
+server = app.server  # Expose Flask server for WSGI
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=DEBUG, port=FLASK_PORT)
