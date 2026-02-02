@@ -97,6 +97,21 @@ def pytest_configure(config):
         except Exception as e:
             logging.error(f"Unexpected error during Redis check: {e}")
             pytest.exit(f"Redis check failed: {e}")
+
+        # Check rclone can connect to MinIO via S3 protocol
+        try:
+            from cosmonaut_app.object_storage_manager import setup_remote, create_bucket
+
+            # Configure rclone remote
+            setup_remote()
+
+            # Try to create/verify bucket (this uses S3 protocol)
+            create_bucket()
+
+            logging.info("rclone MinIO connectivity check passed")
+        except Exception as e:
+            logging.error(f"rclone MinIO connectivity check failed: {e}")
+            pytest.exit(f"MinIO S3 connectivity check failed: {e}")
     else:
         logging.info("Skipping service health checks (--no-services flag set)")
 

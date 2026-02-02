@@ -13,7 +13,7 @@ variables:
   POSTGRES_HOST_NAME: postgres
   POSTGRES_NAME: cosmonaut_db
   POSTGRES_PORT: "5432"
-  POSTGRES_PW: password
+  POSTGRES_PASSWORD: password
   # MinIO
   MINIO_ROOT_USER: minioadmin
   MINIO_ROOT_PASSWORD: minioadmin

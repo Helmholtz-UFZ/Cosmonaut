@@ -11,7 +11,7 @@ from cosmonaut_app.config import (
     POSTGRES_HOST_NAME,
     POSTGRES_PORT,
     POSTGRES_USER,
-    POSTGRES_PW,
+    POSTGRES_PASSWORD,
 )
 
 format_string = (
@@ -20,7 +20,7 @@ format_string = (
 postgres_params = {
     "dbname": POSTGRES_NAME,
     "user": POSTGRES_USER,
-    "password": POSTGRES_PW,
+    "password": POSTGRES_PASSWORD,
     "host": POSTGRES_HOST_NAME,
     "port": POSTGRES_PORT,
 }

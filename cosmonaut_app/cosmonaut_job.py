@@ -1,36 +1,38 @@
+import base64
+import json
 import logging
 import math
 import os
 import shutil
 import uuid
 from datetime import date
-import base64
-import json
+
 from werkzeug.utils import secure_filename
+
 from cosmonaut_app.config import (
     DAYS_DELETE_NOT_SUBMITTED,
     DAYS_DELETE_SUBMITTED,
     WEB_WORK_DIR,
 )
 from cosmonaut_app.constants import (
-    SOLUTION_FILE,
-    JOB_STATUS_RUNNING,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     JOB_STATUS_PENDING,
+    JOB_STATUS_RUNNING,
     LOG_FILE_NAME,
     OSM_DATA_FILE,
     OSM_DATA_TRANSFORMED_FILE,
+    SOLUTION_FILE,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
+from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.object_storage_manager import (
+    delete_directory_from_storage,
     get_files,
     save_files,
-    delete_directory_from_storage,
 )
-from cosmonaut_app.navigation_routing import RouteCreator
+from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel
 from cosmonaut_app.transformation import get_bounds, transform_csv
-from cosmonaut_app.pydantic_models import JobModel, FullPipelineConfig
 
 
 class CosmonautJob:
@@ -257,6 +259,7 @@ class CosmonautJob:
             "zoom": zoom,
         }
         self.save()
+        logging.debug("Finished uploading and processing classification file")
         return classification_data, file_path, bounds
 
     def delete_upload(self):

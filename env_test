@@ -20,7 +20,7 @@ OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
 POSTGRES_NAME="cosmonaut_db"
 POSTGRES_PORT="5432"
 POSTGRES_USER="cosmonaut"
-POSTGRES_PW="password"
+POSTGRES_PASSWORD="password"
 POSTGRES_HOST_NAME="postgres"
 
 ### Redis ###

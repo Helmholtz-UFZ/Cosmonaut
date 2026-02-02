@@ -50,20 +50,49 @@ def check_result(params: list, result: subprocess.CompletedProcess) -> None:
 
 
 def run_rclone_with_retry(
-    params: list, timeout: float = 600
+    params: list, timeout: float = 600, check_connection: bool = False
 ) -> subprocess.CompletedProcess:
     """Run rclone command with retry logic for NFS lock file conflicts.
 
     Args:
         params: The rclone command parameters
         timeout: Timeout in seconds for the subprocess (default: 600 seconds = 10 minutes)
+        check_connection: If True, verify MinIO connectivity before running the command
 
     Raises:
-        ObjectStorageError: If all retry attempts fail
-        subprocess.TimeoutExpired: If the command times out
+        ObjectStorageError: If all retry attempts fail or connection check fails
     """
     max_retries = 3
     retry_delay = 2
+
+    # Optional connection check before running the main command
+    if check_connection:
+        logging.debug("Running MinIO connection check...")
+        check_params = [
+            "rclone",
+            "lsd",
+            f"{OBJECT_STORAGE_REMOTE_NAME}:",
+            "--contimeout",
+            "3s",
+        ]
+        try:
+            check_result_proc = subprocess.run(
+                check_params,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if check_result_proc.returncode != 0:
+                logging.error(
+                    f"MinIO connection check failed: {check_result_proc.stderr}"
+                )
+                raise ObjectStorageError("MinIO connection check failed")
+            logging.debug("MinIO connection check passed")
+        except subprocess.TimeoutExpired:
+            logging.error(
+                "MinIO connection check timed out - storage may be unreachable"
+            )
+            raise ObjectStorageError("MinIO connection check timed out") from None
 
     for attempt in range(max_retries):
         try:
@@ -151,7 +180,7 @@ def get_files(dirname: str) -> None:
         "--checksum",
     ]
 
-    result = run_rclone_with_retry(sync_params, timeout=600)  # 10 minutes for download
+    result = run_rclone_with_retry(sync_params, timeout=600, check_connection=True)
     logging.debug(f"Rclone sync result: {result.stdout}")
 
 
@@ -179,7 +208,7 @@ def save_files(dirname: str) -> None:
         "--checksum",
     ]
 
-    run_rclone_with_retry(sync_params, timeout=600)  # 10 minutes for upload
+    run_rclone_with_retry(sync_params, timeout=600, check_connection=True)
 
 
 def delete_file_from_storage(filepath: str) -> None:

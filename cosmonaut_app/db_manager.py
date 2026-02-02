@@ -33,8 +33,8 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from cosmonaut_app.config import (
     POSTGRES_HOST_NAME,
     POSTGRES_NAME,
+    POSTGRES_PASSWORD,
     POSTGRES_PORT,
-    POSTGRES_PW,
     POSTGRES_USER,
 )
 from cosmonaut_app.error_handling import JobNotFound
@@ -117,7 +117,7 @@ class DataBaseManager:
     on its job ID.
     """
 
-    database_url = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PW}@{POSTGRES_HOST_NAME}:{POSTGRES_PORT}/{POSTGRES_NAME}"
+    database_url = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST_NAME}:{POSTGRES_PORT}/{POSTGRES_NAME}"
     engine = create_engine(
         database_url,
         pool_pre_ping=True,
