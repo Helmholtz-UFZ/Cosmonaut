@@ -35,44 +35,45 @@ OpenStreetMap querying with proper buffering around the data extent. Coordinate
 transformation uses pyproj with CRS validation via the pyproj.CRS class.
 """
 
-import os
 import logging
-import dash
-from dash import html, register_page, dcc, callback, Input, Output, State
-from dash.exceptions import PreventUpdate
-import dash_bootstrap_components as dbc
+import os
 
-from cosmonaut_app.cosmonaut_job import CosmonautJob
+import dash
+import dash_bootstrap_components as dbc
+from dash import Input, Output, State, callback, dcc, html, register_page
+from dash.exceptions import PreventUpdate
+
+from cosmonaut_app.classification_plot import ClassificationPlot
 from cosmonaut_app.constants import (
-    JOB_STATUS_PENDING,
     DEFAULT_MAP_CENTER,
     DEFAULT_MAP_ZOOM,
+    JOB_STATUS_PENDING,
 )
 from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID,
     DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
     DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
-    DELETE_FILE_BUTTON_DATA_UPLOAD_ID,
-    NEXT_BUTTON_DATA_UPLOAD_ID,
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+    DELETE_FILE_BUTTON_DATA_UPLOAD_ID,
     EPSG_STORE_SHARED_ID,
     JOB_ID_STORE_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+    NEXT_BUTTON_DATA_UPLOAD_ID,
 )
-from cosmonaut_app.transformation import (
-    OsmRoads,
-)
-from cosmonaut_app.classification_plot import ClassificationPlot
-from cosmonaut_app.pydantic_models import check_epsg
+from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
-    page_container_split_layout,
-    create_card_input,
-    progress_footer,
-    create_map,
     build_url_step,
+    create_card_input,
+    create_map,
     create_reset_banner,
     create_reset_modal,
+    page_container_split_layout,
+    progress_footer,
+)
+from cosmonaut_app.pydantic_models import check_epsg
+from cosmonaut_app.transformation import (
+    OsmRoads,
 )
 
 register_page(
@@ -222,9 +223,11 @@ def upload_file(contents, filename, job_id, epsg_input):
     if not contents or not filename:
         raise PreventUpdate
 
+    logging.info(f"Uploading file {filename} for job {job_id} with EPSG {epsg_input}")
     try:
         epsg_input = check_epsg(epsg_input)
     except ValueError as e:
+        logging.debug(f"Invalid EPSG code {epsg_input}: {e}")
         return (
             dash.no_update,
             str(e),
@@ -256,6 +259,7 @@ def upload_file(contents, filename, job_id, epsg_input):
     plot.generate_plots()
 
     job.save()
+    logging.debug(f"File {filename} uploaded and processed for job {job_id}")
     return (
         reposition_map,
         f"Selected file: {os.path.basename(file_path)}",
