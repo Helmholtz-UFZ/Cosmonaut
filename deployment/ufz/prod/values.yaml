@@ -3,20 +3,16 @@ persistence:
   storageClassName: "tanzu-storage-policy-raid5-ftt1"
   name: "cosmonaut-work-dir-pvc"
   size: "10G"
-
 frontend:
   enabled: true
   image:
     repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut/frontend
-    tag: "0.0.21"
-
+    tag: "0.0.24"
   imagePullSecrets:
     - name: wombat-docker-registry-codebase
-
   podAnnotations:
     rdm.ufz.de/inception-date: "20240110"
     rdm.ufz.de/duration-in-years: "3"
-
   environmentVariables:
     - name: "EMAIL_PORT"
       value: "587"
@@ -77,8 +73,6 @@ frontend:
       value: "0"
     - name: "REDIS_PASSWORD"
       value: ""
-
-
   ingress:
     enabled: true
     className: "nginx"
@@ -100,37 +94,30 @@ frontend:
       - secretName: web-intern-app-ufz-de
         hosts:
           - "web-intern.app.ufz.de"
-
   resources:
     limits:
-     cpu: 500m
-     memory: 1Gi
+      cpu: 500m
+      memory: 1Gi
     requests:
-     cpu: 200m
-     memory: 512Mi
-
+      cpu: 200m
+      memory: 512Mi
   volumes:
     - name: cosmonaut-work-dir
       persistentVolumeClaim:
         claimName: cosmonaut-work-dir-pvc
-
   volumeMounts:
     - mountPath: "/python_docker/cosmonaut/cosmonaut_app/work_dir"
       name: cosmonaut-work-dir
-
 worker:
   enabled: true
   image:
     repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut/worker
     pullPolicy: Always
-    tag: "0.0.21"
-
+    tag: "0.0.24"
   imagePullSecrets:
     - name: wombat-docker-registry-codebase
-
   nameOverride: ""
   fullnameOverride: "cosmonaut-worker"
-
   environmentVariables:
     - name: "EMAIL_PORT"
       value: "587"
@@ -191,7 +178,6 @@ worker:
       value: "0"
     - name: "REDIS_PASSWORD"
       value: ""
-
   resources:
     limits:
       cpu: 1500m
@@ -199,27 +185,22 @@ worker:
     requests:
       cpu: 500m
       memory: 2000Mi
-
   volumes:
     - name: cosmonaut-work-dir
       persistentVolumeClaim:
         claimName: cosmonaut-work-dir-pvc
-
   volumeMounts:
     - mountPath: "/python_docker/cosmonaut/cosmonaut_app/work_dir"
       name: cosmonaut-work-dir
-
 tileserver:
   enabled: true
-
   securityContext:
     allowPrivilegeEscalation: false
-#    capabilities:
-#      drop: [ "ALL" ]
-#    runAsNonRoot: true  # Container läuft leider nicht als Non-Root
+    #    capabilities:
+    #      drop: [ "ALL" ]
+    #    runAsNonRoot: true  # Container läuft leider nicht als Non-Root
     seccompProfile:
       type: RuntimeDefault
-
   resources:
     limits:
       cpu: 500m
@@ -227,7 +208,6 @@ tileserver:
     requests:
       cpu: 500m
       memory: 500Mi
-
   ingress:
     enabled: true
     className: "nginx"
@@ -249,19 +229,15 @@ tileserver:
       - secretName: cosmonaut--ts-web-intern-app-ufz-de
         hosts:
           - "cosmonaut-ts.web-intern.app.ufz.de"
-
   volumes:
     - name: cosmonaut-work-dir
       persistentVolumeClaim:
         claimName: cosmonaut-work-dir-pvc
-
   volumeMounts:
     - mountPath: "/data"
       name: cosmonaut-work-dir
-
 redis:
   enabled: true
-
   resources:
     limits:
       cpu: 500m
@@ -269,7 +245,6 @@ redis:
     requests:
       cpu: 100m
       memory: 128Mi
-
   persistence:
     enabled: true
     name: "cosmonaut-redis"
