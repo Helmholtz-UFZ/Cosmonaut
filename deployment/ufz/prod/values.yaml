@@ -7,7 +7,7 @@ frontend:
   enabled: true
   image:
     repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut/frontend
-    tag: "0.0.25"
+    tag: "0.0.26"
   imagePullSecrets:
     - name: wombat-docker-registry-codebase
   podAnnotations:
@@ -113,7 +113,7 @@ worker:
   image:
     repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut/worker
     pullPolicy: Always
-    tag: "0.0.25"
+    tag: "0.0.26"
   imagePullSecrets:
     - name: wombat-docker-registry-codebase
   nameOverride: ""
