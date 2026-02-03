@@ -11,7 +11,6 @@ WEB_OUTSIDE_URL="https://cosmonaut.web-intern-stage.app.ufz.de"
 
 ### Object Storage (S3-compatible via rclone) ###
 OBJECT_STORAGE_ACCESS_KEY="MrB4LovDjMtWdegRIyOk"
-OBJECT_STORAGE_SECRET_KEY="<REPLACE IN PRIVATE FILE>"
 OBJECT_STORAGE_HOST="https://minio.ufz.de"
 OBJECT_STORAGE_BUCKET="cosmic-routing"
 OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
@@ -26,4 +25,3 @@ POSTGRES_HOST_NAME="postgres-dev.intranet.ufz.de"
 REDIS_PORT=6379
 REDIS_HOST="redis_cosmonaut"
 REDIS_DB=0
-REDIS_PASSWORD=

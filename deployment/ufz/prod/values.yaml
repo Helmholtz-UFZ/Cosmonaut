@@ -46,14 +46,6 @@ frontend:
         secretKeyRef:
           name: "app.secrets"
           key: "S3_SECRET_KEY"
-    - name: "POSTGRES_DB"
-      value: "cosmonaut_prod"
-    - name: "POSTGRES_HOST_NAME"
-      value: "postgres.intranet.ufz.de"
-    - name: "POSTGRES_PORT"
-      value: "5432"
-    - name: "POSTGRES_USER"
-      value: "cosmonaut_prod_adm"
     - name: "POSTGRES_PASSWORD"
       valueFrom:
         secretKeyRef:
