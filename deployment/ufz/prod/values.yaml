@@ -45,14 +45,14 @@ frontend:
       valueFrom:
         secretKeyRef:
           name: "app.secrets"
-          key: "S3_SECRET_KEY"
+          key: "OBJECT_STORAGE_SECRET_KEY"
     - name: "POSTGRES_PASSWORD"
       valueFrom:
         secretKeyRef:
           name: "app.secrets"
-          key: "DB_PW"
+          key: "POSTGRES_PASSWORD"
     - name: "WEB_OUTSIDE_URL"
-      value: "https://web-intern.app.ufz.de/met/wg7/cosmonaut"
+      value: "https://cosmonaut.web-intern.app.ufz.de"
     - name: "WEB_WORK_DIR"
       value: "/python_docker/cosmonaut/cosmonaut_app/work_dir"
     - name: "TILESERVER_URL"
@@ -78,14 +78,14 @@ frontend:
         add_header 'Content-Security-Policy' "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tile.openstreetmap.org https://*.app.ufz.de; style-src 'self' 'unsafe-inline'; font-src 'self' ; frame-src 'self' *.ufz.de ; child-src 'self' *.ufz.de ; object-src 'none' ; frame-ancestors 'self' http://*.ufz.de https://*.ufz.de ;" always;
         add_header 'X-XSS-Protection' '1';
     hosts:
-      - host: "web-intern.app.ufz.de"
+      - host: "cosmonaut.web-intern.app.ufz.de"
         paths:
-          - path: /met/wg7/cosmonaut
+          - path: /
             pathType: Prefix
     tls:
-      - secretName: web-intern-app-ufz-de
+      - secretName: cosmonaut-web-intern-app-ufz-de
         hosts:
-          - "web-intern.app.ufz.de"
+          - "cosmonaut.web-intern.app.ufz.de"
   resources:
     limits:
       cpu: 500m
@@ -142,7 +142,7 @@ worker:
       valueFrom:
         secretKeyRef:
           name: "app.secrets"
-          key: "S3_SECRET_KEY"
+          key: "OBJECT_STORAGE_SECRET_KEY"
     - name: "POSTGRES_DB"
       value: "cosmonaut_prod"
     - name: "POSTGRES_HOST_NAME"
@@ -155,9 +155,9 @@ worker:
       valueFrom:
         secretKeyRef:
           name: "app.secrets"
-          key: "DB_PW"
+          key: "POSTGRES_PASSWORD"
     - name: "WEB_OUTSIDE_URL"
-      value: "https://web-intern.app.ufz.de/met/wg7/cosmonaut"
+      value: "https://cosmonaut.web-intern.app.ufz.de"
     - name: "WEB_WORK_DIR"
       value: "/python_docker/cosmonaut/cosmonaut_app/work_dir"
     - name: "TILESERVER_URL"
