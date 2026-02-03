@@ -10,21 +10,21 @@ FLASK_PORT=8080
 WEB_OUTSIDE_URL="https://cosmonaut.web-intern-stage.app.ufz.de"
 
 ### Object Storage (S3-compatible via rclone) ###
-OBJECT_STORAGE_ACCESS_KEY="minioadmin"
-OBJECT_STORAGE_SECRET_KEY="minioadmin"
-OBJECT_STORAGE_HOST="http://localhost:9000"
+OBJECT_STORAGE_ACCESS_KEY="AKIATCJ4AYK7SU9P73Q1K"
+OBJECT_STORAGE_SECRET_KEY="fill and copy to env_dev_prod_priv"
+OBJECT_STORAGE_HOST="https://vip.s3.ufz.de"
 OBJECT_STORAGE_BUCKET="cosmic-routing"
 OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
 
 ### Postgres DB ###
-POSTGRES_NAME="cosmonaut_db"
+POSTGRES_NAME="cosmonaut_stage"
 POSTGRES_PORT="5432"
-POSTGRES_USER="cosmonaut"
-POSTGRES_PASSWORD="password"
-POSTGRES_HOST_NAME="localhost" 
+POSTGRES_USER="cosmonaut_stage_rw"
+POSTGRES_PASSWORD="fill and copy to env_dev_prod_priv"
+POSTGRES_HOST_NAME="postgres-dev.intranet.ufz.de"
 
 ### Redis ###
 REDIS_PORT=6379
-REDIS_HOST="localhost"
+REDIS_HOST="redis"
 REDIS_DB=0
-REDIS_PASSWORD=
+REDIS_PASSWORD=""

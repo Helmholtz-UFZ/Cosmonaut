@@ -66,7 +66,7 @@ if [ ! -e ".docker_build_hash" ] || [ "$(sha256sum uv.lock)" != "$(cat .docker_b
 fi
 
 if [ "$1" == "prod" ]; then
-    docker compose up --no-log-prefix cosmonaut
+    docker compose up cosmonaut redis worker tileserver
 else
     docker compose up --no-log-prefix --attach cosmonaut
 fi
