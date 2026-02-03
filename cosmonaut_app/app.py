@@ -1,7 +1,6 @@
 import logging
 import logging.config
 
-import dash_bootstrap_components as dbc
 from dash import Dash
 
 from cosmonaut_app.config import DEBUG, FLASK_PORT
@@ -27,7 +26,6 @@ app = Dash(
     suppress_callback_exceptions=True,
     prevent_initial_callbacks="initial_duplicate",
     assets_url_path="/assets",
-    external_stylesheets=[dbc.themes.BOOTSTRAP],
     title="COSMONAUT",
     on_error=handle_error,
 )

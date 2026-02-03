@@ -67,7 +67,6 @@ def run_rclone_with_retry(
 
     # Optional connection check before running the main command
     if check_connection:
-        logging.debug("Running MinIO connection check...")
         check_params = [
             "rclone",
             "lsd",

@@ -254,9 +254,11 @@ def upload_file(contents, filename, job_id, epsg_input):
 
     osm = OsmRoads(classification_data, epsg_output=epsg_input)
     osm.run_osm_query(job.input_dir)
+    logging.debug("OSM roads queried and saved.")
 
     plot = ClassificationPlot(file_path, job_id, src_epsg=f"EPSG:{epsg_input}")
     plot.generate_plots()
+    logging.debug("Classification plots generated.")
 
     job.save()
     logging.debug(f"File {filename} uploaded and processed for job {job_id}")
