@@ -1,40 +1,40 @@
-import os
 import json
 import logging
+import os
 import re
+
 import dash
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
-from dash import dcc, html, no_update, ctx
+from dash import ctx, dcc, html, no_update
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from dash_extensions.javascript import assign, _default_name_space
+from dash_extensions.javascript import _default_name_space, assign
 
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
 from cosmonaut_app.constants import (
-    JOB_STATUS_RUNNING,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
+    JOB_STATUS_RUNNING,
 )
 from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
+    LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     NAVBAR_COLLAPSE_NAV_SHARED_ID,
     NAVBAR_TOGGLER_NAV_SHARED_ID,
+    RESET_BUTTON_SHARED_ID,
+    RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
+    RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
+    RESET_MODAL_SHARED_ID,
     SEARCH_BUTTON_NAV_SHARED_ID,
     SEARCH_INPUT_NAV_SHARED_ID,
     SEARCH_RESULTS_DIV_NAV_SHARED_ID,
     URL_SHARED_ID,
-    LOADING_OVERLAY_SHARED_ID,
-    RESET_BUTTON_SHARED_ID,
-    RESET_MODAL_SHARED_ID,
-    RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
-    RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
 )
-from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.error_handling import error_modal
-
 
 # ============================================================================
 # Helper Functions and Constants
@@ -356,9 +356,7 @@ def create_reset_modal() -> dbc.Modal:
 def create_navbar():
     """Create a navbar layout."""
     return dbc.Navbar(
-        color="dark",
-        dark=True,
-        sticky="top",
+        className="navbar navbar-expand-lg sticky-top navbar-dark bg-primary",
         children=dbc.Container(
             [
                 dbc.NavbarBrand(

@@ -23,24 +23,24 @@ This page is publicly accessible without authentication.
 import datetime
 
 import dash_bootstrap_components as dbc
-from dash import html, dcc, register_page, callback, Input, Output
+from dash import Input, Output, callback, dcc, html, register_page
 
 from cosmonaut_app.constants.html_ids import (
-    LOG_DATE_PICKER_LOGS_ID,
-    START_HOUR_INPUT_LOGS_ID,
-    START_MINUTE_INPUT_LOGS_ID,
     END_HOUR_INPUT_LOGS_ID,
     END_MINUTE_INPUT_LOGS_ID,
+    LOG_DATE_PICKER_LOGS_ID,
     LOG_LEVELS_DROPDOWN_LOGS_ID,
-    PID_CHECKLIST_LOGS_ID,
-    LOG_PID_INPUT_LOGS_ID,
     LOG_OUTPUT_DIV_LOGS_ID,
+    LOG_PID_INPUT_LOGS_ID,
+    PID_CHECKLIST_LOGS_ID,
+    START_HOUR_INPUT_LOGS_ID,
+    START_MINUTE_INPUT_LOGS_ID,
     TIME_ERROR_DIV_LOGS_ID,
     TIME_INPUT_GROUP_LOGS_ID,
 )
-from cosmonaut_app.layout import page_container_fullscreen_layout, create_header
-from cosmonaut_app.logs_table import format_logs_list
 from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.layout import create_header, page_container_column_layout
+from cosmonaut_app.logs_table import format_logs_list
 
 register_page(
     __name__,
@@ -184,7 +184,7 @@ def layout():
         ),
     ]
 
-    return page_container_fullscreen_layout(page_layout)
+    return page_container_column_layout(page_layout)
 
 
 # ============================================================================

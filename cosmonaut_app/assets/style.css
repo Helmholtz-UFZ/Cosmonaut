@@ -17,3 +17,19 @@ div:has(> #_pages_content) {
   overflow-y: auto;
   min-height: 0; /* Allow flex item to shrink and enable scrolling */
 }
+
+/* Override Flatly's wide nav-link padding (2rem) to standard Bootstrap (1rem) */
+.nav-tabs .nav-link {
+  --bs-nav-link-padding-x: 1rem;
+}
+
+/* Reset paragraph and link style inside markdown cells */
+.dash-table-container .dash-cell div p {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline !important;
+  font-family: monospace !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  text-align: inherit !important;
+}
