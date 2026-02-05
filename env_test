@@ -8,6 +8,17 @@ DEBUG=0
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
 FLASK_PORT=8080
 WEB_OUTSIDE_URL="http://localhost"
+MAINTAINER_EMAIL="john-eric.anders@ufz.de,louis-ferdinand.trinkle@ufz.de"
+
+### Tile Server ###
+TILESERVER_URL="http://127.0.0.1:8001"
+
+### Email ###
+EMAIL_SERVER="test"
+EMAIL_PORT="587"
+EMAIL_USERNAME="soncosmo"
+EMAIL_SENDER="cosmopolitan@ufz.de"
+EMAIL_PASSWORD="test"
 
 ### Object Storage (S3-compatible via rclone) ###
 OBJECT_STORAGE_ACCESS_KEY="minioadmin"
