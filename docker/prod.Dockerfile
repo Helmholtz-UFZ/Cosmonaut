@@ -35,4 +35,4 @@ RUN chown -R 1000:1000 /python_docker/cosmonaut
 
 USER appuser
 
-CMD gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.app:server
+CMD . .env && gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.app:server
