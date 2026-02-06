@@ -80,3 +80,17 @@ For specific implementation details, see:
 - [Bootstrap Styling](docs/conventions/bootstrap_styling.md) - Bootstrap classes only
 - [Logging](docs/conventions/logging.md) - Log levels, proper logger usage
 - [Callbacks](docs/conventions/callbacks.md) - Callback organization patterns
+- [Environment Variables](docs/conventions/environment_variables.md) - Env files, config loading, secrets
+
+---
+
+## Skills
+
+When the user asks to perform one of these tasks, read the corresponding skill
+document first for the step-by-step guide:
+
+- [New Page](docs/skills/new_page.md) - Checklist for creating a new page
+- [New Playwright Test](docs/skills/create_playwright_test.md) - Checklist for creating a new Playwright integration test
+- [New Module Test](docs/skills/create_module_test.md) - Checklist for creating a new core module test
+- [Run and Fix Testing](docs/skills/run_and_fix_testing.md) - Systematic guide for running tests and diagnosing failures
+- [Convention Keeper](docs/skills/convention_keeper.md) - Audit and fix convention violations across the codebase
