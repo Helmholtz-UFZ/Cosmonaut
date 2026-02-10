@@ -7,15 +7,18 @@ Guidelines for AI assistants working on this codebase.
 **DO NOT:**
 
 1. **No defensive programming**
+
    - NO `dict.get()` - use direct access `dict["key"]`
    - NO bare `except Exception` - always catch specific exceptions
    - Existing violations to be refactored later
 
 2. **No inline imports**
+
    - All imports at TOP LEVEL ONLY
    - Never import inside functions
 
 3. **HTML IDs - Restricted Usage**
+
    - MUST use constants from `cosmonaut_app/constants/html_ids.py`
    - NEVER use literal ID strings
    - ONLY create IDs for:
@@ -26,6 +29,7 @@ Guidelines for AI assistants working on this codebase.
    - **LLMs tend to over-create IDs - resist this tendency**
 
 4. **No inline CSS**
+
    - Use Bootstrap classes only
    - Existing `style={}` usages are violations to clean up later
 
@@ -55,17 +59,9 @@ cosmonaut_app/
 ```bash
 # Run tests locally (starts Docker services automatically)
 ./run_pytest.sh
-
-# Run with visible browser
-./run_pytest.sh --headed
-
-# Generate Playwright test
-./run_codegen_test.sh
 ```
 
-**Important:** Always use `./run_pytest.sh` (without `--no-services`) to verify changes.
-The `--no-services` flag is only for faster iteration when you already have
-services running in a separate terminal. See [Testing](docs/conventions/testing.md).
+**Important:** Always use `./run_pytest.sh` (without `--no-services`) to verify changes. See [Testing](docs/conventions/testing.md).
 
 ---
 
@@ -87,10 +83,19 @@ For specific implementation details, see:
 ## Skills
 
 When the user asks to perform one of these tasks, read the corresponding skill
-document first for the step-by-step guide:
+document first for the step-by-step guide. This is espacially important for tasks the
+user asks later. Keep this skill list in Mind:
 
 - [New Page](docs/skills/new_page.md) - Checklist for creating a new page
 - [New Playwright Test](docs/skills/create_playwright_test.md) - Checklist for creating a new Playwright integration test
 - [New Module Test](docs/skills/create_module_test.md) - Checklist for creating a new core module test
 - [Run and Fix Testing](docs/skills/run_and_fix_testing.md) - Systematic guide for running tests and diagnosing failures
 - [Convention Keeper](docs/skills/convention_keeper.md) - Audit and fix convention violations across the codebase
+
+---
+
+## Memory Policy
+
+**DO NOT** use the auto memory system (`MEMORY.md`). If you feel something should
+be remembered across sessions, ask the user whether it should be added to this
+`CLAUDE.md` file instead.

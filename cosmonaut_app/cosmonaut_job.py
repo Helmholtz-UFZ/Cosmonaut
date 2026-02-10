@@ -1,9 +1,9 @@
 import base64
+import glob
 import json
 import logging
 import math
 import os
-import shutil
 import uuid
 from datetime import date
 
@@ -14,7 +14,8 @@ from cosmonaut_app.config import (
     DAYS_DELETE_SUBMITTED,
     WEB_WORK_DIR,
 )
-from cosmonaut_app.constants import (
+from cosmonaut_app.constants.general import (
+    GPX_FILE,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     JOB_STATUS_PENDING,
@@ -22,6 +23,7 @@ from cosmonaut_app.constants import (
     LOG_FILE_NAME,
     OSM_DATA_FILE,
     OSM_DATA_TRANSFORMED_FILE,
+    QR_CODE_FILE,
     SOLUTION_FILE,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
@@ -101,12 +103,6 @@ class CosmonautJob:
         """Create the working directory for the job."""
         self.working_dir = os.path.join(WEB_WORK_DIR, self.model.job_id)
         os.makedirs(self.working_dir, exist_ok=True)
-        self.input_dir = os.path.join(self.working_dir, "input")
-        os.makedirs(self.input_dir, exist_ok=True)
-        self.plots_dir = os.path.join(self.working_dir, "plots")
-        os.makedirs(self.plots_dir, exist_ok=True)
-        self.output_dir = os.path.join(self.working_dir, "output")
-        os.makedirs(self.output_dir, exist_ok=True)
 
     def save(self):
         """Save the job to the database and sync files to object storage."""
@@ -137,10 +133,10 @@ class CosmonautJob:
 
     def dump_routing_params(self):
         """
-        Dump routing parameters (Config fields) to parameters.json in input directory.
+        Dump routing parameters (Config fields) to parameters.json in working directory.
 
         Extracts only the fields from the Config model and writes them to
-        a JSON file in the input work directory.
+        a JSON file in the working directory.
         """
         logging.info(f"Dumping routing parameters for job {self.model.job_id}")
 
@@ -155,8 +151,8 @@ class CosmonautJob:
             if field_name in config_field_names
         }
 
-        # Write to parameters.json in input directory
-        parameters_file = os.path.join(self.input_dir, "parameters.json")
+        # Write to parameters.json in working directory
+        parameters_file = os.path.join(self.working_dir, "parameters.json")
         with open(parameters_file, "w") as f:
             json.dump(config_data, f, indent=2)
 
@@ -223,7 +219,7 @@ class CosmonautJob:
 
         # Check if previously a file was uploaded and remove it
         previous_file = self.model.classification_upload.get("file_name")
-        previous_file_path = os.path.join(self.input_dir, previous_file)
+        previous_file_path = os.path.join(self.working_dir, previous_file)
         if os.path.exists(previous_file_path):
             os.remove(previous_file_path)
             logging.info(f"Removed previous classification file {previous_file}")
@@ -232,7 +228,7 @@ class CosmonautJob:
         decoded = base64.b64decode(content_string)
 
         safe_name = secure_filename(file_name)
-        file_path = os.path.join(self.input_dir, safe_name)
+        file_path = os.path.join(self.working_dir, safe_name)
 
         with open(file_path, "wb") as f:
             f.write(decoded)
@@ -269,24 +265,23 @@ class CosmonautJob:
         # 1. Delete uploaded CSV file
         file_name = self.model.classification_upload.get("file_name")
         if file_name and file_name != "No file uploaded":
-            file_path = os.path.join(self.input_dir, file_name)
+            file_path = os.path.join(self.working_dir, file_name)
             if os.path.exists(file_path):
                 os.remove(file_path)
                 logging.debug(f"Deleted uploaded file: {file_path}")
 
         # 2. Delete OSM data files (using constants)
-        osm_geojson = os.path.join(self.input_dir, OSM_DATA_FILE)
-        osm_transformed = os.path.join(self.input_dir, OSM_DATA_TRANSFORMED_FILE)
+        osm_geojson = os.path.join(self.working_dir, OSM_DATA_FILE)
+        osm_transformed = os.path.join(self.working_dir, OSM_DATA_TRANSFORMED_FILE)
         for osm_file in [osm_geojson, osm_transformed]:
             if os.path.exists(osm_file):
                 os.remove(osm_file)
                 logging.debug(f"Deleted OSM file: {osm_file}")
 
-        # 3. Delete plots directory
-        if os.path.exists(self.plots_dir):
-            shutil.rmtree(self.plots_dir)
-            os.makedirs(self.plots_dir)  # Recreate empty directory
-            logging.debug(f"Cleared plots directory: {self.plots_dir}")
+        # 3. Delete plot files
+        for plot_file in glob.glob(os.path.join(self.working_dir, "*_output*.tif")):
+            os.remove(plot_file)
+            logging.debug(f"Deleted plot file: {plot_file}")
 
         # 4. Reset classification_upload to default values from JobModel
         default_classification_upload = JobModel.model_fields[
@@ -303,11 +298,11 @@ class CosmonautJob:
 
     def create_qr_code_routing(self):
         logging.info(f"Creating QR code for routing job {self.model.job_id}")
-        geojson_path = os.path.join(self.output_dir, SOLUTION_FILE)
+        geojson_path = os.path.join(self.working_dir, SOLUTION_FILE)
 
         route_creator = RouteCreator(
             geojson_path=geojson_path,
-            output_dir=self.output_dir,
+            working_dir=self.working_dir,
             job_id=self.model.job_id,
         )
         qr_code_url = route_creator.create_gpx()
@@ -388,7 +383,7 @@ class CosmonautJob:
             str: Job logs as a string
         """
         logging.info(f"Retrieving logs for job {self.model.job_id}")
-        log_file_path = os.path.join(self.output_dir, LOG_FILE_NAME)
+        log_file_path = os.path.join(self.working_dir, LOG_FILE_NAME)
         if os.path.exists(log_file_path):
             with open(log_file_path, "r") as f:
                 log_content = f.read()
@@ -400,19 +395,15 @@ class CosmonautJob:
         return log_content
 
     def reset(self):
-        """Reset job to PENDING state by clearing output directory and task state.
+        """Reset job to PENDING state by clearing output files and task state.
 
         This method:
         - Cancels the Celery task if job is currently RUNNING
-        - Deletes all files in output directory (logs, solutions, GPX, QR codes)
-        - Preserves input directory (uploaded data, parameters, OSM data)
-        - Preserves plots directory
+        - Deletes output files (logs, solutions, GPX, QR codes)
+        - Preserves input files (uploaded data, parameters, OSM data, plots)
         - Sets status to PENDING
         - Clears celery_task_id and submitted flag
         - Saves changes to database and object storage
-
-        Returns:
-            None
         """
         logging.info(f"Resetting job {self.model.job_id}")
 
@@ -424,18 +415,13 @@ class CosmonautJob:
             job_manager = get_background_job_manager()
             job_manager.revoke_job(self.model.celery_task_id, terminate=True)
 
-        # Delete output directory contents
-        if os.path.exists(self.output_dir):
-            logging.info(f"Deleting output directory contents: {self.output_dir}")
-            for filename in os.listdir(self.output_dir):
-                file_path = os.path.join(self.output_dir, filename)
-                try:
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    logging.error(f"Failed to delete {file_path}: {e}")
+        # Delete known output files
+        output_files = [LOG_FILE_NAME, SOLUTION_FILE, GPX_FILE, QR_CODE_FILE]
+        for fname in output_files:
+            fpath = os.path.join(self.working_dir, fname)
+            if os.path.isfile(fpath):
+                os.unlink(fpath)
+                logging.debug(f"Deleted output file: {fpath}")
 
         # Reset job state
         self.model.status = JOB_STATUS_PENDING
@@ -445,5 +431,4 @@ class CosmonautJob:
         # Save changes
         self.save()
 
-        logging.info(f"Job {self.model.job_id} reset to PENDING")
         logging.info(f"Job {self.model.job_id} reset to PENDING")

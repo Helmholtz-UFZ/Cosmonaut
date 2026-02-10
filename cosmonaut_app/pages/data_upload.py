@@ -40,11 +40,13 @@ import os
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import Input, Output, State, callback, dcc, html, register_page
+from dash import Input, Output, State, callback, ctx, dcc, html, register_page
 from dash.exceptions import PreventUpdate
 
+from cosmonaut_app import map_utils
 from cosmonaut_app.classification_plot import ClassificationPlot
-from cosmonaut_app.constants import (
+from cosmonaut_app.constants.general import (
+    CLASSIFICATION_PLOT_4326_TEMPLATE,
     DEFAULT_MAP_CENTER,
     DEFAULT_MAP_ZOOM,
     JOB_STATUS_PENDING,
@@ -53,6 +55,8 @@ from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID,
     DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
     DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
+    DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID,
+    DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID,
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     DELETE_FILE_BUTTON_DATA_UPLOAD_ID,
     EPSG_STORE_SHARED_ID,
@@ -68,6 +72,7 @@ from cosmonaut_app.layout import (
     create_map,
     create_reset_banner,
     create_reset_modal,
+    default_map_layers,
     page_container_split_layout,
     progress_footer,
 )
@@ -84,6 +89,57 @@ register_page(
     description="Upload data for this job.",
     dynamic=True,
 )
+
+
+def _get_tile_params(job_id):
+    """Get tile layer parameters for the classification GeoTIFF.
+
+    Returns
+    -------
+    tuple
+        (tiff_filename, colormap_params, colorbar_info)
+    """
+    job = CosmonautJob(job_id=job_id)
+    tiff_filename = CLASSIFICATION_PLOT_4326_TEMPLATE.format(
+        epsg=f"EPSG:{job.model.epsg}"
+    )
+    colormap_params = ""  # RGBA GeoTIFF — colors baked in, no server-side colormap
+    colorbar_info = None  # TODO: implement when colorbar data is available
+    return tiff_filename, colormap_params, colorbar_info
+
+
+def create_colorbar_legend(colorbar_info):
+    """Create colorbar legend for classification plot.
+
+    TODO: Implement when colorbar data becomes available.
+    """
+    return html.Div()  # Placeholder
+
+
+def create_tile_layer(job_id, opacity):
+    """Create TileLayer and legend for the classification GeoTIFF.
+
+    Parameters
+    ----------
+    job_id : str
+        Job identifier
+    opacity : float
+        Tile layer opacity (0.0 to 1.0)
+
+    Returns
+    -------
+    list
+        List of dash_leaflet components [tile_layer, legend_layer]
+    """
+    tiff_filename, colormap_params, colorbar_info = _get_tile_params(job_id)
+    tile_layer = map_utils.create_tile_layer_component(
+        job_id, tiff_filename, colormap_params, opacity
+    )
+    legend_layer = create_colorbar_legend(colorbar_info)
+
+    if tile_layer is None:
+        return [legend_layer]
+    return [tile_layer, legend_layer]
 
 
 def layout(job_id):
@@ -114,6 +170,7 @@ def layout(job_id):
         [
             dcc.Store(id=EPSG_STORE_SHARED_ID),
             dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
+            dcc.Store(id=DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, data=file_uploaded),
             html.P(
                 "Please enter a valid EPSG code and then upload your membership data file.",
                 className="text-muted",
@@ -174,6 +231,22 @@ def layout(job_id):
                 style=delete_button_style,
                 disabled=(not is_active),
             ),
+            html.Div(
+                [
+                    dbc.Label("Map Opacity:", className="fw-bold mt-3"),
+                    dcc.Slider(
+                        id=DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID,
+                        min=0,
+                        max=1,
+                        step=0.1,
+                        value=0.7,
+                        marks={0: "0%", 0.5: "50%", 1: "100%"},
+                        tooltip={"placement": "bottom", "always_visible": False},
+                        disabled=not file_uploaded,
+                    ),
+                ],
+                className="mb-3",
+            ),
         ]
     )
 
@@ -184,7 +257,7 @@ def layout(job_id):
     street_selection_path = build_url_step("street_selection", job_id)
 
     classification_file = job.model.classification_upload["file_name"]
-    classification_file_path = os.path.join(job.input_dir, classification_file)
+    classification_file_path = os.path.join(job.working_dir, classification_file)
     next_disabled = not os.path.exists(classification_file_path)
 
     footer = progress_footer(
@@ -212,65 +285,160 @@ def layout(job_id):
     Output(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
     Output(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "style"),
+    Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children"),
+    Output(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled"),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
+    Input(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "value"),
+    Input(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data"),
     State(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     State(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "value"),
-    prevent_initial_call=True,
+    prevent_initial_call="initial_duplicate",
 )
-def upload_file(contents, filename, job_id, epsg_input):
-    """Upload a file to the server and save it in the job working directory."""
-    if not contents or not filename:
-        raise PreventUpdate
+def classification_map_manager(
+    contents, opacity, init_trigger, filename, job_id, epsg_input
+):
+    """Manage classification map: upload, opacity changes, and initial page load."""
+    triggered = ctx.triggered_id
 
-    logging.info(f"Uploading file {filename} for job {job_id} with EPSG {epsg_input}")
-    try:
-        epsg_input = check_epsg(epsg_input)
-    except ValueError as e:
-        logging.debug(f"Invalid EPSG code {epsg_input}: {e}")
+    # --- Upload branch ---
+    if triggered == DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID:
+        if not contents or not filename:
+            raise PreventUpdate
+
+        logging.info(
+            f"Uploading file {filename} for job {job_id} with EPSG {epsg_input}"
+        )
+        try:
+            epsg_input = check_epsg(epsg_input)
+        except ValueError as e:
+            logging.debug(f"Invalid EPSG code {epsg_input}: {e}")
+            return (
+                dash.no_update,
+                str(e),
+                True,
+                False,
+                None,
+                False,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+            )
+
+        job = CosmonautJob(job_id=job_id)
+        job.model.epsg = epsg_input
+        try:
+            classification_data, file_path, bounds = job.upload_file(
+                filename, contents, epsg_input
+            )
+        except ValueError as e:
+            return (
+                dash.no_update,
+                str(e),
+                True,
+                False,
+                None,
+                False,
+                dash.no_update,
+                dash.no_update,
+                dash.no_update,
+            )
+
+        reposition_map = {
+            "bounds": bounds,
+            "transition": "flyTo",
+        }
+
+        osm = OsmRoads(classification_data, epsg_output=epsg_input)
+        osm.run_osm_query(job.working_dir)
+        logging.debug("OSM roads queried and saved.")
+
+        plot = ClassificationPlot(file_path, job_id, src_epsg=f"EPSG:{epsg_input}")
+        plot.generate_plots()
+        logging.debug("Classification plots generated.")
+
+        tile_layers = create_tile_layer(job_id, opacity)
+        new_map_children = list(default_map_layers) + tile_layers
+
+        job.save()
+        logging.debug(f"File {filename} uploaded and processed for job {job_id}")
+        return (
+            reposition_map,
+            f"Selected file: {os.path.basename(file_path)}",
+            False,  # Enable next button
+            True,  # Disable EPSG input
+            None,  # Clear upload contents
+            False,  # Hide loading overlay
+            {"display": "block"},  # Show delete button
+            new_map_children,  # Classification tile overlay
+            False,  # Enable slider
+        )
+
+    # --- Opacity slider branch ---
+    if triggered == DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID:
+        if not job_id:
+            raise PreventUpdate
+
+        job = CosmonautJob(job_id=job_id)
+        tif_name = CLASSIFICATION_PLOT_4326_TEMPLATE.format(
+            epsg=f"EPSG:{job.model.epsg}"
+        )
+        tif_path = os.path.join(job.working_dir, tif_name)
+
+        if not os.path.exists(tif_path):
+            raise PreventUpdate
+
+        tile_layers = create_tile_layer(job_id, opacity)
+        new_map_children = list(default_map_layers) + tile_layers
         return (
             dash.no_update,
-            str(e),
-            True,
-            False,
-            None,
-            False,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            new_map_children,
             dash.no_update,
         )
 
-    job = CosmonautJob(job_id=job_id)
-    job.model.epsg = epsg_input
-    try:
-        classification_data, file_path, bounds = job.upload_file(
-            filename, contents, epsg_input
+    # --- Init store branch (page load with existing upload) ---
+    if triggered == DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID:
+        if init_trigger and job_id:
+            job = CosmonautJob(job_id=job_id)
+            tif_name = CLASSIFICATION_PLOT_4326_TEMPLATE.format(
+                epsg=f"EPSG:{job.model.epsg}"
+            )
+            tif_path = os.path.join(job.working_dir, tif_name)
+
+            if os.path.exists(tif_path):
+                tile_layers = create_tile_layer(job_id, opacity)
+                new_map_children = list(default_map_layers) + tile_layers
+                return (
+                    dash.no_update,
+                    dash.no_update,
+                    dash.no_update,
+                    dash.no_update,
+                    dash.no_update,
+                    dash.no_update,
+                    dash.no_update,
+                    new_map_children,
+                    False,  # Enable slider
+                )
+
+        return (
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            True,  # Disable slider
         )
-    except ValueError as e:
-        return dash.no_update, str(e), True, False, None, False, dash.no_update
 
-    reposition_map = {
-        "bounds": bounds,
-        "transition": "flyTo",
-    }
-
-    osm = OsmRoads(classification_data, epsg_output=epsg_input)
-    osm.run_osm_query(job.input_dir)
-    logging.debug("OSM roads queried and saved.")
-
-    plot = ClassificationPlot(file_path, job_id, src_epsg=f"EPSG:{epsg_input}")
-    plot.generate_plots()
-    logging.debug("Classification plots generated.")
-
-    job.save()
-    logging.debug(f"File {filename} uploaded and processed for job {job_id}")
-    return (
-        reposition_map,
-        f"Selected file: {os.path.basename(file_path)}",
-        False,  # Enable next button
-        True,  # Disable EPSG input
-        None,  # Clear upload contents
-        False,  # Hide loading overlay
-        {"display": "block"},  # Show delete button
-    )
+    raise PreventUpdate
 
 
 @callback(
@@ -280,6 +448,8 @@ def upload_file(contents, filename, job_id, epsg_input):
     Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children", allow_duplicate=True),
+    Output(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Input(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
@@ -344,6 +514,8 @@ def delete_uploaded_file(n_clicks, job_id):
         True,  # Disable next button (no file uploaded)
         default_viewport,  # Reset map
         False,  # Hide loading overlay
+        list(default_map_layers),  # Remove classification overlay
+        True,  # Disable opacity slider
     )
 
 

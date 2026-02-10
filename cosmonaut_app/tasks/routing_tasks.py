@@ -12,7 +12,7 @@ import os
 from logging.config import dictConfig
 
 from celery import Task
-from cosmonaut_app.constants import (
+from cosmonaut_app.constants.general import (
     SOLUTION_FILE,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
@@ -35,21 +35,21 @@ class RoutingTask(Task):
             log.error(f"Job {job_id} failed with error: {str(exc)}")
 
 
-def routing_place_holder(output_dir):
+def routing_place_holder(working_dir):
     """Compute hash from parameters.json and write to file.
 
     This is a placeholder function that will be replaced with the actual
     routing algorithm implementation.
 
     Args:
-        job_id: ID of the job to process
+        working_dir: Working directory for the job
 
     Returns:
         str: SHA256 hash of the parameters
     """
-    logging.info(f"Starting placeholder routing computation in {output_dir}")
+    logging.info(f"Starting placeholder routing computation in {working_dir}")
     sleep(10)  # Simulate computation time
-    result_file = os.path.join(output_dir, SOLUTION_FILE)
+    result_file = os.path.join(working_dir, SOLUTION_FILE)
     with open(result_file, "w") as f:
         json.dump({"status": "completed"}, f)
 
@@ -92,14 +92,14 @@ def process_routing_job(self, job_id):
 
     # Switch logging to file in work directory
     dictConfig(
-        get_logger_config_computation(os.path.join(job.output_dir, LOG_FILE_NAME))
+        get_logger_config_computation(os.path.join(job.working_dir, LOG_FILE_NAME))
     )
 
     try:
         logging.info(f"Starting routing job computation for job_id={job_id}")
 
         # TODO
-        routing_place_holder(job.output_dir)
+        routing_place_holder(job.working_dir)
 
         # Post-processing: Create GPX and QR code
         logging.info(f"Starting post-processing for job {job.model.job_id}")

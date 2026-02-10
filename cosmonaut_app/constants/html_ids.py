@@ -83,6 +83,10 @@ DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID = "data-upload-file-info-div-data-uploa
 
 # --- Inputs ---
 DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID = "data-upload-epsg-input-data-upload-id"
+DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID = "data-upload-opacity-slider-data-upload-id"
+
+# --- Stores ---
+DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID = "data-upload-init-store-data-upload-id"
 
 # --- Other ---
 DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID = (

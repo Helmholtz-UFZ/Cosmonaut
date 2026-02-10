@@ -73,7 +73,7 @@ import dash_bootstrap_components as dbc
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.background_job_manager import get_background_job_manager
-from cosmonaut_app.constants import (
+from cosmonaut_app.constants.general import (
     JOB_STATUS_PENDING,
     JOB_STATUS_RUNNING,
     JOB_STATUS_COMPLETED,

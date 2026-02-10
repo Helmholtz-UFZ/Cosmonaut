@@ -1,5 +1,7 @@
 """Celery configuration for COSMONAUT App."""
 
+from celery.schedules import crontab
+
 from cosmonaut_app.config import REDIS_HOST, REDIS_DB, REDIS_PASSWORD, REDIS_PORT
 
 
@@ -49,3 +51,11 @@ class CeleryConfig:
     # Restart worker after 50 tasks (memory cleanup)
     worker_max_tasks_per_child = 50
     worker_max_memory_per_child = 512000  # 512MB per worker process
+
+    # Celery Beat schedule - periodic tasks
+    beat_schedule = {
+        "daily-cleanup": {
+            "task": "cosmonaut_app.tasks.maintenance_tasks.cleanup",
+            "schedule": crontab(hour=3, minute=0),
+        },
+    }

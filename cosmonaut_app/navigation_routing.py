@@ -12,14 +12,14 @@ from cosmonaut_app.config import get_download_url
 class RouteCreator:
     """Creates a GPX file and QR code from GeoJSON route data."""
 
-    def __init__(self, geojson_path, output_dir, job_id):
+    def __init__(self, geojson_path, working_dir, job_id):
         self.geojson_path = geojson_path
-        self.output_dir = output_dir
+        self.working_dir = working_dir
         self.job_id = job_id
         self.gpx_filename = "route.gpx"
-        self.gpx_path = os.path.join(self.output_dir, self.gpx_filename)
+        self.gpx_path = os.path.join(self.working_dir, self.gpx_filename)
         self.qr_code_filename = "qr_code.png"
-        self.qr_code_path = os.path.join(self.output_dir, self.qr_code_filename)
+        self.qr_code_path = os.path.join(self.working_dir, self.qr_code_filename)
         self.qr_code_url = get_download_url(self.job_id, self.gpx_filename)
         logging.debug("RouteCreator initialized.")
 

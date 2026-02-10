@@ -12,7 +12,7 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.javascript import _default_name_space, assign
 
 from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
-from cosmonaut_app.constants import (
+from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     JOB_STATUS_RUNNING,
@@ -196,7 +196,7 @@ def _filter_by_tags(features, selected_roads):
 
 
 def _paths(job_id):
-    in_dir = os.path.join(WEB_WORK_DIR, job_id, "input")
+    in_dir = os.path.join(WEB_WORK_DIR, job_id)
     return (
         in_dir,
         os.path.join(in_dir, "osm_data_raw_4326.geojson"),

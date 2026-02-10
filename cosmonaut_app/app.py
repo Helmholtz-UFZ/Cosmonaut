@@ -1,8 +1,10 @@
 import logging
 import logging.config
+from threading import Thread
 
 from dash import Dash
 
+from cosmonaut_app.background_job_manager import get_background_job_manager
 from cosmonaut_app.config import DEBUG, FLASK_PORT
 from cosmonaut_app.error_handling import handle_error
 from cosmonaut_app.files_route import serve_files
@@ -42,6 +44,19 @@ register_navbar_callbacks(app)
 register_reset_callbacks(app)
 
 server = app.server  # Expose Flask server for WSGI
+
+
+def start_beat_scheduler():
+    """Start Celery Beat scheduler with thread-specific logging."""
+    job_manager = get_background_job_manager()
+    beat = job_manager.app.Beat(loglevel="DEBUG")
+    beat.run()
+
+
+# Start Beat scheduler as daemon thread
+beat_thread = Thread(target=start_beat_scheduler, daemon=True)
+beat_thread.start()
+logger.info("Celery Beat scheduler started in background thread")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=DEBUG, port=FLASK_PORT)

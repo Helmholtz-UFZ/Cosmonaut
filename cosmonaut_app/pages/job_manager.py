@@ -28,7 +28,7 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, dash_table
 
-from cosmonaut_app.constants import (
+from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     JOB_STATUS_PENDING,

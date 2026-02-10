@@ -6,21 +6,15 @@
 </p>
 </div>
 
-This project is a web application built with Dash and Dash Leaflet for transforming and visualizing CSV data for the COSMOPOLITAN Project at UFZ.
-It allows users to upload a CSV file, transforms the data, queries OpenStreetMap for a planed navigation feature, and visualizes the csv-data on a map (NOTE: Visualization doesn`t work for bigger files)
+COSMONAUT is a Python-based web application designed to optimize navigation routes for mobile Cosmic Ray Neutron Sensor (CRNS) rover surveys.
 
-## Features
+COSMONAUT implements a seven-step guided workflow that transforms membership classification data into field-ready navigation routes. Each step is presented as a separate page within the web interface, preserving state in a PostgreSQL database to enable researchers to pause and resume work at any time.
 
-- File upload: Users can upload a CSV file to the application.
-- Data transformation: The application transforms the uploaded data from EPSG:31468 to EPSG:4326.
-- OSM query: The application queries OpenStreetMap for roads within the convex hull of the uploaded data.
-- Data visualization: The application visualizes the uploaded data and the queried OSM data on a map.
-- It makes individual Jobs which are saved into a PostgreSQL DB.
-- (Work) Is triggering a route calculation based on User Input of the best roads.
+The service is primarily built using Plotly Dash and uses Celery for background and
+resource intensive tasks. Three databases are used: PostgreSQL as main storage, MinIO for
+object storage, and Redis as the broker between the Dash server and workers.
 
-## Installation
-
-### Quick Start
+## Quick Start
 
 ```bash
 # Mock development (no external services)
@@ -32,53 +26,56 @@ cp env_dev_prod env_dev_prod_priv
 ./dev_up.sh prod
 ```
 
-## Usage
+## Technical Architecture
 
-### Local Development
+COSMONAUT's architecture balances scientific workflow requirements with software engineering best practices, implementing a multi-tier system suitable for both single-user local deployments and multi-tenant institutional servers.
 
-```bash
-# Start backend services (Postgres, Redis, MinIO)
-docker compose up postgres redis minio -d
+### Technology Stack
 
-# Option 1: Use the provided script (prepares .env automatically)
-./run_dev.sh
+**Frontend Framework**: Dash 2.x (plotly/dash) provides the reactive web interface entirely in Python, eliminating JavaScript for core functionality. The multi-page application structure uses Dash's `use_pages=True` plugin for automatic route registration: adding a new workflow step requires only creating a file in `pages/` with `register_page()` decorator.
 
-# Option 2: Manual setup
-cp .env.local .env
-uv run python -m cosmonaut_app.app
-```
+**Interactive Mapping**: Dash Leaflet (thedirtyfew/dash-leaflet) wraps Leaflet.js for Python-native geospatial visualization. COSMONAUT leverages GeoJSON layers with click event handling, dynamic style functions (JavaScript-like Python syntax via dash-extensions `assign()`), and multiple tile providers.
 
-### Running Tests
+**Backend Services**: PostgreSQL 15 stores job metadata in a relational schema. The `jobs` table includes columns for job_id (primary key), email, status (enum), start_date, last_modified, epsg_code, and a flexible `config` JSONB field storing the complete Pydantic model of the routing algorithm as JSON. Further all logs of the service are stored in the database.
 
-```bash
-# Run all tests (headless)
-./run_pytest.sh
+**Message Queue**: Redis 7 with Celery 5.x implements the distributed task queue for route computation. Celery workers run in separate Docker containers (cosmonaut-worker) with identical Python environment but isolated process space. The architecture supports task prioritization (routing queue for user jobs, maintenance queue for cleanup tasks), task cancellation, and health monitoring.
 
-# Run all tests with visible browser
-./run_pytest.sh --headed
+**Object Storage**: MinIO (S3-compatible) provides durable file storage independent of container lifecycles. Each job's working directory uploads to MinIO bucket `cosmonaut-jobs/{job_id}/` via rclone synchronization. This enables stateless web container design (containers can restart without data loss).
 
-# Run specific test file
-./run_pytest.sh test/test_app.py
+**Containerization**: Docker Compose orchestrates five services (cosmonaut web, cosmonaut-worker, postgres, redis, minio) with health checks and dependency ordering.
 
-# Skip service startup (if already running)
-./run_pytest.sh --no-services test/test_app.py
-```
+**Local Deployment**: The simplest deployment method is to clone the repository and execute `docker compose up` or better `./dev_up.sh mock` which copies the required env file in the project root. This single command provisions a complete local instance with all required services (Dash web application, Celery workers, PostgreSQL, Redis, MinIO) pre-configured with networking and health checks. A fully functional route planning environment is available within minutes, suitable for local development, evaluation, and institutional pilot deployments.
 
-## Environment Configuration
+**Production Deployment**: In production the service is deployed on a Kubernetes
+cluster. Here only the services cosmonaut-web, cosmonaut-worker, Redis, and the
+tileserver are used, as the permanent storages PostgreSQL and MinIO are managed by the
+infrastructure of the institute.
 
-The application uses different environment files:
+## More Detailed Documentation
 
-- `env_dev_mock` - Enviroment for docker setup where all services are run locally.
-- `env_dev_prod_priv` - Enviroment for docker setup where the production services are
-  used. An can be found `env_dev_prod`.
-- `env_test` - Testing enviroment for ci pipeline
-- `env_test_local` - Testing enviroment for lokal testing
-- `env_prod` - Enviroment for production deployment
+The `docs/` directory contains in-depth guides covering project conventions and LLM-assisted development workflows.
 
-Key environment variables:
+### Conventions
 
-- `FLASK_DEBUG=1` - Enable debug mode with auto-reload
-- `GUNICORN=0` - Use Flask dev server instead of Gunicorn
-- `WEB_WORK_DIR` - Working directory for job files
-- `OBJECT_STORAGE_*` - Objet storage (minio/S3) configuration variables
-- `DB_*` - Database connection settings (Postgres)
+These documents define the coding standards and architectural patterns used throughout the project. They serve as the single source of truth for both human contributors and AI assistants.
+
+- [HTML IDs](docs/conventions/html_ids.md) - Rules for when and how to create HTML element IDs using centralized constants.
+- [Callbacks](docs/conventions/callbacks.md) - Patterns for organizing page-specific and shared Dash callbacks.
+- [Error Handling](docs/conventions/error_handling.md) - Centralized error handling with custom exceptions and an error modal.
+- [Logging](docs/conventions/logging.md) - Proper logger setup and log level conventions.
+- [Layout](docs/conventions/layout.md) - Reusable layout components and flex patterns for page structure.
+- [Bootstrap Styling](docs/conventions/bootstrap_styling.md) - Use Bootstrap classes exclusively instead of inline CSS.
+- [Testing](docs/conventions/testing.md) - Integration testing with Playwright and the CI pipeline setup.
+- [Environment Variables](docs/conventions/environment_variables.md) - Environment files, config loading, and strict variable validation.
+
+### LLM
+
+These are skill documents and configuration files designed for AI-assisted development with Claude Code. They provide step-by-step instructions that LLMs follow when performing common development tasks.
+
+- [CLAUDE.md](CLAUDE.md) - Project conventions and guidelines for AI assistants working on this codebase.
+- [New Page](docs/skills/new_page.md) - Step-by-step checklist for adding a new page to the Dash application.
+- [Create Playwright Test](docs/skills/create_playwright_test.md) - Checklist for adding a Playwright integration test.
+- [Create Module Test](docs/skills/create_module_test.md) - Checklist for adding an integration test for a core module without Playwright.
+- [Run and Fix Testing](docs/skills/run_and_fix_testing.md) - Guide for running tests, diagnosing failures, and applying fixes.
+- [Convention Keeper](docs/skills/convention_keeper.md) - Systematic audit of the codebase against all project conventions.
+- [Adopt User-Generated Playwright Test](docs/skills/adopt_user_generate_playwright_test.md) - Prompt for cleaning up tests generated with the codegen tool.

@@ -136,7 +136,6 @@ def build_solution_route_4326(workdir: str) -> str | None:
     Returns: output file path or None if failed.
     """
     transient = os.path.join(workdir, "transient")
-    input_dir = os.path.join(workdir, "input")
     sol_path = os.path.join(transient, "solution.json")
     if not os.path.isfile(sol_path):
         log.warning("No solution.json found at %s", sol_path)
@@ -170,12 +169,12 @@ def build_solution_route_4326(workdir: str) -> str | None:
             "osm_data_4326.geojson",
             "osm_data.geojson",
         ):
-            p = os.path.join(input_dir, candidate)
+            p = os.path.join(workdir, candidate)
             if os.path.isfile(p):
                 edges_path = p
                 break
         if not edges_path:
-            log.warning("No edges GeoJSON found in %s", input_dir)
+            log.warning("No edges GeoJSON found in %s", workdir)
             return None
 
         edges_fc = _load_json(edges_path)

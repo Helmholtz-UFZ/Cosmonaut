@@ -362,7 +362,7 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, dcc, html, register_page
 from dash.exceptions import PreventUpdate
 
-from cosmonaut_app.constants import JOB_STATUS_PENDING
+from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     URL_SHARED_ID,

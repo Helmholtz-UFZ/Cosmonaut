@@ -36,7 +36,7 @@ RUN chown -R 1000:1000 /python_docker/cosmonaut
 USER appuser
 
 CMD if [ "$GUNICORN" = 1 ] ; then \
-        gunicorn -w 4 -b 0.0.0.0:$FLASK_PORT --timeout 600 cosmonaut_app.wsgi:app; \
+        gunicorn --preload -w 4 -b 0.0.0.0:$FLASK_PORT --timeout 600 cosmonaut_app.wsgi:app; \
     else \
         python3 -m cosmonaut_app.app; \
     fi

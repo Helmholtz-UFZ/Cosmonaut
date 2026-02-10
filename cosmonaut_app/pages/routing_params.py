@@ -57,7 +57,7 @@ from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.constants import JOB_STATUS_PENDING
+from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     NEXT_BUTTON_ROUTING_PARAMS_ID,

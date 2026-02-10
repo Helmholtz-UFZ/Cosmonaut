@@ -29,7 +29,7 @@ from dash import html, register_page, callback, Input, Output, State, dcc
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
-from cosmonaut_app.constants import JOB_STATUS_PENDING
+from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     URL_SHARED_ID,
     USER_INFO_EMAIL_INPUT_USER_INFO_ID,

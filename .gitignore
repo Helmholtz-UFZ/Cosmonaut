@@ -26,3 +26,4 @@ env_dev_prod_priv
 notes*
 /assets/
 *prompt.md
+celerybeat-schedule*

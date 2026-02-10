@@ -10,6 +10,11 @@ from contextlib import contextmanager
 from typing import Optional, Tuple, List
 import csv
 
+from cosmonaut_app.constants.general import (
+    CLASSIFICATION_PLOT_4326_TEMPLATE,
+    CLASSIFICATION_PLOT_TEMPLATE,
+)
+
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 gdal.DontUseExceptions()
 logging.getLogger("rasterio").setLevel(logging.CRITICAL)
@@ -42,9 +47,7 @@ class ClassificationPlot:
         # Read CSV with automatic delimiter and header detection
         self.df = self._read_csv_auto(self.csv_path)
         self.src_epsg = src_epsg
-        self.base_dir = os.path.join(
-            os.getcwd(), "cosmonaut_app/work_dir", str(job_id), "plots"
-        )
+        self.base_dir = os.path.join(os.getcwd(), "cosmonaut_app/work_dir", str(job_id))
         self._prepare_data()
 
     def _sniff_csv(self, path: str) -> Tuple[str, bool]:
@@ -266,14 +269,17 @@ class ClassificationPlot:
     def _create_image(self, cmap):
         logging.info("Creating image.")
         num_classes = len(self.classes)
-        self.image = np.zeros((len(self.x_unique), len(self.y_unique), 4))
+        self.image = np.zeros(
+            (len(self.x_unique), len(self.y_unique), 4), dtype=np.uint8
+        )
         for i in range(num_classes):
             mask = self.grid_max_class == i
-            self.image[mask] = cmap(i / num_classes)
+            rgba = np.array(cmap(i / num_classes))
+            self.image[mask] = (rgba * 255).astype(np.uint8)
 
     def _save_image(self, cmap):
         logging.info("Saving image.")
-        self.image = np.nan_to_num(np.moveaxis(self.image, -1, 0))
+        self.image = np.moveaxis(self.image, -1, 0)
         transform = rasterio.transform.from_bounds(
             self.y_min,
             self.x_max,
@@ -284,14 +290,16 @@ class ClassificationPlot:
         )
         crs = self.src_epsg
 
-        # Dynamically name the output files
-        base_filename = f"job_{self.base_dir.split('/')[-2]}_{self.src_epsg}"
-        output_tif = os.path.join(self.base_dir, f"{base_filename}_output.tif")
+        output_tif = os.path.join(
+            self.base_dir,
+            CLASSIFICATION_PLOT_TEMPLATE.format(epsg=self.src_epsg),
+        )
         output_tif_4326 = os.path.join(
-            self.base_dir, f"{base_filename}_output_4326.tif"
+            self.base_dir,
+            CLASSIFICATION_PLOT_4326_TEMPLATE.format(epsg=self.src_epsg),
         )
 
-        # Save the GeoTIFF file
+        # Save the GeoTIFF file (uint8 RGBA, alpha channel handles transparency)
         with rasterio.open(
             output_tif,
             "w",
@@ -299,14 +307,13 @@ class ClassificationPlot:
             height=self.image.shape[1],
             width=self.image.shape[2],
             count=self.image.shape[0],
-            dtype=self.image.dtype,
+            dtype=np.uint8,
             crs=crs,
             transform=transform,
-            nodata=0,
         ) as ds:
             ds.write(self.image)
 
-        # Reproject to EPSG:4326 and save
+        # Reproject to EPSG:4326 and save as tiled GeoTIFF for TiTiler
         raster = gdal.Open(output_tif)
         gdal.Warp(
             output_tif_4326,
@@ -319,7 +326,13 @@ class ClassificationPlot:
             srcNodata=0,
             dstNodata=0,
             targetAlignedPixels=True,
-            creationOptions=["COMPRESS=LZW", "BIGTIFF=YES"],
+            creationOptions=[
+                "COMPRESS=LZW",
+                "BIGTIFF=YES",
+                "TILED=YES",
+                "BLOCKXSIZE=256",
+                "BLOCKYSIZE=256",
+            ],
         )
 
         logging.info(f"Saved files: {output_tif}, {output_tif_4326}")

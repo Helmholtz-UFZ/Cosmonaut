@@ -21,11 +21,11 @@ def serve_files(app):
             logging.error(f"Job not found for job_id={job_id}")
             abort(404, description="Job not found")
 
-        picture_path = os.path.join(job.output_dir, filename)
+        picture_path = os.path.join(job.working_dir, filename)
         if not os.path.exists(picture_path):
             logging.error(f"Picture not found at {picture_path}")
             abort(404, description="Picture not found")
-        response = send_from_directory(job.output_dir, filename)
+        response = send_from_directory(job.working_dir, filename)
 
         # Add cache control headers to prevent browser caching
         response.headers["Cache-Control"] = (
@@ -45,7 +45,7 @@ def serve_files(app):
             job = CosmonautJob(job_id=job_id)
         except JobNotFound:
             abort(404, description="Job not found")
-        gpx_path = os.path.join(job.output_dir, "route.gpx")
+        gpx_path = os.path.join(job.working_dir, "route.gpx")
 
         if not os.path.exists(gpx_path):
             logging.error(f"GPX file not found at {gpx_path}")

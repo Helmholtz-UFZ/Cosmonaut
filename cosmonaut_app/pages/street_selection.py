@@ -76,7 +76,7 @@ import dash_bootstrap_components as dbc
 import geojson
 
 from cosmonaut_app.config import osm_tags_mapping
-from cosmonaut_app.constants import JOB_STATUS_PENDING
+from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
     CLICKED_ROADS_STORE_SHARED_ID,

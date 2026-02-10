@@ -16,7 +16,7 @@ from cosmonaut_app.config import (
     DAYS_DELETE_SUBMITTED,
     WEB_WORK_DIR,
 )
-from cosmonaut_app.constants import LOG_RETENTION_DAYS
+from cosmonaut_app.constants.general import LOG_RETENTION_DAYS
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.object_storage_manager import delete_directory_from_storage
 
