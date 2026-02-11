@@ -1,3 +1,4 @@
+import collections
 import os
 import csv
 import geojson
@@ -8,6 +9,7 @@ import pandas as pd
 import geopandas as gpd
 from pyproj import CRS, Transformer
 from shapely.geometry import Polygon
+from shapely.ops import linemerge
 
 all_osm_tags = {
     "highway": [
@@ -274,6 +276,95 @@ def transform_geojson(input_file, epsg_input, epsg_output):
     return data
 
 
+def _chain_edges(uv_pairs):
+    """Reconstruct ordered node sequence from (u, v) edge pairs of a single way."""
+    if not uv_pairs:
+        return []
+    if len(uv_pairs) == 1:
+        return [uv_pairs[0][0], uv_pairs[0][1]]
+
+    adjacency = collections.defaultdict(list)
+    for u, v in uv_pairs:
+        adjacency[u].append(v)
+        adjacency[v].append(u)
+
+    start = None
+    for node, neighbors in adjacency.items():
+        if len(neighbors) == 1:
+            start = node
+            break
+    if start is None:
+        start = uv_pairs[0][0]
+
+    visited_edges = set()
+    sequence = [start]
+    current = start
+    while True:
+        moved = False
+        for neighbor in adjacency[current]:
+            edge = tuple(sorted((current, neighbor)))
+            if edge not in visited_edges:
+                visited_edges.add(edge)
+                sequence.append(neighbor)
+                current = neighbor
+                moved = True
+                break
+        if not moved:
+            break
+
+    forward_set = set(uv_pairs)
+    forward_count = sum(
+        1
+        for i in range(len(sequence) - 1)
+        if (sequence[i], sequence[i + 1]) in forward_set
+    )
+    reverse_count = sum(
+        1
+        for i in range(len(sequence) - 1)
+        if (sequence[i + 1], sequence[i]) in forward_set
+    )
+    if reverse_count > forward_count:
+        sequence.reverse()
+
+    return sequence
+
+
+def _reconstruct_ways(edges_gdf):
+    """Group graph edges by osmid and reconstruct per-way GeoDataFrame with node sequences."""
+    edges_reset = edges_gdf.reset_index()
+    forward_edges = edges_reset[edges_reset["reversed"] == False]  # noqa: E712
+
+    rows = []
+    for osmid, group in forward_edges.groupby("osmid"):
+        uv_pairs = list(zip(group["u"], group["v"]))
+        node_sequence = _chain_edges(uv_pairs)
+
+        geom_lookup = {
+            (row["u"], row["v"]): row["geometry"] for _, row in group.iterrows()
+        }
+        segments = []
+        for i in range(len(node_sequence) - 1):
+            pair = (node_sequence[i], node_sequence[i + 1])
+            if pair in geom_lookup:
+                segments.append(geom_lookup[pair])
+
+        if not segments:
+            continue
+
+        merged = linemerge(segments) if len(segments) > 1 else segments[0]
+
+        attrs = group.iloc[0].to_dict()
+        for key in ("u", "v", "key", "geometry", "reversed", "length"):
+            attrs.pop(key, None)
+
+        attrs["nodes"] = node_sequence
+        attrs["geometry"] = merged
+        attrs["osmid"] = osmid
+        rows.append(attrs)
+
+    return gpd.GeoDataFrame(rows, geometry="geometry", crs=edges_gdf.crs)
+
+
 class OsmRoads:
     """
     A class for handling OpenStreetMap road data transformation.
@@ -330,28 +421,58 @@ class OsmRoads:
 
     def _get_roads(self, download_folder):
         """
-        Get road data from OpenStreetMap based on the specified tags.
+        Get road data from OpenStreetMap using graph API to preserve node sequences.
         """
-        osm_data = osmnx.features_from_polygon(self.polygon, tags=self.tags)
+        osmnx.settings.useful_tags_way = [
+            "access",
+            "area",
+            "bicycle",
+            "bridge",
+            "est_width",
+            "highway",
+            "junction",
+            "landuse",
+            "lanes",
+            "lanes:backward",
+            "lit",
+            "maxspeed",
+            "motor_vehicle",
+            "name",
+            "oneway",
+            "ref",
+            "service",
+            "sidewalk",
+            "smoothness",
+            "source:maxspeed",
+            "surface",
+            "tracktype",
+            "traffic_calming",
+            "tunnel",
+            "width",
+        ]
+
+        highway_types = "|".join(self.tags["highway"])
+        custom_filter = f'["highway"~"{highway_types}"]'
+
+        G = osmnx.graph_from_polygon(
+            self.polygon,
+            network_type="all",
+            simplify=False,
+            retain_all=True,
+            truncate_by_edge=True,
+            custom_filter=custom_filter,
+        )
+
+        edges_gdf = osmnx.convert.graph_to_gdfs(G, nodes=False, fill_edge_geometry=True)
+        ways_gdf = _reconstruct_ways(edges_gdf)
 
         columns_to_keep = [
-            col for col in self.columns_to_keep if col in osm_data.columns
+            col for col in self.columns_to_keep if col in ways_gdf.columns
         ]
-        self.roads = osm_data[columns_to_keep]
+        self.roads = ways_gdf[columns_to_keep]
 
-        # Was once important. Fails with key erro no features.
-        # for feature in self.roads["features"]:
-        #     # Extract the numeric part of the 'id' field and move it to 'properties["osmid"]'
-        #     if isinstance(feature["id"], str) and feature["id"].startswith("('way',"):
-        #         osmid = int(feature["id"].split(",")[1].strip(" )"))
-        #         feature["properties"]["osmid"] = osmid
-
-        file_name = "osm_data.geojson"
-        file_path = os.path.join(download_folder, file_name)
-        self.roads.to_file(
-            file_path,
-            driver="GeoJSON",
-        )
+        file_path = os.path.join(download_folder, "osm_data.geojson")
+        self.roads.to_file(file_path, driver="GeoJSON")
 
     def _osm_transform(self, download_folder):
         """
