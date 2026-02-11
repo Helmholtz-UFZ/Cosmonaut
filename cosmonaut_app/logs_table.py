@@ -42,7 +42,7 @@ def format_logs_list(logs: list, show_pid: bool = True) -> html.Ul:
         items.append(
             html.Li(
                 content,
-                style={"white-space": "pre-wrap"},
+                style={"whiteSpace": "pre-wrap"},
             )
         )
 

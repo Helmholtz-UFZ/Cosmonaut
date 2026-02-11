@@ -132,8 +132,10 @@ def create_tile_layer(job_id, opacity):
         List of dash_leaflet components [tile_layer, legend_layer]
     """
     tiff_filename, colormap_params, colorbar_info = _get_tile_params(job_id)
+    job = CosmonautJob(job_id=job_id)
+    bounds = job.model.classification_upload["bounds"]
     tile_layer = map_utils.create_tile_layer_component(
-        job_id, tiff_filename, colormap_params, opacity
+        job_id, tiff_filename, colormap_params, opacity, bounds
     )
     legend_layer = create_colorbar_legend(colorbar_info)
 
@@ -185,7 +187,6 @@ def layout(job_id):
                 type="text",
                 value=job.model.epsg,
                 disabled=epsg_disabled,
-                style={"background-color": "#e9ecef"} if epsg_disabled else {},
             ),
             dbc.FormText(
                 "Common choices: 4326, 25832, 3857, …",
@@ -275,6 +276,16 @@ def layout(job_id):
         job_id=job_id,
     )
     return page_container_split_layout(map, input_container)
+
+
+@callback(
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
+    prevent_initial_call=True,
+)
+def show_loading(filename):
+    """Show loading overlay when file is uploaded."""
+    return filename is not None
 
 
 @callback(

@@ -6,17 +6,18 @@ This will be replaced with actual routing algorithm implementation.
 """
 
 import json
-from time import sleep
 import logging
 import os
 from logging.config import dictConfig
+from time import sleep
 
 from celery import Task
+
 from cosmonaut_app.constants.general import (
-    SOLUTION_FILE,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     LOG_FILE_NAME,
+    SOLUTION_FILE,
 )
 
 # from sensor_routing.sensor_routing_cli import routing_full_pipeline

@@ -90,7 +90,6 @@ def layout(job_id):
                 value=job.model.email,
                 autoFocus=True,
                 disabled=not is_active,
-                style={"background-color": "#e9ecef"} if not is_active else {},
             ),
             dbc.FormText(
                 [

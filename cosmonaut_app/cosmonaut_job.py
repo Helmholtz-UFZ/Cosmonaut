@@ -253,6 +253,7 @@ class CosmonautJob:
             "len": len(classification_data),
             "center": position,
             "zoom": zoom,
+            "bounds": bounds,
         }
         self.save()
         logging.debug("Finished uploading and processing classification file")

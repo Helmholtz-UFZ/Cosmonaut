@@ -90,7 +90,7 @@ dependencies = [
     "networkx==3.4.2",
     "nodeenv==1.9.1",
     "numpy==2.2.0",
-    "osmnx==1.9.1",
+    "osmnx>=2.0.0",
     "packaging==24.2",
     "pandas==2.2.3",
     "parso==0.8.5",
@@ -127,7 +127,7 @@ dependencies = [
     "requests==2.32.3",
     "retrying==1.4.2",
     "ruff==0.7.4",
-    "sensor-routing==0.1.15",
+    "sensor-routing==0.2.1",
     "setuptools==80.9.0",
     "shapely==2.0.6",
     "six==1.17.0",
@@ -161,6 +161,9 @@ dev = [
 docs = [
     "mkdocs>=1.6.1",
 ]
+
+[tool.setuptools.packages.find]
+include = ["cosmonaut_app*"]
 
 [tool.uv]
 default-groups = [

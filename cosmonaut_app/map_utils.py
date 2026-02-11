@@ -8,7 +8,9 @@ import dash_leaflet as dl
 from cosmonaut_app.config import TILESERVER_URL
 
 
-def create_tile_layer_component(job_id, tiff_filename, colormap_params, opacity=0.9):
+def create_tile_layer_component(
+    job_id, tiff_filename, colormap_params, opacity=0.9, bounds=None
+):
     """Create TileLayer component for GeoTIFF using TiTiler.
 
     This function can be mocked in tests to avoid tile server dependency.
@@ -22,4 +24,6 @@ def create_tile_layer_component(job_id, tiff_filename, colormap_params, opacity=
     )
     logging.info(f"Using map URL: {tile_url}")
 
-    return dl.TileLayer(url=tile_url, opacity=opacity)
+    return dl.TileLayer(
+        url=tile_url, opacity=opacity, crossOrigin="anonymous", bounds=bounds
+    )
