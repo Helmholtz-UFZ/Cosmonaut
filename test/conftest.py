@@ -6,10 +6,12 @@ import signal
 import subprocess
 import threading
 import time
+import urllib.request
 
 import pytest
 import redis
 from sqlalchemy.exc import OperationalError
+from werkzeug.serving import make_server
 
 from cosmonaut_app.config import (
     FLASK_PORT,
@@ -125,9 +127,12 @@ def logger():
     return create_logger()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def dash_app(request):
-    """Start the Dash app in a background thread.
+    """Start the Dash app in a background thread with graceful shutdown.
+
+    Uses werkzeug.serving.make_server() directly to retain a server handle
+    for clean shutdown, preventing 'Address already in use' errors.
 
     This fixture is skipped if --no-services flag is set.
     """
@@ -139,21 +144,35 @@ def dash_app(request):
     # Import app here to avoid module-level import triggering service connections
     from cosmonaut_app.app import app
 
-    def run_app():
-        app.run(debug=False, port=int(FLASK_PORT))
-
-    thread = threading.Thread(target=run_app, daemon=True)
+    port = int(FLASK_PORT)
+    srv = make_server("localhost", port, app.server)
+    thread = threading.Thread(target=srv.serve_forever)
     thread.start()
 
-    # Give the server time to start
-    time.sleep(3)
+    # Poll until the server responds instead of a blind sleep
+    url = f"http://localhost:{port}/"
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            urllib.request.urlopen(url, timeout=1)
+            break
+        except OSError:
+            time.sleep(0.2)
+    else:
+        pytest.exit("Dash app failed to start within 10 seconds")
+
+    log.info("Dash app started on port %s", port)
 
     yield app
 
-    # Cleanup is automatic since thread is daemon
+    # Graceful shutdown: stop accepting requests, then join thread
+    log.info("Shutting down Dash app...")
+    srv.shutdown()
+    thread.join(timeout=10)
+    log.info("Dash app shut down")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def celery_worker(request):
     """Start a Celery worker for testing background job processing.
 

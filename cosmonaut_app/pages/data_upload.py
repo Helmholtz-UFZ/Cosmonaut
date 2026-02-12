@@ -155,11 +155,7 @@ def layout(job_id):
     )
     epsg_disabled = (not is_active) or file_uploaded
 
-    # Show delete button only if file uploaded AND job status is PENDING
-    delete_button_visible = file_uploaded and is_active
-    delete_button_style = (
-        {"display": "block"} if delete_button_visible else {"display": "none"}
-    )
+    delete_button_disabled = not (file_uploaded and is_active)
 
     card_body = []
 
@@ -196,26 +192,18 @@ def layout(job_id):
             dbc.FormText(
                 id=DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID, className="fw-semibold"
             ),
-            html.Div(
-                dcc.Upload(
-                    id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
-                    accept=".csv,.txt",
-                    children=html.Div(
-                        [
-                            html.I(className="bi bi-cloud-arrow-up fs-4 me-2"),
-                            "Drag & drop or click to select a .csv or .txt file",
-                        ],
-                    ),
-                    multiple=False,
-                    disabled=True
-                    if not is_active
-                    else True,  # enabled after valid EPSG when active
-                    style=(
-                        {"backgroundColor": "#e9ecef", "cursor": "not-allowed"}
-                        if not is_active
-                        else {}
-                    ),
+            dcc.Upload(
+                id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+                accept=".csv,.txt",
+                children=dbc.Button(
+                    [
+                        html.I(className="bi bi-upload me-2"),
+                        "Upload .csv or .txt file",
+                    ],
+                    color="primary",
                 ),
+                multiple=False,
+                disabled=True,
                 className="my-3",
             ),
             html.Div(
@@ -229,8 +217,7 @@ def layout(job_id):
                 color="danger",
                 size="sm",
                 className="mt-2",
-                style=delete_button_style,
-                disabled=(not is_active),
+                disabled=delete_button_disabled,
             ),
             html.Div(
                 [
@@ -285,6 +272,7 @@ def layout(job_id):
 )
 def show_loading(filename):
     """Show loading overlay when file is uploaded."""
+    logging.info("Activating loading overlay for file upload. File name: {filename}")
     return filename is not None
 
 
@@ -295,9 +283,12 @@ def show_loading(filename):
     Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled"),
     Output(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
-    Output(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "style"),
+    Output(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "disabled"),
     Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children"),
     Output(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled"),
+    Output(
+        DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+    ),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Input(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "value"),
     Input(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data"),
@@ -334,10 +325,13 @@ def classification_map_manager(
                 dash.no_update,
                 dash.no_update,
                 dash.no_update,
+                dash.no_update,
             )
 
         job = CosmonautJob(job_id=job_id)
         job.model.epsg = epsg_input
+        # Delete old files just in case
+        job.delete_upload()
         try:
             classification_data, file_path, bounds = job.upload_file(
                 filename, contents, epsg_input
@@ -353,7 +347,10 @@ def classification_map_manager(
                 dash.no_update,
                 dash.no_update,
                 dash.no_update,
+                dash.no_update,
             )
+
+        logging.debug("Upload finished get OSM data")
 
         reposition_map = {
             "bounds": bounds,
@@ -380,9 +377,10 @@ def classification_map_manager(
             True,  # Disable EPSG input
             None,  # Clear upload contents
             False,  # Hide loading overlay
-            {"display": "block"},  # Show delete button
+            False,  # Enable delete button
             new_map_children,  # Classification tile overlay
             False,  # Enable slider
+            True,  # Disable upload component
         )
 
     # --- Opacity slider branch ---
@@ -411,6 +409,7 @@ def classification_map_manager(
             dash.no_update,
             new_map_children,
             dash.no_update,
+            dash.no_update,
         )
 
     # --- Init store branch (page load with existing upload) ---
@@ -435,6 +434,7 @@ def classification_map_manager(
                     dash.no_update,
                     new_map_children,
                     False,  # Enable slider
+                    True,  # Disable upload component
                 )
 
         return (
@@ -447,6 +447,7 @@ def classification_map_manager(
             dash.no_update,
             dash.no_update,
             True,  # Disable slider
+            dash.no_update,
         )
 
     raise PreventUpdate
@@ -455,12 +456,16 @@ def classification_map_manager(
 @callback(
     Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
     Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Output(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "style", allow_duplicate=True),
+    Output(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
     Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children", allow_duplicate=True),
     Output(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(
+        DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+    ),
+    Output(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data", allow_duplicate=True),
     Input(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
@@ -521,12 +526,14 @@ def delete_uploaded_file(n_clicks, job_id):
     return (
         file_info_text,
         False,  # Enable EPSG input
-        {"display": "none"},  # Hide delete button
+        True,  # Disable delete button
         True,  # Disable next button (no file uploaded)
         default_viewport,  # Reset map
         False,  # Hide loading overlay
         list(default_map_layers),  # Remove classification overlay
         True,  # Disable opacity slider
+        False,  # Enable upload component
+        False,  # Reset init store (no file uploaded)
     )
 
 
@@ -536,9 +543,9 @@ def delete_uploaded_file(n_clicks, job_id):
     Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "valid"),
     Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "invalid"),
     Input(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "value"),
+    State(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data"),
 )
-def validate_epsg(epsg):
-    # Reset when empty/cleared
+def update_upload_state(epsg, file_uploaded):
     logging.info(f"Validating EPSG code: {epsg}")
 
     try:
@@ -549,6 +556,13 @@ def validate_epsg(epsg):
             "Please enter a valid EPSG code.",
             False,
             True,
+        )
+    if file_uploaded:
+        return (
+            True,
+            "EPSG accepted",
+            True,
+            False,
         )
     return (
         False,

@@ -54,26 +54,27 @@ use Dash Leaflet click events with feature_id tracking. The utils module handles
 connectivity analysis and road network processing.
 """
 
-import os
 import json
 import logging
+import os
 import shutil  # required for undo
 from typing import Any, Dict, List, Optional, Tuple
+
+import dash_bootstrap_components as dbc
+import dash_leaflet as dl
+import geojson
 from dash import (
-    html,
-    register_page,
-    dcc,
-    callback,
     Input,
     Output,
     State,
+    callback,
     ctx,
+    dcc,
+    html,
     no_update,
+    register_page,
 )
 from dash.exceptions import PreventUpdate
-import dash_leaflet as dl
-import dash_bootstrap_components as dbc
-import geojson
 
 from cosmonaut_app.config import osm_tags_mapping
 from cosmonaut_app.constants.general import JOB_STATUS_PENDING
@@ -84,6 +85,7 @@ from cosmonaut_app.constants.html_ids import (
     EPSG_STORE_SHARED_ID,
     JOB_ID_STORE_SHARED_ID,
     LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
+    NEXT_BUTTON_STREET_SELECTION_ID,
     NONE_DIV_SHARED_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
     REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
@@ -93,9 +95,19 @@ from cosmonaut_app.constants.html_ids import (
     TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
     UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
-    NEXT_BUTTON_STREET_SELECTION_ID,
 )
+from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
+from cosmonaut_app.layout import (
+    build_url_step,
+    create_card_input,
+    create_map,
+    create_reset_banner,
+    create_reset_modal,
+    page_container_split_layout,
+    progress_footer,
+    style_handle,  # reuse dynamic style so colors stay consistent after filtering
+)
 from cosmonaut_app.road_network_utils import (
     build_graph,
     get_largest_subnetwork,
@@ -103,26 +115,31 @@ from cosmonaut_app.road_network_utils import (
     remove_disconnected_roads,
 )
 from cosmonaut_app.transformation import transform_geojson
-from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.layout import (
-    create_map,
-    page_container_split_layout,
-    create_card_input,
-    progress_footer,
-    build_url_step,
-    style_handle,  # reuse dynamic style so colors stay consistent after filtering
-    create_reset_banner,
-    create_reset_modal,
+from cosmonaut_app.utils.street_selection_utils import (
+    coerce_nodes_list as _coerce_nodes_list,
+)
+from cosmonaut_app.utils.street_selection_utils import (
+    ensure_feature_ids as _ensure_feature_ids,
+)
+from cosmonaut_app.utils.street_selection_utils import (
+    filter_by_tags as _filter_by_tags,
 )
 from cosmonaut_app.utils.street_selection_utils import (
     initial_features,
-    paths as _paths,
-    ensure_feature_ids as _ensure_feature_ids,
-    filter_by_tags as _filter_by_tags,
+)
+from cosmonaut_app.utils.street_selection_utils import (
     load_fc as _load_fc,
-    coerce_nodes_list as _coerce_nodes_list,
+)
+from cosmonaut_app.utils.street_selection_utils import (
+    paths as _paths,
+)
+from cosmonaut_app.utils.street_selection_utils import (
     safe_projected_export as _safe_export,
+)
+from cosmonaut_app.utils.street_selection_utils import (
     save_fc_4326_no_crs as _save,
+)
+from cosmonaut_app.utils.street_selection_utils import (
     snapshot_work_copy as _snapshot,
 )
 
