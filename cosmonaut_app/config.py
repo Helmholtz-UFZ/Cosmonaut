@@ -102,19 +102,6 @@ REDIS_HOST = getenv("REDIS_HOST")
 REDIS_DB = getenv("REDIS_DB")
 REDIS_PASSWORD = getenv("REDIS_PASSWORD")
 
-# Mapping of OSM tags to the corresponding road classes
-osm_tags_mapping = {
-    "Autobahn": ["motorway", "motorway_link"],
-    "Schnellstraße": ["trunk", "trunk_link"],
-    "Bundesstraßen": ["primary", "primary_link"],
-    "Landstraße": ["secondary", "secondary_link"],
-    "Kreisstraße": ["tertiary", "tertiary_link"],
-    "Gemeindestraße": ["unclassified"],
-    "Wohnstraße": ["residential"],
-    "Spielstraße": ["living_street"],
-    "Wirtschaftsweg": ["track"],
-}
-
 
 def get_download_url(job_id, filename="route.gpx"):
     """Construct the full download URL for a GPX file.

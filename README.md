@@ -51,6 +51,14 @@ cluster. Here only the services cosmonaut-web, cosmonaut-worker, Redis, and the
 tileserver are used, as the permanent storages PostgreSQL and MinIO are managed by the
 infrastructure of the institute.
 
+## Update sensor-routing
+
+1. Edit `pyproject.toml` to new version.
+2. Maybe `uv cache clean sensor-routing` if update was just a few minutes ago.
+3. `uv lock`
+4. If you have local python evn `uv sync`.
+5. `./dev_up.sh` will detect changes in `uv.lock` and rebuild container.
+
 ## More Detailed Documentation
 
 The `docs/` directory contains in-depth guides covering project conventions and LLM-assisted development workflows.

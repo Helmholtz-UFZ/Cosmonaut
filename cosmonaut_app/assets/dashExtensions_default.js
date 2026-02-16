@@ -17,18 +17,35 @@ window.dashExtensions = Object.assign({}, window.dashExtensions, {
 
             ,
         function1: function(feature, context) {
-            const {
-                selected,
-                zoom
-            } = context.hideout;
-            const lineWeight = zoom ? Math.max(4, 22 / zoom) : 5;
-            const color = selected.includes(feature.id) ? 'orange' : '#ff6666';
-            return {
-                color: color,
-                weight: lineWeight,
-                opacity: 1.0
-            };
-        }
+                const {
+                    selected,
+                    zoom
+                } = context.hideout;
+                const lineWeight = zoom ? Math.max(4, 22 / zoom) : 5;
+                const color = selected.includes(feature.id) ? 'orange' : '#ff6666';
+                return {
+                    color: color,
+                    weight: lineWeight,
+                    opacity: 1.0
+                };
+            }
 
+            ,
+        function2: function(e, ctx) {
+            const id = e.layer.feature.id;
+            const selected = [...(ctx.hideout.selected || [])];
+            const idx = selected.indexOf(id);
+            if (idx > -1) {
+                selected.splice(idx, 1);
+            } else {
+                selected.push(id);
+            }
+            ctx.setProps({
+                hideout: {
+                    ...ctx.hideout,
+                    selected: selected
+                }
+            });
+        }
     }
 });

@@ -1,7 +1,5 @@
-import json
 import logging
 import os
-import re
 
 import dash
 import dash_bootstrap_components as dbc
@@ -11,7 +9,7 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from dash_extensions.javascript import _default_name_space, assign
 
-from cosmonaut_app.config import WEB_WORK_DIR, osm_tags_mapping
+
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
@@ -71,156 +69,6 @@ function(feature, context){
 }
 """
 )
-
-
-def _coerce_nodes_list(features):
-    """
-    Ensure properties['nodes'] is a list[int] for every feature.
-    Handles cases where nodes are stored as a JSON string or other iterables.
-    """
-    fixed = 0
-    for feat in features:
-        props = feat.get("properties") or {}
-        nodes = props.get("nodes")
-        if nodes is None:
-            continue
-
-        # Already a sequence: coerce items to int
-        if isinstance(nodes, (list, tuple)):
-            try:
-                props["nodes"] = [int(n) for n in nodes]
-            except Exception:
-                # leave as-is if coercion fails
-                pass
-            continue
-
-        # String case: try JSON first, then regex fallback
-        if isinstance(nodes, str):
-            parsed = None
-            try:
-                parsed = json.loads(nodes)
-            except Exception:
-                # extract integers from any string like "[1, 2, 3]" or "1,2,3"
-                parsed = [int(m.group(0)) for m in re.finditer(r"-?\d+", nodes)]
-            if isinstance(parsed, list):
-                try:
-                    props["nodes"] = [int(n) for n in parsed]
-                    fixed += 1
-                except Exception:
-                    # leave original if conversion fails
-                    pass
-    logging.info("Normalized nodes lists for %d features", fixed)
-    return features
-
-
-def _coerce_osmid(props, feature_id=None, fallback=None):
-    # Accept osmid, osm_id, id (props), or feature.id; return int if possible.
-    candidates = [
-        props.get("osmid"),
-        props.get("osm_id"),
-        props.get("id"),
-        feature_id,
-    ]
-    for c in candidates:
-        if c is None:
-            continue
-        # If list/tuple, take the first
-        if isinstance(c, (list, tuple)):
-            c = c[0] if c else None
-        if c is None:
-            continue
-        # Extract first integer substring
-        m = re.search(r"-?\d+", str(c))
-        if m:
-            try:
-                return int(m.group(0))
-            except Exception:
-                pass
-        if isinstance(c, int):
-            return c
-    return fallback
-
-
-def _normalize_for_sensor_routing(features):
-    """Ensure fields required by sensor-routing exist with expected types."""
-    missing = 0
-    for i, feat in enumerate(features):
-        props = feat.get("properties") or {}
-        # osmid: single int
-        osmid = _coerce_osmid(props, feat.get("id"), fallback=i + 1)
-        if "osmid" not in props:
-            missing += 1
-        props["osmid"] = osmid
-        # nodes: list[int]
-        nodes = props.get("nodes")
-        if isinstance(nodes, str):
-            try:
-                nodes = json.loads(nodes)
-            except Exception:
-                nodes = [int(n) for n in re.findall(r"-?\d+", nodes)]
-            props["nodes"] = nodes
-        if isinstance(props.get("nodes"), (list, tuple)):
-            try:
-                props["nodes"] = [int(n) for n in props["nodes"]]
-            except Exception:
-                pass
-        # oneway: normalize to "yes"/"no" strings
-        ow = props.get("oneway")
-        if isinstance(ow, bool):
-            props["oneway"] = "yes" if ow else "no"
-        elif ow is not None:
-            s = str(ow).lower()
-            if s in ("1", "true", "yes"):
-                props["oneway"] = "yes"
-            elif s in ("0", "false", "no", "-1"):
-                props["oneway"] = "no"
-        feat["properties"] = props
-    logging.info(
-        "Normalized %d features; added osmid to %d features", len(features), missing
-    )
-
-
-def _filter_by_tags(features, selected_roads):
-    # Default to all available tags if none are selected so we render a network
-    if not selected_roads:
-        selected_roads = list(osm_tags_mapping.keys())
-    osm_highway_types = set()
-    for german_type in selected_roads:
-        if german_type in osm_tags_mapping:
-            osm_highway_types.update(osm_tags_mapping[german_type])
-    return [
-        f
-        for f in features
-        if (f.get("properties") or {}).get("highway") in osm_highway_types
-    ]
-
-
-def _paths(job_id):
-    in_dir = os.path.join(WEB_WORK_DIR, job_id)
-    return (
-        in_dir,
-        os.path.join(in_dir, "osm_data_raw_4326.geojson"),
-        os.path.join(in_dir, "osm_data_work_4326.geojson"),
-        os.path.join(in_dir, "osm_data.geojson"),
-    )
-
-
-def _load_fc(path):
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _save_fc_4326_no_crs(path, feature_collection):
-    # ensure no 'crs' member (RFC 7946)
-    data = dict(feature_collection)
-    data.pop("crs", None)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-
-
-def _load_geojson(path: str):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 # ============================================================================
@@ -616,8 +464,8 @@ def create_map(job=None, extra_layers=None):
         map_layers += extra_layers
 
     if job is not None:
-        zoom = job.model.classification_upload["zoom"]
-        center = job.model.classification_upload["center"]
+        zoom = job.model.membership_upload["zoom"]
+        center = job.model.membership_upload["center"]
     else:
         zoom = 10
         center = [51.70, 11.20]

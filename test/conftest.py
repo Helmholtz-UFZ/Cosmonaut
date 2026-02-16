@@ -1,7 +1,9 @@
 """Setup tests with conditional fixture loading."""
 
+import importlib.resources
 import logging
 import os
+import shutil
 import signal
 import subprocess
 import threading
@@ -125,6 +127,35 @@ def logger():
     This fixture is always available regardless of --no-services flag.
     """
     return create_logger()
+
+
+def _find_sensor_routing_test_file(substr):
+    """Find a test data file from the sensor_routing package by substring."""
+    test_data_dir = importlib.resources.files("sensor_routing") / "test_data" / "input"
+    for file_path in test_data_dir.iterdir():
+        if substr in file_path.name:
+            return file_path
+    raise FileNotFoundError(
+        f"No test data file found containing substring '{substr}' in the name."
+    )
+
+
+@pytest.fixture(scope="session")
+def membership_file_path(tmp_path_factory):
+    """Fixture that creates a local copy of the membership test data file."""
+    original_file = _find_sensor_routing_test_file("membership")
+    local_path = tmp_path_factory.mktemp("test_data") / "memberships.csv"
+    shutil.copy2(original_file, local_path)
+    return local_path
+
+
+@pytest.fixture(scope="session")
+def predictor_file_path(tmp_path_factory):
+    """Fixture that creates a local copy of the predictor test data file."""
+    original_file = _find_sensor_routing_test_file("predictor")
+    local_path = tmp_path_factory.mktemp("test_data") / "predictors.csv"
+    shutil.copy2(original_file, local_path)
+    return local_path
 
 
 @pytest.fixture(scope="session")

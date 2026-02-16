@@ -21,13 +21,16 @@ from cosmonaut_app.constants.html_ids import (
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTING_PARAMS_ID,
     NEXT_BUTTON_STREET_SELECTION_ID,
+    PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     START_BUTTON_ROUTE_COMPUTATION_ID,
     START_JOB_BUTTON_HOME_ID,
     USER_INFO_NEXT_BUTTON_USER_INFO_ID,
 )
 
 
-def test_complete_routing_workflow(page, dash_app, celery_worker) -> None:
+def test_complete_routing_workflow(
+    page, dash_app, celery_worker, membership_file_path, predictor_file_path
+) -> None:
     """Test the complete routing workflow from job creation to route download."""
     # === Home Page ===
     page.goto(f"http://localhost:{FLASK_PORT}/")
@@ -39,10 +42,18 @@ def test_complete_routing_workflow(page, dash_app, celery_worker) -> None:
     check_all_errors(page)
 
     # === Data Upload Page ===
-    # Upload CSV file using the file input within the Upload component
+    # Upload membership file
     page.locator(
         f"#{DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID} input[type='file']"
-    ).set_input_files("test/test_files/memberships.csv")
+    ).set_input_files(str(membership_file_path))
+    # Upload predictor file (enabled after membership upload completes)
+    expect(
+        page.locator(f"#{PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID} input[type='file']")
+    ).to_be_enabled(timeout=30000)
+    page.locator(
+        f"#{PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID} input[type='file']"
+    ).set_input_files(str(predictor_file_path))
+    expect(page.locator(f"#{NEXT_BUTTON_DATA_UPLOAD_ID}")).to_be_enabled(timeout=30000)
     page.locator(f"#{NEXT_BUTTON_DATA_UPLOAD_ID}").click()
     check_all_errors(page)
 

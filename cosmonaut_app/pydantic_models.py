@@ -69,6 +69,9 @@ def validate_job_id(job_id: str) -> str:
     return job_id
 
 
+# Local copy of FullPipelineConfig: sensor_routing uses Field(type=...) but
+# dash_form_factory.FormFactory reads exclusively from json_schema_extra["type"].
+# We keep this copy so FormFactory renders the correct form widgets.
 class FullPipelineConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -274,7 +277,7 @@ class UserModel(FullPipelineConfig):
         ),
         AfterValidator(validate_job_id),
     ]
-    classification_upload: Annotated[
+    membership_upload: Annotated[
         Dict[str, Any],
         Field(
             {
@@ -284,8 +287,17 @@ class UserModel(FullPipelineConfig):
                 "center": [51.70, 11.20],
                 "zoom": 10,
             },
-            description=("Upload a file with the crns data"),
-            title="Crns upload",
+            description="Upload a file with the membership data",
+            title="Membership upload",
+            json_schema_extra={"type": "file-upload"},
+        ),
+    ]
+    predictor_upload: Annotated[
+        Dict[str, Any],
+        Field(
+            {"file_name": "No file uploaded", "len": 0},
+            description="Upload a file with the predictor data",
+            title="Predictor upload",
             json_schema_extra={"type": "file-upload"},
         ),
     ]

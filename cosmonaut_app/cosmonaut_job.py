@@ -1,4 +1,5 @@
 import base64
+import csv
 import glob
 import json
 import logging
@@ -7,22 +8,31 @@ import os
 import uuid
 from datetime import date
 
-from werkzeug.utils import secure_filename
+import pandas as pd
+from pyproj import CRS, Transformer
 
 from cosmonaut_app.config import (
-    DAYS_DELETE_NOT_SUBMITTED,
-    DAYS_DELETE_SUBMITTED,
     WEB_WORK_DIR,
 )
+from sensor_routing.full_pipeline_cli import (
+    parse_membership_file,
+    parse_predictor_file,
+    validate_predictor_membership_consistency,
+)
+
 from cosmonaut_app.constants.general import (
     GPX_FILE,
+    INPUT_DIR,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     JOB_STATUS_PENDING,
     JOB_STATUS_RUNNING,
     LOG_FILE_NAME,
-    OSM_DATA_FILE,
-    OSM_DATA_TRANSFORMED_FILE,
+    MEMBERSHIP_FILENAME,
+    OSM_DATA_DOWNLOAD_FILE,
+    OSM_DATA_EDITED_FILE,
+    OSM_FILENAME,
+    PREDICTOR_FILENAME,
     QR_CODE_FILE,
     SOLUTION_FILE,
 )
@@ -34,7 +44,90 @@ from cosmonaut_app.object_storage_manager import (
     save_files,
 )
 from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel
-from cosmonaut_app.transformation import get_bounds, transform_csv
+
+
+def _transform_csv(input_file, epsg_input, epsg_output):
+    """Transform coordinates in a CSV file from one CRS to another.
+
+    Args:
+        input_file: Path to the input CSV file.
+        epsg_input: EPSG code of the input CRS.
+        epsg_output: EPSG code of the output CRS.
+
+    Returns:
+        DataFrame with transformed coordinates.
+    """
+    logging.info(f"Starting transformation of CSV file: {input_file}")
+
+    if not input_file.endswith((".csv", ".txt")):
+        logging.error("Input file must be a CSV or TXT file.")
+        raise ValueError("Input file must be a CSV file.")
+
+    with open(input_file, "r") as csvfile:
+        sample = csvfile.read(4096)
+        dialect = csv.Sniffer().sniff(sample)
+        has_header = csv.Sniffer().has_header(sample)
+        delimiter = dialect.delimiter
+
+    crs_input = CRS.from_epsg(epsg_input)
+    crs_output = CRS.from_epsg(epsg_output)
+    transformer = Transformer.from_crs(crs_input, crs_output)
+
+    df = pd.read_csv(input_file, delimiter=delimiter, header=0 if has_header else None)
+
+    if not has_header:
+        df.columns = [f"col_{i}" for i in range(len(df.columns))]
+
+    potential_coord_cols = []
+    for col in df.columns:
+        if df[col].dtype.kind in "iuf":
+            if (df[col].min() < 0 or df[col].max() > 1) and len(df[col].unique()) > 10:
+                potential_coord_cols.append(col)
+
+    if len(potential_coord_cols) == 2:
+        x_col, y_col = potential_coord_cols
+    elif has_header:
+        x_candidates = [
+            col
+            for col in df.columns
+            if any(term in col.lower() for term in ["east", "long", "x", "lon"])
+        ]
+        y_candidates = [
+            col
+            for col in df.columns
+            if any(term in col.lower() for term in ["north", "lat", "y"])
+        ]
+
+        if len(x_candidates) > 0 and len(y_candidates) > 0:
+            x_col = x_candidates[0]
+            y_col = y_candidates[0]
+        else:
+            raise ValueError("Could not automatically identify coordinate columns.")
+    else:
+        raise ValueError("Could not automatically identify coordinate columns.")
+
+    df["Latitude"], df["Longitude"] = transformer.transform(
+        df[x_col].values, df[y_col].values
+    )
+
+    df.drop([x_col, y_col], axis=1, inplace=True)
+
+    return df
+
+
+def _get_bounds(classification_df):
+    """Calculate the rectangular bounds of the given points.
+
+    Returns:
+        A list containing [[min_lat, min_lon], [max_lat, max_lon]].
+    """
+    lon = classification_df.Longitude
+    lat = classification_df.Latitude
+
+    min_lon, max_lon = lon.min(), lon.max()
+    min_lat, max_lat = lat.min(), lat.max()
+
+    return [[min_lat, min_lon], [max_lat, max_lon]]
 
 
 class CosmonautJob:
@@ -100,9 +193,11 @@ class CosmonautJob:
         self.save()
 
     def _create_working_dir(self):
-        """Create the working directory for the job."""
+        """Create the working directory and input subdirectory for the job."""
         self.working_dir = os.path.join(WEB_WORK_DIR, self.model.job_id)
         os.makedirs(self.working_dir, exist_ok=True)
+        self.input_dir = os.path.join(self.working_dir, INPUT_DIR)
+        os.makedirs(self.input_dir, exist_ok=True)
 
     def save(self):
         """Save the job to the database and sync files to object storage."""
@@ -203,99 +298,147 @@ class CosmonautJob:
         # delete files from object storage
         delete_directory_from_storage(self.model.job_id)
 
-    def time_to_life(self):
-        """Return the time to life of the job."""
-        # Note: start_date was removed from the model
-        # This method needs to be reimplemented if needed
-        days_passed = (date.today() - self.start_date).days
-        if not self.model.submitted:
-            return DAYS_DELETE_SUBMITTED - days_passed
-        else:
-            return DAYS_DELETE_NOT_SUBMITTED - days_passed
+    def upload_membership(self, file_name, content, epsg_input):
+        """Upload and process membership CSV file."""
+        logging.info(f"Upload membership file {file_name} with EPSG {epsg_input}")
 
-    def upload_file(self, file_name, content, epsg_input):
-        """Upload and process classification CSV file."""
-        logging.info(f"Upload classification file {file_name} with EPSG {epsg_input}")
-
-        # Check if previously a file was uploaded and remove it
-        previous_file = self.model.classification_upload.get("file_name")
+        # Remove previous membership file if it exists
+        previous_file = self.model.membership_upload["file_name"]
         previous_file_path = os.path.join(self.working_dir, previous_file)
         if os.path.exists(previous_file_path):
             os.remove(previous_file_path)
-            logging.info(f"Removed previous classification file {previous_file}")
+            logging.info(f"Removed previous membership file {previous_file}")
 
         _content_type, content_string = content.split(",", 1)
         decoded = base64.b64decode(content_string)
 
-        safe_name = secure_filename(file_name)
-        file_path = os.path.join(self.working_dir, safe_name)
+        # Save with canonical name for sensor_routing pipeline
+        file_path = os.path.join(self.working_dir, MEMBERSHIP_FILENAME)
 
         with open(file_path, "wb") as f:
             f.write(decoded)
 
+        # Validate with sensor_routing parser
         try:
-            classification_data = transform_csv(file_path, epsg_input, 4326)
+            parse_membership_file(file_path)
+        except Exception as e:
+            logging.info(f"Membership file validation failed: {e}")
+            os.remove(file_path)
+            raise ValueError(str(e))
+
+        try:
+            classification_data = _transform_csv(file_path, epsg_input, 4326)
         except ValueError as e:
             logging.info(f"Error transforming CSV file: {e}")
             os.remove(file_path)
             raise e
 
         # Calculate bounds, position, and zoom
-        bounds = get_bounds(classification_data)
+        bounds = _get_bounds(classification_data)
         position, zoom = self._calculate_map_position_from_bounds(bounds)
 
         # Store EPSG as model attribute
         self.model.epsg = epsg_input
 
-        # Store information about the classification upload
-        self.model.classification_upload = {
-            "file_name": safe_name,
+        # Store information about the membership upload
+        self.model.membership_upload = {
+            "file_name": MEMBERSHIP_FILENAME,
             "len": len(classification_data),
             "center": position,
             "zoom": zoom,
             "bounds": bounds,
         }
         self.save()
-        logging.debug("Finished uploading and processing classification file")
+        logging.debug("Finished uploading and processing membership file")
         return classification_data, file_path, bounds
 
-    def delete_upload(self):
-        """Delete uploaded file and reset upload-related attributes."""
-        logging.info(f"Deleting upload data for job {self.model.job_id}")
+    def upload_predictor(self, content):
+        """Upload and validate predictor CSV file."""
+        logging.info(f"Upload predictor file for job {self.model.job_id}")
 
-        # 1. Delete uploaded CSV file
-        file_name = self.model.classification_upload.get("file_name")
-        if file_name and file_name != "No file uploaded":
-            file_path = os.path.join(self.working_dir, file_name)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                logging.debug(f"Deleted uploaded file: {file_path}")
+        _content_type, content_string = content.split(",", 1)
+        decoded = base64.b64decode(content_string)
 
-        # 2. Delete OSM data files (using constants)
-        osm_geojson = os.path.join(self.working_dir, OSM_DATA_FILE)
-        osm_transformed = os.path.join(self.working_dir, OSM_DATA_TRANSFORMED_FILE)
-        for osm_file in [osm_geojson, osm_transformed]:
-            if os.path.exists(osm_file):
-                os.remove(osm_file)
-                logging.debug(f"Deleted OSM file: {osm_file}")
+        # Save with canonical name for sensor_routing pipeline
+        file_path = os.path.join(self.working_dir, PREDICTOR_FILENAME)
 
-        # 3. Delete plot files
+        with open(file_path, "wb") as f:
+            f.write(decoded)
+
+        # Validate with sensor_routing parser
+        try:
+            parse_predictor_file(file_path)
+        except Exception as e:
+            logging.info(f"Predictor file validation failed: {e}")
+            os.remove(file_path)
+            raise ValueError(str(e))
+
+        # Cross-validate with membership file
+        membership_path = os.path.join(self.working_dir, MEMBERSHIP_FILENAME)
+        try:
+            validate_predictor_membership_consistency(file_path, membership_path)
+        except Exception as e:
+            logging.info(f"Predictor-membership consistency check failed: {e}")
+            os.remove(file_path)
+            raise ValueError(str(e))
+
+        self.model.predictor_upload = {
+            "file_name": PREDICTOR_FILENAME,
+            "len": len(decoded),
+        }
+        self.save()
+        logging.debug("Finished uploading and processing predictor file")
+
+    def delete_predictor(self):
+        """Delete predictor file and reset predictor_upload."""
+        logging.info(f"Deleting predictor data for job {self.model.job_id}")
+
+        file_path = os.path.join(self.working_dir, PREDICTOR_FILENAME)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logging.debug(f"Deleted predictor file: {file_path}")
+
+        default_predictor_upload = JobModel.model_fields["predictor_upload"].default
+        self.model.predictor_upload = default_predictor_upload.copy()
+        self.save()
+
+        logging.info(f"Predictor data deleted for job {self.model.job_id}")
+
+    def delete_membership(self):
+        """Delete membership file, predictor, OSM files, plots and reset state."""
+        logging.info(f"Deleting membership data for job {self.model.job_id}")
+
+        # Cascade: delete predictor first
+        self.delete_predictor()
+
+        # Delete membership CSV file
+        membership_path = os.path.join(self.working_dir, MEMBERSHIP_FILENAME)
+        if os.path.exists(membership_path):
+            os.remove(membership_path)
+            logging.debug(f"Deleted membership file: {membership_path}")
+
+        # Delete OSM data files
+        for osm_name in [OSM_DATA_DOWNLOAD_FILE, OSM_DATA_EDITED_FILE, OSM_FILENAME]:
+            osm_path = os.path.join(self.working_dir, osm_name)
+            if os.path.exists(osm_path):
+                os.remove(osm_path)
+                logging.debug(f"Deleted OSM file: {osm_path}")
+
+        # Delete plot files
         for plot_file in glob.glob(os.path.join(self.working_dir, "*_output*.tif")):
             os.remove(plot_file)
             logging.debug(f"Deleted plot file: {plot_file}")
 
-        # 4. Reset classification_upload to default values from JobModel
-        default_classification_upload = JobModel.model_fields[
-            "classification_upload"
-        ].default
-        self.model.classification_upload = default_classification_upload.copy()
+        # Reset membership_upload to default values
+        default_membership_upload = JobModel.model_fields["membership_upload"].default
+        self.model.membership_upload = default_membership_upload.copy()
 
-        # 5. Reset selected_road_tags (user may have selected based on uploaded data)
+        # Reset selected_road_tags
         self.model.selected_road_tags = []
 
         self.save()
 
-        logging.info(f"Upload data deleted successfully for job {self.model.job_id}")
+        logging.info(f"Membership data deleted for job {self.model.job_id}")
 
     def create_qr_code_routing(self):
         logging.info(f"Creating QR code for routing job {self.model.job_id}")

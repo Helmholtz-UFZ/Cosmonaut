@@ -6,7 +6,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import rasterio
 from osgeo import gdal
-from contextlib import contextmanager
 from typing import Optional, Tuple, List
 import csv
 
@@ -24,17 +23,6 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
-
-
-@contextmanager
-def temporary_file(suffix):
-    import tempfile
-
-    try:
-        temp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
-        yield temp.name
-    finally:
-        os.remove(temp.name)
 
 
 class ClassificationPlot:

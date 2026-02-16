@@ -30,8 +30,8 @@ street selection page to choose which roads to include in your route.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
-File upload uses dcc.Upload with base64 encoding. The OsmRoads class handles
-OpenStreetMap querying with proper buffering around the data extent. Coordinate
+File upload uses dcc.Upload with base64 encoding. The OsmDownloader class handles
+OpenStreetMap downloading with proper buffering around the data extent. Coordinate
 transformation uses pyproj with CRS validation via the pyproj.CRS class.
 """
 
@@ -42,6 +42,10 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, ctx, dcc, html, register_page
 from dash.exceptions import PreventUpdate
+from sensor_routing.full_pipeline_cli import (
+    DESCRIPTION_MEMBERSHIP,
+    DESCRIPTION_PREDICTOR,
+)
 
 from cosmonaut_app import map_utils
 from cosmonaut_app.classification_plot import ClassificationPlot
@@ -58,12 +62,16 @@ from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID,
     DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID,
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
-    DELETE_FILE_BUTTON_DATA_UPLOAD_ID,
-    EPSG_STORE_SHARED_ID,
+    DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID,
+    DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID,
     JOB_ID_STORE_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+    MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
+    PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID,
+    PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
+    PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
@@ -76,10 +84,9 @@ from cosmonaut_app.layout import (
     page_container_split_layout,
     progress_footer,
 )
+from cosmonaut_app.osm_downloader import OsmDownloader
 from cosmonaut_app.pydantic_models import check_epsg
-from cosmonaut_app.transformation import (
-    OsmRoads,
-)
+from cosmonaut_app.street_selector import StreetSelector
 
 register_page(
     __name__,
@@ -133,7 +140,7 @@ def create_tile_layer(job_id, opacity):
     """
     tiff_filename, colormap_params, colorbar_info = _get_tile_params(job_id)
     job = CosmonautJob(job_id=job_id)
-    bounds = job.model.classification_upload["bounds"]
+    bounds = job.model.membership_upload["bounds"]
     tile_layer = map_utils.create_tile_layer_component(
         job_id, tiff_filename, colormap_params, opacity, bounds
     )
@@ -144,18 +151,38 @@ def create_tile_layer(job_id, opacity):
     return [tile_layer, legend_layer]
 
 
+def _first_sentence(text):
+    """Return the first sentence from a multi-line description string."""
+    stripped = text.strip()
+    dot = stripped.find(".")
+    if dot == -1:
+        return stripped
+    return stripped[: dot + 1]
+
+
+def _help_icon(description):
+    """Create a question-mark icon with a native browser tooltip."""
+    return html.Span(
+        "\u24d8",  # ⓘ circled information source
+        className="text-muted ms-1",
+        title=description.strip(),
+    )
+
+
 def layout(job_id):
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 
-    # Determine if file is uploaded and EPSG should be disabled
-    file_uploaded = (
-        job.model.classification_upload.get("file_name") != "No file uploaded"
-    )
-    epsg_disabled = (not is_active) or file_uploaded
-
-    delete_button_disabled = not (file_uploaded and is_active)
+    # --- Disabled-state logic (all in one place) ---
+    membership_uploaded = job.model.membership_upload["file_name"] != "No file uploaded"
+    predictor_uploaded = job.model.predictor_upload["file_name"] != "No file uploaded"
+    epsg_disabled = (not is_active) or membership_uploaded
+    next_disabled = not (membership_uploaded and predictor_uploaded)
+    delete_membership_disabled = not (membership_uploaded and is_active)
+    delete_predictor_disabled = not (predictor_uploaded and is_active)
+    predictor_upload_disabled = not membership_uploaded
+    slider_disabled = not membership_uploaded
 
     card_body = []
 
@@ -166,9 +193,10 @@ def layout(job_id):
     # Add stores and form components
     card_body.extend(
         [
-            dcc.Store(id=EPSG_STORE_SHARED_ID),
             dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
-            dcc.Store(id=DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, data=file_uploaded),
+            dcc.Store(
+                id=DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, data=membership_uploaded
+            ),
             html.P(
                 "Please enter a valid EPSG code and then upload your membership data file.",
                 className="text-muted",
@@ -192,13 +220,14 @@ def layout(job_id):
             dbc.FormText(
                 id=DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID, className="fw-semibold"
             ),
+            # --- Membership upload section ---
             dcc.Upload(
                 id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
                 accept=".csv,.txt",
                 children=dbc.Button(
                     [
                         html.I(className="bi bi-upload me-2"),
-                        "Upload .csv or .txt file",
+                        "Upload membership file",
                     ],
                     color="primary",
                 ),
@@ -206,18 +235,30 @@ def layout(job_id):
                 disabled=True,
                 className="my-3",
             ),
+            html.Span(
+                [
+                    html.Small(
+                        _first_sentence(DESCRIPTION_MEMBERSHIP),
+                        className="text-muted",
+                    ),
+                    _help_icon(DESCRIPTION_MEMBERSHIP),
+                ],
+            ),
             html.Div(
-                job.model.classification_upload["file_name"],
+                id=MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID, className="text-danger small"
+            ),
+            html.Div(
+                "Uploaded" if membership_uploaded else "Not uploaded",
                 id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
                 className="text-muted",
             ),
             dbc.Button(
-                "Delete File",
-                id=DELETE_FILE_BUTTON_DATA_UPLOAD_ID,
+                "Delete Membership",
+                id=DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID,
                 color="danger",
                 size="sm",
                 className="mt-2",
-                disabled=delete_button_disabled,
+                disabled=delete_membership_disabled,
             ),
             html.Div(
                 [
@@ -230,10 +271,50 @@ def layout(job_id):
                         value=0.7,
                         marks={0: "0%", 0.5: "50%", 1: "100%"},
                         tooltip={"placement": "bottom", "always_visible": False},
-                        disabled=not file_uploaded,
+                        disabled=slider_disabled,
                     ),
                 ],
                 className="mb-3",
+            ),
+            # --- Predictor upload section ---
+            dcc.Upload(
+                id=PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+                accept=".csv,.txt",
+                children=dbc.Button(
+                    [
+                        html.I(className="bi bi-upload me-2"),
+                        "Upload predictor file",
+                    ],
+                    color="primary",
+                ),
+                multiple=False,
+                disabled=predictor_upload_disabled,
+                className="my-3",
+            ),
+            html.Span(
+                [
+                    html.Small(
+                        _first_sentence(DESCRIPTION_PREDICTOR),
+                        className="text-muted",
+                    ),
+                    _help_icon(DESCRIPTION_PREDICTOR),
+                ],
+            ),
+            html.Div(
+                id=PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID, className="text-danger small"
+            ),
+            html.Div(
+                "Uploaded" if predictor_uploaded else "Not uploaded",
+                id=PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
+                className="text-muted",
+            ),
+            dbc.Button(
+                "Delete Predictor",
+                id=DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID,
+                color="danger",
+                size="sm",
+                className="mt-2",
+                disabled=delete_predictor_disabled,
             ),
         ]
     )
@@ -243,10 +324,6 @@ def layout(job_id):
 
     user_info_path = build_url_step("user_info", job_id)
     street_selection_path = build_url_step("street_selection", job_id)
-
-    classification_file = job.model.classification_upload["file_name"]
-    classification_file_path = os.path.join(job.working_dir, classification_file)
-    next_disabled = not os.path.exists(classification_file_path)
 
     footer = progress_footer(
         prev_url=user_info_path,
@@ -283,71 +360,104 @@ def show_loading(filename):
     Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled"),
     Output(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
-    Output(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "disabled"),
+    Output(DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "disabled"),
     Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children"),
     Output(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled"),
     Output(
         DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
     ),
+    Output(MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID, "children"),
+    Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled"),
+    Output(PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"),
+    Output(PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID, "children"),
+    Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled"),
+    Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Input(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "value"),
     Input(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data"),
+    Input(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     State(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
+    State(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     State(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "value"),
     prevent_initial_call="initial_duplicate",
 )
-def classification_map_manager(
-    contents, opacity, init_trigger, filename, job_id, epsg_input
+def data_upload_manager(
+    contents,
+    opacity,
+    init_trigger,
+    predictor_contents,
+    filename,
+    predictor_filename,
+    job_id,
+    epsg_input,
 ):
-    """Manage classification map: upload, opacity changes, and initial page load."""
+    """Manage data uploads: membership, predictor, opacity changes, and initial page load."""
     triggered = ctx.triggered_id
+    n_out = len(ctx.outputs_list)
 
-    # --- Upload branch ---
+    def _no_update(**overrides):
+        """Build a no_update tuple, overriding specific output indices by name."""
+        result = [dash.no_update] * n_out
+        # Output index mapping (must match callback @Output order above)
+        idx = {
+            "viewport": 0,
+            "file_info": 1,
+            "next_disabled": 2,
+            "epsg_disabled": 3,
+            "upload_contents": 4,
+            "loading": 5,
+            "delete_membership_disabled": 6,
+            "map_children": 7,
+            "slider_disabled": 8,
+            "upload_disabled": 9,
+            "membership_error": 10,
+            "predictor_upload_disabled": 11,
+            "predictor_file_info": 12,
+            "predictor_error": 13,
+            "delete_predictor_disabled": 14,
+            "predictor_contents": 15,
+        }
+        for key, value in overrides.items():
+            result[idx[key]] = value
+        return tuple(result)
+
+    # --- Membership upload branch ---
     if triggered == DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID:
         if not contents or not filename:
             raise PreventUpdate
 
         logging.info(
-            f"Uploading file {filename} for job {job_id} with EPSG {epsg_input}"
+            f"Uploading membership file {filename} for job {job_id} with EPSG {epsg_input}"
         )
         try:
             epsg_input = check_epsg(epsg_input)
         except ValueError as e:
             logging.debug(f"Invalid EPSG code {epsg_input}: {e}")
-            return (
-                dash.no_update,
-                str(e),
-                True,
-                False,
-                None,
-                False,
-                dash.no_update,
-                dash.no_update,
-                dash.no_update,
-                dash.no_update,
+            return _no_update(
+                next_disabled=True,
+                epsg_disabled=False,
+                upload_contents=None,
+                loading=False,
+                membership_error=str(e),
             )
 
         job = CosmonautJob(job_id=job_id)
         job.model.epsg = epsg_input
         # Delete old files just in case
-        job.delete_upload()
+        job.delete_membership()
         try:
-            classification_data, file_path, bounds = job.upload_file(
+            classification_data, file_path, bounds = job.upload_membership(
                 filename, contents, epsg_input
             )
         except ValueError as e:
-            return (
-                dash.no_update,
-                str(e),
-                True,
-                False,
-                None,
-                False,
-                dash.no_update,
-                dash.no_update,
-                dash.no_update,
-                dash.no_update,
+            return _no_update(
+                file_info=str(e),
+                next_disabled=True,
+                epsg_disabled=False,
+                upload_contents=None,
+                loading=False,
+                membership_error=str(e),
             )
 
         logging.debug("Upload finished get OSM data")
@@ -357,9 +467,13 @@ def classification_map_manager(
             "transition": "flyTo",
         }
 
-        osm = OsmRoads(classification_data, epsg_output=epsg_input)
+        osm = OsmDownloader(classification_data, epsg_output=epsg_input)
         osm.run_osm_query(job.working_dir)
         logging.debug("OSM roads queried and saved.")
+
+        sel = StreetSelector(job)
+        sel.keep_largest(None)
+        sel.save()
 
         plot = ClassificationPlot(file_path, job_id, src_epsg=f"EPSG:{epsg_input}")
         plot.generate_plots()
@@ -369,18 +483,52 @@ def classification_map_manager(
         new_map_children = list(default_map_layers) + tile_layers
 
         job.save()
-        logging.debug(f"File {filename} uploaded and processed for job {job_id}")
-        return (
-            reposition_map,
-            f"Selected file: {os.path.basename(file_path)}",
-            False,  # Enable next button
-            True,  # Disable EPSG input
-            None,  # Clear upload contents
-            False,  # Hide loading overlay
-            False,  # Enable delete button
-            new_map_children,  # Classification tile overlay
-            False,  # Enable slider
-            True,  # Disable upload component
+        logging.debug(f"Membership file uploaded and processed for job {job_id}")
+        return _no_update(
+            viewport=reposition_map,
+            file_info="Uploaded",
+            next_disabled=True,
+            epsg_disabled=True,
+            upload_contents=None,
+            loading=False,
+            delete_membership_disabled=False,
+            map_children=new_map_children,
+            slider_disabled=False,
+            upload_disabled=True,
+            membership_error="",
+            predictor_upload_disabled=False,
+            predictor_file_info="Not uploaded",
+            predictor_error="",
+            delete_predictor_disabled=True,
+        )
+
+    # --- Predictor upload branch ---
+    if triggered == PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID:
+        if not predictor_contents or not predictor_filename:
+            raise PreventUpdate
+
+        logging.info(f"Uploading predictor file for job {job_id}")
+
+        job = CosmonautJob(job_id=job_id)
+        try:
+            job.upload_predictor(predictor_contents)
+        except ValueError as e:
+            return _no_update(
+                next_disabled=True,
+                loading=False,
+                predictor_file_info="Not uploaded",
+                predictor_error=str(e),
+                delete_predictor_disabled=True,
+                predictor_contents=None,
+            )
+
+        return _no_update(
+            next_disabled=False,
+            loading=False,
+            predictor_file_info="Uploaded",
+            predictor_error="",
+            delete_predictor_disabled=False,
+            predictor_contents=None,
         )
 
     # --- Opacity slider branch ---
@@ -399,18 +547,7 @@ def classification_map_manager(
 
         tile_layers = create_tile_layer(job_id, opacity)
         new_map_children = list(default_map_layers) + tile_layers
-        return (
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            new_map_children,
-            dash.no_update,
-            dash.no_update,
-        )
+        return _no_update(map_children=new_map_children)
 
     # --- Init store branch (page load with existing upload) ---
     if triggered == DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID:
@@ -424,31 +561,13 @@ def classification_map_manager(
             if os.path.exists(tif_path):
                 tile_layers = create_tile_layer(job_id, opacity)
                 new_map_children = list(default_map_layers) + tile_layers
-                return (
-                    dash.no_update,
-                    dash.no_update,
-                    dash.no_update,
-                    dash.no_update,
-                    dash.no_update,
-                    dash.no_update,
-                    dash.no_update,
-                    new_map_children,
-                    False,  # Enable slider
-                    True,  # Disable upload component
+                return _no_update(
+                    map_children=new_map_children,
+                    slider_disabled=False,
+                    upload_disabled=True,
                 )
 
-        return (
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            dash.no_update,
-            True,  # Disable slider
-            dash.no_update,
-        )
+        return _no_update(slider_disabled=True)
 
     raise PreventUpdate
 
@@ -456,7 +575,7 @@ def classification_map_manager(
 @callback(
     Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
     Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Output(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
@@ -466,57 +585,31 @@ def classification_map_manager(
         DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
     ),
     Output(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data", allow_duplicate=True),
-    Input(DELETE_FILE_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
+    Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
+    Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Input(DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def delete_uploaded_file(n_clicks, job_id):
-    """Delete uploaded file and reset upload state.
-
-    When user clicks delete button:
-    1. Verify job status is PENDING (safety check)
-    2. Call job.delete_upload() to remove file and reset data
-    3. Update UI to show "No file uploaded"
-    4. Re-enable EPSG input field
-    5. Hide delete button
-    6. Disable next button (can't proceed without file)
-    7. Reset map to default view
-
-    Parameters
-    ----------
-    n_clicks : int
-        Number of times delete button clicked
-    job_id : str
-        Current job ID
-
-    Returns
-    -------
-    tuple
-        (file_info_text, epsg_disabled, delete_button_style,
-         next_button_disabled, map_viewport, loading_overlay)
-    """
+def delete_membership_file(n_clicks, job_id):
+    """Delete membership file and cascade-delete predictor, reset upload state."""
     if n_clicks is None:
         raise PreventUpdate
 
-    logging.info(f"Delete file button clicked for job {job_id}")
+    logging.info(f"Delete membership button clicked for job {job_id}")
 
-    # Load job and verify status
     job = CosmonautJob(job_id=job_id)
 
-    # Safety check: Only allow deletion if job status is PENDING
     if job.model.status != JOB_STATUS_PENDING:
         logging.warning(
             f"Cannot delete upload - job {job_id} status is {job.model.status}"
         )
         raise PreventUpdate
 
-    # Delete upload
-    job.delete_upload()
+    # Cascade: deletes predictor first, then membership
+    job.delete_membership()
 
-    # File info text
-    file_info_text = "No file uploaded"
-
-    # Reset map to default view (using constants)
     default_viewport = {
         "center": DEFAULT_MAP_CENTER,
         "zoom": DEFAULT_MAP_ZOOM,
@@ -524,16 +617,51 @@ def delete_uploaded_file(n_clicks, job_id):
     }
 
     return (
-        file_info_text,
-        False,  # Enable EPSG input
-        True,  # Disable delete button
-        True,  # Disable next button (no file uploaded)
-        default_viewport,  # Reset map
-        False,  # Hide loading overlay
-        list(default_map_layers),  # Remove classification overlay
-        True,  # Disable opacity slider
-        False,  # Enable upload component
-        False,  # Reset init store (no file uploaded)
+        "Not uploaded",  # membership file info
+        False,  # enable EPSG input
+        True,  # disable delete membership button
+        True,  # disable next button
+        default_viewport,  # reset map
+        False,  # hide loading overlay
+        list(default_map_layers),  # remove classification overlay
+        True,  # disable opacity slider
+        False,  # enable upload component
+        False,  # reset init store
+        True,  # disable predictor upload
+        "Not uploaded",  # predictor file info
+        True,  # disable delete predictor button
+    )
+
+
+@callback(
+    Output(PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
+    Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Input(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    prevent_initial_call=True,
+)
+def delete_predictor_file(n_clicks, job_id):
+    """Delete predictor file and reset predictor upload state."""
+    if n_clicks is None:
+        raise PreventUpdate
+
+    logging.info(f"Delete predictor button clicked for job {job_id}")
+
+    job = CosmonautJob(job_id=job_id)
+
+    if job.model.status != JOB_STATUS_PENDING:
+        logging.warning(
+            f"Cannot delete predictor - job {job_id} status is {job.model.status}"
+        )
+        raise PreventUpdate
+
+    job.delete_predictor()
+
+    return (
+        "Not uploaded",  # predictor file info
+        True,  # disable delete predictor button
+        True,  # disable next button (predictor required)
     )
 
 

@@ -23,7 +23,8 @@ def test_db_manager():
         "status": "completed",
         "version": "1.0",
         "selected_road_tags": ["motorway", "primary"],
-        "classification_upload": {"file_name": "test.csv"},
+        "membership_upload": {"file_name": "test.csv"},
+        "predictor_upload": {"file_name": "test_predictors.csv"},
         "epsg": 4326,
         "config": {},
     }

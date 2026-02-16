@@ -10,13 +10,13 @@ locations.
 **Selection Features:**
 
 - **Tag Filtering**: Select road types using dropdown filters organized by
-  German road classifications:
-  - Autobahn (highways)
-  - Bundesstraßen (federal roads)
-  - Landstraße (country roads)
-  - Kreisstraße (district roads)
-  - Gemeindestraße (municipal roads)
-  - Sonstige (other roads including residential, service, tracks)
+  OSM highway classifications:
+  - Motorway (highways and ramps)
+  - Trunk road (expressways)
+  - Primary road (major routes)
+  - Secondary road (regional routes)
+  - Tertiary road (local connectors)
+  - Unclassified, Residential, Living street, Track
 
   Use "Select All" / "Select None" buttons for quick bulk operations.
 
@@ -29,7 +29,6 @@ locations.
     component, removing isolated segments
   - **Remove Disconnected**: Filter out road segments that aren't connected to
     your main network
-  - **Undo**: Revert your last selection action using snapshot-based history
   - **Reset**: Clear all selections and start over with a clean slate
 
 The map displays selected roads with real-time visual feedback as you make
@@ -41,28 +40,22 @@ covers your measurement locations while being traversable by your vehicle.
 - Use "Keep Largest" to remove small disconnected segments automatically
 - Verify all measurement points are reachable from your selected network
 - Click individual segments to fine-tune network boundaries
-- Use Undo if you make a mistake
 
 When satisfied with your street selection, proceed to configure routing parameters
 for the final route calculation.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
-Street selection state is persisted to the job's work directory as GeoJSON. Undo
-functionality uses snapshot files stored in work_dir/snapshots/. Interactive callbacks
-use Dash Leaflet click events with feature_id tracking. The utils module handles graph
-connectivity analysis and road network processing.
+Street selection state is persisted to the job's work directory as GeoJSON.
+Interactive callbacks use Dash Leaflet click events with feature_id tracking.
+The StreetSelector class handles graph connectivity analysis and road network processing.
 """
 
-import json
 import logging
-import os
-import shutil  # required for undo
 from typing import Any, Dict, List, Optional, Tuple
 
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
-import geojson
 from dash import (
     Input,
     Output,
@@ -75,14 +68,16 @@ from dash import (
     register_page,
 )
 from dash.exceptions import PreventUpdate
+from dash_extensions.javascript import assign
 
-from cosmonaut_app.config import osm_tags_mapping
-from cosmonaut_app.constants.general import JOB_STATUS_PENDING
+from cosmonaut_app.constants.general import (
+    JOB_STATUS_PENDING,
+    OSM_TAGS_MAPPING,
+)
 from cosmonaut_app.constants.html_ids import (
     CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
     CLICKED_ROADS_STORE_SHARED_ID,
     CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
-    EPSG_STORE_SHARED_ID,
     JOB_ID_STORE_SHARED_ID,
     LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
     NEXT_BUTTON_STREET_SELECTION_ID,
@@ -94,54 +89,20 @@ from cosmonaut_app.constants.html_ids import (
     TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
     TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
-    UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
     create_map,
     create_reset_banner,
     create_reset_modal,
+    hover_style_handle,
     page_container_split_layout,
     progress_footer,
-    style_handle,  # reuse dynamic style so colors stay consistent after filtering
+    style_handle,
 )
-from cosmonaut_app.road_network_utils import (
-    build_graph,
-    get_largest_subnetwork,
-    remove_dead_roads,
-    remove_disconnected_roads,
-)
-from cosmonaut_app.transformation import transform_geojson
-from cosmonaut_app.utils.street_selection_utils import (
-    coerce_nodes_list as _coerce_nodes_list,
-)
-from cosmonaut_app.utils.street_selection_utils import (
-    ensure_feature_ids as _ensure_feature_ids,
-)
-from cosmonaut_app.utils.street_selection_utils import (
-    filter_by_tags as _filter_by_tags,
-)
-from cosmonaut_app.utils.street_selection_utils import (
-    initial_features,
-)
-from cosmonaut_app.utils.street_selection_utils import (
-    load_fc as _load_fc,
-)
-from cosmonaut_app.utils.street_selection_utils import (
-    paths as _paths,
-)
-from cosmonaut_app.utils.street_selection_utils import (
-    safe_projected_export as _safe_export,
-)
-from cosmonaut_app.utils.street_selection_utils import (
-    save_fc_4326_no_crs as _save,
-)
-from cosmonaut_app.utils.street_selection_utils import (
-    snapshot_work_copy as _snapshot,
-)
+from cosmonaut_app.street_selector import StreetSelector
 
 register_page(
     __name__,
@@ -151,6 +112,18 @@ register_page(
     description="Select streets for the routing process.",
     dynamic=True,
 )
+
+click_handler = assign("""function(e, ctx) {
+    const id = e.layer.feature.id;
+    const selected = [...(ctx.hideout.selected || [])];
+    const idx = selected.indexOf(id);
+    if (idx > -1) {
+        selected.splice(idx, 1);
+    } else {
+        selected.push(id);
+    }
+    ctx.setProps({hideout: {...ctx.hideout, selected: selected}});
+}""")
 
 
 def layout(job_id: str):
@@ -167,7 +140,7 @@ def layout(job_id: str):
     is_active = status == JOB_STATUS_PENDING
 
     logging.info(f"Street selection layout called with job_id={job_id}")
-    logging.info(job.model.classification_upload)
+    logging.info(job.model.membership_upload)
 
     card_body = []
 
@@ -180,23 +153,21 @@ def layout(job_id: str):
         [
             # Shared stores required by cross-page callbacks (map, routing, etc.)
             dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
-            dcc.Store(id=EPSG_STORE_SHARED_ID, storage_type="session"),
             dcc.Store(
                 id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"
             ),
-            # Local store to remember last tag selection
             html.P(
-                "Wählen Sie die gewünschten Straßen im linken Kartenbereich aus. "
-                "Klicken Sie eine Straße an, um sie zu markieren. Mit dem Button "
-                "'Remove selected' entfernen Sie die Auswahl. 'Keep largest' behält die größte "
-                "zusammenhängende Teilmenge innerhalb der aktuell gewählten Straßentypen.",
+                "Select the desired roads in the map on the left. "
+                "Click a road to mark it. Use 'Remove selected' to remove the "
+                "marked roads. 'Keep largest' retains the largest connected "
+                "subset within the currently selected road types.",
                 className="text-muted",
             ),
             dbc.Row(
                 [
                     dbc.Col(
                         dbc.Label(
-                            "Straßenauswahl",
+                            "Road type filter",
                             html_for=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
                             className="mt-2",
                         ),
@@ -232,10 +203,10 @@ def layout(job_id: str):
             dbc.Checklist(
                 id=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
                 options=[
-                    {"label": tag, "value": tag} for tag in osm_tags_mapping.keys()
+                    {"label": tag, "value": tag} for tag in OSM_TAGS_MAPPING.keys()
                 ],
                 # Initialize with all tags so we immediately render the network once data exists
-                value=list(osm_tags_mapping.keys()),
+                value=list(OSM_TAGS_MAPPING.keys()),
                 switch=True,
                 inline=True,
                 input_class_name="form-check-input"
@@ -257,7 +228,6 @@ def layout(job_id: str):
                                     ],
                                     id=REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
                                     color="danger",
-                                    outline=True,
                                     disabled=not is_active,
                                 ),
                                 dbc.Button(
@@ -267,7 +237,6 @@ def layout(job_id: str):
                                     ],
                                     id=LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
                                     color="primary",
-                                    outline=True,
                                     disabled=not is_active,
                                 ),
                                 dbc.Button(
@@ -279,17 +248,6 @@ def layout(job_id: str):
                                     ],
                                     id=RESET_ROADS_BUTTON_STREET_SELECTION_ID,
                                     color="secondary",
-                                    outline=True,
-                                    disabled=not is_active,
-                                ),
-                                dbc.Button(
-                                    [
-                                        html.I(className="bi bi-arrow-90deg-left me-1"),
-                                        "Undo",
-                                    ],
-                                    id=UNDO_BUTTON_BUTTON_STREET_SELECTION_ID,
-                                    color="secondary",
-                                    outline=True,
                                     disabled=not is_active,
                                 ),
                             ],
@@ -353,39 +311,17 @@ def layout(job_id: str):
         next_disabled=False,
     )
 
-    initial_fc = initial_features(job_id)
-
-    # TEMPORARY DIAGNOSTIC LOGGING - TODO: REMOVE
-    logging.info(f"initial_fc type: {type(initial_fc)}")
-    logging.info(
-        f"initial_fc keys: {initial_fc.keys() if isinstance(initial_fc, dict) else 'NOT A DICT'}"
-    )
-    logging.info(f"Number of features: {len(initial_fc.get('features', []))}")
-    if initial_fc.get("features"):
-        first_feature = initial_fc["features"][0]
-        logging.info(f"First feature keys: {first_feature.keys()}")
-        logging.info(f"First feature id: {first_feature.get('id')}")
-        logging.info(f"First feature id type: {type(first_feature.get('id'))}")
-        # Check all features have IDs
-        features_without_ids = [
-            i for i, f in enumerate(initial_fc.get("features", [])) if "id" not in f
-        ]
-        if features_without_ids:
-            logging.error(
-                f"Features missing IDs at indices: {features_without_ids[:10]}"
-            )
-        else:
-            logging.info("All features have IDs")
-    # END TEMPORARY LOGGING
+    sel = StreetSelector(job)
+    initial_fc = sel.initial_fc(list(OSM_TAGS_MAPPING.keys()))
 
     extra_layer = dl.GeoJSON(
         id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,
         data=initial_fc,
-        # Use same dynamic style function used after first interaction for consistency
         options={"style": style_handle},
+        hoverStyle=hover_style_handle,
+        eventHandlers=dict(click=click_handler),
         hideout=dict(selected=[], zoom=10),
-        # Set zoomToBounds on initial layout; later we will disable on updates
-        zoomToBounds=True if initial_fc.get("features") else False,
+        zoomToBounds=bool(initial_fc["features"]),
     )
 
     map = create_map(job=job, extra_layers=[extra_layer])
@@ -399,97 +335,37 @@ def layout(job_id: str):
     return page_container_split_layout(map, input_container)
 
 
-"""
-Callbacks with business logic are intentionally kept minimal here. Complex
-operations (filtering, id assignment, normalization, exports) live in
-cosmonaut_app/utils/street_selection_utils.py and shared map callback lives in layout.
-"""
-
-
 @callback(
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
     [Input(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
-        State(CLICKED_ROADS_STORE_SHARED_ID, "data"),
+        State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
         State(JOB_ID_STORE_SHARED_ID, "data"),
-        State(EPSG_STORE_SHARED_ID, "data"),
         State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     ],
     prevent_initial_call=True,
 )
 def remove_selected(
     n: Optional[int],
-    clicked_roads: Optional[List[int]],
+    hideout: Optional[Dict[str, Any]],
     job_id: Optional[str],
-    epsg_input: Optional[int | str],
     selected_roads: Optional[List[str]],
 ) -> Dict[str, Any]:
-    """Remove the currently selected roads and update the working GeoJSON.
-
-    Args:
-        n: Click count for the Remove button.
-        clicked_roads: Road ids selected on the map.
-        job_id: Current job id.
-        epsg_input: Optional target EPSG code for projected export.
-        selected_roads: Current tag selection used to filter visible features.
-
-    Returns:
-        FeatureCollection dict with filtered visible features after removal.
-    """
+    """Remove the currently selected roads and update the edited GeoJSON."""
     if not n or not job_id:
         raise PreventUpdate
 
-    # Prevent interaction if job is not in PENDING state
-    job = CosmonautJob(job_id=job_id)
-    if job.get_status() != JOB_STATUS_PENDING:
-        logging.warning(f"Remove selected prevented: job {job_id} not in PENDING state")
+    sel = StreetSelector(CosmonautJob(job_id=job_id))
+    if not sel.is_pending():
         raise PreventUpdate
 
-    if not clicked_roads:
-        logging.info("No roads selected; nothing to remove.")
+    clicked = (hideout or {})["selected"]
+    if not clicked:
         raise PreventUpdate
 
-    in_dir, raw_4326, work_4326 = _paths(job_id)
-    # snapshot handled by lower-level utils in dedicated service (left out here for simplicity)
-    if not os.path.exists(work_4326):
-        # First-time edit: seed from raw
-        if os.path.exists(raw_4326):
-            with (
-                open(raw_4326, encoding="utf-8") as fsrc,
-                open(work_4326, "w", encoding="utf-8") as fdst,
-            ):
-                fdst.write(fsrc.read())
-        else:
-            logging.error("Missing baseline file: %s", raw_4326)
-            raise PreventUpdate
-
-    _snapshot(in_dir, work_4326)
-    data = _load_fc(work_4326)
-    all_roads = data.get("features", [])
-    _ensure_feature_ids(all_roads)
-    _coerce_nodes_list(all_roads)
-
-    # Build graph and remove roads idempotently
-    G = build_graph(all_roads)
-    unique_ids = list(dict.fromkeys(clicked_roads))  # de-dup preserve order
-    for road_id in unique_ids:
-        try:
-            all_roads = remove_dead_roads(road_id, all_roads, G)
-            # Rebuild graph after each removal to keep consistency
-            G = build_graph(all_roads)
-        except Exception as e:
-            logging.warning("remove_dead_roads failed for %s: %s", road_id, e)
-
-    # Persist updated working copy (4326, no crs)
-    updated_fc = {"type": "FeatureCollection", "features": all_roads}
-    _save(work_4326, updated_fc)
-
-    # Re-export projected file (wrapped helper handles internal errors)
-    _safe_export(in_dir, work_4326, epsg_input)
-
-    # Return filtered view according to current tag selection
-    visible = _filter_by_tags(all_roads, selected_roads)
-    return {"type": "FeatureCollection", "features": visible}
+    sel.remove_roads(clicked)
+    sel.save()
+    return sel.visible_fc(selected_roads)
 
 
 @callback(
@@ -497,7 +373,6 @@ def remove_selected(
     [Input(LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
         State(JOB_ID_STORE_SHARED_ID, "data"),
-        State(EPSG_STORE_SHARED_ID, "data"),
         State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     ],
     prevent_initial_call=True,
@@ -505,86 +380,21 @@ def remove_selected(
 def keep_largest_subnetwork(
     n: Optional[int],
     job_id: Optional[str],
-    epsg_input: Optional[int | str],
     selected_roads: Optional[List[str]],
 ) -> Dict[str, Any]:
-    """Keep the largest connected subnetwork within the current tag filter.
-
-    Returns a filtered FeatureCollection representing the updated working set.
-    """
+    """Keep the largest connected subnetwork within the current tag filter."""
     if not n or not job_id:
         raise PreventUpdate
 
-    # Prevent interaction if job is not in PENDING state
-    job = CosmonautJob(job_id=job_id)
-    if job.get_status() != JOB_STATUS_PENDING:
-        logging.warning(f"Keep largest prevented: job {job_id} not in PENDING state")
+    sel = StreetSelector(CosmonautJob(job_id=job_id))
+    if not sel.is_pending():
         raise PreventUpdate
 
-    in_dir, raw_4326, work_4326 = _paths(job_id)
-    # Load from work; seed from raw if needed
-    if not os.path.exists(work_4326):
-        if os.path.exists(raw_4326):
-            with (
-                open(raw_4326, encoding="utf-8") as fsrc,
-                open(work_4326, "w", encoding="utf-8") as fdst,
-            ):
-                fdst.write(fsrc.read())
-        else:
-            logging.error("Missing baseline file: %s", raw_4326)
-            raise PreventUpdate
-
-    _snapshot(in_dir, work_4326)
-    data = _load_fc(work_4326)
-    all_roads = data.get("features", [])
-    _ensure_feature_ids(all_roads)
-    _coerce_nodes_list(all_roads)
-
-    # Work within the current tag filter for a user-friendly result
-    filtered_subset = _filter_by_tags(all_roads, selected_roads)
-    logging.info(
-        "Largest-subnetwork on filtered subset: %d features", len(filtered_subset)
-    )
-
-    if not filtered_subset:
-        logging.info("No features in current filter; nothing to keep.")
+    if not sel.keep_largest(selected_roads):
         raise PreventUpdate
 
-    # Build graph on the filtered subset and keep only its largest component
-    G = build_graph(filtered_subset)
-    largest_subnetwork = get_largest_subnetwork(G)
-    kept_subset = remove_disconnected_roads(G, largest_subnetwork, filtered_subset)
-    kept_ids = {f.get("id") for f in kept_subset}
-    logging.info(
-        "Kept %d/%d features in largest component for current filter",
-        len(kept_subset),
-        len(filtered_subset),
-    )
-
-    # Persist: remove only the filtered features not in the largest component;
-    # keep all non-filtered features unchanged.
-    filtered_ids = {f.get("id") for f in filtered_subset}
-    new_all_roads = []
-    for f in all_roads:
-        fid = f.get("id")
-        if fid in filtered_ids:
-            if fid in kept_ids:
-                new_all_roads.append(f)
-        else:
-            # Not part of the filtered subset -> keep as-is
-            new_all_roads.append(f)
-
-    # Persist working copy (4326, no crs)
-    updated_fc = {"type": "FeatureCollection", "features": new_all_roads}
-    _save(work_4326, updated_fc)
-
-    # Re-export projected file
-    _safe_export(in_dir, work_4326, epsg_input)
-
-    # Return the currently-filtered view from the new working set
-    visible = _filter_by_tags(new_all_roads, selected_roads)
-    logging.info("Visible after largest-subnetwork: %d features", len(visible))
-    return {"type": "FeatureCollection", "features": visible}
+    sel.save()
+    return sel.visible_fc(selected_roads)
 
 
 @callback(
@@ -592,7 +402,6 @@ def keep_largest_subnetwork(
     [Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
         State(JOB_ID_STORE_SHARED_ID, "data"),
-        State(EPSG_STORE_SHARED_ID, "data"),
         State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     ],
     prevent_initial_call=True,
@@ -600,40 +409,17 @@ def keep_largest_subnetwork(
 def reset_edits(
     n: Optional[int],
     job_id: Optional[str],
-    epsg_input: Optional[int | str],
     selected_roads: Optional[List[str]],
 ) -> Dict[str, Any]:
-    """Reset edits by restoring the working file from the raw baseline.
-
-    Returns the baseline filtered by the current tag selection.
-    """
+    """Reset edits by restoring the edited file from the download baseline."""
     if not n or not job_id:
         raise PreventUpdate
 
-    in_dir, raw_4326, work_4326 = _paths(job_id)
-    if not os.path.exists(raw_4326):
-        logging.error("Missing baseline file: %s", raw_4326)
-        raise PreventUpdate
-
-    # Reset work from raw
-    with (
-        open(raw_4326, encoding="utf-8") as fsrc,
-        open(work_4326, "w", encoding="utf-8") as fdst,
-    ):
-        fdst.write(fsrc.read())
-
-    # Re-export projected file
-    _safe_export(in_dir, work_4326, epsg_input)
-
-    # Return filtered raw view
-    data = _load_fc(work_4326)
-    all_roads = data.get("features", [])
-    _ensure_feature_ids(all_roads)
-    visible = _filter_by_tags(all_roads, selected_roads)
-    return {"type": "FeatureCollection", "features": visible}
+    sel = StreetSelector(CosmonautJob(job_id=job_id))
+    sel.reset()
+    return sel.visible_fc(selected_roads)
 
 
-# Select all / none tags
 @callback(
     Output(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
@@ -651,45 +437,20 @@ def tags_select_all_none(
 ) -> Tuple[List[str], Dict[str, Any]]:
     """Update tag selection to all or none and refresh the visible FeatureCollection."""
     trig = ctx.triggered_id
-    if trig not in (
-        TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
-        TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
-    ):
+    if trig == TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID:
+        new_selection = list(OSM_TAGS_MAPPING.keys())
+    elif trig == TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID:
+        new_selection = []
+    else:
         raise PreventUpdate
 
-    # Determine new selection list
-    if trig == TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID:
-        new_selection = list(osm_tags_mapping.keys())
-    else:
-        new_selection = []  # show no roads
+    if not job_id:
+        return new_selection, {"type": "FeatureCollection", "features": []}
 
-    # Reload source data (raw or work) to apply fresh filter; avoids cumulative filtering artifacts
-    initial_fc = {"type": "FeatureCollection", "features": []}
-    try:
-        if job_id:
-            in_dir, raw_path, work_path = _paths(job_id)
-            source = work_path if os.path.exists(work_path) else raw_path
-            if source and os.path.exists(source):
-                with open(source, encoding="utf-8") as f:
-                    data = json.load(f)
-                feats = data.get("features", [])
-                _ensure_feature_ids(feats)
-                feats = _filter_by_tags(feats, new_selection)
-                for feat in feats:
-                    p = feat.setdefault("properties", {})
-                    name = p.get("name") or p.get("ref")
-                    hw = p.get("highway")
-                    p["tooltip"] = (
-                        f"{name}, {hw}" if name else f"{hw}" if hw else name or ""
-                    )
-                initial_fc = {"type": "FeatureCollection", "features": feats}
-    except Exception as e:
-        logging.warning("Tag select all/none preload failed: %s", e)
-
-    return new_selection, initial_fc
+    sel = StreetSelector(CosmonautJob(job_id=job_id))
+    return new_selection, sel.visible_fc(new_selection)
 
 
-# Open/close Reset confirmation modal
 @callback(
     Output(
         RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID, "is_open", allow_duplicate=True
@@ -720,9 +481,7 @@ def toggle_reset_modal(
     raise PreventUpdate
 
 
-# Clear selections after actions (use confirm-reset instead of reset-roads)
 @callback(
-    Output(CLICKED_ROADS_STORE_SHARED_ID, "data", allow_duplicate=True),
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout", allow_duplicate=True),
     Input(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     Input(LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
@@ -735,83 +494,15 @@ def clear_selections(
     n_largest: Optional[int],
     n_reset_confirm: Optional[int],
     hideout: Optional[Dict[str, Any]],
-) -> Tuple[List[int], Dict[str, Any]]:
+) -> Dict[str, Any]:
     """Clear current selections after destructive operations for a clean state."""
     if not any([n_remove, n_largest, n_reset_confirm]):
         raise PreventUpdate
     new_hideout = dict(hideout or {})
     new_hideout["selected"] = []
-    return [], new_hideout
+    return new_hideout
 
 
-# Undo: restore last snapshot from history
-@callback(
-    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
-    Input(UNDO_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
-    State(JOB_ID_STORE_SHARED_ID, "data"),
-    State(EPSG_STORE_SHARED_ID, "data"),
-    State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
-    prevent_initial_call=True,
-)
-def undo_last(
-    n: Optional[int],
-    job_id: Optional[str],
-    epsg_input: Optional[int | str],
-    selected_roads: Optional[List[str]],
-) -> Dict[str, Any]:
-    """Restore the most recent snapshot from history and re-filter by tags."""
-    if not n or not job_id:
-        raise PreventUpdate
-
-    # Prevent interaction if job is not in PENDING state
-    job = CosmonautJob(job_id=job_id)
-    if job.get_status() != JOB_STATUS_PENDING:
-        logging.warning(f"Undo prevented: job {job_id} not in PENDING state")
-        raise PreventUpdate
-    in_dir, raw_4326, work_4326 = _paths(job_id)
-    hist_dir = os.path.join(in_dir, "history")
-    if not os.path.isdir(hist_dir):
-        raise PreventUpdate
-    # pick newest snapshot
-    snaps = sorted(
-        (
-            os.path.join(hist_dir, f)
-            for f in os.listdir(hist_dir)
-            if f.endswith(".geojson")
-        ),
-        key=os.path.getmtime,
-        reverse=True,
-    )
-    if not snaps:
-        raise PreventUpdate
-    latest = snaps[0]
-    try:
-        shutil.copy2(latest, work_4326)
-        if epsg_input:
-            transformed = transform_geojson(work_4326, 4326, epsg_input)
-            transformed = {
-                "type": "FeatureCollection",
-                "crs": {
-                    "type": "name",
-                    "properties": {"name": f"urn:ogc:def:crs:EPSG::{epsg_input}"},
-                },
-                "features": transformed["features"],
-            }
-            with open(
-                os.path.join(in_dir, f"osm_data_{epsg_input}.geojson"),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                geojson.dump(transformed, f)
-    except Exception as e:
-        logging.warning("Undo failed: %s", e)
-        raise PreventUpdate
-    data = _load_fc(work_4326)
-    visible = _filter_by_tags(data.get("features", []), selected_roads)
-    return {"type": "FeatureCollection", "features": visible}
-
-
-# Update database with selected tags
 @callback(
     Output(NONE_DIV_SHARED_ID, "children"),
     Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
@@ -819,17 +510,13 @@ def undo_last(
     prevent_initial_call=True,
 )
 def update_tags_dropdown(tags: Optional[List[str]], job_id: Optional[str]):
-    """Persist selected tag values to the database.
-
-    Returns no_update; the effect is stored server-side.
-    """
+    """Persist selected tag values via the Job model."""
     if tags is None:
         raise PreventUpdate
 
-    try:
-        DataBaseManager.update_column(job_id, {"selected_road_tags": tags})
-        logging.info("Updated selected road tags with following tags: %s", tags)
-    except JobNotFound:
-        logging.error("Job with ID %s not found.", job_id)
+    logging.info("Updated selected road tags with following tags: %s", tags)
+    job = CosmonautJob(job_id=job_id)
+    job.model.selected_road_tags = tags
+    job.save()
 
     return no_update

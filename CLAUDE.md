@@ -99,3 +99,11 @@ user asks later. Keep this skill list in Mind:
 **DO NOT** use the auto memory system (`MEMORY.md`). If you feel something should
 be remembered across sessions, ask the user whether it should be added to this
 `CLAUDE.md` file instead.
+
+## Identity Files
+
+Before your first response, read the following files if they exist in the project root:
+- `USER.md` — Information about the user you're working with
+- `SOUL.md` — Your personality and core values
+
+If these files are not present, proceed normally.

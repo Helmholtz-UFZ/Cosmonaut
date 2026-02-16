@@ -8,7 +8,8 @@ DROP TABLE IF EXISTS jobs;
 CREATE TABLE jobs (
     job_id VARCHAR PRIMARY KEY,
     email VARCHAR,
-    classification_upload JSONB,
+    membership_upload JSONB,
+    predictor_upload JSONB,
     selected_road_tags TEXT[],
     submitted BOOL,
     notified_end BOOL,

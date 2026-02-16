@@ -380,7 +380,8 @@ class JobTable(Base):
 
     job_id = Column(String, primary_key=True)
     email = Column("email", String)
-    classification_upload = Column("classification_upload", JSON)
+    membership_upload = Column("membership_upload", JSON)
+    predictor_upload = Column("predictor_upload", JSON)
     selected_road_tags = Column("selected_road_tags", ARRAY(String))
     submitted = Column("submitted", Boolean)
     notified_end = Column("notified_end", Boolean)

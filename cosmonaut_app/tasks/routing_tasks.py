@@ -5,22 +5,23 @@ Currently implements a placeholder that computes a hash of parameters.
 This will be replaced with actual routing algorithm implementation.
 """
 
-import json
 import logging
 import os
+import shutil
 from logging.config import dictConfig
-from time import sleep
 
 from celery import Task
+from sensor_routing.full_pipeline_cli import sensor_routing_pipeline
 
 from cosmonaut_app.constants.general import (
+    INPUT_DIR,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     LOG_FILE_NAME,
-    SOLUTION_FILE,
+    MEMBERSHIP_FILENAME,
+    OSM_FILENAME,
+    PREDICTOR_FILENAME,
 )
-
-# from sensor_routing.sensor_routing_cli import routing_full_pipeline
 
 log = logging.getLogger(__name__)
 
@@ -34,27 +35,6 @@ class RoutingTask(Task):
         job_id = args[0] if args else kwargs.get("job_id")
         if job_id:
             log.error(f"Job {job_id} failed with error: {str(exc)}")
-
-
-def routing_place_holder(working_dir):
-    """Compute hash from parameters.json and write to file.
-
-    This is a placeholder function that will be replaced with the actual
-    routing algorithm implementation.
-
-    Args:
-        working_dir: Working directory for the job
-
-    Returns:
-        str: SHA256 hash of the parameters
-    """
-    logging.info(f"Starting placeholder routing computation in {working_dir}")
-    sleep(10)  # Simulate computation time
-    result_file = os.path.join(working_dir, SOLUTION_FILE)
-    with open(result_file, "w") as f:
-        json.dump({"status": "completed"}, f)
-
-    logging.info(f"Written placeholder solution to {result_file}")
 
 
 def flush_all_handlers():
@@ -76,7 +56,7 @@ def process_routing_job(self, job_id):
     Steps:
     1. Load job from database
     2. Switch logging to file in work_dir (mimicking cosmopolitan's computation_tasks)
-    3. Call routing_place_holder() function
+    3. Call sensor_routing_pipeline() function
     4. Flush handlers and switch logging back to web config
     """
     from cosmonaut_app.config import DEBUG
@@ -99,8 +79,15 @@ def process_routing_job(self, job_id):
     try:
         logging.info(f"Starting routing job computation for job_id={job_id}")
 
-        # TODO
-        routing_place_holder(job.working_dir)
+        # Copy input files to input/ subdirectory for sensor_routing pipeline
+        input_dir = os.path.join(job.working_dir, INPUT_DIR)
+        os.makedirs(input_dir, exist_ok=True)
+        for fname in [MEMBERSHIP_FILENAME, PREDICTOR_FILENAME, OSM_FILENAME]:
+            src = os.path.join(job.working_dir, fname)
+            dst = os.path.join(input_dir, fname)
+            shutil.copy2(src, dst)
+
+        sensor_routing_pipeline(job.working_dir)
 
         # Post-processing: Create GPX and QR code
         logging.info(f"Starting post-processing for job {job.model.job_id}")

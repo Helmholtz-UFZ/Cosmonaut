@@ -40,7 +40,6 @@ If uncertain, ask for review rather than adding # nocheck to suppress the test.
 
 # --- Stores ---
 CLICKED_ROADS_STORE_SHARED_ID = "clicked-roads-store-shared-id"
-EPSG_STORE_SHARED_ID = "epsg-store-shared-id"
 JOB_ID_STORE_SHARED_ID = "job-id-store-shared-id"
 
 # --- Navigation ---
@@ -75,11 +74,15 @@ RESET_MODAL_CONFIRM_BUTTON_SHARED_ID = "reset-modal-confirm-button-shared-id"
 # ============================================================================
 
 # --- Buttons ---
-DELETE_FILE_BUTTON_DATA_UPLOAD_ID = "delete-file-button-data-upload-id"
+DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID = "delete-membership-button-data-upload-id"
+DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID = "delete-predictor-button-data-upload-id"
 NEXT_BUTTON_DATA_UPLOAD_ID = "next-button-data-upload-id"
 
 # --- Divs ---
 DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID = "data-upload-file-info-div-data-upload-id"
+MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID = "membership-error-div-data-upload-id"
+PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID = "predictor-error-div-data-upload-id"
+PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID = "predictor-file-info-div-data-upload-id"
 
 # --- Inputs ---
 DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID = "data-upload-epsg-input-data-upload-id"
@@ -95,6 +98,7 @@ DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID = (
 DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID = (
     "data-upload-upload-component-data-upload-id"
 )
+PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID = "predictor-upload-component-data-upload-id"
 
 
 # ============================================================================
@@ -198,8 +202,6 @@ TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID = (
 TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID = (
     "tags-select-none-button-street-selection-id"
 )
-UNDO_BUTTON_BUTTON_STREET_SELECTION_ID = "undo-button-button-street-selection-id"
-
 # --- Dropdowns ---
 TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID = (
     "tags-dropdown-dropdown-street-selection-id"
