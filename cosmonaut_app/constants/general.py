@@ -1,15 +1,5 @@
 """General application constants for COSMONAUT."""
 
-import os
-
-from sensor_routing.full_pipeline_cli import (
-    MEMBERSHIP_FILENAME,
-    OSM_FILENAME,
-    PREDICTOR_FILENAME,
-)
-
-# Constants for file names
-SOLUTION_FILE = "solution_transformed.json"
 LOG_FILE_NAME = "worker.log"
 GPX_FILE = "route.gpx"
 QR_CODE_FILE = "qr_code.png"
@@ -26,12 +16,6 @@ JOB_STATUS_FAILED = "FAILED"
 
 # Maintenance constants
 LOG_RETENTION_DAYS = 30  # Days to retain logs in PostgreSQL database
-
-# Input directory and paths for sensor_routing pipeline
-INPUT_DIR = "input"
-PREDICTOR_PATH = os.path.join(INPUT_DIR, PREDICTOR_FILENAME)
-MEMBERSHIP_PATH = os.path.join(INPUT_DIR, MEMBERSHIP_FILENAME)
-OSM_INPUT_PATH = os.path.join(INPUT_DIR, OSM_FILENAME)
 
 # OSM data file names
 OSM_DATA_DOWNLOAD_FILE = "osm_data_download.geojson"

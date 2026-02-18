@@ -30,6 +30,7 @@ class CeleryConfig:
     # Broker and result backend
     broker_url = _redis_url
     result_backend = _redis_url
+    broker_connection_retry_on_startup = True
 
     # Serialization
     task_serializer = "json"

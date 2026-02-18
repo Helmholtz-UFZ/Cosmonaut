@@ -14,6 +14,7 @@ from pyproj import CRS, Transformer
 from cosmonaut_app.config import (
     WEB_WORK_DIR,
 )
+from sensor_routing.constants import ROUTE_FILENAME
 from sensor_routing.full_pipeline_cli import (
     parse_membership_file,
     parse_predictor_file,
@@ -22,7 +23,6 @@ from sensor_routing.full_pipeline_cli import (
 
 from cosmonaut_app.constants.general import (
     GPX_FILE,
-    INPUT_DIR,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     JOB_STATUS_PENDING,
@@ -34,7 +34,6 @@ from cosmonaut_app.constants.general import (
     OSM_FILENAME,
     PREDICTOR_FILENAME,
     QR_CODE_FILE,
-    SOLUTION_FILE,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.navigation_routing import RouteCreator
@@ -193,11 +192,9 @@ class CosmonautJob:
         self.save()
 
     def _create_working_dir(self):
-        """Create the working directory and input subdirectory for the job."""
+        """Create the working directory for the job."""
         self.working_dir = os.path.join(WEB_WORK_DIR, self.model.job_id)
         os.makedirs(self.working_dir, exist_ok=True)
-        self.input_dir = os.path.join(self.working_dir, INPUT_DIR)
-        os.makedirs(self.input_dir, exist_ok=True)
 
     def save(self):
         """Save the job to the database and sync files to object storage."""
@@ -442,7 +439,7 @@ class CosmonautJob:
 
     def create_qr_code_routing(self):
         logging.info(f"Creating QR code for routing job {self.model.job_id}")
-        geojson_path = os.path.join(self.working_dir, SOLUTION_FILE)
+        geojson_path = os.path.join(self.working_dir, ROUTE_FILENAME)
 
         route_creator = RouteCreator(
             geojson_path=geojson_path,
@@ -452,6 +449,20 @@ class CosmonautJob:
         qr_code_url = route_creator.create_gpx()
         self.save()
         return qr_code_url
+
+    def get_route_polyline(self):
+        """Return the route as WGS84 [[lat, lon], ...] positions, or None if unavailable."""
+        route_path = os.path.join(self.working_dir, ROUTE_FILENAME)
+        if not os.path.exists(route_path):
+            return None
+        with open(route_path) as f:
+            solution = json.load(f)
+        transformer = Transformer.from_crs(self.model.epsg, 4326, always_xy=True)
+        positions = []
+        for x, y in solution["Path"]:
+            lon, lat = transformer.transform(x, y)
+            positions.append([lat, lon])
+        return positions
 
     def submit(self):
         """Submit the job to background worker."""
@@ -560,7 +571,7 @@ class CosmonautJob:
             job_manager.revoke_job(self.model.celery_task_id, terminate=True)
 
         # Delete known output files
-        output_files = [LOG_FILE_NAME, SOLUTION_FILE, GPX_FILE, QR_CODE_FILE]
+        output_files = [LOG_FILE_NAME, ROUTE_FILENAME, GPX_FILE, QR_CODE_FILE]
         for fname in output_files:
             fpath = os.path.join(self.working_dir, fname)
             if os.path.isfile(fpath):

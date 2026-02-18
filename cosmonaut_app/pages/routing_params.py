@@ -126,7 +126,7 @@ def layout(job_id):
     footer = progress_footer(
         prev_url=user_info_path,
         next_id=NEXT_BUTTON_ROUTING_PARAMS_ID,
-        next_disabled=not is_active,  # Disable next button when not active
+        next_disabled=is_active,  # When PENDING, disable until form validated by callback
     )
 
     map = create_map(job=job)
@@ -164,11 +164,15 @@ def update_routing_params(**inputs):
     job_id = inputs.pop("job_id")
     job = CosmonautJob(job_id=job_id)
 
-    # Prevent updates if job is not in PENDING state
+    # If job is not PENDING, only allow navigation (no param updates)
     if job.get_status() != JOB_STATUS_PENDING:
-        logging.warning(
-            f"Routing params update prevented: job {job_id} not in PENDING state"
-        )
+        triggered_id = callback_context.triggered[0]["prop_id"].split(".")[0]
+        if triggered_id == NEXT_BUTTON_ROUTING_PARAMS_ID:
+            return {
+                **{k: no_update for k in form_factory.produce_callback_outputs()},
+                "url": build_url_step("route_computation", job_id),
+                "next_button": no_update,
+            }
         raise PreventUpdate
 
     valid, output_dict = form_factory.validate_callback(inputs)

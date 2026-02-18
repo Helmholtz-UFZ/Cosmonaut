@@ -196,7 +196,7 @@ def create_status_badge(status):
     }
 
     spinner = (
-        dbc.Spinner(size="sm", className="ms-2")
+        dbc.Spinner(size="sm", spinner_class_name="ms-2")
         if status == JOB_STATUS_RUNNING
         else None
     )

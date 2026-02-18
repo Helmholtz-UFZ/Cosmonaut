@@ -1,5 +1,6 @@
 import logging
 import logging.config
+from pathlib import Path
 from threading import Thread
 
 from dash import Dash
@@ -59,4 +60,7 @@ beat_thread.start()
 logger.info("Celery Beat scheduler started in background thread")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=DEBUG, port=FLASK_PORT)
+    # Watch local sensor-routing source for auto-reload (mounted via --local-sr)
+    local_sr = Path("/python_docker/sensor-routing/sensor_routing")
+    extra = list(local_sr.rglob("*.py")) if local_sr.is_dir() else []
+    app.run(host="0.0.0.0", debug=DEBUG, port=FLASK_PORT, extra_files=extra)

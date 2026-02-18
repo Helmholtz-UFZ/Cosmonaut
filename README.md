@@ -51,7 +51,19 @@ cluster. Here only the services cosmonaut-web, cosmonaut-worker, Redis, and the
 tileserver are used, as the permanent storages PostgreSQL and MinIO are managed by the
 infrastructure of the institute.
 
-## Update sensor-routing
+## sensor-routing
+
+### Local development
+
+Develop against a local checkout of sensor-routing (must be a sibling directory `../sensor-routing`):
+
+```bash
+./dev_up.sh --local-sr mock
+```
+
+Changes to sensor-routing Python files auto-reload the Dash server. The Celery worker requires a container restart.
+
+### Updating the PyPI version
 
 1. Edit `pyproject.toml` to new version.
 2. Maybe `uv cache clean sensor-routing` if update was just a few minutes ago.

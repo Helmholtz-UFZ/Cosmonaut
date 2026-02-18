@@ -1,6 +1,10 @@
-# COSMONAUT LLM Development Context
+## What is the purpose of this code base
 
-Guidelines for AI assistants working on this codebase.
+This is the repository of COSMONAUT, a Python-based web application designed to optimize navigation routes surveys.
+
+The service is primarily built using Plotly Dash and uses Celery for background and
+resource intensive tasks. Three databases are used: PostgreSQL as main storage, MinIO for
+object storage, and Redis as the broker between the Dash server and workers.
 
 ## Critical Anti-Patterns
 
@@ -10,7 +14,6 @@ Guidelines for AI assistants working on this codebase.
 
    - NO `dict.get()` - use direct access `dict["key"]`
    - NO bare `except Exception` - always catch specific exceptions
-   - Existing violations to be refactored later
 
 2. **No inline imports**
 
@@ -33,10 +36,6 @@ Guidelines for AI assistants working on this codebase.
    - Use Bootstrap classes only
    - Existing `style={}` usages are violations to clean up later
 
-5. **No legacy logging patterns**
-   - DO NOT use: `extra={"tag": "..."}`
-   - Use: `log = logging.getLogger(__name__)` then `log.info(...)`
-
 ---
 
 ## Project Structure
@@ -54,17 +53,6 @@ cosmonaut_app/
 
 ---
 
-## Quick Start
-
-```bash
-# Run tests locally (starts Docker services automatically)
-./run_pytest.sh
-```
-
-**Important:** Always use `./run_pytest.sh` (without `--no-services`) to verify changes. See [Testing](docs/conventions/testing.md).
-
----
-
 ## Detailed Conventions
 
 For specific implementation details, see:
@@ -77,6 +65,14 @@ For specific implementation details, see:
 - [Logging](docs/conventions/logging.md) - Log levels, proper logger usage
 - [Callbacks](docs/conventions/callbacks.md) - Callback organization patterns
 - [Environment Variables](docs/conventions/environment_variables.md) - Env files, config loading, secrets
+
+**Important** read the convention befor you make any codebase exploration or answering.
+Never sacrfice speed for accuracy.
+
+Which conventions you should read depends on the first user prompt. Determine the
+conventions which are important for the current task and read them imediatly. Keep the
+conventions in mind and if you have not read them and they become important read them
+then.
 
 ---
 
@@ -91,19 +87,23 @@ user asks later. Keep this skill list in Mind:
 - [New Module Test](docs/skills/create_module_test.md) - Checklist for creating a new core module test
 - [Run and Fix Testing](docs/skills/run_and_fix_testing.md) - Systematic guide for running tests and diagnosing failures
 - [Convention Keeper](docs/skills/convention_keeper.md) - Audit and fix convention violations across the codebase
+- [Local sensor-routing](docs/skills/local_sensor_routing.md) - Cross-repo work with the sensor-routing library
 
 ---
 
 ## Memory Policy
 
 **DO NOT** use the auto memory system (`MEMORY.md`). If you feel something should
-be remembered across sessions, ask the user whether it should be added to this
-`CLAUDE.md` file instead.
+be remembered, ask the user whether it should be added to this
+`CLAUDE.md` or the `conventions` file instead.
+
+---
 
 ## Identity Files
 
-Before your first response, read the following files if they exist in the project root:
+Before your first response, you must read the following files (they might be symlinks) if they exist in the project root:
+
 - `USER.md` — Information about the user you're working with
 - `SOUL.md` — Your personality and core values
 
-If these files are not present, proceed normally.
+---

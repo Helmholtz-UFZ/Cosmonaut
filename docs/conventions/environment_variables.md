@@ -87,6 +87,40 @@ How env vars reach containers (see `docker-compose.yml`):
 
 ---
 
+## Local sensor-routing Development (`--local-sr`)
+
+The `--local-sr` flag on `dev_up.sh` lets you develop cosmonaut and sensor-routing
+side by side without publishing to PyPI.
+
+### How it works
+
+1. `dev_up.sh --local-sr mock` layers `docker-compose.local-sr.yml` on top of
+   the base compose file.
+2. The override mounts `../sensor-routing` into both the `cosmonaut` and `worker`
+   containers at `/python_docker/sensor-routing`.
+3. `PYTHONPATH` is set so the local source shadows the PyPI-installed package.
+4. `app.py` watches the mounted sensor-routing `.py` files via Flask's
+   `extra_files` parameter, so the Dash dev server auto-reloads on changes.
+5. The **Celery worker does not auto-reload** — restart it manually after
+   sensor-routing changes (`docker compose restart worker`).
+
+### Prerequisites
+
+- The sensor-routing repo must be cloned as a **sibling directory**:
+  `../sensor-routing` (flat layout, i.e. `../sensor-routing/sensor_routing/`).
+- No changes to `pyproject.toml` or `uv.lock` are needed — the PYTHONPATH
+  override takes precedence over the installed version.
+
+### Files involved
+
+| File | Role |
+|------|------|
+| `docker-compose.local-sr.yml` | Compose override: volume mount + PYTHONPATH |
+| `dev_up.sh` | `--local-sr` flag builds the compose command with `-f` layering |
+| `cosmonaut_app/app.py` | Watches `/python_docker/sensor-routing/sensor_routing/*.py` for reload |
+
+---
+
 ## Testing & Adding New Variables
 
 `test/test_env.py` validates that every env file contains all required variables.

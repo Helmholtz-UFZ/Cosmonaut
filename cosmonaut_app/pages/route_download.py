@@ -56,6 +56,7 @@ GPX files are stored in MinIO object storage and retrieved via Flask routes.
 """
 
 import logging
+import dash_leaflet as dl
 from dash import html, register_page, callback, Input, Output, State, dcc
 from dash.exceptions import PreventUpdate
 
@@ -132,7 +133,16 @@ def layout(job_id):
         next_url=None,
     )
 
-    map = create_map(job=job)
+    extra_layers = None
+    route_positions = job.get_route_polyline()
+    if route_positions is not None:
+        extra_layers = [
+            dl.Polyline(
+                positions=route_positions, color="#1a73e8", weight=4, opacity=0.8
+            )
+        ]
+
+    map = create_map(job=job, extra_layers=extra_layers)
 
     input_container = create_card_input(
         card_body,

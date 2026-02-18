@@ -349,7 +349,7 @@ def layout(job_id):
 )
 def show_loading(filename):
     """Show loading overlay when file is uploaded."""
-    logging.info("Activating loading overlay for file upload. File name: {filename}")
+    logging.info(f"Activating loading overlay for file upload. File name: {filename}")
     return filename is not None
 
 

@@ -7,20 +7,15 @@ This will be replaced with actual routing algorithm implementation.
 
 import logging
 import os
-import shutil
 from logging.config import dictConfig
 
 from celery import Task
 from sensor_routing.full_pipeline_cli import sensor_routing_pipeline
 
 from cosmonaut_app.constants.general import (
-    INPUT_DIR,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     LOG_FILE_NAME,
-    MEMBERSHIP_FILENAME,
-    OSM_FILENAME,
-    PREDICTOR_FILENAME,
 )
 
 log = logging.getLogger(__name__)
@@ -78,14 +73,6 @@ def process_routing_job(self, job_id):
 
     try:
         logging.info(f"Starting routing job computation for job_id={job_id}")
-
-        # Copy input files to input/ subdirectory for sensor_routing pipeline
-        input_dir = os.path.join(job.working_dir, INPUT_DIR)
-        os.makedirs(input_dir, exist_ok=True)
-        for fname in [MEMBERSHIP_FILENAME, PREDICTOR_FILENAME, OSM_FILENAME]:
-            src = os.path.join(job.working_dir, fname)
-            dst = os.path.join(input_dir, fname)
-            shutil.copy2(src, dst)
 
         sensor_routing_pipeline(job.working_dir)
 

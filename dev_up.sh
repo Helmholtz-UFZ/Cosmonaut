@@ -2,6 +2,7 @@
 
 # Parse command line arguments
 DEBUG_MODE=false
+LOCAL_SR=false
 MODE=""
 
 while [[ $# -gt 0 ]]; do
@@ -10,26 +11,34 @@ while [[ $# -gt 0 ]]; do
         DEBUG_MODE=true
         shift
         ;;
+    --local-sr)
+        LOCAL_SR=true
+        shift
+        ;;
     mock | prod | stage)
         MODE="$1"
         shift
         ;;
     *)
         echo "Unknown option: $1"
-        echo "Usage: $0 [-d|--debug] <mock|prod>"
+        echo "Usage: $0 [-d|--debug] [--local-sr] <mock|prod|stage>"
         echo "  -d, --debug: Enable debug mode (DEBUG=1)"
-        echo "  mock: Use mock environment (env_dev_mock)"
-        echo "  prod: Use production environment (env_dev_prod_priv)"
+        echo "  --local-sr:  Use local ../sensor-routing instead of PyPI version"
+        echo "  mock:  Use mock environment (env_dev_mock)"
+        echo "  prod:  Use production environment (env_dev_prod_priv)"
+        echo "  stage: Use staging environment (env_dev_stage_priv)"
         exit 1
         ;;
     esac
 done
 
 if [ -z "$MODE" ]; then
-    echo "Usage: $0 [-d|--debug] <mock|prod>"
+    echo "Usage: $0 [-d|--debug] [--local-sr] <mock|prod|stage>"
     echo "  -d, --debug: Enable debug mode (DEBUG=1)"
-    echo "  mock: Use mock environment (env_dev_mock)"
-    echo "  prod: Use production environment (env_dev_prod_priv)"
+    echo "  --local-sr:  Use local ../sensor-routing instead of PyPI version"
+    echo "  mock:  Use mock environment (env_dev_mock)"
+    echo "  prod:  Use production environment (env_dev_prod_priv)"
+    echo "  stage: Use staging environment (env_dev_stage_priv)"
     exit 1
 fi
 
@@ -56,17 +65,28 @@ if [ "$DEBUG_MODE" = true ]; then
     sed -i 's/^DEBUG=.*/DEBUG=1/' .env
 fi
 
+# Build compose command (optionally layer local sensor-routing override)
+COMPOSE="docker compose -f docker-compose.yml"
+if [ "$LOCAL_SR" = true ]; then
+    if [ ! -d "../sensor-routing" ]; then
+        echo "Error: ../sensor-routing directory not found."
+        echo "Clone sensor-routing as a sibling directory first."
+        exit 1
+    fi
+    COMPOSE="$COMPOSE -f docker-compose.local-sr.yml"
+    echo "Using local sensor-routing from ../sensor-routing"
+fi
+
 # Check if the uv.lock file has changed since the last Docker build
 if [ ! -e ".docker_build_hash" ] || [ "$(sha256sum uv.lock)" != "$(cat .docker_build_hash)" ]; then
-    # Build the Docker image
-    docker compose build cosmonaut
+    $COMPOSE build cosmonaut
+    $COMPOSE build worker
 
-    # Save the hash of the uv.lock file
     sha256sum uv.lock >.docker_build_hash
 fi
 
-if [ "$1" == "prod" ]; then
-    docker compose up cosmonaut redis worker tileserver
+if [ "$MODE" == "prod" ]; then
+    $COMPOSE up cosmonaut redis worker tileserver
 else
-    docker compose up --no-log-prefix --attach cosmonaut
+    $COMPOSE up --no-log-prefix --attach cosmonaut
 fi

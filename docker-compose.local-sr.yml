@@ -1,0 +1,17 @@
+# Override for local sensor-routing development.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.local-sr.yml up
+#
+# Expects sensor-routing repo at ../sensor-routing (sibling directory).
+# The local source is prepended to PYTHONPATH, shadowing the PyPI version.
+services:
+  cosmonaut:
+    volumes:
+      - "../sensor-routing:/python_docker/sensor-routing"
+    environment:
+      - PYTHONPATH=/python_docker/sensor-routing:/python_docker/cosmonaut/
+
+  worker:
+    volumes:
+      - "../sensor-routing:/python_docker/sensor-routing"
+    environment:
+      - PYTHONPATH=/python_docker/sensor-routing:/python_docker/cosmonaut/

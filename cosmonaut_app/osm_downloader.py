@@ -102,6 +102,8 @@ def _reconstruct_ways(edges_gdf):
             continue
 
         merged = linemerge(segments) if len(segments) > 1 else segments[0]
+        if merged.geom_type == "MultiLineString":
+            continue
 
         attrs = group.iloc[0].to_dict()
         for key in ("u", "v", "key", "geometry", "reversed", "length"):
@@ -125,6 +127,7 @@ class OsmDownloader:
 
     columns_to_keep = [
         "geometry",
+        "osmid",
         "name",
         "highway",
         "nodes",
