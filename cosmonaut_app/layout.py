@@ -9,22 +9,27 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from dash_extensions.javascript import _default_name_space, assign
 
-
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     JOB_STATUS_RUNNING,
+    OSM_TAGS_MAPPING,
 )
 from cosmonaut_app.constants.html_ids import (
+    CURRENT_JOB_ID_MAP_STORE_ID,
     JOB_ID_STORE_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+    MAP_INIT_INTERVAL_ID,
+    MEMBERSHIP_TILE_LAYER_MAP_ID,
     NAVBAR_COLLAPSE_NAV_SHARED_ID,
     NAVBAR_TOGGLER_NAV_SHARED_ID,
+    OSM_GEOJSON_LAYER_MAP_SHARED_ID,
     RESET_BUTTON_SHARED_ID,
     RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
     RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
     RESET_MODAL_SHARED_ID,
+    ROUTE_POLYLINE_LAYER_MAP_ID,
     SEARCH_BUTTON_NAV_SHARED_ID,
     SEARCH_INPUT_NAV_SHARED_ID,
     SEARCH_RESULTS_DIV_NAV_SHARED_ID,
@@ -32,7 +37,9 @@ from cosmonaut_app.constants.html_ids import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
-from cosmonaut_app.error_handling import error_modal
+from cosmonaut_app.error_handling import JobNotFound, error_modal
+from cosmonaut_app.map_utils import get_tile_url
+from cosmonaut_app.street_selector import StreetSelector
 
 # ============================================================================
 # Helper Functions and Constants
@@ -69,6 +76,18 @@ function(feature, context){
 }
 """
 )
+
+click_handler = assign("""function(e, ctx) {
+    const id = e.layer.feature.id;
+    const selected = [...(ctx.hideout.selected || [])];
+    const idx = selected.indexOf(id);
+    if (idx > -1) {
+        selected.splice(idx, 1);
+    } else {
+        selected.push(id);
+    }
+    ctx.setProps({hideout: {...ctx.hideout, selected: selected}});
+}""")
 
 
 # ============================================================================
@@ -285,16 +304,75 @@ def create_navbar():
     )
 
 
+def build_global_map():
+    """Build the global persistent map with empty layer slots.
+
+    Layers are populated by register_map_callbacks after Leaflet has initialised.
+    The dcc.Interval in app_layout() fires 300 ms after mount — by which point the
+    Leaflet layer objects exist and can receive prop updates.
+    """
+    layers_control = dl.LayersControl(
+        [
+            dl.Overlay(
+                dl.TileLayer(id=MEMBERSHIP_TILE_LAYER_MAP_ID, url="", opacity=0.7),
+                name="Membership",
+                checked=True,
+            ),
+            dl.Overlay(
+                dl.GeoJSON(
+                    id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,
+                    data={"type": "FeatureCollection", "features": []},
+                    options={"style": style_handle},
+                    hoverStyle=hover_style_handle,
+                    eventHandlers=dict(click=click_handler),
+                    hideout=dict(selected=[], zoom=10),
+                ),
+                name="Streets",
+                checked=True,
+            ),
+            dl.Overlay(
+                dl.GeoJSON(
+                    id=ROUTE_POLYLINE_LAYER_MAP_ID,
+                    data={"type": "FeatureCollection", "features": []},
+                    options={
+                        "style": {"color": "#1a73e8", "weight": 4, "opacity": 0.8}
+                    },
+                ),
+                name="Route",
+                checked=True,
+            ),
+        ],
+        position="topright",
+    )
+    return dl.Map(
+        [osm_layer, dl.FullScreenControl(), layers_control],
+        id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+        center=[51.70, 11.20],
+        zoom=10,
+        style={"height": "100%"},
+    )
+
+
 def app_layout():
     """Create the main page layout with navbar and content."""
     return html.Div(
         className="d-flex flex-column min-vh-100 bg-light",
         children=[
-            dcc.Location(id=URL_SHARED_ID, refresh=True),
+            dcc.Store(id=CURRENT_JOB_ID_MAP_STORE_ID, data=None),
+            dcc.Interval(id=MAP_INIT_INTERVAL_ID, interval=1000, max_intervals=1),
             loading_overlay,
             error_modal,
             create_navbar(),
-            dash.page_container,
+            html.Div(
+                className="d-flex flex-grow-1 app-panels overflow-hidden",
+                children=[
+                    html.Div(build_global_map(), className="map-panel col-7 p-0"),
+                    html.Div(
+                        dash.page_container,
+                        className="content-panel col-5 p-0 d-flex flex-column",
+                    ),
+                ],
+            ),
         ],
     )
 
@@ -318,27 +396,9 @@ def page_container_column_layout(content):
             ),
             className="flex-grow-1 d-flex justify-content-center",
         ),
-        className="d-flex flex-column flex-grow-1",
+        className="d-flex flex-column flex-grow-1 no-map-page",
     )
     return page
-
-
-def page_container_split_layout(map, input):
-    """Create a page container with a split layout (sidebar + main map)."""
-    map_container = dbc.Col(
-        map,
-        className="col-7 p-0",
-    )
-    input_container = dbc.Col(input, className="col-5 p-0")
-    return page_container_fullscreen_layout(
-        dbc.Row(
-            [
-                map_container,
-                input_container,
-            ],
-            className="flex-grow-1 d-flex",
-        ),
-    )
 
 
 def create_card_input(
@@ -414,22 +474,24 @@ def progress_footer(
     kwargs_prev = dict(color="primary", disabled=prev_disabled)
     if prev_id is None and prev_url is None:
         prev_button = html.Span()
-    else:
-        if prev_url is not None:
-            kwargs_prev["href"] = prev_url
+    elif prev_url is not None:
         if prev_id is not None:
             kwargs_prev["id"] = prev_id
+        prev_button = dcc.Link(dbc.Button(args_prev, **kwargs_prev), href=prev_url)
+    else:
+        kwargs_prev["id"] = prev_id
         prev_button = dbc.Button(args_prev, **kwargs_prev)
 
     args_next = [html.I(className="bi bi-arrow-right-circle me-1"), "Next"]
     kwargs_next = dict(color="primary", disabled=next_disabled)
     if next_id is None and next_url is None:
         next_button = html.Span()
-    else:
-        if next_url is not None:
-            kwargs_next["href"] = next_url
+    elif next_url is not None:
         if next_id is not None:
             kwargs_next["id"] = next_id
+        next_button = dcc.Link(dbc.Button(args_next, **kwargs_next), href=next_url)
+    else:
+        kwargs_next["id"] = next_id
         next_button = dbc.Button(args_next, **kwargs_next)
 
     actions = html.Div(
@@ -458,40 +520,6 @@ def steps_tab(name_step):
     )
 
 
-def create_map(job=None, extra_layers=None):
-    map_layers = default_map_layers
-    if extra_layers is not None:
-        map_layers += extra_layers
-
-    if job is not None:
-        zoom = job.model.membership_upload["zoom"]
-        center = job.model.membership_upload["center"]
-    else:
-        zoom = 10
-        center = [51.70, 11.20]
-
-    return dl.Map(
-        map_layers,
-        id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
-        center=center,
-        zoom=zoom,
-        style={"height": "100%"},
-    )
-
-
-# Main Map
-
-# TODO
-main_map = html.Div(
-    dl.Map(
-        default_map_layers,
-        id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
-        center=[51.70, 11.20],
-        zoom=10,
-        style={"height": "100%"},
-    ),
-    style={"height": "100%", "width": "100%"},
-)
 # Search Bar
 search_bar = dbc.Row(
     [
@@ -661,3 +689,68 @@ def register_reset_callbacks(app):
 
         # Return same pathname to reload page with new state
         return pathname
+
+
+def register_map_callbacks(app):
+    """Register the global map layer callback.
+
+    Populates all three map layers (membership tile, streets, route) and
+    repositions the viewport when the job changes.
+
+    Triggered by URL_SHARED_ID on every SPA pathname change.
+    """
+
+    @app.callback(
+        Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True),
+        Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
+        Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+        Output(ROUTE_POLYLINE_LAYER_MAP_ID, "data"),
+        Output(CURRENT_JOB_ID_MAP_STORE_ID, "data"),
+        Input(URL_SHARED_ID, "pathname"),
+        State(CURRENT_JOB_ID_MAP_STORE_ID, "data"),
+        prevent_initial_call=True,
+    )
+    def update_map_layers(pathname, prev_job_id):
+        logging.info(f"Map update triggered by {ctx.triggered_id}: {pathname}")
+        empty_fc = {"type": "FeatureCollection", "features": []}
+        parts = pathname.split("/")
+        if len(parts) < 3 or parts[1] != "job":
+            logging.info("Not a job page, returning empty")
+            return no_update, "", empty_fc, empty_fc, None
+
+        job_id = parts[2]
+        try:
+            job = CosmonautJob(job_id=job_id)
+        except JobNotFound:
+            logging.info(f"Job {job_id} not found, returning empty")
+            return no_update, "", empty_fc, empty_fc, None
+
+        # Only recentre the map when the job changes
+        if job_id != prev_job_id:
+            viewport = {
+                "center": job.model.membership_upload["center"],
+                "zoom": job.model.membership_upload["zoom"],
+                "transition": "flyTo",
+            }
+        else:
+            viewport = no_update
+
+        tile_url = get_tile_url(job_id, job.model.epsg, job.working_dir)
+        streets_fc = StreetSelector(job).initial_fc(list(OSM_TAGS_MAPPING.keys()))
+        raw_positions = job.get_route_polyline() or []
+        route_fc = {"type": "FeatureCollection", "features": []}
+        if raw_positions:
+            route_fc["features"] = [
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [[lon, lat] for lat, lon in raw_positions],
+                    },
+                    "properties": {},
+                }
+            ]
+        logging.info(
+            f"Returning tile_url={tile_url!r}, streets={len(streets_fc['features'])}, route_pts={len(raw_positions)}"
+        )
+        return viewport, tile_url, streets_fc, route_fc, job_id

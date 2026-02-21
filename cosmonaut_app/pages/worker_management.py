@@ -15,6 +15,7 @@ import logging
 from datetime import datetime
 import re
 
+import dash
 import dash_bootstrap_components as dbc
 from dash import callback, html, no_update, register_page
 from dash.exceptions import PreventUpdate
@@ -493,14 +494,14 @@ def layout():
 # ============================================================================
 
 
-@callback(
+# Clientside: open overlay instantly in the browser, avoiding server-side
+# callback ordering issues with allow_duplicate.
+dash.clientside_callback(
+    "function(n) { return true; }",
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
     Input(WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID, "n_clicks"),
     prevent_initial_call=True,
 )
-def show_loading(n_clicks):
-    """Show loading overlay when refresh button is clicked."""
-    return True
 
 
 @callback(

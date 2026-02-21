@@ -2176,7 +2176,7 @@ wheels = [
 
 [[package]]
 name = "sensor-routing"
-version = "0.2.4"
+version = "0.2.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-types" },
@@ -2195,9 +2195,9 @@ dependencies = [
     { name = "shapely" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/05/16/ef3487ed554404f396cde26b8027522ee300fc3316fbb664a8c320d7fa97/sensor_routing-0.2.4.tar.gz", hash = "sha256:23e90b1c74238e7660010bea93157437f2d9d42679c4ceb22c99912c6d290e3d", size = 2462517, upload-time = "2026-02-13T10:53:29.897Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/37/e8/28635db0dd53eb045e4e8499db43ee5ae7a93090384035044d0be94de1f7/sensor_routing-0.2.5.tar.gz", hash = "sha256:d4364d807c4d80af213da2705a1207733f46b8f563716e1beeaa7c12e73a433e", size = 5087243, upload-time = "2026-02-18T12:21:02.287Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/41/c374f1fb1e1ac4af9064177b64847ad3268cb0bac23accc4c8d9765c5575/sensor_routing-0.2.4-py3-none-any.whl", hash = "sha256:1964e5dbea412b90772e3ade05b57fd41cbc56545b9fc0331d70281f53fba162", size = 2549029, upload-time = "2026-02-13T10:53:27.072Z" },
+    { url = "https://files.pythonhosted.org/packages/67/2a/01a78bc38829e6bbf11e2ab5ce1779626ad910b6ce08e64dc720f8ed5da3/sensor_routing-0.2.5-py3-none-any.whl", hash = "sha256:356f0a02df3f1bc71dfb80e478baf72af2b8b2adf5db62acb9f728af9c72b644", size = 5210786, upload-time = "2026-02-18T12:20:58.497Z" },
 ]
 
 [[package]]
@@ -2667,7 +2667,7 @@ requires-dist = [
     { name = "requests", specifier = "==2.32.3" },
     { name = "retrying", specifier = "==1.4.2" },
     { name = "ruff", specifier = "==0.7.4" },
-    { name = "sensor-routing", specifier = "==0.2.4" },
+    { name = "sensor-routing", specifier = "==0.2.5" },
     { name = "setuptools", specifier = "==80.9.0" },
     { name = "shapely", specifier = "==2.0.6" },
     { name = "six", specifier = "==1.17.0" },

@@ -1,42 +1,51 @@
-"""Upload membership data and configure coordinate reference system.
+"""Upload membership and predictor data and configure coordinate reference system.
 
 # User documentation (This section is for user documentation and will appear in the user documentation.)
 
 This page is where you upload your cosmic ray neutron sensor measurement locations
 or sampling points that will be used to plan the navigation route. The workflow
-on this page involves two key steps:
+on this page involves three key steps:
 
 1. **Specify EPSG Code**: Enter the coordinate reference system (CRS) of your data.
    The application validates the EPSG code.
 
-2. **Upload CSV File**: Drag and drop or select a CSV/TXT file containing your
+2. **Upload Membership File**: Drag and drop or select a CSV/TXT file containing your
    membership data with coordinate columns. The system will parse your file,
    transform coordinates to WGS84 (EPSG:4326) for map display, and visualize
-   your locations on the interactive map.
+   your locations on the interactive map. After uploading, the system automatically
+   queries OpenStreetMap for road networks within your data's geographic extent.
 
-After uploading, your data is validated and the system automatically queries
-OpenStreetMap for road networks within your data's geographic extent. The buffered
-bounding box of your points determines which street data is retrieved for the next
-step (street selection).
+3. **Upload Predictor File**: Upload a CSV file containing the predictor data
+   (e.g. environmental covariates) used by the routing algorithm. The predictor
+   file must be consistent with the membership file. Hover over the upload
+   button to see the exact format requirements in the tooltip.
 
-**File Requirements:**
+**Membership File Requirements:**
 - Format: CSV or TXT with delimiter-separated values
 - Must include coordinate columns (latitude/longitude or projected coordinates)
 - Coordinates should match the specified EPSG code
 - Files are stored securely in your job's work directory
 
-Once your data is uploaded, validated, and displayed on the map, proceed to the
-street selection page to choose which roads to include in your route.
+**Predictor File Requirements:**
+- Format: CSV with delimiter-separated values
+- Must be consistent with the uploaded membership file
+
+Once both files are uploaded and validated, proceed to the street selection page
+to choose which roads to include in your route.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
 File upload uses dcc.Upload with base64 encoding. The OsmDownloader class handles
 OpenStreetMap downloading with proper buffering around the data extent. Coordinate
 transformation uses pyproj with CRS validation via the pyproj.CRS class.
+Predictor upload is validated via parse_predictor_file and cross-checked against
+the membership file using validate_predictor_membership_consistency. The exact
+predictor file format is not duplicated here — it is sourced at runtime from
+DESCRIPTION_PREDICTOR in the sensor-routing package and displayed in the UI
+tooltip on the upload button.
 """
 
 import logging
-import os
 
 import dash
 import dash_bootstrap_components as dbc
@@ -47,10 +56,9 @@ from sensor_routing.full_pipeline_cli import (
     DESCRIPTION_PREDICTOR,
 )
 
-from cosmonaut_app import map_utils
 from cosmonaut_app.classification_plot import ClassificationPlot
+from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.constants.general import (
-    CLASSIFICATION_PLOT_4326_TEMPLATE,
     DEFAULT_MAP_CENTER,
     DEFAULT_MAP_ZOOM,
     JOB_STATUS_PENDING,
@@ -68,6 +76,7 @@ from cosmonaut_app.constants.html_ids import (
     LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID,
+    MEMBERSHIP_TILE_LAYER_MAP_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID,
     PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
@@ -77,13 +86,12 @@ from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
-    create_map,
     create_reset_banner,
     create_reset_modal,
-    default_map_layers,
-    page_container_split_layout,
+    page_container_fullscreen_layout,
     progress_footer,
 )
+from cosmonaut_app.map_utils import get_tile_url
 from cosmonaut_app.osm_downloader import OsmDownloader
 from cosmonaut_app.pydantic_models import check_epsg
 from cosmonaut_app.street_selector import StreetSelector
@@ -96,59 +104,6 @@ register_page(
     description="Upload data for this job.",
     dynamic=True,
 )
-
-
-def _get_tile_params(job_id):
-    """Get tile layer parameters for the classification GeoTIFF.
-
-    Returns
-    -------
-    tuple
-        (tiff_filename, colormap_params, colorbar_info)
-    """
-    job = CosmonautJob(job_id=job_id)
-    tiff_filename = CLASSIFICATION_PLOT_4326_TEMPLATE.format(
-        epsg=f"EPSG:{job.model.epsg}"
-    )
-    colormap_params = ""  # RGBA GeoTIFF — colors baked in, no server-side colormap
-    colorbar_info = None  # TODO: implement when colorbar data is available
-    return tiff_filename, colormap_params, colorbar_info
-
-
-def create_colorbar_legend(colorbar_info):
-    """Create colorbar legend for classification plot.
-
-    TODO: Implement when colorbar data becomes available.
-    """
-    return html.Div()  # Placeholder
-
-
-def create_tile_layer(job_id, opacity):
-    """Create TileLayer and legend for the classification GeoTIFF.
-
-    Parameters
-    ----------
-    job_id : str
-        Job identifier
-    opacity : float
-        Tile layer opacity (0.0 to 1.0)
-
-    Returns
-    -------
-    list
-        List of dash_leaflet components [tile_layer, legend_layer]
-    """
-    tiff_filename, colormap_params, colorbar_info = _get_tile_params(job_id)
-    job = CosmonautJob(job_id=job_id)
-    bounds = job.model.membership_upload["bounds"]
-    tile_layer = map_utils.create_tile_layer_component(
-        job_id, tiff_filename, colormap_params, opacity, bounds
-    )
-    legend_layer = create_colorbar_legend(colorbar_info)
-
-    if tile_layer is None:
-        return [legend_layer]
-    return [tile_layer, legend_layer]
 
 
 def _first_sentence(text):
@@ -332,25 +287,29 @@ def layout(job_id):
         next_disabled=next_disabled,
     )
 
-    map = create_map(job=job)
     input_container = create_card_input(
         card_body,
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
     )
-    return page_container_split_layout(map, input_container)
+    return page_container_fullscreen_layout(input_container)
 
 
-@callback(
+# Clientside callback: open loading overlay instantly in the browser when a file
+# is selected.  A server-side callback here would queue behind the slow processing
+# callback (due to allow_duplicate), leaving the overlay stuck open.
+dash.clientside_callback(
+    """
+    function(filename, predictor_filename) {
+        return !!(filename || predictor_filename);
+    }
+    """,
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
+    Input(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
     prevent_initial_call=True,
 )
-def show_loading(filename):
-    """Show loading overlay when file is uploaded."""
-    logging.info(f"Activating loading overlay for file upload. File name: {filename}")
-    return filename is not None
 
 
 @callback(
@@ -361,7 +320,7 @@ def show_loading(filename):
     Output(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
     Output(DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "disabled"),
-    Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children"),
+    Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
     Output(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled"),
     Output(
         DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
@@ -372,6 +331,7 @@ def show_loading(filename):
     Output(PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID, "children"),
     Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled"),
     Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
+    Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "opacity"),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Input(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "value"),
     Input(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data"),
@@ -408,7 +368,7 @@ def data_upload_manager(
             "upload_contents": 4,
             "loading": 5,
             "delete_membership_disabled": 6,
-            "map_children": 7,
+            "tile_url": 7,
             "slider_disabled": 8,
             "upload_disabled": 9,
             "membership_error": 10,
@@ -417,6 +377,7 @@ def data_upload_manager(
             "predictor_error": 13,
             "delete_predictor_disabled": 14,
             "predictor_contents": 15,
+            "tile_opacity": 16,
         }
         for key, value in overrides.items():
             result[idx[key]] = value
@@ -450,7 +411,7 @@ def data_upload_manager(
             classification_data, file_path, bounds = job.upload_membership(
                 filename, contents, epsg_input
             )
-        except ValueError as e:
+        except FileValidationError as e:
             return _no_update(
                 file_info=str(e),
                 next_disabled=True,
@@ -479,8 +440,7 @@ def data_upload_manager(
         plot.generate_plots()
         logging.debug("Classification plots generated.")
 
-        tile_layers = create_tile_layer(job_id, opacity)
-        new_map_children = list(default_map_layers) + tile_layers
+        tile_url = get_tile_url(job_id, job.model.epsg, job.working_dir)
 
         job.save()
         logging.debug(f"Membership file uploaded and processed for job {job_id}")
@@ -492,7 +452,7 @@ def data_upload_manager(
             upload_contents=None,
             loading=False,
             delete_membership_disabled=False,
-            map_children=new_map_children,
+            tile_url=tile_url,
             slider_disabled=False,
             upload_disabled=True,
             membership_error="",
@@ -512,7 +472,7 @@ def data_upload_manager(
         job = CosmonautJob(job_id=job_id)
         try:
             job.upload_predictor(predictor_contents)
-        except ValueError as e:
+        except FileValidationError as e:
             return _no_update(
                 next_disabled=True,
                 loading=False,
@@ -536,36 +496,15 @@ def data_upload_manager(
         if not job_id:
             raise PreventUpdate
 
-        job = CosmonautJob(job_id=job_id)
-        tif_name = CLASSIFICATION_PLOT_4326_TEMPLATE.format(
-            epsg=f"EPSG:{job.model.epsg}"
-        )
-        tif_path = os.path.join(job.working_dir, tif_name)
-
-        if not os.path.exists(tif_path):
-            raise PreventUpdate
-
-        tile_layers = create_tile_layer(job_id, opacity)
-        new_map_children = list(default_map_layers) + tile_layers
-        return _no_update(map_children=new_map_children)
+        return _no_update(tile_opacity=opacity)
 
     # --- Init store branch (page load with existing upload) ---
     if triggered == DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID:
         if init_trigger and job_id:
-            job = CosmonautJob(job_id=job_id)
-            tif_name = CLASSIFICATION_PLOT_4326_TEMPLATE.format(
-                epsg=f"EPSG:{job.model.epsg}"
+            return _no_update(
+                slider_disabled=False,
+                upload_disabled=True,
             )
-            tif_path = os.path.join(job.working_dir, tif_name)
-
-            if os.path.exists(tif_path):
-                tile_layers = create_tile_layer(job_id, opacity)
-                new_map_children = list(default_map_layers) + tile_layers
-                return _no_update(
-                    map_children=new_map_children,
-                    slider_disabled=False,
-                    upload_disabled=True,
-                )
 
         return _no_update(slider_disabled=True)
 
@@ -579,7 +518,7 @@ def data_upload_manager(
     Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
-    Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "children", allow_duplicate=True),
+    Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
     Output(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(
         DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
@@ -621,9 +560,9 @@ def delete_membership_file(n_clicks, job_id):
         False,  # enable EPSG input
         True,  # disable delete membership button
         True,  # disable next button
-        default_viewport,  # reset map
+        default_viewport,  # reset map viewport
         False,  # hide loading overlay
-        list(default_map_layers),  # remove classification overlay
+        "",  # clear tile URL
         True,  # disable opacity slider
         False,  # enable upload component
         False,  # reset init store

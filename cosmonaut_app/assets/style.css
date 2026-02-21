@@ -33,3 +33,20 @@ div:has(> #_pages_content) {
   line-height: inherit !important;
   text-align: inherit !important;
 }
+
+/* Two-panel layout */
+.app-panels {
+    overflow: hidden;
+}
+.map-panel {
+    min-width: 0;
+}
+
+/* Admin pages: hide map, full-width content */
+.app-panels:has(.no-map-page) .map-panel {
+    display: none;
+}
+.app-panels:has(.no-map-page) .content-panel {
+    flex: 1;
+    max-width: 100%;
+}

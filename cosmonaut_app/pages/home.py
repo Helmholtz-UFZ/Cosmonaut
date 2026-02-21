@@ -32,9 +32,8 @@ from cosmonaut_app.constants.html_ids import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
-    page_container_split_layout,
+    page_container_fullscreen_layout,
     create_card_input,
-    create_map,
     build_url_step,
 )
 
@@ -65,10 +64,9 @@ card_body = [
     ),
 ]
 
-map = create_map()
 input_container = create_card_input(card_body, title="Welcome to COSMONAUT")
 
-layout = page_container_split_layout(map, input_container)
+layout = page_container_fullscreen_layout(input_container)
 
 
 # ============================================================================

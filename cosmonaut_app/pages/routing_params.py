@@ -65,8 +65,7 @@ from cosmonaut_app.constants.html_ids import (
 )
 
 from cosmonaut_app.layout import (
-    create_map,
-    page_container_split_layout,
+    page_container_fullscreen_layout,
     create_card_input,
     progress_footer,
     build_url_step,
@@ -129,15 +128,13 @@ def layout(job_id):
         next_disabled=is_active,  # When PENDING, disable until form validated by callback
     )
 
-    map = create_map(job=job)
-
     input_container = create_card_input(
         card_body,
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
     )
-    return page_container_split_layout(map, input_container)
+    return page_container_fullscreen_layout(input_container)
 
 
 # ============================================================================

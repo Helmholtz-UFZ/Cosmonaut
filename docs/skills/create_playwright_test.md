@@ -75,6 +75,22 @@ Before writing any test code, read:
 ./run_pytest.sh --headed test/test_<feature>.py
 ```
 
+**If the test fails**, check artifacts in `test/artifacts/` before debugging code:
+
+```bash
+# Screenshot — see what the page looked like at failure
+open test/artifacts/<test-dir>/test-failed-1.png
+
+# Trace — step through actions, DOM, and network
+npx playwright show-trace test/artifacts/<test-dir>/trace.zip
+
+# Server logs — check for callback errors
+cat test/artifacts/<test-dir>/server.log
+```
+
+See [Testing conventions — Test Artifacts](../conventions/testing.md#test-artifacts) for
+the full artifact reference.
+
 ### Step 5: Verify CI compatibility
 
 - Test must run headless (no `--headed` dependency)

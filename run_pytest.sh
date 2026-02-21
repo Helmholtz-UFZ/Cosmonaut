@@ -50,7 +50,13 @@ show_help() {
     echo "Options:"
     echo "  --headed          Run Playwright tests with visible browser"
     echo "  --no-services     Skip Docker service management (assume already running)"
+    echo "  --no-artifacts    Disable artifact capture (screenshots, traces, HTML, console)"
     echo "  -h, --help        Show this help message"
+    echo ""
+    echo "Artifacts (enabled by default):"
+    echo "  On failure, screenshots, traces, HTML snapshots, and console logs are"
+    echo "  saved to test/artifacts/. View traces with:"
+    echo "    npx playwright show-trace test/artifacts/<test-dir>/trace.zip"
     echo ""
     echo "Test Selection:"
     echo "  [TEST_PATH]       Specific test file or directory to run (optional)"
@@ -61,6 +67,7 @@ show_help() {
     echo "  ./run_pytest.sh test/test_app.py                     # Run specific test file"
     echo "  ./run_pytest.sh --no-services test/test_env.py       # Run specific test without services"
     echo "  ./run_pytest.sh --headed test/test_complete_routing_workflow.py  # Run specific test with visible browser"
+    echo "  ./run_pytest.sh --no-artifacts test/test_env.py                   # Run without artifact capture"
     echo "  ./run_pytest.sh --headed --no-services test/test_env.py          # Combine all flags"
     exit 0
 }
@@ -68,6 +75,7 @@ show_help() {
 # Parse command line arguments
 START_SERVICES=1
 HEADED=false
+ARTIFACTS=true
 TEST_PATH=""
 
 while [[ $# -gt 0 ]]; do
@@ -78,6 +86,10 @@ while [[ $# -gt 0 ]]; do
         ;;
     --no-services)
         START_SERVICES=0
+        shift
+        ;;
+    --no-artifacts)
+        ARTIFACTS=false
         shift
         ;;
     -h | --help)
@@ -120,6 +132,11 @@ fi
 
 # Build pytest command dynamically based on flags
 PYTEST_CMD="uv run pytest"
+
+# Add artifact flags (enabled by default)
+if [ "$ARTIFACTS" = true ]; then
+    PYTEST_CMD="$PYTEST_CMD --screenshot only-on-failure --tracing retain-on-failure --output test/artifacts"
+fi
 
 # Add --no-services flag if needed
 if [ "$START_SERVICES" -eq 0 ]; then

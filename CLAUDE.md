@@ -38,6 +38,13 @@ object storage, and Redis as the broker between the Dash server and workers.
 
 ---
 
+## Proactive Issue Reporting
+
+When you spot bad practices, convention violations, symmetric bugs, or fragile patterns
+— even if unrelated to the current task — flag them briefly and ask: "Want me to fix it?"
+
+---
+
 ## Project Structure
 
 ```
@@ -64,6 +71,7 @@ For specific implementation details, see:
 - [Bootstrap Styling](docs/conventions/bootstrap_styling.md) - Bootstrap classes only
 - [Logging](docs/conventions/logging.md) - Log levels, proper logger usage
 - [Callbacks](docs/conventions/callbacks.md) - Callback organization patterns
+- [Dash Leaflet](docs/conventions/dash_leaflet.md) - Map component gotchas
 - [Environment Variables](docs/conventions/environment_variables.md) - Env files, config loading, secrets
 
 **Important** read the convention befor you make any codebase exploration or answering.
@@ -93,9 +101,19 @@ user asks later. Keep this skill list in Mind:
 
 ## Memory Policy
 
-**DO NOT** use the auto memory system (`MEMORY.md`). If you feel something should
-be remembered, ask the user whether it should be added to this
-`CLAUDE.md` or the `conventions` file instead.
+**DO NOT** use the auto memory system (`MEMORY.md`).
+
+When you discover something worth preserving — a non-obvious gotcha, a hard-won
+debugging insight, a pattern that should be followed — ask the user where to record it.
+The options are:
+
+- **`CLAUDE.md`** — High-level rules and project-wide constraints
+- **An existing `docs/conventions/*.md`** — Extend the relevant convention file
+- **A new `docs/conventions/*.md`** — If no existing file fits, propose creating one.
+  Do not hesitate to do this; a focused new file is better than cramming unrelated
+  knowledge into an existing one.
+
+Always prefer the most specific home for the knowledge.
 
 ---
 

@@ -56,24 +56,23 @@ GPX files are stored in MinIO object storage and retrieved via Flask routes.
 """
 
 import logging
-import dash_leaflet as dl
-from dash import html, register_page, callback, Input, Output, State, dcc
+
+from dash import Input, Output, State, callback, dcc, html, register_page
 from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.config import get_download_url
-from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.constants.html_ids import (
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
     JOB_ID_STORE_SHARED_ID,
     QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID,
     START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID,
 )
+from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
-    create_map,
-    page_container_split_layout,
-    create_card_input,
-    progress_footer,
     build_url_step,
+    create_card_input,
+    page_container_fullscreen_layout,
+    progress_footer,
 )
 
 register_page(
@@ -87,7 +86,7 @@ register_page(
 
 
 def layout(job_id):
-    job = CosmonautJob(job_id=job_id)
+    CosmonautJob(job_id=job_id)
     logging.info(f"Route & Download layout called with job_id={job_id}")
 
     # Construct full download URL
@@ -133,24 +132,13 @@ def layout(job_id):
         next_url=None,
     )
 
-    extra_layers = None
-    route_positions = job.get_route_polyline()
-    if route_positions is not None:
-        extra_layers = [
-            dl.Polyline(
-                positions=route_positions, color="#1a73e8", weight=4, opacity=0.8
-            )
-        ]
-
-    map = create_map(job=job, extra_layers=extra_layers)
-
     input_container = create_card_input(
         card_body,
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
     )
-    return page_container_split_layout(map, input_container)
+    return page_container_fullscreen_layout(input_container)
 
 
 # ============================================================================

@@ -28,5 +28,7 @@ dev_gpx.py
 /assets/
 *prompt.md
 celerybeat-schedule*
+test/artifacts/
 USER.md
 SOUL.md
+bug_repro_center_zoom.py

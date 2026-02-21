@@ -13,12 +13,12 @@ import shutil
 from typing import TYPE_CHECKING
 
 import networkx as nx
+from sensor_routing.constants import OSM_FILENAME
 
 from cosmonaut_app.constants.general import (
     JOB_STATUS_PENDING,
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
-    OSM_FILENAME,
     OSM_TAGS_MAPPING,
 )
 from cosmonaut_app.osm_downloader import project_and_save

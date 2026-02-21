@@ -17,6 +17,7 @@ from cosmonaut_app.config import FLASK_PORT
 from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
+    LOADING_OVERLAY_SHARED_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTING_PARAMS_ID,
@@ -54,6 +55,11 @@ def test_complete_routing_workflow(
         f"#{PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID} input[type='file']"
     ).set_input_files(str(predictor_file_path))
     expect(page.locator(f"#{NEXT_BUTTON_DATA_UPLOAD_ID}")).to_be_enabled(timeout=30000)
+    # Wait for loading overlay to close — the predictor callback enables the button
+    # but the overlay may still be visible (backdrop="static" intercepts clicks)
+    expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
+        timeout=10000
+    )
     page.locator(f"#{NEXT_BUTTON_DATA_UPLOAD_ID}").click()
     check_all_errors(page)
 

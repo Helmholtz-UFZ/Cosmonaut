@@ -11,6 +11,7 @@ from cosmonaut_app.error_handling import handle_error
 from cosmonaut_app.files_route import serve_files
 from cosmonaut_app.layout import (
     app_layout,
+    register_map_callbacks,
     register_navbar_callbacks,
     register_reset_callbacks,
 )
@@ -43,6 +44,7 @@ create_bucket()
 
 register_navbar_callbacks(app)
 register_reset_callbacks(app)
+register_map_callbacks(app)
 
 server = app.server  # Expose Flask server for WSGI
 

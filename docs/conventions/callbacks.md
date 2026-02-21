@@ -59,6 +59,75 @@ When multiple callbacks output to same component:
 )
 ```
 
+### Loading Overlay — Clientside Only
+
+The shared loading overlay (`LOADING_OVERLAY_SHARED_ID`) uses a two-callback pattern:
+a fast callback opens it (`is_open=True`), a slow processing callback closes it
+(`is_open=False`). The opening callback **must** be a `dash.clientside_callback`.
+
+**Why:** With `allow_duplicate=True`, Dash does not guarantee execution order of
+server-side callbacks targeting the same output. A server-side `show_loading` can fire
+*after* the processing callback returns, leaving the overlay permanently stuck open.
+Clientside callbacks execute instantly in the browser, guaranteeing the overlay opens
+before the server roundtrip begins.
+
+```python
+# CORRECT — clientside, fires instantly in the browser
+import dash
+
+dash.clientside_callback(
+    "function(n) { return true; }",
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Input(SOME_BUTTON_ID, "n_clicks"),
+    prevent_initial_call=True,
+)
+
+# The processing callback closes it when done
+@callback(
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    ...
+    Input(SOME_BUTTON_ID, "n_clicks"),
+    prevent_initial_call=True,
+)
+def process(n_clicks, ...):
+    # ... slow work ...
+    return False  # closes overlay
+```
+
+```python
+# WRONG — server-side show_loading races with the processing callback
+@callback(
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Input(SOME_BUTTON_ID, "n_clicks"),
+    prevent_initial_call=True,
+)
+def show_loading(n_clicks):
+    return True
+```
+
+**Multiple triggers:** For callbacks with several button inputs, check any non-null:
+
+```python
+dash.clientside_callback(
+    """
+    function() {
+        for (var i = 0; i < arguments.length; i++) {
+            if (arguments[i] != null) return true;
+        }
+        return false;
+    }
+    """,
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Input(BUTTON_A_ID, "n_clicks"),
+    Input(BUTTON_B_ID, "n_clicks"),
+    prevent_initial_call=True,
+)
+```
+
+**Testing note:** With clientside overlay callbacks, Dash callback chains may cascade
+(e.g. a submit callback re-fires after a refresh, triggering a second refresh cycle).
+Use overlay wait timeouts of at least 20s in Playwright tests to accommodate this.
+
 ### `PreventUpdate`
 Stop callback execution for guard conditions:
 ```python

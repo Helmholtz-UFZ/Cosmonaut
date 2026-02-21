@@ -38,7 +38,37 @@ verification. See [Testing conventions](../conventions/testing.md).
 **Outcome:**
 
 - Passes locally → skip to **Step 5** (CI-specific issues)
-- Fails locally → continue to **Step 2**
+- Fails locally → **examine artifacts first** (see below), then continue to **Step 2**
+
+**Examine artifacts immediately after failure:**
+
+Artifacts are captured automatically in `test/artifacts/` on every Playwright test
+failure. Before diving into code, check them:
+
+```bash
+# View screenshot — is the page in the expected state?
+open test/artifacts/<test-dir>/test-failed-1.png
+
+# Step through the trace — DOM, network, action timeline
+npx playwright show-trace test/artifacts/<test-dir>/trace.zip
+
+# Check browser console for JS errors
+cat test/artifacts/<test-dir>/console.log
+
+# Check server logs for callback errors/exceptions
+cat test/artifacts/<test-dir>/server.log
+
+# Inspect the DOM at the moment of failure
+open test/artifacts/<test-dir>/page.html
+```
+
+| Artifact | What it tells you |
+|----------|-------------------|
+| `test-failed-1.png` | Visual state — is the element on screen? Is an overlay blocking? |
+| `trace.zip` | Full action replay — step through clicks, network requests, DOM changes |
+| `console.log` | Browser-side errors — failed resource loads, JS exceptions |
+| `server.log` | Dash callback logs — exceptions, callback ordering, timing |
+| `page.html` | DOM structure — missing elements, wrong IDs, hidden components |
 
 **Common startup failures:**
 
@@ -160,6 +190,10 @@ docker compose down --remove-orphans
 | Browser | `--headed` option available | headless only |
 | Services | Docker Compose containers | GitLab service containers |
 
+**CI artifacts:** On failure, GitLab archives `test/artifacts/` (7-day retention).
+Download from the pipeline job page → "Job artifacts". Contains the same screenshots,
+traces, HTML snapshots, console logs, and server logs as local runs.
+
 **Common CI-specific failures:**
 
 1. **Hardcoded hostnames or ports** — use config vars from `cosmonaut_app/config.py`, never literals
@@ -179,16 +213,17 @@ diff env_test env_test_local
 
 ### Step 6: Common failure patterns
 
-| Symptom | Likely Cause | Fix |
-|---------|--------------|-----|
-| `PostgreSQL not available` | DB container not healthy | Check Docker logs, verify ports in `env_test_local` |
-| `locator.click: Timeout 30000ms exceeded` | Element not visible or not rendered | Add `expect().to_be_visible()` before interaction |
-| `VIOLATIONS: Found id= usages with string literals` | Literal ID strings in page code | Replace with constants from `cosmonaut_app/constants/html_ids.py` |
-| `ModuleNotFoundError` | Missing dependency or inline import | Run `uv sync`; move import to top level |
-| `AssertionError` | Test expectation does not match behavior | Verify whether test or code is wrong |
-| `Celery worker failed to start` | Redis broker issue or import error | Check Redis is running; check worker imports |
-| Passes locally, fails CI | Environment differences | Check config vars vs hardcoded values; compare `env_test` and `env_test_local` |
-| Random pass/fail (flaky) | Race condition, insufficient waits | Add explicit waits with appropriate timeouts |
+| Symptom | Likely Cause | Artifact to check | Fix |
+|---------|--------------|-------------------|-----|
+| `locator.click: Timeout 30000ms exceeded` | Element not visible or overlay blocking | Screenshot, trace | Add `expect().to_be_visible()` before interaction; wait for overlay to close |
+| `PostgreSQL not available` | DB container not healthy | — | Check Docker logs, verify ports in `env_test_local` |
+| `VIOLATIONS: Found id= usages with string literals` | Literal ID strings in page code | — | Replace with constants from `cosmonaut_app/constants/html_ids.py` |
+| `ModuleNotFoundError` | Missing dependency or inline import | — | Run `uv sync`; move import to top level |
+| `AssertionError` | Test expectation does not match behavior | Screenshot, server.log | Verify whether test or code is wrong |
+| `Celery worker failed to start` | Redis broker issue or import error | — | Check Redis is running; check worker imports |
+| `Broken image` errors in `check_all_errors` | Leaflet tile images with empty src | page.html | Likely false positive from map tiles — check `check_all_errors()` filter |
+| Passes locally, fails CI | Environment differences | CI artifacts | Check config vars vs hardcoded values; compare `env_test` and `env_test_local` |
+| Random pass/fail (flaky) | Race condition, insufficient waits | Trace | Add explicit waits with appropriate timeouts |
 
 ---
 
@@ -214,8 +249,15 @@ diff env_test env_test_local
 Test failure
 │
 ├── Does it fail locally? (./run_pytest.sh test/test_<name>.py)
-│   ├── No → Step 5: CI-specific issues
+│   ├── No → Step 5: CI-specific issues (download CI artifacts)
 │   └── Yes ↓
+│
+├── Examine artifacts in test/artifacts/<test-dir>/
+│   ├── Screenshot → visual state, overlay blocking?
+│   ├── trace.zip → step through actions (npx playwright show-trace)
+│   ├── console.log → JS errors?
+│   ├── server.log → callback exceptions?
+│   └── page.html → DOM structure correct?
 │
 ├── Does the test need services? (check fixtures)
 │   ├── No → run with --no-services, check test logic
@@ -231,11 +273,11 @@ Test failure
 │
 ├── What type of error?
 │   ├── locator not found → check HTML IDs, add waits
-│   ├── timeout → increase timeout, check for JS errors
+│   ├── timeout → check screenshot + trace for overlay/loading issues
 │   ├── assertion failed → verify test expectations vs actual behavior
 │   ├── import error → uv sync, check top-level imports
 │   ├── ID enforcement violation → use constants from html_ids.py
-│   └── other → check logs, run with --headed
+│   └── other → check server.log, run with --headed
 │
 └── Fix → verify specific test → verify full suite → verify CI
 ```
@@ -247,10 +289,11 @@ Test failure
 | File | Purpose |
 |------|---------|
 | `./run_pytest.sh` | Main test runner with service management |
-| `test/conftest.py` | Fixtures (`dash_app`, `celery_worker`), health checks |
+| `test/conftest.py` | Fixtures (`dash_app`, `celery_worker`), `page` override (artifact capture), health checks |
 | `test/help_functions_tests.py` | `check_all_errors(page)` utility |
+| `test/artifacts/` | Auto-generated on failure: screenshots, traces, HTML, console logs, server logs |
 | `env_test_local` | Local test environment (custom ports) |
 | `env_test` | CI test environment (service hostnames) |
-| `.gitlab-ci.yml` | CI pipeline configuration |
+| `.gitlab-ci.yml` | CI pipeline configuration (uploads `test/artifacts/` on failure) |
 | `cosmonaut_app/constants/html_ids.py` | HTML ID constants for Playwright locators |
 | `docs/conventions/testing.md` | Testing conventions reference |

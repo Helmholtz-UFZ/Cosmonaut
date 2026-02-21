@@ -91,7 +91,12 @@ testing:
     - "cp env_test .env"
   script:
     # Run all tests in headless mode (default)
-    - "uv run pytest -v"
+    - "uv run pytest -v --screenshot only-on-failure --tracing retain-on-failure --output test/artifacts"
+  artifacts:
+    when: on_failure
+    paths:
+      - test/artifacts/
+    expire_in: 7 days
 
 build-latest:
   stage: "build"

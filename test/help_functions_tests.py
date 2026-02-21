@@ -47,10 +47,12 @@ def check_all_errors(page):
     # Wait for images to load
     page.wait_for_load_state("networkidle", timeout=5000)
 
-    # Check for broken images
+    # Check for broken images (exclude Leaflet tile images which may have
+    # empty/invalid src before tile URLs are populated by callbacks)
     broken_images = page.evaluate(
         """() => {
             return Array.from(document.querySelectorAll('img'))
+                .filter(img => !img.closest('.leaflet-tile-pane'))
                 .filter(img => img.complete && img.naturalWidth === 0 && img.src !== '')
                 .map(img => img.src);
         }"""

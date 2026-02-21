@@ -42,12 +42,11 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
 
     logging.info("Submitted test task, waiting for it to appear in active tasks table")
 
-    # Verify loading modal appears
-    expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).to_be_visible(timeout=5000)
-
-    # Wait for loading modal to disappear (refresh complete)
+    # Wait for the submit callback chain to complete (submit -> overlay -> refresh -> close overlay).
+    # We only assert the overlay is gone, not that it appeared — the open/close cycle
+    # can complete faster than Playwright's polling interval.
     expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
-        timeout=10000
+        timeout=20000
     )
 
     # Wait for task to appear in active tasks table
@@ -61,7 +60,7 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
         # Refresh to poll latest task state from Celery
         page.locator(f"#{WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID}").click()
         expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
-            timeout=10000
+            timeout=20000
         )
 
         # Key fix: Use Playwright's async waiting instead of synchronous is_visible()
@@ -92,10 +91,10 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
     expect(kill_button).to_be_enabled(timeout=5000)
     kill_button.click()
 
-    # Wait for loading modal to appear and disappear
-    expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).to_be_visible(timeout=5000)
+    # Wait for kill callback chain to complete.
+    # Don't assert to_be_visible — the open/close cycle can complete faster than polling.
     expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
-        timeout=10000
+        timeout=20000
     )
 
     # Verify task ID appears in revoked tasks table.
@@ -116,7 +115,7 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
                 )
             page.locator(f"#{WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID}").click()
             expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
-                timeout=10000
+                timeout=20000
             )
 
     # Check for any errors

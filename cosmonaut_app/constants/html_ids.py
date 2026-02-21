@@ -39,7 +39,10 @@ If uncertain, ask for review rather than adding # nocheck to suppress the test.
 # ============================================================================
 
 # --- Stores ---
-CLICKED_ROADS_STORE_SHARED_ID = "clicked-roads-store-shared-id"
+CLICKED_ROADS_STORE_SHARED_ID = (
+    "clicked-roads-store-shared-id"  # nocheck used as dcc.Store only
+)
+CURRENT_JOB_ID_MAP_STORE_ID = "current-job-id-map-store-id"
 JOB_ID_STORE_SHARED_ID = "job-id-store-shared-id"
 
 # --- Navigation ---
@@ -48,13 +51,17 @@ NAVBAR_TOGGLER_NAV_SHARED_ID = "navbar-toggler-nav-shared-id"
 SEARCH_BUTTON_NAV_SHARED_ID = "search-button-nav-shared-id"
 SEARCH_INPUT_NAV_SHARED_ID = "search-input-nav-shared-id"
 SEARCH_RESULTS_DIV_NAV_SHARED_ID = "search-results-div-nav-shared-id"
-URL_SHARED_ID = "url-shared-id"
+# Dash's internal routing location — page_container listens to this ID.
+# Outputting to it triggers layout() and navigates without a full reload.
 
 # --- Utility ---
 NONE_DIV_SHARED_ID = "none-div-shared-id"
 # --- Map Elements ---
 MAIN_MAP_COMPONENT_MAP_SHARED_ID = "main-map-component-map-shared-id"
+MAP_INIT_INTERVAL_ID = "map-init-interval-id"  # nocheck used as dcc.Interval only
+MEMBERSHIP_TILE_LAYER_MAP_ID = "membership-tile-layer-map-id"
 OSM_GEOJSON_LAYER_MAP_SHARED_ID = "osm-geojson-layer-map-shared-id"
+ROUTE_POLYLINE_LAYER_MAP_ID = "route-polyline-layer-map-id"
 
 # --- Modals ---
 # used not in normal callbacks, but in error handling callbacks (set_props())

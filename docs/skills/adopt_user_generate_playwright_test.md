@@ -233,11 +233,27 @@ For example:
 
 **If the test passes:** You're done! The test is ready to be committed.
 
-**If the test fails:**
+**If the test fails**, check artifacts before debugging code:
 
-- Review the error output
-- Fix any issues with locators, timing, or test logic
-- Re-run the test until it passes
+```bash
+# Screenshot — see the page state at failure
+open test/artifacts/<test-dir>/test-failed-1.png
+
+# Trace — step through the action timeline
+npx playwright show-trace test/artifacts/<test-dir>/trace.zip
+
+# Server logs — check for callback errors
+cat test/artifacts/<test-dir>/server.log
+```
+
+Common codegen-specific failures visible in artifacts:
+
+| Artifact shows | Cause | Fix |
+|---|---|---|
+| Wrong page in screenshot | Hardcoded port or missing `FLASK_PORT` | Use `f"http://localhost:{FLASK_PORT}/..."` |
+| Loading overlay blocking click | Missing overlay wait | Add `expect(overlay).not_to_be_visible()` before click |
+| Element not found in DOM | Wrong locator from codegen | Replace with ID constant from `html_ids.py` |
+| Callback error in server.log | Missing fixture (`dash_app`, `celery_worker`) | Add fixture to test function signature |
 
 ### Common Systematic Issues from Codegen
 

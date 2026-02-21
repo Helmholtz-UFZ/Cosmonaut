@@ -77,3 +77,35 @@ Configuration is in `cosmonaut_app/logger.py`:
 - Web/worker: Console + PostgreSQL database logging
 - Computation tasks: File-based logging in job output directory
 - Third-party package filtering to reduce noise
+
+---
+
+## Logs in Test Artifacts
+
+When a Playwright test fails, the `page` fixture in `test/conftest.py` captures all
+Python log output (including Dash callbacks, werkzeug requests, and application logs)
+into `test/artifacts/<test-dir>/server.log`. This uses a `logging.Handler` that
+collects records during the test and writes them on failure.
+
+This means every `log.info(...)`, `log.error(...)`, etc. from your application code
+is available for post-mortem debugging without re-running the test.
+
+See [Testing conventions — Test Artifacts](testing.md#test-artifacts) for the full
+artifact reference.
+
+---
+
+## Celery and the Root Logger
+
+The web process runs a Celery Beat thread (`app.py`). By default Celery hijacks the
+root logger on startup, replacing all handlers with its own stdout-only handler. This
+silently drops the PostgreSQL handler.
+
+**Always keep this in `CeleryConfig`:**
+
+```python
+worker_hijack_root_logger = False
+```
+
+Without it, logs appear in the container stdout (in Celery format) but never reach
+the database, and the `/logs` page shows nothing.

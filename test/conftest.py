@@ -1,8 +1,10 @@
 """Setup tests with conditional fixture loading."""
 
+import hashlib
 import importlib.resources
 import logging
 import os
+import pathlib
 import shutil
 import signal
 import subprocess
@@ -12,6 +14,8 @@ import urllib.request
 
 import pytest
 import redis
+from playwright.sync_api import ConsoleMessage, Error as PlaywrightError, Page
+from slugify import slugify
 from sqlalchemy.exc import OperationalError
 from werkzeug.serving import make_server
 
@@ -131,7 +135,7 @@ def logger():
 
 def _find_sensor_routing_test_file(substr):
     """Find a test data file from the sensor_routing package by substring."""
-    test_data_dir = importlib.resources.files("sensor_routing") / "test_data" / "input"
+    test_data_dir = importlib.resources.files("sensor_routing") / "test_data"
     for file_path in test_data_dir.iterdir():
         if substr in file_path.name:
             return file_path
@@ -156,6 +160,70 @@ def predictor_file_path(tmp_path_factory):
     local_path = tmp_path_factory.mktemp("test_data") / "predictors.csv"
     shutil.copy2(original_file, local_path)
     return local_path
+
+
+def _truncate_file_name(file_name: str) -> str:
+    if len(file_name) < 256:
+        return file_name
+    return f"{file_name[:100]}-{hashlib.sha256(file_name.encode()).hexdigest()[:7]}-{file_name[-100:]}"
+
+
+class _LogCollector(logging.Handler):
+    """Handler that collects formatted log records in memory."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: list[str] = []
+        self.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        )
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(self.format(record))
+
+
+@pytest.fixture
+def page(
+    page: Page, request: pytest.FixtureRequest, pytestconfig: pytest.Config
+) -> Page:
+    console_messages: list[str] = []
+
+    def _on_console(msg: ConsoleMessage) -> None:
+        console_messages.append(f"[{msg.type}] {msg.text}")
+
+    page.on("console", _on_console)
+
+    log_collector = _LogCollector()
+    root_logger = logging.getLogger()
+    root_logger.addHandler(log_collector)
+
+    yield page
+
+    root_logger.removeHandler(log_collector)
+
+    failed = request.node.rep_call.failed if hasattr(request.node, "rep_call") else True
+    if not failed:
+        return
+
+    output_dir = pathlib.Path(pytestconfig.getoption("--output")).absolute()
+    test_dir = output_dir / _truncate_file_name(slugify(request.node.nodeid))
+    test_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        html_content = page.content()
+        (test_dir / "page.html").write_text(html_content, encoding="utf-8")
+    except PlaywrightError:
+        pass  # Page may have already closed
+
+    if console_messages:
+        (test_dir / "console.log").write_text(
+            "\n".join(console_messages), encoding="utf-8"
+        )
+
+    if log_collector.records:
+        (test_dir / "server.log").write_text(
+            "\n".join(log_collector.records), encoding="utf-8"
+        )
 
 
 @pytest.fixture(scope="session")

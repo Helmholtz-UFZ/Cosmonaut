@@ -10,17 +10,21 @@ from datetime import date
 
 import pandas as pd
 from pyproj import CRS, Transformer
-
-from cosmonaut_app.config import (
-    WEB_WORK_DIR,
+from sensor_routing.constants import (
+    MEMBERSHIP_FILENAME,
+    OSM_FILENAME,
+    PREDICTOR_FILENAME,
+    ROUTE_FILENAME,
 )
-from sensor_routing.constants import ROUTE_FILENAME
 from sensor_routing.full_pipeline_cli import (
     parse_membership_file,
     parse_predictor_file,
     validate_predictor_membership_consistency,
 )
 
+from cosmonaut_app.config import (
+    WEB_WORK_DIR,
+)
 from cosmonaut_app.constants.general import (
     GPX_FILE,
     JOB_STATUS_COMPLETED,
@@ -28,14 +32,12 @@ from cosmonaut_app.constants.general import (
     JOB_STATUS_PENDING,
     JOB_STATUS_RUNNING,
     LOG_FILE_NAME,
-    MEMBERSHIP_FILENAME,
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
-    OSM_FILENAME,
-    PREDICTOR_FILENAME,
     QR_CODE_FILE,
 )
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
+from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.object_storage_manager import (
     delete_directory_from_storage,
@@ -321,14 +323,14 @@ class CosmonautJob:
         except Exception as e:
             logging.info(f"Membership file validation failed: {e}")
             os.remove(file_path)
-            raise ValueError(str(e))
+            raise FileValidationError(str(e))
 
         try:
             classification_data = _transform_csv(file_path, epsg_input, 4326)
         except ValueError as e:
             logging.info(f"Error transforming CSV file: {e}")
             os.remove(file_path)
-            raise e
+            raise FileValidationError(str(e))
 
         # Calculate bounds, position, and zoom
         bounds = _get_bounds(classification_data)
@@ -368,7 +370,7 @@ class CosmonautJob:
         except Exception as e:
             logging.info(f"Predictor file validation failed: {e}")
             os.remove(file_path)
-            raise ValueError(str(e))
+            raise FileValidationError(str(e))
 
         # Cross-validate with membership file
         membership_path = os.path.join(self.working_dir, MEMBERSHIP_FILENAME)
@@ -377,7 +379,7 @@ class CosmonautJob:
         except Exception as e:
             logging.info(f"Predictor-membership consistency check failed: {e}")
             os.remove(file_path)
-            raise ValueError(str(e))
+            raise FileValidationError(str(e))
 
         self.model.predictor_upload = {
             "file_name": PREDICTOR_FILENAME,

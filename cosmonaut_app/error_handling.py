@@ -36,6 +36,29 @@ class WrongCeleryTaskId(Exception):
         super().__init__(f"Invalid Celery task ID format: '{task_id}'")
 
 
+class FileValidationError(Exception):
+    """Signals that a user-uploaded input file failed validation.
+
+    Raised exclusively inside CosmonautJob.upload_membership() and
+    CosmonautJob.upload_predictor() when the uploaded CSV fails format
+    validation or cross-file consistency checks (via the sensor-routing
+    parsers). The error message is the raw validation message from the
+    parser, suitable for display directly to the user.
+
+    Contract:
+    - Raised only in upload methods on CosmonautJob.
+    - Caught only in the upload callback in data_upload.py.
+    - Must never escape to handle_error(). Reaching handle_error()
+      means the callback is missing an except clause and is a bug.
+    - Do not raise outside of input file validation contexts.
+    """
+
+    def __init__(self, message):
+        """Store the validation message for inline display to the user."""
+        self.message = message
+        super().__init__(message)
+
+
 database_error_title = "Database Connection Error"
 database_error_message = "Unfortunately, it is not possible to connect to the job database. Please try again later."  # noqa
 error_responds_dict = {
@@ -60,6 +83,10 @@ error_responds_dict = {
     WrongCeleryTaskId: (
         "Invalid Task ID",
         "The task ID '{task_id}' is not a valid Celery task ID format. Task IDs must be UUIDs.",
+    ),
+    FileValidationError: (
+        "File Validation Error",
+        "The uploaded file could not be validated. Please check the file format and try again.",
     ),
 }
 error_modal = dbc.Modal(
@@ -108,7 +135,7 @@ def handle_error(error):
     # Define here the error that should be reported
     if not isinstance(
         error,
-        (JobNotFound, WrongCeleryTaskId),
+        (JobNotFound, WrongCeleryTaskId, FileValidationError),
     ):
         callback_context = dash.ctx
         # email_subject = f"Error {str(error)}"

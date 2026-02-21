@@ -21,6 +21,9 @@ Main test runner with automatic service management.
 
 # Run specific test file
 ./run_pytest.sh test/test_app.py
+
+# Run without artifact capture
+./run_pytest.sh --no-artifacts
 ```
 
 **`--no-services` flag — use with care:**
@@ -47,7 +50,7 @@ background services will produce connection failures, not meaningful results.
 1. Backs up and replaces `.env` with `env_test_local`
 2. Starts Docker services (postgres, minio, redis)
 3. Waits for services to be healthy (10 retry limit)
-4. Runs pytest with `uv run pytest`
+4. Runs pytest with artifact flags (`--screenshot only-on-failure --tracing retain-on-failure --output test/artifacts`)
 5. Restores `.env`, stops services
 
 **Service Health Checks:**
@@ -79,11 +82,53 @@ Opens browser, records interactions, outputs test file.
 
 ---
 
+## Test Artifacts
+
+On failure, Playwright tests automatically capture artifacts in `test/artifacts/`:
+
+```
+test/artifacts/
+  test-test-<name>-chromium/
+    test-failed-1.png    # Screenshot at moment of failure
+    trace.zip            # Playwright trace (DOM, network, actions)
+    page.html            # HTML snapshot of the page
+    console.log          # Browser console output
+    server.log           # Dash/Python server logs during the test
+```
+
+**Viewing traces** (the most powerful debugging tool):
+
+```bash
+npx playwright show-trace test/artifacts/<test-dir>/trace.zip
+```
+
+**Key points:**
+
+- Artifacts are only generated on failure — passing tests produce nothing
+- The `test/artifacts/` directory is auto-cleaned at session start by pytest-playwright
+- `test/artifacts/` is in `.gitignore`
+- `--no-artifacts` flag disables capture (see `./run_pytest.sh --help`)
+
+**Which artifact to check first:**
+
+| Failure type | Check first |
+|---|---|
+| Element not found / timeout | `test-failed-1.png` — is the element on screen? |
+| Callback race / stuck overlay | `trace.zip` — step through the action timeline |
+| JavaScript error | `console.log` — browser-side errors |
+| Unexpected app behavior | `server.log` — Dash callback logs and exceptions |
+| Layout / rendering issue | `page.html` — inspect the DOM structure |
+
+---
+
 ## CI Pipeline
 
 Tests run in GitLab CI. See `.gitlab-ci.yml` for configuration.
 
 All tests must pass in CI before merging.
+
+On failure, CI uploads `test/artifacts/` as a GitLab artifact (7-day retention).
+Download from the pipeline job page under "Job artifacts".
 
 ---
 
@@ -108,6 +153,10 @@ test/
 
 - Custom pytest options via `pytest_addoption()`
 - Early validation in `pytest_configure()`
-- Module-scoped fixtures: `dash_app`, `celery_worker`
+- Session-scoped fixtures: `dash_app`, `celery_worker`
 - Daemon threads for background services
 - Conditional skip with `--no-services` flag
+- `page` fixture override — wraps pytest-playwright's `page` to capture:
+  - Browser console messages (via `page.on("console", ...)`)
+  - Python/Dash server logs (via `logging.Handler`)
+  - HTML snapshot and log files on failure

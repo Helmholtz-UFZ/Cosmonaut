@@ -25,27 +25,27 @@ The email is stored in the job model and accessible throughout the workflow.
 """
 
 import logging
-from dash import html, register_page, callback, Input, Output, State, dcc
-from dash.exceptions import PreventUpdate
+
 import dash_bootstrap_components as dbc
+from dash import Input, Output, State, callback, dcc, html, register_page
+from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
+    JOB_ID_STORE_SHARED_ID,
     URL_SHARED_ID,
     USER_INFO_EMAIL_INPUT_USER_INFO_ID,
     USER_INFO_NEXT_BUTTON_USER_INFO_ID,
-    JOB_ID_STORE_SHARED_ID,
-)
-from cosmonaut_app.layout import (
-    page_container_split_layout,
-    create_card_input,
-    progress_footer,
-    create_map,
-    build_url_step,
-    create_reset_banner,
-    create_reset_modal,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.layout import (
+    build_url_step,
+    create_card_input,
+    create_reset_banner,
+    create_reset_modal,
+    page_container_fullscreen_layout,
+    progress_footer,
+)
 from cosmonaut_app.pydantic_models import check_email
 
 register_page(
@@ -58,6 +58,7 @@ register_page(
 
 
 def layout(job_id):
+    logging.info(f"Creating layout page {__name__} for {job_id}")
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
@@ -112,7 +113,6 @@ def layout(job_id):
     footer = progress_footer(
         next_id=USER_INFO_NEXT_BUTTON_USER_INFO_ID,
     )
-    map = create_map(job=job)
     input_container = create_card_input(
         card_body,
         card_footer=footer,
@@ -120,7 +120,7 @@ def layout(job_id):
         job_id=job_id,
     )
 
-    return page_container_split_layout(map, input_container)
+    return page_container_fullscreen_layout(input_container)
 
 
 @callback(

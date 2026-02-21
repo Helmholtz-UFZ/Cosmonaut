@@ -46,6 +46,10 @@ class CeleryConfig:
         "cosmonaut_app.tasks.routing_tasks.*": {"queue": "routing"},
     }
 
+    # Logging - prevent Celery from hijacking the root logger and removing
+    # our PostgreSQL handler (which is configured in app.py / logger.py)
+    worker_hijack_root_logger = False
+
     # Worker settings for better performance and reliability
     worker_prefetch_multiplier = 1  # Fair distribution of tasks
     task_acks_late = True  # Acknowledge task after completion, not before

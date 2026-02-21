@@ -67,9 +67,11 @@ Celery worker info updates only on page load and after start/restart (performanc
 """
 
 import logging
+
+import dash
+import dash_bootstrap_components as dbc
 from dash import html, register_page, callback, Input, Output, State, dcc, no_update
 from dash.exceptions import PreventUpdate
-import dash_bootstrap_components as dbc
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.background_job_manager import get_background_job_manager
@@ -95,11 +97,10 @@ from cosmonaut_app.constants.html_ids import (
     UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID,
 )
 from cosmonaut_app.layout import (
-    page_container_split_layout,
+    page_container_fullscreen_layout,
     create_card_input,
     progress_footer,
     build_url_step,
-    create_map,
 )
 
 register_page(
@@ -182,8 +183,7 @@ def layout(job_id):
         job_id=job_id,
     )
 
-    map = create_map(job=job)
-    return page_container_split_layout(map, input_container)
+    return page_container_fullscreen_layout(input_container)
 
 
 def create_status_badge(status):
@@ -445,16 +445,23 @@ def update_celery_info(trigger, job_id):
     )
 
 
-@callback(
+# Clientside: open overlay instantly in the browser, avoiding server-side
+# callback ordering issues with allow_duplicate.
+dash.clientside_callback(
+    """
+    function() {
+        for (var i = 0; i < arguments.length; i++) {
+            if (arguments[i] != null) return true;
+        }
+        return false;
+    }
+    """,
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
     Input(START_BUTTON_ROUTE_COMPUTATION_ID, "n_clicks"),
     Input(CANCEL_BUTTON_ROUTE_COMPUTATION_ID, "n_clicks"),
     Input(RESTART_BUTTON_ROUTE_COMPUTATION_ID, "n_clicks"),
     prevent_initial_call=True,
 )
-def show_loading(*inputs):
-    """Show loading overlay when any action button is clicked."""
-    return any(inp is not None for inp in inputs)
 
 
 @callback(

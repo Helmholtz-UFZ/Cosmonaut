@@ -55,7 +55,6 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 import dash_bootstrap_components as dbc
-import dash_leaflet as dl
 from dash import (
     Input,
     Output,
@@ -68,7 +67,6 @@ from dash import (
     register_page,
 )
 from dash.exceptions import PreventUpdate
-from dash_extensions.javascript import assign
 
 from cosmonaut_app.constants.general import (
     JOB_STATUS_PENDING,
@@ -94,13 +92,10 @@ from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
-    create_map,
     create_reset_banner,
     create_reset_modal,
-    hover_style_handle,
-    page_container_split_layout,
+    page_container_fullscreen_layout,
     progress_footer,
-    style_handle,
 )
 from cosmonaut_app.street_selector import StreetSelector
 
@@ -112,18 +107,6 @@ register_page(
     description="Select streets for the routing process.",
     dynamic=True,
 )
-
-click_handler = assign("""function(e, ctx) {
-    const id = e.layer.feature.id;
-    const selected = [...(ctx.hideout.selected || [])];
-    const idx = selected.indexOf(id);
-    if (idx > -1) {
-        selected.splice(idx, 1);
-    } else {
-        selected.push(id);
-    }
-    ctx.setProps({hideout: {...ctx.hideout, selected: selected}});
-}""")
 
 
 def layout(job_id: str):
@@ -311,28 +294,13 @@ def layout(job_id: str):
         next_disabled=False,
     )
 
-    sel = StreetSelector(job)
-    initial_fc = sel.initial_fc(list(OSM_TAGS_MAPPING.keys()))
-
-    extra_layer = dl.GeoJSON(
-        id=OSM_GEOJSON_LAYER_MAP_SHARED_ID,
-        data=initial_fc,
-        options={"style": style_handle},
-        hoverStyle=hover_style_handle,
-        eventHandlers=dict(click=click_handler),
-        hideout=dict(selected=[], zoom=10),
-        zoomToBounds=bool(initial_fc["features"]),
-    )
-
-    map = create_map(job=job, extra_layers=[extra_layer])
-
     input_container = create_card_input(
         card_body,
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
     )
-    return page_container_split_layout(map, input_container)
+    return page_container_fullscreen_layout(input_container)
 
 
 @callback(

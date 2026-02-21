@@ -7,13 +7,13 @@ import shutil
 import geopandas as gpd
 import numpy as np
 import osmnx
+from sensor_routing.constants import OSM_FILENAME
 from shapely.geometry import Polygon
 from shapely.ops import linemerge
 
 from cosmonaut_app.constants.general import (
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
-    OSM_FILENAME,
 )
 
 log = logging.getLogger(__name__)

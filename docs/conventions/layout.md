@@ -19,52 +19,55 @@ loading_overlay = dbc.Modal(
 )
 ```
 
-**Create a callback to show the overlay** when buttons are clicked:
+**Open the overlay** with a clientside callback (fires instantly in the browser):
 
 ```python
-@callback(
-    Output(LOADING_OVERLAY_ID, "is_open", allow_duplicate=True),
-    Input("button_id", "n_clicks"),
+import dash
+
+dash.clientside_callback(
+    "function(n) { return true; }",
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Input(SOME_BUTTON_ID, "n_clicks"),
     prevent_initial_call=True,
 )
- def show_loading(*inputs):
-     """Show loading overlay when preparing input."""
-     return any(input for input in inputs if input is not None)
 ```
 
-**Note**: If the `show_loading` callback has identical inputs to your main callback,
-you must add a dummy input to differentiate them. Double check if this is needed or not.
+For multiple button triggers:
 
 ```python
-# Add a dummy store to the layout. Use None
-layout = [
-    dcc.Store(id=PAGE_DUMMY_ID, data=None),
-    # ... rest of layout
-]
-
-# Include dummy input in show_loading callback
-@callback(
-    Output(LOADING_OVERLAY_ID, "is_open", allow_duplicate=True),
-    Input("button_id", "n_clicks"),
-    Input(PAGE_DUMMY_ID, "data"),  # Dummy input
+dash.clientside_callback(
+    """
+    function() {
+        for (var i = 0; i < arguments.length; i++) {
+            if (arguments[i] != null) return true;
+        }
+        return false;
+    }
+    """,
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Input(BUTTON_A_ID, "n_clicks"),
+    Input(BUTTON_B_ID, "n_clicks"),
     prevent_initial_call=True,
 )
-def show_loading(*inputs):
-    """Show loading overlay when preparing input."""
-    return any(input for input in inputs if input is not None)
 ```
 
-**Hide the overlay** in your main callback by returning `False`:
+**Why clientside?** With `allow_duplicate=True`, Dash does not guarantee execution
+order of server-side callbacks targeting the same output. A server-side `show_loading`
+can fire *after* the processing callback returns, leaving the overlay permanently
+stuck open. See [Callbacks — Loading Overlay](callbacks.md#loading-overlay--clientside-only)
+for the full explanation.
+
+**Close the overlay** in your processing callback by returning `False`:
 
 ```python
 @callback(
     # ... other outputs
-    Output(LOADING_OVERLAY_ID, "is_open", allow_duplicate=True),
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
     # ... inputs and states
 )
 def main_callback():
     # ... your logic
-    return result, False  # False hides the overlay
+    return result, False  # False closes the overlay
 ```
 
 ### `create_card_input(card_body, card_footer=None, name_step=None, title=None, job_id=None)`

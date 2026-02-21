@@ -154,6 +154,7 @@ class ExcludeSubmodulesFilter(logging.Filter):
         excluded_packages = [
             "matplotlib",
             "PIL",
+            "pyogrio",
             "rasterio",
             "watchdog",
             "selenium",
