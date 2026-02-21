@@ -34,6 +34,8 @@ BEFORE ADDING # nocheck: Double-check that one of the two valid cases above appl
 If uncertain, ask for review rather than adding # nocheck to suppress the test.
 """
 
+from dash.dash import _ID_LOCATION
+
 # ============================================================================
 # SHARED/COMMON IDS
 # ============================================================================
@@ -53,6 +55,7 @@ SEARCH_INPUT_NAV_SHARED_ID = "search-input-nav-shared-id"
 SEARCH_RESULTS_DIV_NAV_SHARED_ID = "search-results-div-nav-shared-id"
 # Dash's internal routing location — page_container listens to this ID.
 # Outputting to it triggers layout() and navigates without a full reload.
+URL_SHARED_ID = _ID_LOCATION
 
 # --- Utility ---
 NONE_DIV_SHARED_ID = "none-div-shared-id"

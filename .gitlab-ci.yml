@@ -89,6 +89,7 @@ testing:
     - "mc alias set myminio http://minio:9000 minioadmin minioadmin"
     - "mc mb myminio/cosmic-routing || true"
     - "cp env_test .env"
+    - "mkdir -p test/artifacts"
   script:
     # Run all tests in headless mode (default)
     - "uv run pytest -v --screenshot only-on-failure --tracing retain-on-failure --output test/artifacts"
