@@ -59,10 +59,12 @@ def test_all_env_files(logger):
             "MINIO_SECRET_KEY='password'",
             "REDIS_PASSWORD='password'",
             "OBJECT_STORAGE_SECRET_KEY='password'",
+            "EMAIL_PASSWORD='password'",
         ]
     }
 
     for env_filename in env_files:
         logger.info(f"Testing environment file: {env_filename}")
+        # This is not defensive programming designed intentionally like this.
         additional_lines = additional_lines_map.get(env_filename, [])
         _test_single_env_file(env_filename, logger, additional_lines)

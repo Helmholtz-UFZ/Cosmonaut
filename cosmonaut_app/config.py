@@ -34,6 +34,7 @@ env_vars = [
     "REDIS_PORT",
     "REDIS_HOST",
     "REDIS_DB",
+    "REDIS_PASSWORD",
     "OBJECT_STORAGE_ACCESS_KEY",
     "OBJECT_STORAGE_SECRET_KEY",
     "OBJECT_STORAGE_HOST",
@@ -47,6 +48,7 @@ env_vars = [
     "DOCKER_UID",
     "DOCKER_GID",
     "DEBUG",
+    "GUNICORN",
     "WEB_OUTSIDE_URL",
     "OBJECT_STORAGE_PORT",
     "OBJECT_STORAGE_CONSOLE_PORT",
@@ -55,10 +57,14 @@ env_vars = [
     "EMAIL_SERVER",
     "EMAIL_PORT",
     "EMAIL_USERNAME",
+    "EMAIL_PASSWORD",
+    "EMAIL_SENDER",
 ]
 
 # Devolopment Debug Mode
 DEBUG = getenv("DEBUG") == "1"
+# Testing flag — set in env_test / env_test_local, absent in production
+COSMONAUT_TESTING = os.getenv("COSMONAUT_TESTING", "false") == "true"
 # Not neeeded for service kept for testing
 DOCKER_UID = getenv("DOCKER_UID")
 DOCKER_GID = getenv("DOCKER_GID")
@@ -69,7 +75,7 @@ WEB_WORK_DIR = os.path.abspath(getenv("WEB_WORK_DIR"))
 JOB_WORK_DIR_TEMPLATE = os.path.join(WEB_WORK_DIR, "{job_id}")
 WEB_OUTSIDE_URL = getenv("WEB_OUTSIDE_URL")
 FLASK_PORT = getenv("FLASK_PORT")
-MAINTAINER_EMAIL = getenv("MAINTAINER_EMAIL")
+MAINTAINER_EMAIL = [e.strip() for e in getenv("MAINTAINER_EMAIL").split(",")]
 
 # Tile Server URL
 TILESERVER_URL = getenv("TILESERVER_URL")
@@ -78,6 +84,8 @@ TILESERVER_URL = getenv("TILESERVER_URL")
 EMAIL_SERVER = getenv("EMAIL_SERVER")
 EMAIL_PORT = getenv("EMAIL_PORT")
 EMAIL_USERNAME = getenv("EMAIL_USERNAME")
+EMAIL_PASSWORD = getenv("EMAIL_PASSWORD")
+EMAIL_SENDER = getenv("EMAIL_SENDER")
 
 # Object Storage Configuration (rclone-based S3)
 OBJECT_STORAGE_ACCESS_KEY = getenv("OBJECT_STORAGE_ACCESS_KEY")
@@ -114,7 +122,7 @@ def get_download_url(job_id, filename="route.gpx"):
         str: Full URL to download the file
     """
     if "localhost" in WEB_OUTSIDE_URL:
-        url_base = WEB_OUTSIDE_URL + FLASK_PORT
+        url_base = WEB_OUTSIDE_URL + ":" + FLASK_PORT
     else:
         url_base = WEB_OUTSIDE_URL
     return f"{url_base}/download/{job_id}/{filename}"

@@ -94,6 +94,7 @@ test/artifacts/
     page.html            # HTML snapshot of the page
     console.log          # Browser console output
     server.log           # Dash/Python server logs during the test
+    worker.log           # Celery worker stderr (task execution, errors)
 ```
 
 **Viewing traces** (the most powerful debugging tool):
@@ -117,6 +118,7 @@ npx playwright show-trace test/artifacts/<test-dir>/trace.zip
 | Callback race / stuck overlay | `trace.zip` — step through the action timeline |
 | JavaScript error | `console.log` — browser-side errors |
 | Unexpected app behavior | `server.log` — Dash callback logs and exceptions |
+| Routing task failure | `worker.log` — Celery worker output and task traces |
 | Layout / rendering issue | `page.html` — inspect the DOM structure |
 
 ---

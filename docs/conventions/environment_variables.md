@@ -28,7 +28,7 @@ Grouped by service. The full list lives in `config.env_vars`.
 - **Redis / Celery**: `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD`
 - **Object Storage (S3/MinIO)**: `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_HOST`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_REMOTE_NAME`, `OBJECT_STORAGE_PORT`, `OBJECT_STORAGE_CONSOLE_PORT`
 - **Tileserver**: `TILESERVER_URL`
-- **Email**: `MAINTAINER_EMAIL`, `EMAIL_SERVER`, `EMAIL_PORT`, `EMAIL_USERNAME`
+- **Email**: `MAINTAINER_EMAIL`, `EMAIL_SERVER`, `EMAIL_PORT`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_SENDER`
 - **Docker**: `DOCKER_UID`, `DOCKER_GID`
 
 ---
@@ -66,7 +66,7 @@ How env vars reach containers (see `docker-compose.yml`):
 
 - `deployment/ufz/prod/values.yaml` injects env vars via `environmentVariables`
   on both frontend and worker pods.
-- Secrets (`EMAIL_PASSWORD`, `OBJECT_STORAGE_SECRET_KEY`, `POSTGRES_PASSWORD`)
+- Secrets (`EMAIL_PASSWORD`, `OBJECT_STORAGE_SECRET_KEY`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`)
   are pulled from the K8s Secret `app.secrets` using `secretKeyRef`.
 - The Secret is sealed with Bitnami SealedSecrets
   (`deployment/ufz/prod/app.sealedsecret.yaml`).

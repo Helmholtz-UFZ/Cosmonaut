@@ -15,11 +15,11 @@ from cosmonaut_app.layout import (
     register_navbar_callbacks,
     register_reset_callbacks,
 )
-from cosmonaut_app.logger import get_logger_config
+from cosmonaut_app.logger import get_logger_config_web
 from cosmonaut_app.object_storage_manager import create_bucket, setup_remote
 
 # Configure application-wide logging
-logging.config.dictConfig(get_logger_config(DEBUG))
+logging.config.dictConfig(get_logger_config_web())
 logger = logging.getLogger(__name__)
 logger.info("COSMONAUT application starting")
 

@@ -8,6 +8,7 @@ import pathlib
 import shutil
 import signal
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.request
@@ -45,6 +46,8 @@ def create_logger():
 
 log = create_logger()
 
+_worker_log_path: pathlib.Path | None = None
+
 
 def pytest_addoption(parser):
     """Add custom command-line options to pytest.
@@ -70,7 +73,7 @@ def pytest_configure(config):
 
     if not skip_services:
         # Give services a moment to fully initialize after health checks
-        time.sleep(2)
+        time.sleep(4)
 
         # Check PostgreSQL connectivity
         try:
@@ -225,6 +228,9 @@ def page(
             "\n".join(log_collector.records), encoding="utf-8"
         )
 
+    if _worker_log_path and _worker_log_path.stat().st_size > 0:
+        shutil.copy2(_worker_log_path, test_dir / "worker.log")
+
 
 @pytest.fixture(scope="session")
 def dash_app(request):
@@ -288,10 +294,21 @@ def celery_worker(request):
     if skip_services:
         pytest.skip("Skipping celery_worker fixture (--no-services flag set)")
 
+    global _worker_log_path  # noqa: PLW0603
+
     log.info("Starting Celery worker for testing...")
+
+    # Redirect worker stderr to a temp file so it can be captured as a test artifact
+    worker_log_file = tempfile.NamedTemporaryFile(
+        mode="w", prefix="worker_", suffix=".log", delete=False
+    )
+    _worker_log_path = pathlib.Path(worker_log_file.name)
 
     # Start Celery worker process
     # Command adapted from cosmopolitan reference but using uv instead of poetry
+    # Both stdout and stderr go to the log file: Celery's own logging uses stderr,
+    # but the routing task switches logging to stdout via dictConfig.
+    worker_env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     worker_process = subprocess.Popen(
         [
             "uv",
@@ -307,9 +324,10 @@ def celery_worker(request):
             "--hostname=worker@test",  # Give worker a name for identification
             "-E",  # Enable task events for inspect() API to work
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=worker_log_file,
+        stderr=worker_log_file,
         text=True,
+        env=worker_env,
         preexec_fn=os.setsid,  # Create new process group for clean termination
     )
 
@@ -318,14 +336,16 @@ def celery_worker(request):
 
     # Check if worker process is still running (not crashed)
     if worker_process.poll() is not None:
-        stdout, stderr = worker_process.communicate()
-        pytest.exit(
-            f"Celery worker failed to start. stdout: {stdout}, stderr: {stderr}"
-        )
+        worker_log_file.close()
+        stderr = _worker_log_path.read_text()
+        pytest.exit(f"Celery worker failed to start. stderr: {stderr}")
 
     log.info("Celery worker started successfully")
 
     yield worker_process
+
+    # Close the log file so all output is flushed
+    worker_log_file.close()
 
     # Cleanup: terminate worker process and all child processes
     log.info("Terminating Celery worker...")

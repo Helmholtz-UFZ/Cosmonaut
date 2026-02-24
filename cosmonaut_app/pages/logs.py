@@ -59,7 +59,7 @@ def layout():
     start_minute = now.minute
     end_hour = now.hour
     end_minute = now.minute
-
+    raise ValueError
     header = create_header(
         "View logs", "Show logs of the webserver", bg_color="bg-info", rounded=False
     )

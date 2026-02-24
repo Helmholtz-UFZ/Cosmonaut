@@ -11,11 +11,13 @@ from dash import set_props
 from sqlalchemy.exc import DatabaseError, OperationalError
 from werkzeug.exceptions import NotFound
 
+from cosmonaut_app.config import MAINTAINER_EMAIL
 from cosmonaut_app.constants.html_ids import (
     ERROR_MODAL_MESSAGE_SHARED_ID,
     ERROR_MODAL_SHARED_ID,
     ERROR_MODAL_TITLE_SHARED_ID,
 )
+from cosmonaut_app.email_service import send_mail
 
 
 class JobNotFound(Exception):
@@ -138,23 +140,23 @@ def handle_error(error):
         (JobNotFound, WrongCeleryTaskId, FileValidationError),
     ):
         callback_context = dash.ctx
-        # email_subject = f"Error {str(error)}"
         truncated_triggered = _truncate_data(callback_context.triggered)
-        email_body = f"""
-        Traceback info: {traceback.format_exc()}\n\n
-        Input info: {json.dumps(truncated_triggered)}
-        """
-        # send_mail(MAINTAINER_EMAIL, email_subject, email_body)
-        # TODO set up email
-        logging.error(f"Unhandled error: {error}", extra={"tag": "frontend"})
-        logging.error(email_body, extra={"tag": "frontend"})
+        email_subject = f"COSMONAUT Error: {error}"
+        email_body = (
+            f"Traceback info: {traceback.format_exc()}\n\n"
+            f"Input info: {json.dumps(truncated_triggered)}"
+        )
+        try:
+            logging.debug(f"Send mail to {MAINTAINER_EMAIL}")
+            send_mail(MAINTAINER_EMAIL, email_subject, email_body)
+        except Exception:
+            logging.error("Failed to send maintainer error email", exc_info=True)
+        logging.error(f"Unhandled error: {error}")
+        logging.error(email_body)
 
-    error_title = error_responds_dict.get(type(error), error_responds_dict[Exception])[
-        0
-    ]
-    error_message = error_responds_dict.get(
-        type(error), error_responds_dict[Exception]
-    )[1]
+    error_type = type(error) if type(error) in error_responds_dict else Exception
+    error_title = error_responds_dict[error_type][0]
+    error_message = error_responds_dict[error_type][1]
 
     try:
         error_message = error_message.format(job_id=error.job_id)

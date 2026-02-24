@@ -27,6 +27,7 @@ class RoutingTask(Task):
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """Handle task failure."""
         log.error(f"Task {task_id} failed: {exc}")
+        # This is not defensive programming designed intentionally like this.
         job_id = args[0] if args else kwargs.get("job_id")
         if job_id:
             log.error(f"Job {job_id} failed with error: {str(exc)}")
@@ -54,11 +55,10 @@ def process_routing_job(self, job_id):
     3. Call sensor_routing_pipeline() function
     4. Flush handlers and switch logging back to web config
     """
-    from cosmonaut_app.config import DEBUG
     from cosmonaut_app.cosmonaut_job import CosmonautJob
     from cosmonaut_app.logger import (
         get_logger_config_computation,
-        get_logger_config_web,
+        get_logger_config_worker,
     )
 
     logging.info(f"Starting routing job task for job_id={job_id}")
@@ -87,21 +87,54 @@ def process_routing_job(self, job_id):
         flush_all_handlers()
 
         # Switch logging back to web config
-        dictConfig(get_logger_config_web(DEBUG))
+        dictConfig(get_logger_config_worker())
 
         logging.info(f"Routing job {job_id} finished")
 
         job.model.status = JOB_STATUS_COMPLETED
         job.save()
 
+        _notify_user(job, JOB_STATUS_COMPLETED)
+
     except Exception as e:
         logging.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
 
         # Flush handlers and switch back even on error
         flush_all_handlers()
-        dictConfig(get_logger_config_web(DEBUG))
+        dictConfig(get_logger_config_worker())
 
         job.model.status = JOB_STATUS_FAILED
         job.save()
 
+        _notify_user(job, JOB_STATUS_FAILED)
+
         raise
+
+
+def _notify_user(job, status):
+    """Send email notification to user if email is set and not yet notified."""
+    if not job.model.email or job.model.notified_end:
+        return
+
+    from cosmonaut_app.config import get_download_url
+    from cosmonaut_app.email_service import send_mail
+
+    job_id = job.model.job_id
+
+    if status == JOB_STATUS_COMPLETED:
+        download_url = get_download_url(job_id)
+        subject = f"COSMONAUT Job {job_id} completed"
+        body = (
+            f"Your routing job {job_id} has completed successfully.\n\n"
+            f"Download your results: {download_url}"
+        )
+    else:
+        subject = f"COSMONAUT Job {job_id} failed"
+        body = f"Your routing job {job_id} has failed. Please check the application for details."
+
+    try:
+        send_mail([job.model.email], subject, body)
+        job.model.notified_end = True
+        job.save()
+    except Exception:
+        log.error(f"Failed to send notification email for job {job_id}", exc_info=True)

@@ -10,9 +10,8 @@ your routing job. Email notifications will be sent when:
 - Any errors occur during processing
 
 The email field includes live validation to ensure proper formatting before you can
-proceed. Currently the email service is not enabled and further your email will be able
-to be accessed by anybody from within the UFZ network. Providing an email is optional
-but recommended for tracking long-running jobs that process in the background.
+proceed. Providing an email is optional but recommended for tracking long-running
+jobs that process in the background.
 
 Once you enter a valid email address (or skip this step by proceeding without one),
 click "Next" to continue to the data upload page where you'll provide your
@@ -77,7 +76,7 @@ def layout(job_id):
                 className="text-muted",
             ),
             dbc.Alert(
-                "Warning: Your email is visible from inside the UFZ network. Currently in beta,  email not enabled.",
+                "Warning: Your email is visible from inside the UFZ network.",
                 color="warning",
             ),
             dbc.Label(

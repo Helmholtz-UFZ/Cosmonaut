@@ -1,6 +1,5 @@
 import logging
 import re
-import sys
 from datetime import date
 from pyproj.exceptions import CRSError
 from pyproj import CRS
@@ -37,10 +36,9 @@ def check_email(email: str) -> str:
     if email == "":
         return email
     try:
-        # Checks syntax and domain
-        # Skip deliverability check during tests (pytest environment)
-        in_tests = "pytest" in sys.modules
-        validate_email(email, check_deliverability=not in_tests)
+        # Checks syntax only — deliverability (DNS/MX) checks are unreliable
+        # and cause inconsistencies between web process and Celery worker
+        validate_email(email, check_deliverability=False)
         return email  # Return email if valid
     except EmailNotValidError as e:
         raise ValueError(f"Invalid email: {e}")

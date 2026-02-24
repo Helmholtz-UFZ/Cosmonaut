@@ -36,29 +36,10 @@ object storage, and Redis as the broker between the Dash server and workers.
    - Use Bootstrap classes only
    - Existing `style={}` usages are violations to clean up later
 
----
-
 ## Proactive Issue Reporting
 
 When you spot bad practices, convention violations, symmetric bugs, or fragile patterns
 — even if unrelated to the current task — flag them briefly and ask: "Want me to fix it?"
-
----
-
-## Project Structure
-
-```
-cosmonaut_app/
-├── constants/html_ids.py   # HTML ID constants
-├── pages/                  # Page layouts + callbacks (colocated)
-├── layout.py               # Shared layout + callbacks
-├── error_handling.py       # Custom exceptions, error modal
-├── logger.py               # Logger configuration
-├── app.py                  # Flask/Dash setup
-└── config.py               # Environment config
-```
-
----
 
 ## Detailed Conventions
 
@@ -74,15 +55,13 @@ For specific implementation details, see:
 - [Dash Leaflet](docs/conventions/dash_leaflet.md) - Map component gotchas
 - [Environment Variables](docs/conventions/environment_variables.md) - Env files, config loading, secrets
 
-**Important** read the convention befor you make any codebase exploration or answering.
+**Important** read the convention before you make any codebase exploration or answering.
 Never sacrfice speed for accuracy.
 
 Which conventions you should read depends on the first user prompt. Determine the
 conventions which are important for the current task and read them imediatly. Keep the
 conventions in mind and if you have not read them and they become important read them
 then.
-
----
 
 ## Skills
 
@@ -96,8 +75,6 @@ user asks later. Keep this skill list in Mind:
 - [Run and Fix Testing](docs/skills/run_and_fix_testing.md) - Systematic guide for running tests and diagnosing failures
 - [Convention Keeper](docs/skills/convention_keeper.md) - Audit and fix convention violations across the codebase
 - [Local sensor-routing](docs/skills/local_sensor_routing.md) - Cross-repo work with the sensor-routing library
-
----
 
 ## Memory Policy
 
@@ -115,13 +92,9 @@ The options are:
 
 Always prefer the most specific home for the knowledge.
 
----
-
 ## Identity Files
 
 Before your first response, you must read the following files (they might be symlinks) if they exist in the project root:
 
 - `USER.md` — Information about the user you're working with
 - `SOUL.md` — Your personality and core values
-
----

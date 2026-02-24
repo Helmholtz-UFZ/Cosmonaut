@@ -2,12 +2,13 @@
 
 This test validates the end-to-end user journey:
 1. Create a new job from the home page
-2. Navigate through user info page
+2. Enter email on user info page
 3. Upload a CSV file with member data
 4. Navigate through street selection
 5. Configure routing parameters
 6. Start and wait for route computation
 7. Verify the download URL is visible on the route download page
+8. Verify email notification was sent (notified_end flag in DB)
 """
 
 from playwright.sync_api import expect
@@ -25,8 +26,10 @@ from cosmonaut_app.constants.html_ids import (
     PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     START_BUTTON_ROUTE_COMPUTATION_ID,
     START_JOB_BUTTON_HOME_ID,
+    USER_INFO_EMAIL_INPUT_USER_INFO_ID,
     USER_INFO_NEXT_BUTTON_USER_INFO_ID,
 )
+from cosmonaut_app.db_manager import DataBaseManager
 
 
 def test_complete_routing_workflow(
@@ -39,6 +42,11 @@ def test_complete_routing_workflow(
     check_all_errors(page)
 
     # === User Info Page ===
+    email_input = page.locator(f"#{USER_INFO_EMAIL_INPUT_USER_INFO_ID}")
+    email_input.fill("test@ufz.de")
+    expect(page.locator(f"#{USER_INFO_NEXT_BUTTON_USER_INFO_ID}")).to_be_enabled(
+        timeout=5000
+    )
     page.locator(f"#{USER_INFO_NEXT_BUTTON_USER_INFO_ID}").click()
     check_all_errors(page)
 
@@ -89,3 +97,15 @@ def test_complete_routing_workflow(
     # Verify that the download URL is visible
     expect(page.locator(f"#{DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID}")).to_be_visible()
     check_all_errors(page)
+
+    # === Verify email notification was sent ===
+    # Extract job_id from the current URL (e.g. /job/<id>/route-download)
+    job_id = page.url.split("/job/")[1].split("/")[0]
+    job_row = DataBaseManager.get_job_columns(job_id)
+    assert (
+        job_row["email"] == "test@ufz.de"
+    ), f"Expected email 'test@ufz.de' in DB, got '{job_row['email']}'"
+    assert job_row["notified_end"] is True, (
+        "Expected notified_end=True in DB after job completion — "
+        "email notification was not recorded"
+    )

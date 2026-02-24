@@ -2,11 +2,12 @@
 
 import datetime
 import logging
-import sys
 
+import psycopg2
 from psycopg2 import pool
 
 from cosmonaut_app.config import (
+    COSMONAUT_TESTING,
     POSTGRES_NAME,
     POSTGRES_HOST_NAME,
     POSTGRES_PORT,
@@ -63,8 +64,6 @@ class PostgreSQLHandler(logging.Handler):
         Args:
             record: The log record to write.
         """
-        import psycopg2
-
         # Get a connection from the pool
         connection = self.connection_pool.getconn()
         connection_is_bad = False
@@ -114,14 +113,14 @@ class PostgreSQLHandler(logging.Handler):
                         new_connection.commit()
                 finally:
                     self.connection_pool.putconn(new_connection)
-            except Exception as retry_error:  # noqa
+            except Exception as retry_error:  # noqa — intentional broad catch: any DB error after retry is fatal
                 print(
                     f"FATAL: Database logging failed after retry. "
                     f"Worker cannot continue without logging capability: {retry_error}"
                 )
                 # Re-raise to fail the worker - logging is critical
                 raise
-        except Exception as e:  # noqa
+        except Exception as e:  # noqa — intentional broad catch: any non-OperationalError DB error is fatal
             # Any other database error is also fatal
             print(f"FATAL: Error writing to PostgreSQL: {e}")
             # Re-raise to fail the worker
@@ -169,10 +168,11 @@ class ExcludeSubmodulesFilter(logging.Filter):
 
 
 def get_logger_config_computation(log_file_path):
-    """Get the config dic for the computation logger.
+    """Get the config dict for the computation logger.
 
     This configures logging to write to a file in the job's working directory
-    during background task execution.
+    during background task execution. No postgres handler — computation logs
+    go to the job-specific log file only.
 
     Args:
         log_file_path: Path to the log file to write to
@@ -207,82 +207,80 @@ def get_logger_config_computation(log_file_path):
     }
 
 
-def get_logger_config_web(debug):
-    """Get the logging configuration dictionary for the webservice logger.
-
-    This is the standard web/worker logging configuration that logs to console
-    and PostgreSQL database.
+def _build_stream_config(stream, disable_existing_loggers):
+    """Build a logging config that writes to a stream and PostgreSQL.
 
     Args:
-        debug (bool): Whether to enable debug mode logging
+        stream: The stream ext:// URI for the StreamHandler
+            (e.g. "ext://sys.stderr" or "ext://sys.__stderr__")
+        disable_existing_loggers: Whether to disable loggers not in the config.
+            False preserves Celery's own handlers; True is the default for the
+            web process in production.
 
     Returns:
         dict: Logging configuration dictionary for use with dictConfig()
     """
-    return get_logger_config(debug)
-
-
-def get_logger_config(debug):
-    """Get the logging configuration dictionary for the logger.
-
-    This configuration sets up both console and database logging.
-
-    Args:
-        debug (bool): Whether to enable debug mode logging
-
-    Returns:
-        dict: Logging configuration dictionary for use with dictConfig()
-    """
-    # Detect if we're in test environment
-    in_tests = "pytest" in sys.modules
-
-    # Base handlers - always include console
-    handler_configs = {
-        "wsgi": {
-            "class": "logging.StreamHandler",
-            "stream": "ext://sys.stdout",
-            "formatter": "default",
-            "filters": ["exclude_submodules"],
-            "level": "DEBUG",
-        },
-    }
-
-    # Try to add postgres handler, but skip if connection fails (e.g., during tests)
-    try:
-        # Test database connection before adding handler
-        import psycopg2
-
-        test_conn = psycopg2.connect(**postgres_params, connect_timeout=2)
-        test_conn.close()
-
-        # Connection works, add postgres handler
-        handler_configs["postgres"] = {
-            "class": __name__ + ".PostgreSQLHandler",
-            "level": "DEBUG",
-            "formatter": "message_only",
-            "filters": ["exclude_submodules"],
-            "connection_params": postgres_params,
-        }
-    except Exception as e:
-        # Database not available, skip postgres handler
-        print(f"Warning: Skipping PostgreSQL logging handler: {e}")
-
-    logging_config = {
+    return {
         "version": 1,
-        "disable_existing_loggers": not in_tests,  # Preserve test loggers
+        "disable_existing_loggers": disable_existing_loggers,
         "formatters": {
             "default": {"format": format_string},
-            "message_only": {
-                "format": "%(message)s",
-            },
+            "message_only": {"format": "%(message)s"},
         },
         "filters": {"exclude_submodules": {"()": ExcludeSubmodulesFilter}},
-        "handlers": handler_configs,
+        "handlers": {
+            "stream": {
+                "class": "logging.StreamHandler",
+                "stream": stream,
+                "formatter": "default",
+                "filters": ["exclude_submodules"],
+                "level": "DEBUG",
+            },
+            "postgres": {
+                "class": __name__ + ".PostgreSQLHandler",
+                "level": "DEBUG",
+                "formatter": "message_only",
+                "filters": ["exclude_submodules"],
+                "connection_params": postgres_params,
+            },
+        },
         "root": {
-            "handlers": handler_configs.keys(),
+            "handlers": ["stream", "postgres"],
             "level": "DEBUG",
             "filters": ["exclude_submodules"],
         },
     }
 
-    return logging_config
+
+def get_logger_config_web():
+    """Get the logging configuration for the web process (Dash/Flask).
+
+    Writes to sys.stderr and PostgreSQL.
+
+    Returns:
+        dict: Logging configuration dictionary for use with dictConfig()
+    """
+    return _build_stream_config(
+        stream="ext://sys.stderr",
+        disable_existing_loggers=not COSMONAUT_TESTING,
+    )
+
+
+def get_logger_config_worker():
+    """Get the logging configuration for use inside a Celery worker task.
+
+    Writes to sys.__stderr__ (the real stderr fd) instead of sys.stderr.
+    This is necessary because Celery's prefork pool replaces sys.stderr
+    with a LoggingProxy, and writing to it from a StreamHandler causes
+    circular recursion.
+
+    disable_existing_loggers is always False to preserve Celery's own
+    logging handlers.
+
+    Returns:
+        dict: Logging configuration dictionary for use with dictConfig()
+    """
+    return _build_stream_config(
+        stream="ext://sys.__stderr__",
+        disable_existing_loggers=False,
+    )

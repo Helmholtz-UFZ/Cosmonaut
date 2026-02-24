@@ -18,6 +18,7 @@ EMAIL_SERVER="smtp.ufz.de"
 EMAIL_PORT="587"
 EMAIL_USERNAME="soncosmo"
 EMAIL_SENDER="cosmopolitan@ufz.de"
+EMAIL_PASSWORD="fill and copy to env_dev_prod_priv"
 
 ### Object Storage (S3-compatible via rclone) ###
 OBJECT_STORAGE_ACCESS_KEY="AKIATCJ4AYK7SU9P73Q1K"
@@ -37,6 +38,6 @@ POSTGRES_HOST_NAME="postgres-dev.intranet.ufz.de"
 
 ### Redis ###
 REDIS_PORT=6379
-REDIS_HOST="redis"
+REDIS_HOST="localhost"
 REDIS_DB=0
 REDIS_PASSWORD=""
