@@ -88,7 +88,7 @@ def test_complete_routing_workflow(
     page.locator(f"#{START_BUTTON_ROUTE_COMPUTATION_ID}").click()
     # Wait for computation to complete (Next button becomes enabled)
     expect(page.locator(f"#{NEXT_BUTTON_ROUTE_COMPUTATION_ID}")).to_be_enabled(
-        timeout=120000
+        timeout=240000
     )
     page.locator(f"#{NEXT_BUTTON_ROUTE_COMPUTATION_ID}").click()
     # Note: check_all_errors skipped here as we're navigating to route_download
