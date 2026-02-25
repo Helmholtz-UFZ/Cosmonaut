@@ -1,6 +1,6 @@
 [project]
 name = "ufz-flask"
-version = "0.0.39"
+version = "0.0.40"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"

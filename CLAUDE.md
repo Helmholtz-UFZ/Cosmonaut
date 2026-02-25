@@ -6,6 +6,21 @@ The service is primarily built using Plotly Dash and uses Celery for background 
 resource intensive tasks. Three databases are used: PostgreSQL as main storage, MinIO for
 object storage, and Redis as the broker between the Dash server and workers.
 
+## Sister Project: COSMOPOLITAN
+
+COSMONAUT has a sister project **COSMOPOLITAN** (`../cosmopolitan`). Both share the same
+architecture (Dash + Celery + PostgreSQL + MinIO), the same conventions, and the same
+anti-patterns/coding rules. Key differences:
+
+- **COSMOPOLITAN** analyzes cosmic ray neutron sensor (CRNS) data to predict soil
+  moisture using random forest models. Goal: live soil moisture map of Germany.
+- App module: `cosmopolitan_app/` (vs `cosmonaut_app/`)
+- Backend package: `soil-moisture-prediction` (COSMONAUT uses `sensor-routing`)
+- Uses PostGIS for spatial data; integrates with TimeIO API for CRNS measurements
+
+When the user references "cosmopolitan" they mean this project. Patterns and fixes in
+one project often apply symmetrically to the other.
+
 ## Critical Anti-Patterns
 
 **DO NOT:**
