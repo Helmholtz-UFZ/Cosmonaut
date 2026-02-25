@@ -149,7 +149,7 @@ def handle_error(error):
         try:
             logging.debug(f"Send mail to {MAINTAINER_EMAIL}")
             send_mail(MAINTAINER_EMAIL, email_subject, email_body)
-        except Exception:
+        except Exception:  # noqa - must not let email failure crash the error handler
             logging.error("Failed to send maintainer error email", exc_info=True)
         logging.error(f"Unhandled error: {error}")
         logging.error(email_body)

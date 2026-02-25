@@ -24,7 +24,6 @@ env_dev_prod_priv
 .gitmodules
 .config/
 notes*
-dev_gpx.py
 /assets/
 *prompt.md
 celerybeat-schedule*

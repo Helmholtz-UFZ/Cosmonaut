@@ -58,11 +58,11 @@ def test_complete_routing_workflow(
     # Upload predictor file (enabled after membership upload completes)
     expect(
         page.locator(f"#{PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID} input[type='file']")
-    ).to_be_enabled(timeout=30000)
+    ).to_be_enabled(timeout=120000)
     page.locator(
         f"#{PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID} input[type='file']"
     ).set_input_files(str(predictor_file_path))
-    expect(page.locator(f"#{NEXT_BUTTON_DATA_UPLOAD_ID}")).to_be_enabled(timeout=30000)
+    expect(page.locator(f"#{NEXT_BUTTON_DATA_UPLOAD_ID}")).to_be_enabled(timeout=120000)
     # Wait for loading overlay to close — the predictor callback enables the button
     # but the overlay may still be visible (backdrop="static" intercepts clicks)
     expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(

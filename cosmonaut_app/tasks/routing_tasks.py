@@ -136,5 +136,5 @@ def _notify_user(job, status):
         send_mail([job.model.email], subject, body)
         job.model.notified_end = True
         job.save()
-    except Exception:
+    except Exception:  # noqa - must not let email failure crash notification path
         log.error(f"Failed to send notification email for job {job_id}", exc_info=True)

@@ -8,6 +8,8 @@ services:
     volumes:
       - "./:/python_docker/cosmonaut"
     env_file: .env
+    environment:
+      TZ: Europe/Berlin
     user: "${DOCKER_UID}:${DOCKER_GID}"
     network_mode: host
     depends_on:
@@ -24,6 +26,8 @@ services:
     volumes:
       - "./:/python_docker/cosmonaut"
     env_file: .env
+    environment:
+      TZ: Europe/Berlin
     user: "${DOCKER_UID}:${DOCKER_GID}"
     network_mode: host
     depends_on:

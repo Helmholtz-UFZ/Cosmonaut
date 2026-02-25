@@ -5,6 +5,7 @@ FROM python:3.13-slim
 ARG REQUIREMENTS_SHA
 
 ENV MPLCONFIGDIR=/python_docker/cosmonaut/.config/matplotlib
+ENV TZ=Europe/Berlin
 
 RUN useradd -m -u 1000 appuser && \
     apt-get update && \

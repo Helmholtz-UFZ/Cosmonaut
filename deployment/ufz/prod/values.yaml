@@ -14,6 +14,8 @@ frontend:
     rdm.ufz.de/inception-date: "20240110"
     rdm.ufz.de/duration-in-years: "3"
   environmentVariables:
+    - name: "TZ"
+      value: "Europe/Berlin"
     - name: "EMAIL_PASSWORD"
       valueFrom:
         secretKeyRef:
@@ -77,6 +79,8 @@ worker:
   nameOverride: ""
   fullnameOverride: "cosmonaut-worker"
   environmentVariables:
+    - name: "TZ"
+      value: "Europe/Berlin"
     - name: "EMAIL_PASSWORD"
       valueFrom:
         secretKeyRef:
