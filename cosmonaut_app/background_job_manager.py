@@ -13,12 +13,14 @@ from cosmonaut_app.celery_config import CeleryConfig
 from cosmonaut_app.tasks.routing_tasks import RoutingTask, process_routing_job
 from cosmonaut_app.tasks.test_tasks import TestTask, test_sleep_task
 from cosmonaut_app.tasks.maintenance_tasks import MaintenanceTask, cleanup_task
+from cosmonaut_app.tasks.upload_tasks import UploadTask, process_upload_task
 
 log = logging.getLogger(__name__)
 
 NAME_ROUTING_TASK = "cosmonaut_app.tasks.routing_tasks.process_routing"
 NAME_TEST_TASK = "cosmonaut_app.tasks.test_tasks.test_sleep"
 NAME_MAINTENANCE_CLEANUP_TASK = "cosmonaut_app.tasks.maintenance_tasks.cleanup"
+NAME_UPLOAD_TASK = "cosmonaut_app.tasks.upload_tasks.process_upload"
 
 
 class BackgroundJobManager:
@@ -63,6 +65,12 @@ class BackgroundJobManager:
             name=NAME_MAINTENANCE_CLEANUP_TASK,
         )(cleanup_task)
 
+        self.upload_task = self.app.task(
+            bind=True,
+            base=UploadTask,
+            name=NAME_UPLOAD_TASK,
+        )(process_upload_task)
+
     def submit_routing_job(self, job):
         """Submit a routing job to the Celery queue.
 
@@ -98,6 +106,42 @@ class BackgroundJobManager:
             return result.id, False
         except Exception as e:
             log.error(f"Failed to submit routing job {job.model.job_id}: {str(e)}")
+            return None, True
+
+    def submit_upload_job(self, job, epsg_input):
+        """Submit an upload post-processing job to the Celery queue.
+
+        Args:
+            job: CosmonautJob instance to submit
+            epsg_input: EPSG code of the uploaded membership data
+
+        Returns:
+            tuple: (celery_task_id, failed_boolean)
+                   celery_task_id is None if submission failed
+        """
+        try:
+            result = self.upload_task.apply_async(
+                args=[job.model.job_id, epsg_input],
+                queue="upload",
+                retry=True,
+                retry_policy={
+                    "max_retries": 3,
+                    "interval_start": 60,
+                    "interval_step": 60,
+                    "interval_max": 300,
+                },
+            )
+            self.app.backend.client.set(
+                f"task_name:{result.id}",
+                NAME_UPLOAD_TASK,
+                ex=86400,
+            )
+            log.info(
+                f"Submitted upload job {job.model.job_id} with task_id={result.id}"
+            )
+            return result.id, False
+        except Exception as e:
+            log.error(f"Failed to submit upload job {job.model.job_id}: {str(e)}")
             return None, True
 
     def get_job_status(self, task_id):

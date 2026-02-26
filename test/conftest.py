@@ -320,7 +320,7 @@ def celery_worker(request):
             "--loglevel=debug",
             "--concurrency=1",
             "--pool=prefork",  # Use prefork pool for proper task termination
-            "--queues=routing,test",  # Listen to both queues (routing for routing tasks, test for test tasks)
+            "--queues=routing,test,upload",  # Listen to routing, test, and upload queues
             "--hostname=worker@test",  # Give worker a name for identification
             "-E",  # Enable task events for inspect() API to work
         ],

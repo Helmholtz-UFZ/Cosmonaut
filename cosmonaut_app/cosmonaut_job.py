@@ -349,7 +349,7 @@ class CosmonautJob:
         }
         self.save()
         logging.debug("Finished uploading and processing membership file")
-        return classification_data, file_path, bounds
+        return file_path, bounds
 
     def upload_predictor(self, content):
         """Upload and validate predictor CSV file."""
@@ -403,9 +403,45 @@ class CosmonautJob:
 
         logging.info(f"Predictor data deleted for job {self.model.job_id}")
 
+    def get_street_processing_status(self):
+        """Get street processing status, syncing from Celery if task is running.
+
+        Returns:
+            str: "PENDING", "RUNNING", "COMPLETED", or "FAILED"
+        """
+        sp = self.model.membership_upload["street_processing"]
+        if sp in ("PENDING", "COMPLETED", "FAILED"):
+            return sp
+        # sp is a Celery task ID — check its status
+        from cosmonaut_app.background_job_manager import get_background_job_manager
+
+        job_manager = get_background_job_manager()
+        celery_info = job_manager.get_job_status(sp)
+        celery_status = celery_info["status"]
+        if celery_status == "SUCCESS":
+            self.model.membership_upload["street_processing"] = "COMPLETED"
+            self.save()
+            return "COMPLETED"
+        elif celery_status in ("FAILURE", "REVOKED"):
+            self.model.membership_upload["street_processing"] = "FAILED"
+            self.save()
+            return "FAILED"
+        return "RUNNING"
+
     def delete_membership(self):
         """Delete membership file, predictor, OSM files, plots and reset state."""
         logging.info(f"Deleting membership data for job {self.model.job_id}")
+
+        # Revoke running upload task if street_processing holds a task ID
+        sp = self.model.membership_upload["street_processing"]
+        if sp not in ("PENDING", "COMPLETED", "FAILED"):
+            from cosmonaut_app.background_job_manager import get_background_job_manager
+
+            job_manager = get_background_job_manager()
+            job_manager.revoke_job(sp, terminate=True)
+            logging.info(
+                f"Revoked upload processing task {sp} for job {self.model.job_id}"
+            )
 
         # Cascade: delete predictor first
         self.delete_predictor()

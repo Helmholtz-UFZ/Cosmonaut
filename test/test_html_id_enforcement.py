@@ -250,6 +250,10 @@ def extract_constants_from_ast(node: ast.AST) -> Set[str]:
         # Handle [Input(...), Output(...)]
         for element in node.elts:
             constants.update(extract_constants_from_ast(element))
+    elif isinstance(node, ast.Dict):
+        # Handle output={key: Output(...), ...} dict-style callbacks
+        for value in node.values:
+            constants.update(extract_constants_from_ast(value))
 
     return constants
 

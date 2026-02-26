@@ -42,6 +42,14 @@ Constants map to **kebab-case** HTML values:
 START_JOB_BUTTON_HOME_ID = "start-job-button-home-id"
 ```
 
+**Exception — dict-style callbacks:** When an ID is used as a key in dict-style
+`@callback(output={...}, inputs={...})` patterns, Dash requires keys to be valid
+Python identifiers. These IDs must use **underscores** instead of hyphens:
+
+```python
+CHECK_INPUT_BUTTON_INPUT_ID = "check_input_button_input_id"  # underscores required
+```
+
 ---
 
 ## File Organization

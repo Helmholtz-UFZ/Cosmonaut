@@ -84,9 +84,12 @@ from cosmonaut_app.constants.html_ids import (
     REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
     RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
+    STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
+    STREET_PROCESSING_POLL_STREET_SELECTION_ID,
     TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
     TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
+    URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
@@ -124,6 +127,13 @@ def layout(job_id: str):
 
     logging.info(f"Street selection layout called with job_id={job_id}")
     logging.info(job.model.membership_upload)
+
+    # Gate on street processing status
+    sp_status = job.get_street_processing_status()
+    if sp_status == "RUNNING":
+        return _street_processing_wait_layout(job_id)
+    elif sp_status == "FAILED":
+        return _street_processing_failed_layout(job_id)
 
     card_body = []
 
@@ -301,6 +311,118 @@ def layout(job_id: str):
         job_id=job_id,
     )
     return page_container_fullscreen_layout(input_container)
+
+
+def _street_processing_wait_layout(job_id):
+    """Render a waiting layout while street processing is in progress."""
+    card_body = [
+        dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
+        dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
+        dbc.Alert(
+            "Road network is being built, please wait...",
+            id=STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
+            color="info",
+        ),
+        dcc.Interval(
+            id=STREET_PROCESSING_POLL_STREET_SELECTION_ID,
+            interval=3000,
+            disabled=False,
+        ),
+    ]
+
+    data_upload_path = build_url_step("data_upload", job_id)
+    routing_params_path = build_url_step("routing_params", job_id)
+
+    footer = progress_footer(
+        prev_url=data_upload_path,
+        next_url=routing_params_path,
+        next_id=NEXT_BUTTON_STREET_SELECTION_ID,
+        next_disabled=True,
+    )
+
+    input_container = create_card_input(
+        card_body,
+        card_footer=footer,
+        name_step=__name__.replace("pages.", ""),
+        job_id=job_id,
+    )
+    return page_container_fullscreen_layout(input_container)
+
+
+def _street_processing_failed_layout(job_id):
+    """Render a failure layout when street processing has failed."""
+    card_body = [
+        dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
+        dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
+        dbc.Alert(
+            "Road network construction failed. Please go back to Data Upload "
+            "and re-upload your membership file. If the problem persists, "
+            "contact the maintainer.",
+            id=STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
+            color="danger",
+        ),
+    ]
+
+    data_upload_path = build_url_step("data_upload", job_id)
+    routing_params_path = build_url_step("routing_params", job_id)
+
+    footer = progress_footer(
+        prev_url=data_upload_path,
+        next_url=routing_params_path,
+        next_id=NEXT_BUTTON_STREET_SELECTION_ID,
+        next_disabled=True,
+    )
+
+    input_container = create_card_input(
+        card_body,
+        card_footer=footer,
+        name_step=__name__.replace("pages.", ""),
+        job_id=job_id,
+    )
+    return page_container_fullscreen_layout(input_container)
+
+
+@callback(
+    Output(STREET_PROCESSING_ALERT_STREET_SELECTION_ID, "children"),
+    Output(STREET_PROCESSING_ALERT_STREET_SELECTION_ID, "color"),
+    Output(STREET_PROCESSING_POLL_STREET_SELECTION_ID, "disabled"),
+    Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
+    Input(STREET_PROCESSING_POLL_STREET_SELECTION_ID, "n_intervals"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    prevent_initial_call=True,
+)
+def poll_street_processing_status(n_intervals, job_id):
+    """Poll street processing and reload page when complete."""
+    if not job_id:
+        raise PreventUpdate
+
+    job = CosmonautJob(job_id=job_id)
+    sp_status = job.get_street_processing_status()
+
+    if sp_status == "COMPLETED":
+        # Trigger page reload by navigating to the same URL
+        return (
+            no_update,
+            no_update,
+            True,
+            f"/job/{job_id}/street_selection",
+        )
+    elif sp_status == "FAILED":
+        return (
+            "Road network construction failed. Please go back to Data Upload "
+            "and re-upload your membership file. If the problem persists, "
+            "contact the maintainer.",
+            "danger",
+            True,
+            no_update,
+        )
+    # Still running
+    return (
+        "Road network is being built, please wait...",
+        "info",
+        False,
+        no_update,
+    )
 
 
 @callback(

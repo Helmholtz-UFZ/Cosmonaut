@@ -98,8 +98,16 @@ PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID = "predictor-file-info-div-data-upload-id
 DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID = "data-upload-epsg-input-data-upload-id"
 DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID = "data-upload-opacity-slider-data-upload-id"
 
+# --- Intervals ---
+STREET_PROCESSING_POLL_DATA_UPLOAD_ID = "street-processing-poll-data-upload-id"
+
 # --- Stores ---
 DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID = "data-upload-init-store-data-upload-id"
+
+# --- Status ---
+STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID = (
+    "street-processing-status-div-data-upload-id"
+)
 
 # --- Other ---
 DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID = (
@@ -198,6 +206,11 @@ QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID = "qr-code-image-route-download-id"
 # PAGE: STREET_SELECTION
 # ============================================================================
 
+# --- Alerts ---
+STREET_PROCESSING_ALERT_STREET_SELECTION_ID = (
+    "street-processing-alert-street-selection-id"
+)
+
 # --- Buttons ---
 # Needed for testing purposes
 NEXT_BUTTON_STREET_SELECTION_ID = "next-button-street-selection-id"  # nocheck
@@ -215,6 +228,11 @@ TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID = (
 # --- Dropdowns ---
 TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID = (
     "tags-dropdown-dropdown-street-selection-id"
+)
+
+# --- Intervals ---
+STREET_PROCESSING_POLL_STREET_SELECTION_ID = (
+    "street-processing-poll-street-selection-id"
 )
 
 # --- Modals ---

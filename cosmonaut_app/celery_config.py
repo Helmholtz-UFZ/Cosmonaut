@@ -44,6 +44,7 @@ class CeleryConfig:
     # Task routing - different queues for different task types
     task_routes = {
         "cosmonaut_app.tasks.routing_tasks.*": {"queue": "routing"},
+        "cosmonaut_app.tasks.upload_tasks.*": {"queue": "upload"},
     }
 
     # Logging - prevent Celery from hijacking the root logger and removing

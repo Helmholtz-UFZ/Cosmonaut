@@ -100,6 +100,7 @@ class UserModel(FullPipelineConfig):
                 "epsg": 25832,
                 "center": [51.70, 11.20],
                 "zoom": 10,
+                "street_processing": "PENDING",
             },
             description="Upload a file with the membership data",
             title="Membership upload",

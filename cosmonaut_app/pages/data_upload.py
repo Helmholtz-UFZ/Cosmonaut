@@ -56,6 +56,7 @@ from sensor_routing.full_pipeline_cli import (
     DESCRIPTION_PREDICTOR,
 )
 
+from cosmonaut_app.background_job_manager import get_background_job_manager
 from cosmonaut_app.classification_plot import ClassificationPlot
 from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.constants.general import (
@@ -81,6 +82,8 @@ from cosmonaut_app.constants.html_ids import (
     PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID,
     PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
     PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+    STREET_PROCESSING_POLL_DATA_UPLOAD_ID,
+    STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
@@ -92,9 +95,7 @@ from cosmonaut_app.layout import (
     progress_footer,
 )
 from cosmonaut_app.map_utils import get_tile_url
-from cosmonaut_app.osm_downloader import OsmDownloader
 from cosmonaut_app.pydantic_models import check_epsg
-from cosmonaut_app.street_selector import StreetSelector
 
 register_page(
     __name__,
@@ -132,12 +133,35 @@ def layout(job_id):
     # --- Disabled-state logic (all in one place) ---
     membership_uploaded = job.model.membership_upload["file_name"] != "No file uploaded"
     predictor_uploaded = job.model.predictor_upload["file_name"] != "No file uploaded"
+    street_processing = job.model.membership_upload["street_processing"]
     epsg_disabled = (not is_active) or membership_uploaded
     next_disabled = not (membership_uploaded and predictor_uploaded)
     delete_membership_disabled = not (membership_uploaded and is_active)
     delete_predictor_disabled = not (predictor_uploaded and is_active)
     predictor_upload_disabled = not membership_uploaded
     slider_disabled = not membership_uploaded
+
+    # Determine street processing display state
+    if street_processing == "COMPLETED":
+        sp_text = "Road network is constructed"
+        sp_class = "text-muted small"
+        sp_poll_disabled = True
+    elif street_processing == "FAILED":
+        sp_text = (
+            "Road network construction failed! Re-upload membership file. "
+            "If the problem persists, contact the maintainer."
+        )
+        sp_class = "text-danger small"
+        sp_poll_disabled = True
+    elif street_processing == "PENDING":
+        sp_text = ""
+        sp_class = "text-muted small"
+        sp_poll_disabled = True
+    else:
+        # Task ID — still running
+        sp_text = "Road network is being built..."
+        sp_class = "text-info small"
+        sp_poll_disabled = False
 
     card_body = []
 
@@ -214,6 +238,16 @@ def layout(job_id):
                 size="sm",
                 className="mt-2",
                 disabled=delete_membership_disabled,
+            ),
+            html.Div(
+                sp_text,
+                id=STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
+                className=sp_class,
+            ),
+            dcc.Interval(
+                id=STREET_PROCESSING_POLL_DATA_UPLOAD_ID,
+                interval=3000,
+                disabled=sp_poll_disabled,
             ),
             html.Div(
                 [
@@ -408,9 +442,7 @@ def data_upload_manager(
         # Delete old files just in case
         job.delete_membership()
         try:
-            classification_data, file_path, bounds = job.upload_membership(
-                filename, contents, epsg_input
-            )
+            file_path, bounds = job.upload_membership(filename, contents, epsg_input)
         except FileValidationError as e:
             return _no_update(
                 file_info=str(e),
@@ -421,20 +453,12 @@ def data_upload_manager(
                 membership_error=str(e),
             )
 
-        logging.debug("Upload finished get OSM data")
+        logging.debug("Upload finished, generating plots and submitting OSM task")
 
         reposition_map = {
             "bounds": bounds,
             "transition": "flyTo",
         }
-
-        osm = OsmDownloader(classification_data, epsg_output=epsg_input)
-        osm.run_osm_query(job.working_dir)
-        logging.debug("OSM roads queried and saved.")
-
-        sel = StreetSelector(job)
-        sel.keep_largest(None)
-        sel.save()
 
         plot = ClassificationPlot(file_path, job_id, src_epsg=f"EPSG:{epsg_input}")
         plot.generate_plots()
@@ -442,7 +466,15 @@ def data_upload_manager(
 
         tile_url = get_tile_url(job_id, job.model.epsg, job.working_dir)
 
+        # Submit heavy OSM download + street selection to Celery worker
+        job_manager = get_background_job_manager()
+        task_id, failed = job_manager.submit_upload_job(job, epsg_input)
+        if not failed:
+            job.model.membership_upload["street_processing"] = task_id
+        else:
+            job.model.membership_upload["street_processing"] = "FAILED"
         job.save()
+
         logging.debug(f"Membership file uploaded and processed for job {job_id}")
         return _no_update(
             viewport=reposition_map,
@@ -637,3 +669,32 @@ def update_upload_state(epsg, file_uploaded):
         True,
         False,
     )
+
+
+@callback(
+    Output(STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "children"),
+    Output(STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "className"),
+    Output(STREET_PROCESSING_POLL_DATA_UPLOAD_ID, "disabled"),
+    Input(STREET_PROCESSING_POLL_DATA_UPLOAD_ID, "n_intervals"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    prevent_initial_call=True,
+)
+def poll_street_processing(n_intervals, job_id):
+    """Poll street processing status and update the status hint."""
+    if not job_id:
+        raise PreventUpdate
+
+    job = CosmonautJob(job_id=job_id)
+    status = job.get_street_processing_status()
+
+    if status == "COMPLETED":
+        return "Road network is constructed", "text-muted small", True
+    elif status == "FAILED":
+        return (
+            "Road network construction failed! Re-upload membership file. "
+            "If the problem persists, contact the maintainer.",
+            "text-danger small",
+            True,
+        )
+    # Still running
+    return "Road network is being built...", "text-info small", False

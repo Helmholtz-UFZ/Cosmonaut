@@ -72,6 +72,11 @@ def test_complete_routing_workflow(
     check_all_errors(page)
 
     # === Street Selection Page ===
+    # Wait for street processing (OSM download) to complete — the page polls
+    # and reloads when done, enabling the next button
+    expect(page.locator(f"#{NEXT_BUTTON_STREET_SELECTION_ID}")).to_be_enabled(
+        timeout=120000
+    )
     page.locator(f"#{NEXT_BUTTON_STREET_SELECTION_ID}").click()
     check_all_errors(page)
 

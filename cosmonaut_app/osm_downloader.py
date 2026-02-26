@@ -221,7 +221,11 @@ class OsmDownloader:
                     props["oneway"] = "no"
 
     def _get_roads(self, download_folder):
-        """Get road data from OpenStreetMap using graph API to preserve node sequences."""
+        """Get road data from OpenStreetMap using graph API to preserve node sequences.
+
+        Returns:
+            list: GeoJSON features with stable IDs and normalized routing attributes.
+        """
         osmnx.settings.useful_tags_way = [
             "access",
             "area",
@@ -263,42 +267,45 @@ class OsmDownloader:
         )
 
         edges_gdf = osmnx.convert.graph_to_gdfs(G, nodes=False, fill_edge_geometry=True)
+        del G
         ways_gdf = _reconstruct_ways(edges_gdf)
+        del edges_gdf
 
         columns_to_keep = [
             col for col in self.columns_to_keep if col in ways_gdf.columns
         ]
         self.roads = ways_gdf[columns_to_keep]
 
-        # Save the 4326 download/edit files
-        download_path = os.path.join(download_folder, OSM_DATA_DOWNLOAD_FILE)
-        self.roads.to_file(download_path, driver="GeoJSON")
-
-        # Assign stable IDs and normalize for routing on the saved GeoJSON
-        with open(download_path, encoding="utf-8") as f:
-            fc = json.load(f)
+        # Convert to GeoJSON, assign stable IDs and normalize in-memory
+        fc = json.loads(self.roads.to_json())
         self._ensure_feature_ids(fc["features"])
         self._normalize_for_routing(fc["features"])
+
+        # Save the 4326 download/edit files
+        download_path = os.path.join(download_folder, OSM_DATA_DOWNLOAD_FILE)
         with open(download_path, "w", encoding="utf-8") as f:
             json.dump(fc, f, ensure_ascii=False)
 
         edit_path = os.path.join(download_folder, OSM_DATA_EDITED_FILE)
         shutil.copy2(download_path, edit_path)
 
-    def _osm_transform(self, download_folder):
-        """Project the download file to the output CRS and save as the transformed file."""
-        log.info("Transforming road data to EPSG:%s ...", self.epsg_output)
-        download_path = os.path.join(download_folder, OSM_DATA_DOWNLOAD_FILE)
-        with open(download_path, encoding="utf-8") as f:
-            fc = json.load(f)
+        return fc["features"]
 
+    def _osm_transform(self, features, download_folder):
+        """Project features to the output CRS and save as the transformed file.
+
+        Args:
+            features: GeoJSON features list (already in EPSG:4326).
+            download_folder: Directory to write the transformed file.
+        """
+        log.info("Transforming road data to EPSG:%s ...", self.epsg_output)
         project_and_save(
-            fc["features"],
+            features,
             os.path.join(download_folder, OSM_FILENAME),
             self.epsg_input,
             self.epsg_output,
         )
 
     def run_osm_query(self, download_folder):
-        self._get_roads(download_folder)
-        self._osm_transform(download_folder)
+        features = self._get_roads(download_folder)
+        self._osm_transform(features, download_folder)

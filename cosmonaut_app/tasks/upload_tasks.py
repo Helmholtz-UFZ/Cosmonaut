@@ -1,0 +1,94 @@
+"""Upload post-processing tasks for COSMONAUT App.
+
+This module contains Celery tasks for processing membership uploads.
+After the web process validates and saves the membership file, these tasks
+handle the heavy operations: OSM road network download, street selection,
+and initial graph construction.
+"""
+
+import logging
+import os
+
+from celery import Task
+from sensor_routing.constants import MEMBERSHIP_FILENAME
+
+from cosmonaut_app.config import MAINTAINER_EMAIL
+from cosmonaut_app.email_service import send_mail
+
+log = logging.getLogger(__name__)
+
+
+class UploadTask(Task):
+    """Base class for upload processing tasks with custom error handling."""
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        """Handle task failure by marking street_processing as FAILED."""
+        log.error(f"Upload task {task_id} failed: {exc}")
+        # This is not defensive programming designed intentionally like this.
+        job_id = args[0] if args else kwargs.get("job_id")
+        if job_id:
+            log.error(f"Upload processing for job {job_id} failed: {str(exc)}")
+
+
+def process_upload_task(self, job_id, epsg_input):
+    """Celery task to process membership upload post-processing.
+
+    Downloads OSM road data, performs initial street selection (keep largest),
+    and saves the result. This offloads the memory-intensive osmnx graph
+    construction from the web server process.
+
+    Args:
+        job_id: ID of the job to process.
+        epsg_input: EPSG code of the uploaded membership data.
+    """
+    from cosmonaut_app.cosmonaut_job import CosmonautJob, _transform_csv
+    from cosmonaut_app.osm_downloader import OsmDownloader
+    from cosmonaut_app.street_selector import StreetSelector
+
+    log.info(f"Starting upload processing task for job_id={job_id}")
+
+    job = CosmonautJob(job_id=job_id)
+
+    try:
+        membership_path = os.path.join(job.working_dir, MEMBERSHIP_FILENAME)
+        classification_data = _transform_csv(membership_path, epsg_input, 4326)
+
+        osm = OsmDownloader(classification_data, epsg_output=epsg_input)
+        osm.run_osm_query(job.working_dir)
+        log.info(f"OSM roads queried and saved for job {job_id}")
+
+        sel = StreetSelector(job)
+        sel.keep_largest(None)
+        sel.save()
+        log.info(f"Street selection completed for job {job_id}")
+
+        job.model.membership_upload["street_processing"] = "COMPLETED"
+        job.save()
+
+        log.info(f"Upload processing completed for job {job_id}")
+
+    except Exception as e:
+        log.error(f"Error processing upload for job {job_id}: {str(e)}", exc_info=True)
+
+        job.model.membership_upload["street_processing"] = "FAILED"
+        job.save()
+
+        _notify_maintainer(job_id, e)
+
+        raise
+
+
+def _notify_maintainer(job_id, error):
+    """Send email notification to maintainer on upload processing failure."""
+    subject = f"COSMONAUT Upload Processing Failed: Job {job_id}"
+    body = (
+        f"Upload post-processing (OSM download / street selection) failed "
+        f"for job {job_id}.\n\n"
+        f"Error: {error}"
+    )
+    try:
+        send_mail(MAINTAINER_EMAIL, subject, body)
+    except Exception:  # noqa - must not let email failure crash notification path
+        log.error(
+            f"Failed to send maintainer notification for job {job_id}", exc_info=True
+        )
