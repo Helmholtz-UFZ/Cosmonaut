@@ -8,12 +8,14 @@ and initial graph construction.
 
 import logging
 import os
+from logging.config import dictConfig
 
 from celery import Task
 from sensor_routing.constants import MEMBERSHIP_FILENAME
 
 from cosmonaut_app.config import MAINTAINER_EMAIL
 from cosmonaut_app.email_service import send_mail
+from cosmonaut_app.logger import get_logger_config_worker
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ def process_upload_task(self, job_id, epsg_input):
     from cosmonaut_app.osm_downloader import OsmDownloader
     from cosmonaut_app.street_selector import StreetSelector
 
+    dictConfig(get_logger_config_worker())
     log.info(f"Starting upload processing task for job_id={job_id}")
 
     job = CosmonautJob(job_id=job_id)

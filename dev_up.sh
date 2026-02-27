@@ -77,12 +77,13 @@ if [ "$LOCAL_SR" = true ]; then
     echo "Using local sensor-routing from ../sensor-routing"
 fi
 
-# Check if the uv.lock file has changed since the last Docker build
-if [ ! -e ".docker_build_hash" ] || [ "$(sha256sum uv.lock)" != "$(cat .docker_build_hash)" ]; then
+# Rebuild images when uv.lock or Dockerfiles change
+CURRENT_HASH="$(sha256sum uv.lock docker/dev.Dockerfile docker/worker.Dockerfile)"
+if [ ! -e ".docker_build_hash" ] || [ "$CURRENT_HASH" != "$(cat .docker_build_hash)" ]; then
     $COMPOSE build cosmonaut
     $COMPOSE build worker
 
-    sha256sum uv.lock >.docker_build_hash
+    echo "$CURRENT_HASH" >.docker_build_hash
 fi
 
 if [ "$MODE" == "prod" ]; then

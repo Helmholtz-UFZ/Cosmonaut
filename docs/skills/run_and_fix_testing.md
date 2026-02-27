@@ -17,6 +17,10 @@ Ask the user before starting:
 
 ## 2. Step-by-step Diagnostic Checklist
 
+**Services are required for meaningful results.** Most tests depend on PostgreSQL,
+MinIO, and Redis. Always run `./run_pytest.sh` (which starts services automatically).
+Never use `--no-services` unless you are certain the test has no service fixtures.
+
 ### Step 1: Reproduce locally
 
 Always start by running the failing test locally with full services:

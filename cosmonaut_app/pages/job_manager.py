@@ -22,7 +22,6 @@ This docstring is displayed on the documentation webpage.
 
 import logging
 import re
-from datetime import date
 
 import dash
 import dash_bootstrap_components as dbc
@@ -93,11 +92,7 @@ def format_jobs_for_table(jobs_dict):
         submitted_display = "Yes" if job_data["submitted"] else "No"
 
         # Format start_date
-        start_date = job_data.get("start_date")
-        if isinstance(start_date, date):
-            start_date_str = start_date.strftime("%Y-%m-%d")
-        else:
-            start_date_str = str(start_date) if start_date else "N/A"
+        start_date_str = job_data["start_date"].strftime("%Y-%m-%d")
 
         rows.append(
             {

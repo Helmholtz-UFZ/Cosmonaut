@@ -735,7 +735,7 @@ def register_map_callbacks(app):
         else:
             viewport = no_update
 
-        tile_url = get_tile_url(job_id, job.model.epsg, job.working_dir)
+        tile_url = get_tile_url(job_id, job.working_dir)
         streets_fc = StreetSelector(job).initial_fc(list(OSM_TAGS_MAPPING.keys()))
         raw_positions = job.get_route_polyline() or []
         route_fc = {"type": "FeatureCollection", "features": []}

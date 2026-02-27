@@ -58,7 +58,6 @@ from sensor_routing.full_pipeline_cli import (
 
 from cosmonaut_app.background_job_manager import get_background_job_manager
 from cosmonaut_app.classification_plot import ClassificationPlot
-from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.constants.general import (
     DEFAULT_MAP_CENTER,
     DEFAULT_MAP_ZOOM,
@@ -86,6 +85,7 @@ from cosmonaut_app.constants.html_ids import (
     STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
@@ -154,7 +154,7 @@ def layout(job_id):
         sp_class = "text-danger small"
         sp_poll_disabled = True
     elif street_processing == "PENDING":
-        sp_text = ""
+        sp_text = "Road network will be constructed in the background"
         sp_class = "text-muted small"
         sp_poll_disabled = True
     else:
@@ -366,6 +366,13 @@ dash.clientside_callback(
     Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled"),
     Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "opacity"),
+    Output(
+        STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True
+    ),
+    Output(
+        STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "className", allow_duplicate=True
+    ),
+    Output(STREET_PROCESSING_POLL_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
     Input(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "value"),
     Input(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data"),
@@ -412,6 +419,9 @@ def data_upload_manager(
             "delete_predictor_disabled": 14,
             "predictor_contents": 15,
             "tile_opacity": 16,
+            "sp_text": 17,
+            "sp_class": 18,
+            "sp_poll_disabled": 19,
         }
         for key, value in overrides.items():
             result[idx[key]] = value
@@ -442,7 +452,9 @@ def data_upload_manager(
         # Delete old files just in case
         job.delete_membership()
         try:
-            file_path, bounds = job.upload_membership(filename, contents, epsg_input)
+            file_path, bounds, membership_df = job.upload_membership(
+                filename, contents, epsg_input
+            )
         except FileValidationError as e:
             return _no_update(
                 file_info=str(e),
@@ -460,11 +472,13 @@ def data_upload_manager(
             "transition": "flyTo",
         }
 
-        plot = ClassificationPlot(file_path, job_id, src_epsg=f"EPSG:{epsg_input}")
+        plot = ClassificationPlot(
+            membership_df, job.working_dir, src_epsg=f"EPSG:{epsg_input}"
+        )
         plot.generate_plots()
         logging.debug("Classification plots generated.")
 
-        tile_url = get_tile_url(job_id, job.model.epsg, job.working_dir)
+        tile_url = get_tile_url(job_id, job.working_dir)
 
         # Submit heavy OSM download + street selection to Celery worker
         job_manager = get_background_job_manager()
@@ -476,6 +490,19 @@ def data_upload_manager(
         job.save()
 
         logging.debug(f"Membership file uploaded and processed for job {job_id}")
+
+        if failed:
+            sp_text = (
+                "Road network construction failed! Re-upload membership file. "
+                "If the problem persists, contact the maintainer."
+            )
+            sp_class = "text-danger small"
+            sp_poll_disabled = True
+        else:
+            sp_text = "Road network is being built..."
+            sp_class = "text-info small"
+            sp_poll_disabled = False
+
         return _no_update(
             viewport=reposition_map,
             file_info="Uploaded",
@@ -492,6 +519,9 @@ def data_upload_manager(
             predictor_file_info="Not uploaded",
             predictor_error="",
             delete_predictor_disabled=True,
+            sp_text=sp_text,
+            sp_class=sp_class,
+            sp_poll_disabled=sp_poll_disabled,
         )
 
     # --- Predictor upload branch ---
@@ -559,6 +589,13 @@ def data_upload_manager(
     Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
     Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(
+        STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True
+    ),
+    Output(
+        STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "className", allow_duplicate=True
+    ),
+    Output(STREET_PROCESSING_POLL_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Input(DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
@@ -601,6 +638,9 @@ def delete_membership_file(n_clicks, job_id):
         True,  # disable predictor upload
         "Not uploaded",  # predictor file info
         True,  # disable delete predictor button
+        "Road network will be constructed in the background",  # reset sp text
+        "text-muted small",  # reset sp class
+        True,  # disable sp polling
     )
 
 

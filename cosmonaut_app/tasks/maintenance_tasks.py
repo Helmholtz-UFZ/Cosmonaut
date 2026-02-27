@@ -83,7 +83,9 @@ def clean_up_jobs(
     logging.debug(f"Found {len(job_info_dict)} total jobs in database")
 
     # Evaluate each job for deletion
-    for job_id, (start_date, submitted) in job_info_dict.items():
+    for job_id, job_info in job_info_dict.items():
+        start_date = job_info["start_date"]
+        submitted = job_info["submitted"]
         # Determine if job should be deleted
         should_delete = False
         if not submitted and start_date <= cutoff_not_submitted:

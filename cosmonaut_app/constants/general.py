@@ -4,9 +4,8 @@ LOG_FILE_NAME = "worker.log"
 GPX_FILE = "route.gpx"
 QR_CODE_FILE = "qr_code.png"
 
-# Classification plot file templates ({epsg} = e.g. "EPSG:25832")
-CLASSIFICATION_PLOT_TEMPLATE = "job_work_dir_{epsg}_output.tif"
-CLASSIFICATION_PLOT_4326_TEMPLATE = "job_work_dir_{epsg}_output_4326.tif"
+# Membership raster (WGS84 GeoTIFF for TiTiler)
+MEMBERSHIP_TIF = "membership.tif"
 
 # Job status constants
 JOB_STATUS_PENDING = "PENDING"

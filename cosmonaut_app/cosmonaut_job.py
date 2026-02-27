@@ -319,7 +319,7 @@ class CosmonautJob:
 
         # Validate with sensor_routing parser
         try:
-            parse_membership_file(file_path)
+            membership_df = parse_membership_file(file_path)
         except Exception as e:
             logging.info(f"Membership file validation failed: {e}")
             os.remove(file_path)
@@ -349,7 +349,7 @@ class CosmonautJob:
         }
         self.save()
         logging.debug("Finished uploading and processing membership file")
-        return file_path, bounds
+        return file_path, bounds, membership_df
 
     def upload_predictor(self, content):
         """Upload and validate predictor CSV file."""
@@ -459,10 +459,14 @@ class CosmonautJob:
                 os.remove(osm_path)
                 logging.debug(f"Deleted OSM file: {osm_path}")
 
-        # Delete plot files
+        # Delete plot files (new name + legacy names)
         for plot_file in glob.glob(os.path.join(self.working_dir, "*_output*.tif")):
             os.remove(plot_file)
             logging.debug(f"Deleted plot file: {plot_file}")
+        membership_tif = os.path.join(self.working_dir, "membership.tif")
+        if os.path.exists(membership_tif):
+            os.remove(membership_tif)
+            logging.debug(f"Deleted plot file: {membership_tif}")
 
         # Reset membership_upload to default values
         default_membership_upload = JobModel.model_fields["membership_upload"].default

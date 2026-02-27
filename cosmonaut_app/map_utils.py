@@ -7,7 +7,7 @@ import urllib.parse
 import dash_leaflet as dl
 
 from cosmonaut_app.config import TILESERVER_URL
-from cosmonaut_app.constants.general import CLASSIFICATION_PLOT_4326_TEMPLATE
+from cosmonaut_app.constants.general import MEMBERSHIP_TIF
 
 
 def create_tile_layer_component(
@@ -31,10 +31,9 @@ def create_tile_layer_component(
     )
 
 
-def get_tile_url(job_id, epsg, working_dir):
-    """Return TileServer URL for the job's classification GeoTIFF, or '' if absent."""
-    tiff_filename = CLASSIFICATION_PLOT_4326_TEMPLATE.format(epsg=f"EPSG:{epsg}")
-    tif_path = os.path.join(working_dir, tiff_filename)
+def get_tile_url(job_id, working_dir):
+    """Return TileServer URL for the job's membership GeoTIFF, or '' if absent."""
+    tif_path = os.path.join(working_dir, MEMBERSHIP_TIF)
     if not os.path.exists(tif_path):
         return ""
-    return create_tile_layer_component(job_id, tiff_filename, colormap_params="").url
+    return create_tile_layer_component(job_id, MEMBERSHIP_TIF, colormap_params="").url
