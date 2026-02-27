@@ -163,7 +163,7 @@ Replace generic text-based assertions with ID-based checks:
 expect(page.get_by_role("button", name="Start Route")).to_be_visible()
 
 # After:
-expect(page.locator(f"#{START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID}")).to_be_visible()
+expect(page.locator(f"#{DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID}")).to_be_visible()
 ```
 
 ## 7. Organize Imports

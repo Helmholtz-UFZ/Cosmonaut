@@ -168,6 +168,11 @@ docker exec redis_cosmonaut redis-cli ping
 
 **Clean up and restart:**
 
+When `run_pytest.sh` fails with `PostgreSQL not available` despite the health check
+passing, the containers are likely in a stale state from a previous run. **Always
+`docker compose down` before retrying** — `run_pytest.sh` only starts containers, it
+does not restart them:
+
 ```bash
 docker compose down
 ./run_pytest.sh

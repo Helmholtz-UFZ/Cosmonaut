@@ -75,6 +75,7 @@ from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.background_job_manager import get_background_job_manager
+from cosmonaut_app.files_route import create_download_button
 from cosmonaut_app.constants.general import (
     JOB_STATUS_PENDING,
     JOB_STATUS_RUNNING,
@@ -161,6 +162,7 @@ def layout(job_id):
         html.Hr(),
         html.H5("Computation Logs", className="mt-3"),
         log_viewer,
+        html.Div(create_download_button(job_id), className="mb-3"),
         interval,
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
         dcc.Store(id=UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, data=None),
@@ -208,7 +210,7 @@ def create_status_badge(status):
                 dbc.Badge(
                     status,
                     id=STATUS_BADGE_ROUTE_COMPUTATION_ID,
-                    color=color_map.get(status, "secondary"),
+                    color=color_map[status],
                 ),
                 width="auto",
             ),
@@ -370,7 +372,7 @@ def update_status(n_intervals, trigger, job_id):
 
     return (
         status,
-        color_map.get(status, "secondary"),
+        color_map[status],
         disable_interval,
         log_content,
         next_button_disabled,

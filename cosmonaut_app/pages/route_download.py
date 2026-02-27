@@ -57,16 +57,14 @@ GPX files are stored in MinIO object storage and retrieved via Flask routes.
 
 import logging
 
-from dash import Input, Output, State, callback, dcc, html, register_page
-from dash.exceptions import PreventUpdate
+from dash import dcc, html, register_page
 
 from cosmonaut_app.config import get_download_url
 from cosmonaut_app.constants.html_ids import (
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
     JOB_ID_STORE_SHARED_ID,
-    QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID,
-    START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID,
 )
+from cosmonaut_app.files_route import create_download_button
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
     build_url_step,
@@ -112,6 +110,8 @@ def layout(job_id):
                             className="btn btn-primary mt-3",
                         ),
                         html.Br(),
+                        create_download_button(job_id, class_name="mt-2"),
+                        html.Br(),
                         html.Code(
                             download_url,
                             id=DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
@@ -139,22 +139,3 @@ def layout(job_id):
         job_id=job_id,
     )
     return page_container_fullscreen_layout(input_container)
-
-
-# ============================================================================
-# Callbacks
-# ============================================================================
-
-
-@callback(
-    Output(QR_CODE_IMAGE_ROUTE_DOWNLOAD_ID, "src"),
-    Input(START_ROUTE_BUTTON_ROUTE_DOWNLOAD_ID, "n_clicks"),
-    State(JOB_ID_STORE_SHARED_ID, "data"),
-    prevent_initial_call=True,
-)
-def update_qr_code(n_clicks, job_id):
-    logging.info(f"Generating QR code for job_id={job_id} on click {n_clicks}")
-    if n_clicks is None:
-        raise PreventUpdate
-    job = CosmonautJob(job_id=job_id)
-    return job.create_qr_code_routing()

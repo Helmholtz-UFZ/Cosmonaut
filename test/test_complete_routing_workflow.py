@@ -9,7 +9,13 @@ This test validates the end-to-end user journey:
 6. Start and wait for route computation
 7. Verify the download URL is visible on the route download page
 8. Verify email notification was sent (notified_end flag in DB)
+9. Download work_dir zip and verify contents match expected file set
 """
+
+import io
+import logging
+import os
+import zipfile
 
 from playwright.sync_api import expect
 
@@ -114,3 +120,70 @@ def test_complete_routing_workflow(
         "Expected notified_end=True in DB after job completion — "
         "email notification was not recorded"
     )
+
+    # === Download work_dir zip and verify contents ===
+    download_link = page.locator("a[href*='/download/'][href$='.zip']")
+    expect(download_link).to_be_visible(timeout=5000)
+    download_href = download_link.get_attribute("href")
+
+    with dash_app.server.test_client() as client:
+        response = client.get(download_href)
+        assert response.status_code == 200, f"Download failed: {response.status_code}"
+        assert response.content_type == "application/zip"
+
+        zip_data = io.BytesIO(response.data)
+        with zipfile.ZipFile(zip_data) as zf:
+            zip_file_names = sorted(zf.namelist())
+            logging.info(f"Zip file names: {zip_file_names}")
+
+            # Verify zip matches work_dir on disk
+            work_dir = os.path.join("cosmonaut_app/work_dir", job_id)
+            disk_file_names = sorted(
+                os.path.relpath(os.path.join(root, f), work_dir)
+                for root, _, files in os.walk(work_dir)
+                for f in files
+            )
+            logging.info(f"Disk file names: {disk_file_names}")
+            assert zip_file_names == disk_file_names, (
+                f"Zip contents don't match work_dir.\n"
+                f"Zip: {zip_file_names}\nDisk: {disk_file_names}"
+            )
+
+            # Verify file contents are identical
+            for name in zip_file_names:
+                with open(os.path.join(work_dir, name), "rb") as f:
+                    disk_content = f.read()
+                zip_content = zf.read(name)
+                assert zip_content == disk_content, f"Content mismatch for {name}"
+
+            expected_files = {
+                "membership.tif",
+                "memberships.csv",
+                "osm_data_download.geojson",
+                "osm_data_edited.geojson",
+                "osm_data_transformed.geojson",
+                "parameters.json",
+                "points.csv",
+                "predictors.csv",
+                "qr_code.png",
+                "route.gpx",
+                "solution.json",
+                "transient/bc_benefits_output.json",
+                "transient/bc_top_benefits_output.json",
+                "transient/econ_bc_benefits_output.json",
+                "transient/econ_bc_top_benefits_output.json",
+                "transient/econ_pf_output.json",
+                "transient/econ_pm_output.json",
+                "transient/initial_route.json",
+                "transient/maxspeed_information.json",
+                "transient/optimal_grid_cells_50_filtered_bbox.json",
+                "transient/pf_output.json",
+                "transient/pm_output.json",
+                "transient/point_hull_collection.json",
+                "transient/slow_coords.json",
+                "worker.log",
+            }
+            assert set(zip_file_names) == expected_files, (
+                f"Unexpected files in work_dir zip.\n"
+                f"Zip: {sorted(zip_file_names)}\nExpected: {sorted(expected_files)}"
+            )
