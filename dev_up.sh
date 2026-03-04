@@ -86,6 +86,15 @@ if [ ! -e ".docker_build_hash" ] || [ "$CURRENT_HASH" != "$(cat .docker_build_ha
     echo "$CURRENT_HASH" >.docker_build_hash
 fi
 
+cleaning_up() {
+    echo "Cleaning up..."
+    $COMPOSE down 2>/dev/null || true
+}
+
+trap cleaning_up EXIT
+
+$COMPOSE down 2>/dev/null || true
+
 if [ "$MODE" == "prod" ]; then
     $COMPOSE up cosmonaut redis worker tileserver
 else

@@ -277,47 +277,66 @@ class DataBaseManager:
             return job_info
 
     @classmethod
+    def query_distinct_modules(cls) -> List[str]:
+        """Return all distinct module names from the logs table.
+
+        Returns
+        -------
+        list[str]
+            Sorted list of unique module names.
+        """
+        with SessionScope(cls.Session) as session:
+            rows = (
+                session.query(LogTable.module)
+                .distinct()
+                .order_by(LogTable.module)
+                .all()
+            )
+            return [row[0] for row in rows]
+
+    @classmethod
     def query_logs(
         cls,
         date: str,
-        sh: int,
-        sm: int,
-        eh: int,
-        em: int,
+        start_hour: int,
+        start_minute: int,
+        end_hour: int,
+        end_minute: int,
         levels: List[str],
         pid: Optional[int] = None,
+        excluded_modules: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Query logs from the database with specified filters.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         date : str
             Date in the format 'YYYY-MM-DD'
-        sh : int
+        start_hour : int
             Start hour (0-23)
-        sm : int
+        start_minute : int
             Start minute (0-59)
-        eh : int
+        end_hour : int
             End hour (0-23)
-        em : int
+        end_minute : int
             End minute (0-59)
         levels : list
             List of log levels to include (e.g., ['INFO', 'ERROR'])
         pid : int, optional
             Process ID to filter logs by
-
-        Returns:
-        --------
-        list
-            List of dictionaries containing log records
+        excluded_modules : list[str], optional
+            Module names to exclude from results
         """
-        logging.debug(f"Querying logs from {date} {sh}:{sm} to {date} {eh}:{em}")
+        logging.debug(
+            f"Querying logs from {date} {start_hour}:{start_minute} "
+            f"to {date} {end_hour}:{end_minute}"
+        )
 
         start_datetime = datetime.strptime(
-            f"{date} {sh:02d}:{sm:02d}:00", "%Y-%m-%d %H:%M:%S"
+            f"{date} {start_hour:02d}:{start_minute:02d}:00", "%Y-%m-%d %H:%M:%S"
         )
         end_datetime = datetime.strptime(
-            f"{date} {eh:02d}:{em:02d}:59", "%Y-%m-%d %H:%M:%S"
+            f"{date} {end_hour:02d}:{end_minute:02d}:59", "%Y-%m-%d %H:%M:%S"
         )
 
         # Create session directly (not using SessionScope)
@@ -331,6 +350,9 @@ class DataBaseManager:
 
             if pid is not None:
                 query = query.filter(LogTable.pid == pid)
+
+            if excluded_modules:
+                query = query.filter(LogTable.module.notin_(excluded_modules))
 
             # Order results by timestamp
             query = query.order_by(LogTable.timestamp)

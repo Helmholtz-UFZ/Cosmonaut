@@ -108,9 +108,10 @@ class StreetSelector:
         return True
 
     def reset(self) -> None:
-        """Restore edited file from download baseline and regenerate export."""
+        """Restore edited file from download baseline, prune disconnected roads, and regenerate export."""
         shutil.copy2(self.download_path, self.edit_path)
         self._features = None
+        self.keep_largest(None)
         self.save()
 
     def save(self) -> None:

@@ -149,6 +149,13 @@ def layout(job_id):
         className="mb-3",
     )
 
+    ttl_days = job.time_to_live()
+    ttl_alert = dbc.Alert(
+        f"This job will be automatically deleted in {ttl_days} day(s).",
+        color="info",
+        className="mb-3",
+    )
+
     card_body = [
         html.P(
             "Monitor the routing computation status and manage the computation job.",
@@ -156,6 +163,7 @@ def layout(job_id):
         ),
         status_badge,
         control_buttons,
+        ttl_alert,
         html.Hr(),
         html.H5("Celery Worker Information", className="mt-3"),
         celery_info_card,
@@ -229,7 +237,10 @@ def create_control_buttons(status):
     """
     # Start button (initially visible for PENDING or FAILED)
     start_button = dbc.Button(
-        "Start Computation",
+        [
+            html.I(className="bi bi-play-circle me-1"),
+            "Start Computation",
+        ],
         id=START_BUTTON_ROUTE_COMPUTATION_ID,
         color="success",
         className="me-2",
@@ -238,7 +249,10 @@ def create_control_buttons(status):
 
     # Cancel button (initially visible for RUNNING)
     cancel_button = dbc.Button(
-        "Cancel Computation",
+        [
+            html.I(className="bi bi-stop-circle me-1"),
+            "Cancel Computation",
+        ],
         id=CANCEL_BUTTON_ROUTE_COMPUTATION_ID,
         color="danger",
         className="me-2",
@@ -247,7 +261,10 @@ def create_control_buttons(status):
 
     # Restart button (initially visible for COMPLETED or FAILED)
     restart_button = dbc.Button(
-        "Restart Computation",
+        [
+            html.I(className="bi bi-arrow-repeat me-1"),
+            "Restart Computation",
+        ],
         id=RESTART_BUTTON_ROUTE_COMPUTATION_ID,
         color="warning",
         className="me-2",
@@ -314,17 +331,25 @@ def create_celery_info_card():
 
 
 @callback(
-    Output(STATUS_BADGE_ROUTE_COMPUTATION_ID, "children"),
-    Output(STATUS_BADGE_ROUTE_COMPUTATION_ID, "color"),
-    Output(STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID, "disabled"),
-    Output(LOG_VIEWER_ROUTE_COMPUTATION_ID, "children"),
-    Output(NEXT_BUTTON_ROUTE_COMPUTATION_ID, "disabled"),
-    Output(START_BUTTON_ROUTE_COMPUTATION_ID, "style"),
-    Output(CANCEL_BUTTON_ROUTE_COMPUTATION_ID, "style"),
-    Output(RESTART_BUTTON_ROUTE_COMPUTATION_ID, "style"),
-    Input(STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID, "n_intervals"),
-    Input(UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, "data"),
-    State(JOB_ID_STORE_SHARED_ID, "data"),
+    output={
+        "badge_text": Output(STATUS_BADGE_ROUTE_COMPUTATION_ID, "children"),
+        "badge_color": Output(STATUS_BADGE_ROUTE_COMPUTATION_ID, "color"),
+        "interval_disabled": Output(
+            STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID, "disabled"
+        ),
+        "log_content": Output(LOG_VIEWER_ROUTE_COMPUTATION_ID, "children"),
+        "next_disabled": Output(NEXT_BUTTON_ROUTE_COMPUTATION_ID, "disabled"),
+        "start_style": Output(START_BUTTON_ROUTE_COMPUTATION_ID, "style"),
+        "cancel_style": Output(CANCEL_BUTTON_ROUTE_COMPUTATION_ID, "style"),
+        "restart_style": Output(RESTART_BUTTON_ROUTE_COMPUTATION_ID, "style"),
+    },
+    inputs={
+        "n_intervals": Input(STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID, "n_intervals"),
+        "trigger": Input(UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, "data"),
+    },
+    state={
+        "job_id": State(JOB_ID_STORE_SHARED_ID, "data"),
+    },
     prevent_initial_call=False,
 )
 def update_status(n_intervals, trigger, job_id):
@@ -335,7 +360,6 @@ def update_status(n_intervals, trigger, job_id):
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
 
-    # Status badge color
     color_map = {
         JOB_STATUS_PENDING: "secondary",
         JOB_STATUS_RUNNING: "primary",
@@ -343,43 +367,21 @@ def update_status(n_intervals, trigger, job_id):
         JOB_STATUS_FAILED: "danger",
     }
 
-    # Disable interval if not running
-    disable_interval = status != JOB_STATUS_RUNNING
+    visible = {"display": "inline-block"}
+    hidden = {"display": "none"}
 
-    # Enable next button only when completed
-    next_button_disabled = status != JOB_STATUS_COMPLETED
-
-    # Control button visibility based on status
-    # Start button: visible for PENDING or FAILED
-    start_style = {
-        "display": "inline-block" if status == JOB_STATUS_PENDING else "none"
-    }
-
-    # Cancel button: visible for RUNNING
-    cancel_style = {
-        "display": "inline-block" if status == JOB_STATUS_RUNNING else "none"
-    }
-
-    # Restart button: visible for COMPLETED or FAILED
-    restart_style = {
-        "display": "inline-block"
+    return {
+        "badge_text": status,
+        "badge_color": color_map[status],
+        "interval_disabled": status != JOB_STATUS_RUNNING,
+        "log_content": job.get_logs(),
+        "next_disabled": status != JOB_STATUS_COMPLETED,
+        "start_style": visible if status == JOB_STATUS_PENDING else hidden,
+        "cancel_style": visible if status == JOB_STATUS_RUNNING else hidden,
+        "restart_style": visible
         if status in [JOB_STATUS_COMPLETED, JOB_STATUS_FAILED]
-        else "none"
+        else hidden,
     }
-
-    # Get logs
-    log_content = job.get_logs()
-
-    return (
-        status,
-        color_map[status],
-        disable_interval,
-        log_content,
-        next_button_disabled,
-        start_style,
-        cancel_style,
-        restart_style,
-    )
 
 
 @callback(
@@ -405,12 +407,9 @@ def update_celery_info(trigger, job_id):
     tasks_overview = job_manager.get_all_tasks_overview()
 
     # Check worker availability
-    workers = tasks_overview.get("workers", [])
-    worker_available = len(workers) > 0
+    workers = tasks_overview["workers"]
     worker_status_text = (
-        f"{len(workers)} worker(s) available"
-        if worker_available
-        else "No workers available"
+        f"{len(workers)} worker(s) available" if workers else "No workers available"
     )
 
     # Get task status and worker name
@@ -419,21 +418,19 @@ def update_celery_info(trigger, job_id):
 
     if job.model.celery_task_id:
         celery_status_info = job_manager.get_job_status(job.model.celery_task_id)
-        task_status_text = celery_status_info.get("status", "UNKNOWN")
+        task_status_text = celery_status_info["status"]
 
         # Find which worker is processing this task by searching active tasks
-        active_tasks = tasks_overview.get("active", [])
-        for task in active_tasks:
-            if task.get("id") == job.model.celery_task_id:
-                worker_name_text = task.get("worker", "Unknown")
+        for task in tasks_overview["active"]:
+            if task["id"] == job.model.celery_task_id:
+                worker_name_text = task["worker"]
                 break
 
         # If not in active, check reserved tasks
         if worker_name_text == "N/A":
-            reserved_tasks = tasks_overview.get("reserved", [])
-            for task in reserved_tasks:
-                if task.get("id") == job.model.celery_task_id:
-                    worker_name_text = task.get("worker", "Unknown")
+            for task in tasks_overview["reserved"]:
+                if task["id"] == job.model.celery_task_id:
+                    worker_name_text = task["worker"]
                     break
 
     logging.info(

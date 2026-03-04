@@ -25,7 +25,7 @@ import re
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import Input, Output, State, callback, dash_table
+from dash import Input, Output, State, callback, dash_table, html
 
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
@@ -183,19 +183,28 @@ def layout():
     # Button controls - buttons on the right side like cosmopolitan
     button_group = [
         dbc.Button(
-            "Refresh Jobs",
+            [
+                html.I(className="bi bi-arrow-clockwise me-1"),
+                "Refresh Jobs",
+            ],
             id=REFRESH_BUTTON_JOB_MANAGER_ID,
             color="primary",
             className="ms-2 float-end",
         ),
         dbc.Button(
-            "Delete Selection",
+            [
+                html.I(className="bi bi-trash me-1"),
+                "Delete Selection",
+            ],
             id=DELETE_BUTTON_JOB_MANAGER_ID,
             color="danger",
             className="ms-2 float-end",
         ),
         dbc.Button(
-            "Clean",
+            [
+                html.I(className="bi bi-recycle me-1"),
+                "Clean",
+            ],
             id=CLEAN_UP_BUTTON_JOB_MANAGER_ID,
             color="warning",
             className="ms-2 float-end",

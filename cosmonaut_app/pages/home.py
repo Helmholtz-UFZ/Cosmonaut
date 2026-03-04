@@ -22,9 +22,10 @@ and the user is redirected to the user_info page with the new job_id.
 """
 
 import logging
-from dash import html, register_page, callback, Input, Output
-from dash.exceptions import PreventUpdate
+
 import dash_bootstrap_components as dbc
+from dash import Input, Output, callback, html, register_page
+from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.constants.html_ids import (
     START_JOB_BUTTON_HOME_ID,
@@ -32,9 +33,9 @@ from cosmonaut_app.constants.html_ids import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
-    page_container_fullscreen_layout,
-    create_card_input,
     build_url_step,
+    create_card_input,
+    page_container_fullscreen_layout,
 )
 
 register_page(
@@ -81,7 +82,6 @@ layout = page_container_fullscreen_layout(input_container)
 )
 def start_job(n_clicks):
     if not n_clicks:
-        logging.debug("No clicks detected, preventing update")
         raise PreventUpdate
 
     logging.info("Initializing new CosmonautJob")

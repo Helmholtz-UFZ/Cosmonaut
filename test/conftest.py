@@ -372,3 +372,9 @@ def celery_worker(request):
             os.killpg(os.getpgid(worker_process.pid), signal.SIGKILL)
         except (ProcessLookupError, OSError):
             pass
+
+
+@pytest.fixture(scope="session")
+def worker_log_path(celery_worker):
+    """Expose the Celery worker log file path for test assertions."""
+    return _worker_log_path

@@ -39,7 +39,12 @@ from cosmonaut_app.db_manager import DataBaseManager
 
 
 def test_complete_routing_workflow(
-    page, dash_app, celery_worker, membership_file_path, predictor_file_path
+    page,
+    dash_app,
+    celery_worker,
+    membership_file_path,
+    predictor_file_path,
+    worker_log_path,
 ) -> None:
     """Test the complete routing workflow from job creation to route download."""
     # === Home Page ===
@@ -120,6 +125,15 @@ def test_complete_routing_workflow(
         "Expected notified_end=True in DB after job completion — "
         "email notification was not recorded"
     )
+
+    # Verify email notifications were logged by the worker
+    worker_log = worker_log_path.read_text()
+    assert (
+        "Send mail about submitted job" in worker_log
+    ), "Worker log missing submission email log"
+    assert (
+        "Send mail about finished job" in worker_log
+    ), "Worker log missing finished email log"
 
     # === Download work_dir zip and verify contents ===
     download_link = page.locator("a[href*='/download/'][href$='.zip']")

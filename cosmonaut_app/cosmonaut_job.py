@@ -6,7 +6,7 @@ import logging
 import math
 import os
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 from pyproj import CRS, Transformer
@@ -23,6 +23,8 @@ from sensor_routing.full_pipeline_cli import (
 )
 
 from cosmonaut_app.config import (
+    DAYS_DELETE_NOT_SUBMITTED,
+    DAYS_DELETE_SUBMITTED,
     WEB_WORK_DIR,
 )
 from cosmonaut_app.constants.general import (
@@ -160,8 +162,6 @@ class CosmonautJob:
         load the data from object storage,
         and store files in the working directory.
         """
-        logging.debug(f"load job with id {job_id}")
-
         # Get job information from the database
         job_data = DataBaseManager.get_job_columns(job_id)
 
@@ -250,7 +250,7 @@ class CosmonautJob:
         with open(parameters_file, "w") as f:
             json.dump(config_data, f, indent=2)
 
-        logging.info(f"Routing parameters written to {parameters_file}")
+        logging.debug(f"Routing parameters written to {parameters_file}")
 
     def _calculate_map_position_from_bounds(self, bounds):
         """
@@ -572,6 +572,15 @@ class CosmonautJob:
                 )
 
         return self.model.status
+
+    def time_to_live(self) -> int:
+        """Return number of days until this job is deleted by cleanup."""
+        if self.model.submitted:
+            retention_days = DAYS_DELETE_SUBMITTED
+        else:
+            retention_days = DAYS_DELETE_NOT_SUBMITTED
+        deletion_date = self.model.start_date + timedelta(days=retention_days)
+        return (deletion_date - date.today()).days
 
     def get_logs(self) -> str:
         """Retrieve logs for the job from object storage.

@@ -57,6 +57,12 @@ can fire *after* the processing callback returns, leaving the overlay permanentl
 stuck open. See [Callbacks — Loading Overlay](callbacks.md#loading-overlay--clientside-only)
 for the full explanation.
 
+**Critical:** The clientside (open) and server-side (close) callbacks must have
+**different `Input()` sets**. Dash hashes the inputs to generate `allow_duplicate`
+callback IDs — identical inputs produce the same hash and raise an "already in use"
+error. If both callbacks naturally share the same inputs, add a dummy store/div as an
+extra input to the server-side callback to differentiate them.
+
 **Close the overlay** in your processing callback by returning `False`:
 
 ```python

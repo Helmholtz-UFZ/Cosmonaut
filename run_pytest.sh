@@ -2,6 +2,8 @@
 
 set -e
 
+trap cleaning_up EXIT
+
 # Cleanup function - restores environment and stops services
 cleaning_up() {
     echo "Cleaning up..."
@@ -49,6 +51,7 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  --headed          Run Playwright tests with visible browser"
+    echo "  --local-sr        Use local ../sensor-routing instead of PyPI version"
     echo "  --no-services     Skip Docker service management (assume already running)"
     echo "  --no-artifacts    Disable artifact capture (screenshots, traces, HTML, console)"
     echo "  -h, --help        Show this help message"
@@ -68,6 +71,7 @@ show_help() {
     echo "  ./run_pytest.sh --no-services test/test_env.py       # Run specific test without services"
     echo "  ./run_pytest.sh --headed test/test_complete_routing_workflow.py  # Run specific test with visible browser"
     echo "  ./run_pytest.sh --no-artifacts test/test_env.py                   # Run without artifact capture"
+    echo "  ./run_pytest.sh --local-sr test/test_app.py                        # Run with local sr repo"
     echo "  ./run_pytest.sh --headed --no-services test/test_env.py          # Combine all flags"
     exit 0
 }
@@ -75,6 +79,7 @@ show_help() {
 # Parse command line arguments
 START_SERVICES=1
 HEADED=false
+LOCAL_SR=false
 ARTIFACTS=true
 TEST_PATH=""
 
@@ -82,6 +87,10 @@ while [[ $# -gt 0 ]]; do
     case $1 in
     --headed)
         HEADED=true
+        shift
+        ;;
+    --local-sr)
+        LOCAL_SR=true
         shift
         ;;
     --no-services)
@@ -102,7 +111,17 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# No validation needed - flags can be combined
+# Validate --local-sr
+if [ "$LOCAL_SR" = true ]; then
+    if [ ! -d "../sensor-routing" ]; then
+        echo "Error: ../sensor-routing directory not found."
+        echo "Clone sensor-routing as a sibling directory first."
+        exit 1
+    fi
+    SR_PATH="$(cd ../sensor-routing && pwd)"
+    export PYTHONPATH="${SR_PATH}:${PYTHONPATH:-}"
+    echo "Using local sensor-routing from ${SR_PATH}"
+fi
 
 # Backup existing .env
 if [ -f .env ]; then
@@ -156,6 +175,3 @@ fi
 # Run pytest with all accumulated flags
 echo "Running: $PYTEST_CMD"
 $PYTEST_CMD
-
-# Always cleanup, regardless of test success/failure
-cleaning_up

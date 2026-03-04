@@ -49,7 +49,17 @@ import logging
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import Input, Output, State, callback, ctx, dcc, html, register_page
+from dash import (
+    Input,
+    Output,
+    State,
+    callback,
+    ctx,
+    dcc,
+    html,
+    no_update,
+    register_page,
+)
 from dash.exceptions import PreventUpdate
 from sensor_routing.full_pipeline_cli import (
     DESCRIPTION_MEMBERSHIP,
@@ -118,9 +128,8 @@ def _first_sentence(text):
 
 def _help_icon(description):
     """Create a question-mark icon with a native browser tooltip."""
-    return html.Span(
-        "\u24d8",  # ⓘ circled information source
-        className="text-muted ms-1",
+    return html.I(
+        className="bi bi-info-circle text-muted ms-1",
         title=description.strip(),
     )
 
@@ -138,7 +147,7 @@ def layout(job_id):
     next_disabled = not (membership_uploaded and predictor_uploaded)
     delete_membership_disabled = not (membership_uploaded and is_active)
     delete_predictor_disabled = not (predictor_uploaded and is_active)
-    predictor_upload_disabled = not membership_uploaded
+    predictor_upload_disabled = not membership_uploaded or predictor_uploaded
     slider_disabled = not membership_uploaded
 
     # Determine street processing display state
@@ -232,7 +241,10 @@ def layout(job_id):
                 className="text-muted",
             ),
             dbc.Button(
-                "Delete Membership",
+                [
+                    html.I(className="bi bi-trash me-1"),
+                    "Delete Membership",
+                ],
                 id=DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID,
                 color="danger",
                 size="sm",
@@ -298,7 +310,10 @@ def layout(job_id):
                 className="text-muted",
             ),
             dbc.Button(
-                "Delete Predictor",
+                [
+                    html.I(className="bi bi-trash me-1"),
+                    "Delete Predictor",
+                ],
                 id=DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID,
                 color="danger",
                 size="sm",
@@ -346,41 +361,261 @@ dash.clientside_callback(
 )
 
 
+def _no_update_upload():
+    """Return a dict with no_update for all data_upload_manager outputs."""
+    return {
+        "viewport": no_update,
+        "file_info": no_update,
+        "next_disabled": no_update,
+        "epsg_disabled": no_update,
+        "upload_contents": no_update,
+        "loading": no_update,
+        "delete_membership_disabled": no_update,
+        "tile_url": no_update,
+        "slider_disabled": no_update,
+        "upload_disabled": no_update,
+        "membership_error": no_update,
+        "predictor_upload_disabled": no_update,
+        "predictor_file_info": no_update,
+        "predictor_error": no_update,
+        "delete_predictor_disabled": no_update,
+        "predictor_contents": no_update,
+        "tile_opacity": no_update,
+        "sp_text": no_update,
+        "sp_class": no_update,
+        "sp_poll_disabled": no_update,
+    }
+
+
+def _handle_membership_upload(contents, filename, job_id, epsg_input):
+    """Process membership file upload."""
+    if not contents or not filename:
+        raise PreventUpdate
+
+    logging.info(
+        f"Uploading membership file {filename} for job {job_id} with EPSG {epsg_input}"
+    )
+    try:
+        epsg_input = check_epsg(epsg_input)
+    except ValueError as e:
+        logging.debug(f"Invalid EPSG code {epsg_input}: {e}")
+        result = _no_update_upload()
+        result.update(
+            {
+                "next_disabled": True,
+                "epsg_disabled": False,
+                "upload_contents": None,
+                "loading": False,
+                "membership_error": str(e),
+            }
+        )
+        return result
+
+    job = CosmonautJob(job_id=job_id)
+    job.model.epsg = epsg_input
+    job.delete_membership()
+    try:
+        file_path, bounds, membership_df = job.upload_membership(
+            filename, contents, epsg_input
+        )
+    except FileValidationError as e:
+        result = _no_update_upload()
+        result.update(
+            {
+                "file_info": str(e),
+                "next_disabled": True,
+                "epsg_disabled": False,
+                "upload_contents": None,
+                "loading": False,
+                "membership_error": str(e),
+            }
+        )
+        return result
+
+    logging.debug("Upload finished, generating plots and submitting OSM task")
+
+    plot = ClassificationPlot(
+        membership_df, job.working_dir, src_epsg=f"EPSG:{epsg_input}"
+    )
+    plot.generate_plots()
+    logging.debug("Classification plots generated.")
+
+    tile_url = get_tile_url(job_id, job.working_dir)
+
+    job_manager = get_background_job_manager()
+    task_id, failed = job_manager.submit_upload_job(job, epsg_input)
+    if not failed:
+        job.model.membership_upload["street_processing"] = task_id
+    else:
+        job.model.membership_upload["street_processing"] = "FAILED"
+    job.save()
+
+    logging.debug(f"Membership file uploaded and processed for job {job_id}")
+
+    if failed:
+        sp_text = (
+            "Road network construction failed! Re-upload membership file. "
+            "If the problem persists, contact the maintainer."
+        )
+        sp_class = "text-danger small"
+        sp_poll_disabled = True
+    else:
+        sp_text = "Road network is being built..."
+        sp_class = "text-info small"
+        sp_poll_disabled = False
+
+    result = _no_update_upload()
+    result.update(
+        {
+            "viewport": {"bounds": bounds, "transition": "flyTo"},
+            "file_info": "Uploaded",
+            "next_disabled": True,
+            "epsg_disabled": True,
+            "upload_contents": None,
+            "loading": False,
+            "delete_membership_disabled": False,
+            "tile_url": tile_url,
+            "slider_disabled": False,
+            "upload_disabled": True,
+            "membership_error": "",
+            "predictor_upload_disabled": False,
+            "predictor_file_info": "Not uploaded",
+            "predictor_error": "",
+            "delete_predictor_disabled": True,
+            "sp_text": sp_text,
+            "sp_class": sp_class,
+            "sp_poll_disabled": sp_poll_disabled,
+        }
+    )
+    return result
+
+
+def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
+    """Process predictor file upload."""
+    if not predictor_contents or not predictor_filename:
+        raise PreventUpdate
+
+    logging.info(f"Uploading predictor file for job {job_id}")
+
+    job = CosmonautJob(job_id=job_id)
+    try:
+        job.upload_predictor(predictor_contents)
+    except FileValidationError as e:
+        result = _no_update_upload()
+        result.update(
+            {
+                "next_disabled": True,
+                "loading": False,
+                "predictor_file_info": "Not uploaded",
+                "predictor_error": str(e),
+                "delete_predictor_disabled": True,
+                "predictor_contents": None,
+            }
+        )
+        return result
+
+    result = _no_update_upload()
+    result.update(
+        {
+            "next_disabled": False,
+            "loading": False,
+            "predictor_file_info": "Uploaded",
+            "predictor_error": "",
+            "delete_predictor_disabled": False,
+            "predictor_contents": None,
+            "predictor_upload_disabled": True,
+        }
+    )
+    return result
+
+
+def _handle_opacity_change(opacity, job_id):
+    """Process opacity slider change."""
+    if not job_id:
+        raise PreventUpdate
+
+    result = _no_update_upload()
+    result["tile_opacity"] = opacity
+    return result
+
+
+def _handle_init_store(init_trigger, job_id):
+    """Handle initial page load with existing upload."""
+    result = _no_update_upload()
+    if init_trigger and job_id:
+        result.update({"slider_disabled": False, "upload_disabled": True})
+    else:
+        result["slider_disabled"] = True
+    return result
+
+
 @callback(
-    Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport"),
-    Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"),
-    Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled"),
-    Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled"),
-    Output(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
-    Output(DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "disabled"),
-    Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
-    Output(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled"),
-    Output(
-        DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
-    ),
-    Output(MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID, "children"),
-    Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled"),
-    Output(PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"),
-    Output(PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID, "children"),
-    Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled"),
-    Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
-    Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "opacity"),
-    Output(
-        STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True
-    ),
-    Output(
-        STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "className", allow_duplicate=True
-    ),
-    Output(STREET_PROCESSING_POLL_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
-    Input(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "value"),
-    Input(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data"),
-    Input(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
-    State(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
-    State(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
-    State(JOB_ID_STORE_SHARED_ID, "data"),
-    State(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "value"),
+    output={
+        "viewport": Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport"),
+        "file_info": Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"),
+        "next_disabled": Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled"),
+        "epsg_disabled": Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled"),
+        "upload_contents": Output(
+            DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"
+        ),
+        "loading": Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+        "delete_membership_disabled": Output(
+            DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "disabled"
+        ),
+        "tile_url": Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
+        "slider_disabled": Output(
+            DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled"
+        ),
+        "upload_disabled": Output(
+            DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+            "disabled",
+            allow_duplicate=True,
+        ),
+        "membership_error": Output(MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID, "children"),
+        "predictor_upload_disabled": Output(
+            PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled"
+        ),
+        "predictor_file_info": Output(
+            PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children"
+        ),
+        "predictor_error": Output(PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID, "children"),
+        "delete_predictor_disabled": Output(
+            DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled"
+        ),
+        "predictor_contents": Output(
+            PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"
+        ),
+        "tile_opacity": Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "opacity"),
+        "sp_text": Output(
+            STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
+            "children",
+            allow_duplicate=True,
+        ),
+        "sp_class": Output(
+            STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
+            "className",
+            allow_duplicate=True,
+        ),
+        "sp_poll_disabled": Output(
+            STREET_PROCESSING_POLL_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+    },
+    inputs={
+        "contents": Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"),
+        "opacity": Input(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "value"),
+        "init_trigger": Input(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data"),
+        "predictor_contents": Input(
+            PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"
+        ),
+    },
+    state={
+        "filename": State(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
+        "predictor_filename": State(
+            PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"
+        ),
+        "job_id": State(JOB_ID_STORE_SHARED_ID, "data"),
+        "epsg_input": State(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "value"),
+    },
     prevent_initial_call="initial_duplicate",
 )
 def data_upload_manager(
@@ -395,209 +630,77 @@ def data_upload_manager(
 ):
     """Manage data uploads: membership, predictor, opacity changes, and initial page load."""
     triggered = ctx.triggered_id
-    n_out = len(ctx.outputs_list)
 
-    def _no_update(**overrides):
-        """Build a no_update tuple, overriding specific output indices by name."""
-        result = [dash.no_update] * n_out
-        # Output index mapping (must match callback @Output order above)
-        idx = {
-            "viewport": 0,
-            "file_info": 1,
-            "next_disabled": 2,
-            "epsg_disabled": 3,
-            "upload_contents": 4,
-            "loading": 5,
-            "delete_membership_disabled": 6,
-            "tile_url": 7,
-            "slider_disabled": 8,
-            "upload_disabled": 9,
-            "membership_error": 10,
-            "predictor_upload_disabled": 11,
-            "predictor_file_info": 12,
-            "predictor_error": 13,
-            "delete_predictor_disabled": 14,
-            "predictor_contents": 15,
-            "tile_opacity": 16,
-            "sp_text": 17,
-            "sp_class": 18,
-            "sp_poll_disabled": 19,
-        }
-        for key, value in overrides.items():
-            result[idx[key]] = value
-        return tuple(result)
-
-    # --- Membership upload branch ---
     if triggered == DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID:
-        if not contents or not filename:
-            raise PreventUpdate
+        return _handle_membership_upload(contents, filename, job_id, epsg_input)
 
-        logging.info(
-            f"Uploading membership file {filename} for job {job_id} with EPSG {epsg_input}"
-        )
-        try:
-            epsg_input = check_epsg(epsg_input)
-        except ValueError as e:
-            logging.debug(f"Invalid EPSG code {epsg_input}: {e}")
-            return _no_update(
-                next_disabled=True,
-                epsg_disabled=False,
-                upload_contents=None,
-                loading=False,
-                membership_error=str(e),
-            )
-
-        job = CosmonautJob(job_id=job_id)
-        job.model.epsg = epsg_input
-        # Delete old files just in case
-        job.delete_membership()
-        try:
-            file_path, bounds, membership_df = job.upload_membership(
-                filename, contents, epsg_input
-            )
-        except FileValidationError as e:
-            return _no_update(
-                file_info=str(e),
-                next_disabled=True,
-                epsg_disabled=False,
-                upload_contents=None,
-                loading=False,
-                membership_error=str(e),
-            )
-
-        logging.debug("Upload finished, generating plots and submitting OSM task")
-
-        reposition_map = {
-            "bounds": bounds,
-            "transition": "flyTo",
-        }
-
-        plot = ClassificationPlot(
-            membership_df, job.working_dir, src_epsg=f"EPSG:{epsg_input}"
-        )
-        plot.generate_plots()
-        logging.debug("Classification plots generated.")
-
-        tile_url = get_tile_url(job_id, job.working_dir)
-
-        # Submit heavy OSM download + street selection to Celery worker
-        job_manager = get_background_job_manager()
-        task_id, failed = job_manager.submit_upload_job(job, epsg_input)
-        if not failed:
-            job.model.membership_upload["street_processing"] = task_id
-        else:
-            job.model.membership_upload["street_processing"] = "FAILED"
-        job.save()
-
-        logging.debug(f"Membership file uploaded and processed for job {job_id}")
-
-        if failed:
-            sp_text = (
-                "Road network construction failed! Re-upload membership file. "
-                "If the problem persists, contact the maintainer."
-            )
-            sp_class = "text-danger small"
-            sp_poll_disabled = True
-        else:
-            sp_text = "Road network is being built..."
-            sp_class = "text-info small"
-            sp_poll_disabled = False
-
-        return _no_update(
-            viewport=reposition_map,
-            file_info="Uploaded",
-            next_disabled=True,
-            epsg_disabled=True,
-            upload_contents=None,
-            loading=False,
-            delete_membership_disabled=False,
-            tile_url=tile_url,
-            slider_disabled=False,
-            upload_disabled=True,
-            membership_error="",
-            predictor_upload_disabled=False,
-            predictor_file_info="Not uploaded",
-            predictor_error="",
-            delete_predictor_disabled=True,
-            sp_text=sp_text,
-            sp_class=sp_class,
-            sp_poll_disabled=sp_poll_disabled,
-        )
-
-    # --- Predictor upload branch ---
     if triggered == PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID:
-        if not predictor_contents or not predictor_filename:
-            raise PreventUpdate
+        return _handle_predictor_upload(predictor_contents, predictor_filename, job_id)
 
-        logging.info(f"Uploading predictor file for job {job_id}")
-
-        job = CosmonautJob(job_id=job_id)
-        try:
-            job.upload_predictor(predictor_contents)
-        except FileValidationError as e:
-            return _no_update(
-                next_disabled=True,
-                loading=False,
-                predictor_file_info="Not uploaded",
-                predictor_error=str(e),
-                delete_predictor_disabled=True,
-                predictor_contents=None,
-            )
-
-        return _no_update(
-            next_disabled=False,
-            loading=False,
-            predictor_file_info="Uploaded",
-            predictor_error="",
-            delete_predictor_disabled=False,
-            predictor_contents=None,
-        )
-
-    # --- Opacity slider branch ---
     if triggered == DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID:
-        if not job_id:
-            raise PreventUpdate
+        return _handle_opacity_change(opacity, job_id)
 
-        return _no_update(tile_opacity=opacity)
-
-    # --- Init store branch (page load with existing upload) ---
     if triggered == DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID:
-        if init_trigger and job_id:
-            return _no_update(
-                slider_disabled=False,
-                upload_disabled=True,
-            )
-
-        return _no_update(slider_disabled=True)
+        return _handle_init_store(init_trigger, job_id)
 
     raise PreventUpdate
 
 
 @callback(
-    Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
-    Output(DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Output(DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True),
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
-    Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
-    Output(DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Output(
-        DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
-    ),
-    Output(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data", allow_duplicate=True),
-    Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Output(PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
-    Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Output(
-        STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True
-    ),
-    Output(
-        STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID, "className", allow_duplicate=True
-    ),
-    Output(STREET_PROCESSING_POLL_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
-    Input(DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
-    State(JOB_ID_STORE_SHARED_ID, "data"),
+    output={
+        "file_info": Output(
+            DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True
+        ),
+        "epsg_disabled": Output(
+            DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+        "delete_membership_disabled": Output(
+            DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+        "next_disabled": Output(
+            NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+        "viewport": Output(
+            MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True
+        ),
+        "loading": Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+        "tile_url": Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
+        "slider_disabled": Output(
+            DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+        "upload_disabled": Output(
+            DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+            "disabled",
+            allow_duplicate=True,
+        ),
+        "init_store": Output(
+            DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data", allow_duplicate=True
+        ),
+        "predictor_upload_disabled": Output(
+            PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+        "predictor_file_info": Output(
+            PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True
+        ),
+        "delete_predictor_disabled": Output(
+            DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+        "sp_text": Output(
+            STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
+            "children",
+            allow_duplicate=True,
+        ),
+        "sp_class": Output(
+            STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
+            "className",
+            allow_duplicate=True,
+        ),
+        "sp_poll_disabled": Output(
+            STREET_PROCESSING_POLL_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+    },
+    inputs={"n_clicks": Input(DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "n_clicks")},
+    state={"job_id": State(JOB_ID_STORE_SHARED_ID, "data")},
     prevent_initial_call=True,
 )
 def delete_membership_file(n_clicks, job_id):
@@ -615,39 +718,37 @@ def delete_membership_file(n_clicks, job_id):
         )
         raise PreventUpdate
 
-    # Cascade: deletes predictor first, then membership
     job.delete_membership()
 
-    default_viewport = {
-        "center": DEFAULT_MAP_CENTER,
-        "zoom": DEFAULT_MAP_ZOOM,
-        "transition": "flyTo",
+    return {
+        "file_info": "Not uploaded",
+        "epsg_disabled": False,
+        "delete_membership_disabled": True,
+        "next_disabled": True,
+        "viewport": {
+            "center": DEFAULT_MAP_CENTER,
+            "zoom": DEFAULT_MAP_ZOOM,
+            "transition": "flyTo",
+        },
+        "loading": False,
+        "tile_url": "",
+        "slider_disabled": True,
+        "upload_disabled": False,
+        "init_store": False,
+        "predictor_upload_disabled": True,
+        "predictor_file_info": "Not uploaded",
+        "delete_predictor_disabled": True,
+        "sp_text": "Road network will be constructed in the background",
+        "sp_class": "text-muted small",
+        "sp_poll_disabled": True,
     }
-
-    return (
-        "Not uploaded",  # membership file info
-        False,  # enable EPSG input
-        True,  # disable delete membership button
-        True,  # disable next button
-        default_viewport,  # reset map viewport
-        False,  # hide loading overlay
-        "",  # clear tile URL
-        True,  # disable opacity slider
-        False,  # enable upload component
-        False,  # reset init store
-        True,  # disable predictor upload
-        "Not uploaded",  # predictor file info
-        True,  # disable delete predictor button
-        "Road network will be constructed in the background",  # reset sp text
-        "text-muted small",  # reset sp class
-        True,  # disable sp polling
-    )
 
 
 @callback(
     Output(PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
     Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Input(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
@@ -673,6 +774,7 @@ def delete_predictor_file(n_clicks, job_id):
         "Not uploaded",  # predictor file info
         True,  # disable delete predictor button
         True,  # disable next button (predictor required)
+        False,  # re-enable predictor upload button
     )
 
 

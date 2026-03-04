@@ -165,14 +165,38 @@ def check_if_constant_from_html_ids(
     return id_value in html_ids_constants
 
 
-def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
-    """Find all ID constants used in @app.callback or @callback decorators.
+def _is_callback_call(node: ast.Call) -> bool:
+    """Check if an ast.Call is a callback: @app.callback, @callback, or dash.clientside_callback."""
+    func = node.func
+    # Pattern 1: @app.callback / dash.clientside_callback (ast.Attribute)
+    if isinstance(func, ast.Attribute) and func.attr in (
+        "callback",
+        "clientside_callback",
+    ):
+        return True
+    # Pattern 2: @callback (ast.Name)
+    if isinstance(func, ast.Name) and func.id == "callback":
+        return True
+    return False
 
-    This now also finds callbacks inside registration functions like:
-        def register_navbar_callbacks(app):
-            @app.callback(...)
-            def some_function():
-                pass
+
+def _extract_callback_constants(call_node: ast.Call) -> Set[str]:
+    """Extract ID constants from a callback call's arguments."""
+    constants = set()
+    for arg in call_node.args:
+        constants.update(extract_constants_from_ast(arg))
+    for keyword in call_node.keywords:
+        constants.update(extract_constants_from_ast(keyword.value))
+    return constants
+
+
+def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
+    """Find all ID constants used in callbacks.
+
+    Detects three patterns:
+    - @app.callback(...) decorators
+    - @callback(...) decorators
+    - dash.clientside_callback(...) top-level calls
 
     Returns:
         Set of constant names used in Input/Output/State.
@@ -183,46 +207,25 @@ def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
         with open(file_path, "r") as f:
             content = f.read()
 
-        # Parse the file as AST
         tree = ast.parse(content, filename=str(file_path))
 
-        # Recursively find all FunctionDef nodes (including nested ones)
-        def find_all_functions(node):
-            """Recursively find all function definitions."""
-            functions = []
-            for child in ast.walk(node):
-                if isinstance(child, ast.FunctionDef):
-                    functions.append(child)
-            return functions
+        # Pattern 1 & 2: @callback / @app.callback decorators on functions
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                for decorator in node.decorator_list:
+                    if isinstance(decorator, ast.Call) and _is_callback_call(decorator):
+                        used_constants.update(_extract_callback_constants(decorator))
 
-        # Find all function decorators (top-level and nested)
-        for func_node in find_all_functions(tree):
-            for decorator in func_node.decorator_list:
-                # Check if this is a callback decorator
-                # Pattern 1: @app.callback (ast.Attribute)
-                # Pattern 2: @callback (ast.Name)
-                is_callback = False
-                if isinstance(decorator, ast.Call):
-                    if (
-                        isinstance(decorator.func, ast.Attribute)
-                        and decorator.func.attr == "callback"
-                    ):
-                        is_callback = True
-                    elif (
-                        isinstance(decorator.func, ast.Name)
-                        and decorator.func.id == "callback"
-                    ):
-                        is_callback = True
-
-                if is_callback:
-                    # Look at all arguments to the decorator
-                    for arg in decorator.args:
-                        used_constants.update(extract_constants_from_ast(arg))
-                    for keyword in decorator.keywords:
-                        used_constants.update(extract_constants_from_ast(keyword.value))
+        # Pattern 3: dash.clientside_callback(...) top-level calls
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Expr)
+                and isinstance(node.value, ast.Call)
+                and _is_callback_call(node.value)
+            ):
+                used_constants.update(_extract_callback_constants(node.value))
 
     except SyntaxError as e:
-        # If file has syntax errors, fail with file name
         raise SyntaxError(f"Syntax error in {file_path}: {e}") from e
 
     return used_constants

@@ -79,7 +79,6 @@ from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
     NEXT_BUTTON_STREET_SELECTION_ID,
-    NONE_DIV_SHARED_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
     REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
     RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
@@ -101,6 +100,8 @@ from cosmonaut_app.layout import (
     progress_footer,
 )
 from cosmonaut_app.street_selector import StreetSelector
+
+log = logging.getLogger(__name__)
 
 register_page(
     __name__,
@@ -125,8 +126,8 @@ def layout(job_id: str):
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 
-    logging.info(f"Street selection layout called with job_id={job_id}")
-    logging.info(job.model.membership_upload)
+    log.info(f"Street selection layout for job {job_id}")
+    log.debug(f"Job {job_id} membership_upload: {job.model.membership_upload}")
 
     # Gate on street processing status
     sp_status = job.get_street_processing_status()
@@ -170,14 +171,20 @@ def layout(job_id: str):
                         dbc.ButtonGroup(
                             [
                                 dbc.Button(
-                                    "Select all",
+                                    [
+                                        html.I(className="bi bi-check-all me-1"),
+                                        "Select all",
+                                    ],
                                     id=TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
                                     size="sm",
                                     color="link",
                                     disabled=not is_active,
                                 ),
                                 dbc.Button(
-                                    "Select none",
+                                    [
+                                        html.I(className="bi bi-x-circle me-1"),
+                                        "Select none",
+                                    ],
                                     id=TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
                                     size="sm",
                                     color="link",
@@ -205,9 +212,7 @@ def layout(job_id: str):
                 input_class_name="form-check-input"
                 if is_active
                 else "form-check-input disabled",
-                style={"pointer-events": "none", "opacity": "0.6"}
-                if not is_active
-                else {},
+                className="" if is_active else "pe-none opacity-50",
             ),
             dbc.Row(
                 [
@@ -594,19 +599,22 @@ def clear_selections(
 
 
 @callback(
-    Output(NONE_DIV_SHARED_ID, "children"),
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
     Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def update_tags_dropdown(tags: Optional[List[str]], job_id: Optional[str]):
-    """Persist selected tag values via the Job model."""
+def update_tags_dropdown(
+    tags: Optional[List[str]], job_id: Optional[str]
+) -> Dict[str, Any]:
+    """Persist selected tag values and refresh the map to match the filter."""
     if tags is None:
         raise PreventUpdate
 
-    logging.info("Updated selected road tags with following tags: %s", tags)
+    log.info(f"Job {job_id} road tags updated: {tags}")
     job = CosmonautJob(job_id=job_id)
     job.model.selected_road_tags = tags
     job.save()
 
-    return no_update
+    sel = StreetSelector(job)
+    return sel.visible_fc(tags)

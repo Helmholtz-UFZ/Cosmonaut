@@ -57,8 +57,6 @@ SEARCH_RESULTS_DIV_NAV_SHARED_ID = "search-results-div-nav-shared-id"
 # Outputting to it triggers layout() and navigates without a full reload.
 URL_SHARED_ID = _ID_LOCATION
 
-# --- Utility ---
-NONE_DIV_SHARED_ID = "none-div-shared-id"
 # --- Map Elements ---
 MAIN_MAP_COMPONENT_MAP_SHARED_ID = "main-map-component-map-shared-id"
 MAP_INIT_INTERVAL_ID = "map-init-interval-id"  # nocheck used as dcc.Interval only
@@ -138,12 +136,16 @@ START_JOB_BUTTON_HOME_ID = "start-job-button-home-id"
 # PAGE: LOGS
 # ============================================================================
 
+# --- Buttons ---
+REFRESH_BUTTON_LOGS_ID = "refresh-button-logs-id"
+
 # --- Divs ---
 LOG_OUTPUT_DIV_LOGS_ID = "log-output-div-logs-id"
 TIME_ERROR_DIV_LOGS_ID = "time-error-div-logs-id"
 
 # --- Dropdowns ---
 LOG_LEVELS_DROPDOWN_LOGS_ID = "log-levels-dropdown-logs-id"
+MODULE_EXCLUDE_DROPDOWN_LOGS_ID = "module-exclude-dropdown-logs-id"
 
 # --- Inputs ---
 END_HOUR_INPUT_LOGS_ID = "end-hour-input-logs-id"
@@ -152,7 +154,11 @@ LOG_PID_INPUT_LOGS_ID = "log-pid-input-logs-id"
 START_HOUR_INPUT_LOGS_ID = "start-hour-input-logs-id"
 START_MINUTE_INPUT_LOGS_ID = "start-minute-input-logs-id"
 
+# --- Intervals ---
+AUTO_POLL_INTERVAL_LOGS_ID = "auto-poll-interval-logs-id"
+
 # --- Other ---
+LIVE_MODE_CHECKLIST_LOGS_ID = "live-mode-checklist-logs-id"
 LOG_DATE_PICKER_LOGS_ID = "log-date-picker-logs-id"
 PID_CHECKLIST_LOGS_ID = "pid-checklist-logs-id"
 TIME_INPUT_GROUP_LOGS_ID = "time-input-group-logs-id"

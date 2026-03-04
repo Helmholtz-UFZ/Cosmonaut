@@ -66,6 +66,9 @@ def process_routing_job(self, job_id):
     # Load job to get work directory
     job = CosmonautJob(job_id=job_id)
 
+    # Send submission notification before computation starts
+    _notify_submission(job)
+
     # Switch logging to file in work directory
     dictConfig(
         get_logger_config_computation(os.path.join(job.working_dir, LOG_FILE_NAME))
@@ -111,6 +114,36 @@ def process_routing_job(self, job_id):
         raise
 
 
+def _notify_submission(job):
+    """Send email notification that job was submitted."""
+    if not job.model.email:
+        return
+
+    from cosmonaut_app.config import FLASK_PORT, WEB_OUTSIDE_URL
+    from cosmonaut_app.email_service import send_mail
+
+    job_id = job.model.job_id
+
+    log.info(f"Send mail about submitted job {job_id}.")
+
+    if "localhost" in WEB_OUTSIDE_URL:
+        url_base = WEB_OUTSIDE_URL + ":" + FLASK_PORT
+    else:
+        url_base = WEB_OUTSIDE_URL
+    job_url = f"{url_base}/job/{job_id}/route-computation"
+
+    subject = f"COSMONAUT Job {job_id} submitted"
+    body = (
+        f"Your routing job {job_id} has been submitted and is now being processed.\n\n"
+        f"Check progress: {job_url}"
+    )
+
+    try:
+        send_mail([job.model.email], subject, body)
+    except Exception:  # noqa - must not let email failure crash submission path
+        log.error(f"Failed to send submission email for job {job_id}", exc_info=True)
+
+
 def _notify_user(job, status):
     """Send email notification to user if email is set and not yet notified."""
     if not job.model.email or job.model.notified_end:
@@ -120,6 +153,8 @@ def _notify_user(job, status):
     from cosmonaut_app.email_service import send_mail
 
     job_id = job.model.job_id
+
+    log.info(f"Send mail about finished job {job_id}.")
 
     if status == JOB_STATUS_COMPLETED:
         download_url = get_download_url(job_id)

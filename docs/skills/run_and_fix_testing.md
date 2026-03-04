@@ -34,6 +34,9 @@ Always start by running the failing test locally with full services:
 
 # Run with visible browser (Playwright debugging)
 ./run_pytest.sh --headed test/test_<name>.py
+
+# Use local sensor-routing repo (sibling directory)
+./run_pytest.sh --local-sr test/test_<name>.py
 ```
 
 **Important:** Always use `./run_pytest.sh` (without `--no-services`) for
@@ -81,7 +84,7 @@ open test/artifacts/<test-dir>/page.html
 | `PostgreSQL not available` | DB container failed health check | `docker logs postgres_cosmonaut` |
 | `MinIO not available` | Object storage failed health check | `docker logs minio_cosmonaut` |
 | `Redis not available` | Redis failed health check | `docker logs redis_cosmonaut` |
-| Port already in use | Another process on 5433/9010/6380 | Stop conflicting service or check `env_test_local` |
+| Port already in use | Leftover Docker containers or another process on 5433/9010/6380 | 1. `docker compose down` in the current project first. 2. If persists, tell the user which port is blocked — a sibling project (cosmopolitan, etc.) may be running in parallel and only the user knows which is safe to stop. |
 | Docker not running | Docker daemon not started | `sudo systemctl start docker` |
 
 ---

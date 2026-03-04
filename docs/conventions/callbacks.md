@@ -71,6 +71,19 @@ server-side callbacks targeting the same output. A server-side `show_loading` ca
 Clientside callbacks execute instantly in the browser, guaranteeing the overlay opens
 before the server roundtrip begins.
 
+**No shared inputs:** Dash generates `allow_duplicate` callback IDs by hashing the
+**inputs** (SHA-256 of all `Input()` specs joined together). If the clientside (open)
+callback and the server-side (close) callback share the exact same inputs, Dash produces
+identical callback IDs and raises an "already in use" error. The clientside callback must
+use a **different set** of inputs — typically only the button click(s), while the
+server-side callback includes an additional dummy/store input for differentiation.
+
+**Debugging hash collisions:** The error message includes a hash suffix like
+`output-id.prop@<hex>`. To identify *which* callback collides, compute the SHA-256 of
+the dot-joined `Input()` specs (e.g.
+`hashlib.sha256("btn-id.n_clicks.store-id.data".encode()).hexdigest()`) and match it
+against the hash in the error. This pinpoints the exact pair of callbacks sharing inputs.
+
 ```python
 # CORRECT — clientside, fires instantly in the browser
 import dash
@@ -127,6 +140,54 @@ dash.clientside_callback(
 **Testing note:** With clientside overlay callbacks, Dash callback chains may cascade
 (e.g. a submit callback re-fires after a refresh, triggering a second refresh cycle).
 Use overlay wait timeouts of at least 20s in Playwright tests to accommodate this.
+
+### Dict-Style Callbacks for Many Outputs
+
+When a callback has **5+ outputs**, use dict-style `output={}`, `inputs={}`, `state={}`
+instead of positional arguments. This makes return values self-documenting and eliminates
+the error-prone counting of tuple positions.
+
+**Keys must be valid Python identifiers** (underscores, not hyphens). The HTML ID string
+values are unaffected — only the dict keys need to be identifiers.
+
+```python
+@callback(
+    output={
+        "log_content": Output(LOG_OUTPUT_DIV_LOGS_ID, "children"),
+        "pid_disabled": Output(LOG_PID_INPUT_LOGS_ID, "disabled"),
+        "interval_disabled": Output(AUTO_POLL_INTERVAL_LOGS_ID, "disabled"),
+    },
+    inputs={
+        "n_clicks": Input(REFRESH_BUTTON_LOGS_ID, "n_clicks"),
+    },
+    state={
+        "date": State(LOG_DATE_PICKER_LOGS_ID, "date"),
+    },
+    prevent_initial_call=True,
+)
+def log_manager(n_clicks, date):
+    return {
+        "log_content": "...",
+        "pid_disabled": False,
+        "interval_disabled": True,
+    }
+```
+
+For branches that only update a subset of outputs, use a `no_update` baseline helper:
+
+```python
+def _no_update_result():
+    return {
+        "interval_disabled": no_update,
+        "end_hour_value": no_update,
+        # ... all control outputs default to no_update
+    }
+
+# In callback branch:
+result = _no_update_result()
+result.update({"log_content": content, "pid_disabled": disabled_pid})
+return result
+```
 
 ### `PreventUpdate`
 Stop callback execution for guard conditions:

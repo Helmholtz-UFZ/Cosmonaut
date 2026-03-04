@@ -397,13 +397,19 @@ def layout():
             dbc.Col(
                 [
                     dbc.Button(
-                        "Refresh",
+                        [
+                            html.I(className="bi bi-arrow-clockwise me-1"),
+                            "Refresh",
+                        ],
                         id=WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID,
                         color="primary",
                         className="me-2",
                     ),
                     dbc.Button(
-                        "Submit Test Task",
+                        [
+                            html.I(className="bi bi-play me-1"),
+                            "Submit Test Task",
+                        ],
                         id=TEST_TASK_BUTTON_WORKER_MANAGEMENT_ID,
                         color="success",
                         className="me-2",
@@ -505,18 +511,32 @@ dash.clientside_callback(
 
 
 @callback(
-    Output(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
-    Output(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
-    Output(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
-    Output(REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
-    Output(WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID, "children"),
-    Output(WORKER_LAST_REFRESH_DIV_WORKER_MANAGEMENT_ID, "children"),
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
-    Output(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"),
-    Output(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"),
-    Output(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"),
-    Input(WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID, "n_clicks"),
-    Input(WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID, "children"),
+    output={
+        "active_data": Output(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
+        "reserved_data": Output(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
+        "scheduled_data": Output(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
+        "revoked_data": Output(REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
+        "worker_cards": Output(WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID, "children"),
+        "last_refresh": Output(
+            WORKER_LAST_REFRESH_DIV_WORKER_MANAGEMENT_ID, "children"
+        ),
+        "loading": Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+        "active_selected": Output(
+            ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"
+        ),
+        "reserved_selected": Output(
+            RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"
+        ),
+        "scheduled_selected": Output(
+            SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"
+        ),
+    },
+    inputs={
+        "refresh_clicks": Input(WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID, "n_clicks"),
+        "dummy_data": Input(
+            WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID, "children"
+        ),
+    },
     prevent_initial_call="initial_duplicate",
 )
 def refresh_worker_data(refresh_clicks, dummy_data):
@@ -526,7 +546,6 @@ def refresh_worker_data(refresh_clicks, dummy_data):
     overview = job_manager.get_all_tasks_overview()
     logging.debug(f"Retrieved task overview: {overview}")
 
-    # Format data for each table
     active_data = format_active_tasks(overview["active"])
     reserved_data = format_reserved_tasks(overview["reserved"])
     scheduled_data = format_scheduled_tasks(overview["scheduled"])
@@ -534,9 +553,7 @@ def refresh_worker_data(refresh_clicks, dummy_data):
 
     worker_cards = format_worker_stats(overview)
 
-    # Update timestamp
     timestamp = datetime.now().strftime("%H:%M:%S")
-    timestamp_text = f"Last refresh: {timestamp}"
 
     log.info(
         f"Worker data refreshed - {len(active_data)} active, "
@@ -544,18 +561,18 @@ def refresh_worker_data(refresh_clicks, dummy_data):
         f"{len(revoked_data)} revoked tasks"
     )
 
-    return (
-        active_data,
-        reserved_data,
-        scheduled_data,
-        revoked_data,
-        worker_cards,
-        timestamp_text,
-        False,
-        [],  # Clear active table selection
-        [],  # Clear reserved table selection
-        [],  # Clear scheduled table selection
-    )
+    return {
+        "active_data": active_data,
+        "reserved_data": reserved_data,
+        "scheduled_data": scheduled_data,
+        "revoked_data": revoked_data,
+        "worker_cards": worker_cards,
+        "last_refresh": f"Last refresh: {timestamp}",
+        "loading": False,
+        "active_selected": [],
+        "reserved_selected": [],
+        "scheduled_selected": [],
+    }
 
 
 @callback(
@@ -627,8 +644,6 @@ def confirm_cancel_task(
     n_clicks, reserved_selected, reserved_data, scheduled_selected, scheduled_data
 ):
     """Cancel the selected task."""
-    from cosmonaut_app.background_job_manager import get_background_job_manager
-
     # Determine which table has selection
     if (
         reserved_selected

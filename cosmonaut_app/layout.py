@@ -158,7 +158,10 @@ def create_reset_banner(job_id: str, status: str) -> dbc.Alert:
                     ),
                     dbc.Col(
                         dbc.Button(
-                            "Reset Job",
+                            [
+                                html.I(className="bi bi-arrow-counterclockwise me-1"),
+                                "Reset Job",
+                            ],
                             id=RESET_BUTTON_SHARED_ID,
                             color="warning",
                             size="sm",
@@ -205,7 +208,10 @@ def create_reset_modal() -> dbc.Modal:
                         outline=True,
                     ),
                     dbc.Button(
-                        "Reset Job",
+                        [
+                            html.I(className="bi bi-exclamation-triangle me-1"),
+                            "Reset Job",
+                        ],
                         id=RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
                         color="danger",
                     ),
@@ -247,7 +253,7 @@ def create_navbar():
                             dbc.NavItem(
                                 dbc.NavLink(
                                     [
-                                        html.I(className="bi bi-book me-2"),
+                                        html.I(className="bi bi-book me-1"),
                                         "Documentation",
                                     ],
                                     href=dash.page_registry["pages.documentation"][
@@ -257,7 +263,10 @@ def create_navbar():
                             ),
                             dbc.NavItem(
                                 dbc.NavLink(
-                                    "Logs",
+                                    [
+                                        html.I(className="bi bi-journal-text me-1"),
+                                        "Logs",
+                                    ],
                                     href=dash.page_registry["pages.logs"][
                                         "relative_path"
                                     ],
@@ -265,7 +274,10 @@ def create_navbar():
                             ),
                             dbc.NavItem(
                                 dbc.NavLink(
-                                    "Worker manager",
+                                    [
+                                        html.I(className="bi bi-cpu me-1"),
+                                        "Worker manager",
+                                    ],
                                     href=dash.page_registry["pages.worker_management"][
                                         "relative_path"
                                     ],
@@ -273,7 +285,10 @@ def create_navbar():
                             ),
                             dbc.NavItem(
                                 dbc.NavLink(
-                                    "Job manager",
+                                    [
+                                        html.I(className="bi bi-list-task me-1"),
+                                        "Job manager",
+                                    ],
                                     href=dash.page_registry["pages.job_manager"][
                                         "relative_path"
                                     ],
@@ -470,7 +485,7 @@ def progress_footer(
 ):
     """Create a footer with Previous and Next buttons for navigation between steps."""
 
-    args_prev = [html.I(className="bi bi-arrow-right-circle me-1"), "Previous"]
+    args_prev = [html.I(className="bi bi-arrow-left-circle me-1"), "Previous"]
     kwargs_prev = dict(color="primary", disabled=prev_disabled)
     if prev_id is None and prev_url is None:
         prev_button = html.Span()
@@ -533,7 +548,10 @@ search_bar = dbc.Row(
         ),
         dbc.Col(
             dbc.Button(
-                "Search",
+                [
+                    html.I(className="bi bi-search me-1"),
+                    "Search",
+                ],
                 color="primary",
                 id=SEARCH_BUTTON_NAV_SHARED_ID,
             ),

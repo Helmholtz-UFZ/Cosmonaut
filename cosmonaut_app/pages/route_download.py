@@ -104,7 +104,10 @@ def layout(job_id):
                 html.Div(
                     [
                         html.A(
-                            "Download GPX File",
+                            [
+                                html.I(className="bi bi-download me-1"),
+                                "Download GPX File",
+                            ],
                             href=f"/download/{job_id}/route.gpx",
                             download="route.gpx",
                             className="btn btn-primary mt-3",

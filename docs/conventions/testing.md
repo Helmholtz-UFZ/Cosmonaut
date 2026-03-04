@@ -22,6 +22,9 @@ Main test runner with automatic service management.
 # Run specific test file
 ./run_pytest.sh test/test_app.py
 
+# Use local sensor-routing repo (sibling directory)
+./run_pytest.sh --local-sr test/test_app.py
+
 # Run without artifact capture
 ./run_pytest.sh --no-artifacts
 ```

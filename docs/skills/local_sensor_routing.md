@@ -34,9 +34,13 @@ Do not create the directory or clone anything without explicit user instruction.
 ## Step 3 — Understand the integration boundary
 
 sensor-routing is an **external library** with its own maintainer. COSMONAUT depends on
-it via PyPI (`pyproject.toml` pins a version). The `--local-sr` flag in `dev_up.sh`
-volume-mounts the local repo into the container and prepends it to `PYTHONPATH`, which
-shadows the PyPI-installed version.
+it via PyPI (`pyproject.toml` pins a version). The `--local-sr` flag is available in
+both `dev_up.sh` and `run_pytest.sh`:
+
+- **`dev_up.sh --local-sr`** — volume-mounts the local repo into the container and
+  prepends it to `PYTHONPATH`, shadowing the PyPI version.
+- **`run_pytest.sh --local-sr`** — prepends the local repo to `PYTHONPATH` before
+  running `uv run pytest`, so tests use the local sensor-routing on the host.
 
 Key files at the boundary:
 
