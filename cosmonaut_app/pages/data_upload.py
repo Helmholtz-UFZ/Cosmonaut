@@ -66,7 +66,7 @@ from sensor_routing.full_pipeline_cli import (
     DESCRIPTION_PREDICTOR,
 )
 
-from cosmonaut_app.background_job_manager import get_background_job_manager
+from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.classification_plot import ClassificationPlot
 from cosmonaut_app.constants.general import (
     DEFAULT_MAP_CENTER,
@@ -442,8 +442,7 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
 
     tile_url = get_tile_url(job_id, job.working_dir)
 
-    job_manager = get_background_job_manager()
-    task_id, failed = job_manager.submit_upload_job(job, epsg_input)
+    task_id, failed = background_job_manager.submit_upload_job(job, epsg_input)
     if not failed:
         job.model.membership_upload["street_processing"] = task_id
     else:

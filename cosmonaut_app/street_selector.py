@@ -137,8 +137,12 @@ class StreetSelector:
 
         Returns empty FeatureCollection if the edit file does not exist yet.
         """
+        # TODO remove logs
         if not os.path.exists(self.edit_path):
+            logging.info(f"Edit path is: {self.edit_path}")
             return {"type": "FeatureCollection", "features": []}
+        logging.info(f"No Edit path exist: {self.edit_path}")
+        logging.info(f"Use tag filters: {tag_filter}")
         return self.visible_fc(tag_filter)
 
     def _save_edit_file(self, feature_collection: dict) -> None:

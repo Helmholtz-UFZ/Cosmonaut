@@ -38,6 +38,7 @@ from cosmonaut_app.constants.general import (
     OSM_DATA_EDITED_FILE,
     QR_CODE_FILE,
 )
+from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.navigation_routing import RouteCreator
@@ -413,10 +414,7 @@ class CosmonautJob:
         if sp in ("PENDING", "COMPLETED", "FAILED"):
             return sp
         # sp is a Celery task ID — check its status
-        from cosmonaut_app.background_job_manager import get_background_job_manager
-
-        job_manager = get_background_job_manager()
-        celery_info = job_manager.get_job_status(sp)
+        celery_info = background_job_manager.get_job_status(sp)
         celery_status = celery_info["status"]
         if celery_status == "SUCCESS":
             self.model.membership_upload["street_processing"] = "COMPLETED"
@@ -435,10 +433,7 @@ class CosmonautJob:
         # Revoke running upload task if street_processing holds a task ID
         sp = self.model.membership_upload["street_processing"]
         if sp not in ("PENDING", "COMPLETED", "FAILED"):
-            from cosmonaut_app.background_job_manager import get_background_job_manager
-
-            job_manager = get_background_job_manager()
-            job_manager.revoke_job(sp, terminate=True)
+            background_job_manager.revoke_job(sp, terminate=True)
             logging.info(
                 f"Revoked upload processing task {sp} for job {self.model.job_id}"
             )
@@ -510,17 +505,12 @@ class CosmonautJob:
         """Submit the job to background worker."""
         logging.info(f"Submitting job {self.model.job_id} to background worker")
         try:
-            # Lazy import to avoid circular imports
-            from cosmonaut_app.background_job_manager import get_background_job_manager
-
             # Mark as submitted and set status to RUNNING
             self.model.submitted = True
             self.model.status = JOB_STATUS_RUNNING
             self.save()  # This calls dump_routing_params() automatically
 
-            # Get the singleton manager and submit the job
-            job_manager = get_background_job_manager()
-            celery_task_id, failed = job_manager.submit_routing_job(self)
+            celery_task_id, failed = background_job_manager.submit_routing_job(self)
 
             if failed:
                 logging.error(f"Failed to submit job {self.model.job_id}")
@@ -548,15 +538,13 @@ class CosmonautJob:
         Returns:
             str: Current job status (PENDING, RUNNING, COMPLETED, or FAILED)
         """
-        # Lazy import to avoid circular imports
-        from cosmonaut_app.background_job_manager import get_background_job_manager
-
         # Only sync if job has a celery task and is currently RUNNING
         if self.model.celery_task_id and self.model.status == JOB_STATUS_RUNNING:
             # Query Celery for task status
-            job_manager = get_background_job_manager()
-            celery_status_info = job_manager.get_job_status(self.model.celery_task_id)
-            celery_status = celery_status_info.get("status")
+            celery_status_info = background_job_manager.get_job_status(
+                self.model.celery_task_id
+            )
+            celery_status = celery_status_info["status"]
 
             # Map Celery states to job statuses
             if celery_status == "SUCCESS":
@@ -616,10 +604,7 @@ class CosmonautJob:
         # If job is currently running, cancel the Celery task first
         if self.model.status == JOB_STATUS_RUNNING and self.model.celery_task_id:
             logging.info(f"Cancelling running task {self.model.celery_task_id}")
-            from cosmonaut_app.background_job_manager import get_background_job_manager
-
-            job_manager = get_background_job_manager()
-            job_manager.revoke_job(self.model.celery_task_id, terminate=True)
+            background_job_manager.revoke_job(self.model.celery_task_id, terminate=True)
 
         # Delete known output files
         output_files = [LOG_FILE_NAME, ROUTE_FILENAME, GPX_FILE, QR_CODE_FILE]

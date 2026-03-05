@@ -74,7 +74,7 @@ from dash import html, register_page, callback, Input, Output, State, dcc, no_up
 from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.background_job_manager import get_background_job_manager
+from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.files_route import create_download_button
 from cosmonaut_app.constants.general import (
     JOB_STATUS_PENDING,
@@ -403,8 +403,8 @@ def update_celery_info(trigger, job_id):
     job = CosmonautJob(job_id=job_id)
 
     # Get Celery worker information
-    job_manager = get_background_job_manager()
-    tasks_overview = job_manager.get_all_tasks_overview()
+
+    tasks_overview = background_job_manager.get_all_tasks_overview()
 
     # Check worker availability
     workers = tasks_overview["workers"]
@@ -417,7 +417,9 @@ def update_celery_info(trigger, job_id):
     worker_name_text = "N/A"
 
     if job.model.celery_task_id:
-        celery_status_info = job_manager.get_job_status(job.model.celery_task_id)
+        celery_status_info = background_job_manager.get_job_status(
+            job.model.celery_task_id
+        )
         task_status_text = celery_status_info["status"]
 
         # Find which worker is processing this task by searching active tasks
@@ -530,8 +532,7 @@ def cancel_computation(n_clicks, job_id):
         logging.warning(f"Job {job_id} has no celery_task_id to cancel")
         return False, no_update
 
-    job_manager = get_background_job_manager()
-    job_manager.revoke_job(job.model.celery_task_id, terminate=True)
+    background_job_manager.revoke_job(job.model.celery_task_id, terminate=True)
     logging.info(f"Cancelled computation for job {job_id}")
 
     # Close modal, trigger status check
@@ -565,8 +566,7 @@ def restart_computation(n_clicks, job_id):
 
     # Cancel existing task if it exists (safety check)
     if job.model.celery_task_id:
-        job_manager = get_background_job_manager()
-        job_manager.revoke_job(job.model.celery_task_id, terminate=True)
+        background_job_manager.revoke_job(job.model.celery_task_id, terminate=True)
 
     job.reset()
     job.submit()

@@ -40,7 +40,7 @@ from cosmonaut_app.constants.html_ids import (
 )
 from cosmonaut_app.layout import create_header, page_container_column_layout
 from cosmonaut_app.background_job_manager import (
-    get_background_job_manager,
+    background_job_manager,
     NAME_ROUTING_TASK,
     BackgroundJobManager,
 )
@@ -306,13 +306,13 @@ def format_revoked_tasks(revoked_list: list, job_manager: BackgroundJobManager):
     tasks = []
     for task_id in revoked_list:
         # Get AsyncResult to access task status
-        result = AsyncResult(task_id, app=job_manager.app)
+        result = AsyncResult(task_id, app=background_job_manager.app)
         logging.debug(f"Revoked task {task_id} has status {result.status}")
         logging.debug(result)
 
         # Get task name from Redis (stored at submission time)
         try:
-            task_name_full = job_manager.app.backend.client.get(
+            task_name_full = background_job_manager.app.backend.client.get(
                 f"task_name:{task_id}"
             ).decode()
             task_name = task_name_full.split(".")[-1]
@@ -542,14 +542,14 @@ dash.clientside_callback(
 def refresh_worker_data(refresh_clicks, dummy_data):
     """Fetch and display current worker and task data."""
     logging.info("Refreshing worker data")
-    job_manager = get_background_job_manager()
-    overview = job_manager.get_all_tasks_overview()
+
+    overview = background_job_manager.get_all_tasks_overview()
     logging.debug(f"Retrieved task overview: {overview}")
 
     active_data = format_active_tasks(overview["active"])
     reserved_data = format_reserved_tasks(overview["reserved"])
     scheduled_data = format_scheduled_tasks(overview["scheduled"])
-    revoked_data = format_revoked_tasks(overview["revoked"], job_manager)
+    revoked_data = format_revoked_tasks(overview["revoked"], background_job_manager)
 
     worker_cards = format_worker_stats(overview)
 
@@ -618,8 +618,7 @@ def confirm_kill_task(n_clicks, task_id):
         if not re.match(uuid_pattern, task_id, re.IGNORECASE):
             raise WrongCeleryTaskId(task_id)
 
-        job_manager = get_background_job_manager()
-        job_manager.revoke_job(task_id, terminate=True)  # SIGTERM
+        background_job_manager.revoke_job(task_id, terminate=True)  # SIGTERM
 
         log.warning(f"Task {task_id} killed by user")
 
@@ -662,8 +661,7 @@ def confirm_cancel_task(
 
     task_id = task["task_id"]
 
-    job_manager = get_background_job_manager()
-    job_manager.revoke_job(task_id, terminate=False)  # Revoke only
+    background_job_manager.revoke_job(task_id, terminate=False)  # Revoke only
 
     log.warning(f"Task {task_id} ({task['task_name']}) cancelled by user")
 
@@ -685,9 +683,8 @@ def submit_test_task(n_clicks):
     log.info("Test task button clicked")
     if n_clicks is None:
         raise PreventUpdate
-    job_manager = get_background_job_manager()
 
-    task_id, failed = job_manager.submit_test_task()
+    task_id, failed = background_job_manager.submit_test_task()
 
     if failed:
         log.error("Failed to submit test task")

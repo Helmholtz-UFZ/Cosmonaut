@@ -8,6 +8,8 @@ import logging
 import time
 
 from celery import Celery
+from celery.result import AsyncResult
+from kombu.exceptions import OperationalError
 
 from cosmonaut_app.celery_config import CeleryConfig
 from cosmonaut_app.tasks.routing_tasks import RoutingTask, process_routing_job
@@ -157,8 +159,6 @@ class BackgroundJobManager:
                   - result: Task result if ready, None otherwise
                   - traceback: Traceback if task failed, None otherwise
         """
-        from celery.result import AsyncResult
-
         result = AsyncResult(task_id, app=self.app)
         return {
             "task_id": task_id,
@@ -181,8 +181,6 @@ class BackgroundJobManager:
         Raises:
             ConnectionError: If unable to connect to Redis/Celery broker
         """
-        from kombu.exceptions import OperationalError
-
         try:
             inspect = self.app.control.inspect()
 
@@ -282,34 +280,11 @@ class BackgroundJobManager:
             return None, True
 
 
-# Lazy initialization pattern - singleton instance
-_background_job_manager = None
+# Module-level singleton — instantiated on first import.
+# The Celery worker command needs `celery` at module scope anyway,
+# so lazy initialization would be defeated.
+background_job_manager = BackgroundJobManager()
 
-
-def get_background_job_manager():
-    """Get the global BackgroundJobManager instance (lazy instantiation).
-
-    Returns:
-        BackgroundJobManager: The singleton instance
-    """
-    global _background_job_manager
-    if _background_job_manager is None:
-        _background_job_manager = BackgroundJobManager()
-    return _background_job_manager
-
-
-# Expose Celery app for worker command
-def make_celery():
-    """Create Celery app for worker command.
-
-    This is used by the Celery worker command line:
-    celery -A cosmonaut_app.background_job_manager.celery worker ...
-
-    Returns:
-        Celery: Configured Celery application instance
-    """
-    manager = get_background_job_manager()
-    return manager.app
-
-
-celery = make_celery()
+# Expose Celery app for worker command:
+# celery -A cosmonaut_app.background_job_manager.celery worker ...
+celery = background_job_manager.app
