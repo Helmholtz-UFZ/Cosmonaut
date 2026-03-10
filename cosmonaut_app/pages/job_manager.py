@@ -281,10 +281,14 @@ def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows, tabl
     log.info("Job management callback triggered")
 
     # Determine which button was clicked
-    button_id = dash.callback_context.triggered[0]["prop_id"].split(".")[0]
+    triggered_ids = {
+        t["prop_id"].split(".")[0]
+        for t in dash.callback_context.triggered
+        if t["value"] is not None
+    }
 
     # Handle DELETE operation
-    if button_id == DELETE_BUTTON_JOB_MANAGER_ID and selected_rows:
+    if DELETE_BUTTON_JOB_MANAGER_ID in triggered_ids and selected_rows:
         log.info(f"Deleting {len(selected_rows)} selected jobs")
 
         for row_index in selected_rows:
@@ -306,7 +310,7 @@ def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows, tabl
                 log.error(f"Could not extract job_id from: {job_id_markdown}")
 
     # Handle CLEANUP operation
-    elif button_id == CLEAN_UP_BUTTON_JOB_MANAGER_ID:
+    elif CLEAN_UP_BUTTON_JOB_MANAGER_ID in triggered_ids:
         log.info("Running cleanup task to remove old jobs")
 
         try:
@@ -326,7 +330,7 @@ def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows, tabl
     log.info(f"Job manager refreshed - {len(table_rows)} jobs displayed")
 
     # Reset selection after delete/clean, hide loading overlay
-    if button_id in [DELETE_BUTTON_JOB_MANAGER_ID, CLEAN_UP_BUTTON_JOB_MANAGER_ID]:
+    if triggered_ids & {DELETE_BUTTON_JOB_MANAGER_ID, CLEAN_UP_BUTTON_JOB_MANAGER_ID}:
         return table_rows, [], False
 
     # For refresh, keep current selection

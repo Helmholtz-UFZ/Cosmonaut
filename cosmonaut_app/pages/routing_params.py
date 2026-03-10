@@ -161,10 +161,15 @@ def update_routing_params(**inputs):
     job_id = inputs.pop("job_id")
     job = CosmonautJob(job_id=job_id)
 
+    triggered_ids = {
+        t["prop_id"].split(".")[0]
+        for t in callback_context.triggered
+        if t["value"] is not None
+    }
+
     # If job is not PENDING, only allow navigation (no param updates)
     if job.get_status() != JOB_STATUS_PENDING:
-        triggered_id = callback_context.triggered[0]["prop_id"].split(".")[0]
-        if triggered_id == NEXT_BUTTON_ROUTING_PARAMS_ID:
+        if NEXT_BUTTON_ROUTING_PARAMS_ID in triggered_ids:
             return {
                 **{k: no_update for k in form_factory.produce_callback_outputs()},
                 "url": build_url_step("route_computation", job_id),
@@ -173,9 +178,8 @@ def update_routing_params(**inputs):
         raise PreventUpdate
 
     valid, output_dict = form_factory.validate_callback(inputs)
-    triggered_id = callback_context.triggered[0]["prop_id"].split(".")[0]
-    logging.info(f"Routing params callback triggered by {triggered_id}, valid={valid}")
-    if valid and triggered_id == NEXT_BUTTON_ROUTING_PARAMS_ID:
+    logging.info(f"Routing params callback triggered by {triggered_ids}, valid={valid}")
+    if valid and NEXT_BUTTON_ROUTING_PARAMS_ID in triggered_ids:
         for key, value in inputs.items():
             if hasattr(job.model, key):
                 setattr(job.model, key, value)

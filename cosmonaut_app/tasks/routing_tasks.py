@@ -12,11 +12,15 @@ from logging.config import dictConfig
 from celery import Task
 from sensor_routing.full_pipeline_cli import sensor_routing_pipeline
 
+from cosmonaut_app.config import FLASK_PORT, WEB_OUTSIDE_URL, get_download_url
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     LOG_FILE_NAME,
 )
+from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.email_service import send_mail
+from cosmonaut_app.logger import get_logger_config_computation, get_logger_config_worker
 
 log = logging.getLogger(__name__)
 
@@ -55,12 +59,6 @@ def process_routing_job(self, job_id):
     3. Call sensor_routing_pipeline() function
     4. Flush handlers and switch logging back to web config
     """
-    from cosmonaut_app.cosmonaut_job import CosmonautJob
-    from cosmonaut_app.logger import (
-        get_logger_config_computation,
-        get_logger_config_worker,
-    )
-
     logging.info(f"Starting routing job task for job_id={job_id}")
 
     # Load job to get work directory
@@ -119,9 +117,6 @@ def _notify_submission(job):
     if not job.model.email:
         return
 
-    from cosmonaut_app.config import FLASK_PORT, WEB_OUTSIDE_URL
-    from cosmonaut_app.email_service import send_mail
-
     job_id = job.model.job_id
 
     log.info(f"Send mail about submitted job {job_id}.")
@@ -148,9 +143,6 @@ def _notify_user(job, status):
     """Send email notification to user if email is set and not yet notified."""
     if not job.model.email or job.model.notified_end:
         return
-
-    from cosmonaut_app.config import get_download_url
-    from cosmonaut_app.email_service import send_mail
 
     job_id = job.model.job_id
 

@@ -7,7 +7,7 @@ from pyproj import CRS
 from email_validator import EmailNotValidError, validate_email
 from pydantic import AfterValidator, Field
 from sensor_routing.full_pipeline_cli import FullPipelineConfig
-from typing import Annotated, Any, Dict, List
+from typing import Annotated, Any, Dict
 
 log = logging.getLogger(__name__)
 
@@ -114,15 +114,6 @@ class UserModel(FullPipelineConfig):
             description="Upload a file with the predictor data",
             title="Predictor upload",
             json_schema_extra={"type": "file-upload"},
-        ),
-    ]
-    selected_road_tags: Annotated[
-        List[str],
-        Field(
-            [],
-            description="Selected road tags from OpenStreetMap.",
-            title="Selected road tags",
-            json_schema_extra={"type": "list"},
         ),
     ]
     epsg: Annotated[

@@ -10,7 +10,6 @@ CREATE TABLE jobs (
     email VARCHAR,
     membership_upload JSONB,
     predictor_upload JSONB,
-    selected_road_tags TEXT[],
     submitted BOOL,
     notified_end BOOL,
     stage INT,

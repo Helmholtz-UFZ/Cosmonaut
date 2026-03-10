@@ -182,6 +182,7 @@ def test_complete_routing_workflow(
                 "qr_code.png",
                 "route.gpx",
                 "solution.json",
+                "street_edits.json",
                 "transient/bc_benefits_output.json",
                 "transient/bc_top_benefits_output.json",
                 "transient/econ_bc_benefits_output.json",

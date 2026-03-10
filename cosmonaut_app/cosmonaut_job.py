@@ -37,6 +37,7 @@ from cosmonaut_app.constants.general import (
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
     QR_CODE_FILE,
+    STREET_EDITS_FILE,
 )
 from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
@@ -448,7 +449,12 @@ class CosmonautJob:
             logging.debug(f"Deleted membership file: {membership_path}")
 
         # Delete OSM data files
-        for osm_name in [OSM_DATA_DOWNLOAD_FILE, OSM_DATA_EDITED_FILE, OSM_FILENAME]:
+        for osm_name in [
+            OSM_DATA_DOWNLOAD_FILE,
+            OSM_DATA_EDITED_FILE,
+            OSM_FILENAME,
+            STREET_EDITS_FILE,
+        ]:
             osm_path = os.path.join(self.working_dir, osm_name)
             if os.path.exists(osm_path):
                 os.remove(osm_path)
@@ -466,9 +472,6 @@ class CosmonautJob:
         # Reset membership_upload to default values
         default_membership_upload = JobModel.model_fields["membership_upload"].default
         self.model.membership_upload = default_membership_upload.copy()
-
-        # Reset selected_road_tags
-        self.model.selected_road_tags = []
 
         self.save()
 

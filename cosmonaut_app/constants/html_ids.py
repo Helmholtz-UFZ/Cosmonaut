@@ -50,9 +50,6 @@ JOB_ID_STORE_SHARED_ID = "job-id-store-shared-id"
 # --- Navigation ---
 NAVBAR_COLLAPSE_NAV_SHARED_ID = "navbar-collapse-nav-shared-id"
 NAVBAR_TOGGLER_NAV_SHARED_ID = "navbar-toggler-nav-shared-id"
-SEARCH_BUTTON_NAV_SHARED_ID = "search-button-nav-shared-id"
-SEARCH_INPUT_NAV_SHARED_ID = "search-input-nav-shared-id"
-SEARCH_RESULTS_DIV_NAV_SHARED_ID = "search-results-div-nav-shared-id"
 # Dash's internal routing location — page_container listens to this ID.
 # Outputting to it triggers layout() and navigates without a full reload.
 URL_SHARED_ID = _ID_LOCATION
@@ -217,7 +214,9 @@ STREET_PROCESSING_ALERT_STREET_SELECTION_ID = (
 # Needed for testing purposes
 NEXT_BUTTON_STREET_SELECTION_ID = "next-button-street-selection-id"  # nocheck
 CANCEL_RESET_BUTTON_STREET_SELECTION_ID = "cancel-reset-button-street-selection-id"
+CLEAR_REMOVED_BUTTON_STREET_SELECTION_ID = "clear-removed-button-street-selection-id"
 CONFIRM_RESET_BUTTON_STREET_SELECTION_ID = "confirm-reset-button-street-selection-id"
+KEEP_LARGEST_HINT_STREET_SELECTION_ID = "keep-largest-hint-street-selection-id"
 LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID = "largest-button-button-street-selection-id"
 REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID = "remove-button-button-street-selection-id"
 RESET_ROADS_BUTTON_STREET_SELECTION_ID = "reset-roads-button-street-selection-id"
@@ -227,6 +226,11 @@ TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID = (
 TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID = (
     "tags-select-none-button-street-selection-id"
 )
+# --- Divs ---
+REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID = (
+    "removed-roads-list-div-street-selection-id"
+)
+
 # --- Dropdowns ---
 TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID = (
     "tags-dropdown-dropdown-street-selection-id"

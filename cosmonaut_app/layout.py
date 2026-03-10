@@ -13,11 +13,9 @@ from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     JOB_STATUS_RUNNING,
-    OSM_TAGS_MAPPING,
 )
 from cosmonaut_app.constants.html_ids import (
     CURRENT_JOB_ID_MAP_STORE_ID,
-    JOB_ID_STORE_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MAP_INIT_INTERVAL_ID,
@@ -30,13 +28,9 @@ from cosmonaut_app.constants.html_ids import (
     RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
     RESET_MODAL_SHARED_ID,
     ROUTE_POLYLINE_LAYER_MAP_ID,
-    SEARCH_BUTTON_NAV_SHARED_ID,
-    SEARCH_INPUT_NAV_SHARED_ID,
-    SEARCH_RESULTS_DIV_NAV_SHARED_ID,
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.error_handling import JobNotFound, error_modal
 from cosmonaut_app.map_utils import get_tile_url
 from cosmonaut_app.street_selector import StreetSelector
@@ -294,25 +288,11 @@ def create_navbar():
                                     ],
                                 )
                             ),
-                            dbc.NavItem(
-                                search_bar,
-                            ),
                         ],
                     ),
                     id=NAVBAR_COLLAPSE_NAV_SHARED_ID,
                     navbar=True,
                     is_open=False,
-                ),
-                # Fixed-position container for toast notifications (does not affect layout)
-                html.Div(
-                    id=SEARCH_RESULTS_DIV_NAV_SHARED_ID,
-                    style={
-                        "position": "fixed",
-                        "top": "1rem",
-                        "right": "1rem",
-                        "zIndex": 1100,
-                        "maxWidth": "28rem",
-                    },
                 ),
             ],
         ),
@@ -535,33 +515,6 @@ def steps_tab(name_step):
     )
 
 
-# Search Bar
-search_bar = dbc.Row(
-    [
-        dbc.Col(
-            dbc.Input(
-                type="search",
-                placeholder="Job_ID",
-                id=SEARCH_INPUT_NAV_SHARED_ID,
-            ),
-            width=6,
-        ),
-        dbc.Col(
-            dbc.Button(
-                [
-                    html.I(className="bi bi-search me-1"),
-                    "Search",
-                ],
-                color="primary",
-                id=SEARCH_BUTTON_NAV_SHARED_ID,
-            ),
-            width="auto",
-        ),
-    ],
-    class_name="ml-auto flex-nowrap mt-2 mt-md-0",
-    align="center",
-)
-
 # Initial Sidebar for the Job Start
 side_bar = dbc.Col(
     [
@@ -588,57 +541,6 @@ side_bar = dbc.Col(
 
 def register_navbar_callbacks(app):
     """Register callbacks for the navbar."""
-
-    @app.callback(
-        Output(SEARCH_RESULTS_DIV_NAV_SHARED_ID, "children"),
-        Output(JOB_ID_STORE_SHARED_ID, "data", allow_duplicate=True),
-        Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
-        Input(SEARCH_BUTTON_NAV_SHARED_ID, "n_clicks"),
-        State(SEARCH_INPUT_NAV_SHARED_ID, "value"),
-        prevent_initial_call=True,
-    )
-    def search_job_id(n_clicks, job_id):
-        if n_clicks is None:
-            raise PreventUpdate
-
-        if DataBaseManager.check_existence(job_id):
-            CosmonautJob(job_id=job_id)
-
-            return (
-                dbc.Toast(
-                    [html.Div(f"Job {job_id} found and loaded successfully.")],
-                    header="Job loaded",
-                    icon="success",
-                    is_open=True,
-                    duration=3000,
-                    dismissable=True,
-                    style={
-                        "maxWidth": "26rem",
-                        "wordWrap": "break-word",
-                        "whiteSpace": "normal",
-                    },
-                ),
-                job_id,
-                f"/job/{job_id}/user-info",
-            )
-        else:
-            return (
-                dbc.Toast(
-                    [html.Div(f"Job {job_id} not found")],
-                    header="Not found",
-                    icon="danger",
-                    is_open=True,
-                    duration=3000,
-                    dismissable=True,
-                    style={
-                        "maxWidth": "26rem",
-                        "wordWrap": "break-word",
-                        "whiteSpace": "normal",
-                    },
-                ),
-                no_update,
-                no_update,
-            )
 
     @app.callback(
         Output(NAVBAR_COLLAPSE_NAV_SHARED_ID, "is_open"),
@@ -754,7 +656,7 @@ def register_map_callbacks(app):
             viewport = no_update
 
         tile_url = get_tile_url(job_id, job.working_dir)
-        streets_fc = StreetSelector(job).initial_fc(list(OSM_TAGS_MAPPING.keys()))
+        streets_fc = StreetSelector(job).initial_fc()
         raw_positions = job.get_route_polyline() or []
         route_fc = {"type": "FeatureCollection", "features": []}
         if raw_positions:

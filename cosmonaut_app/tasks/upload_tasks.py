@@ -14,8 +14,10 @@ from celery import Task
 from sensor_routing.constants import MEMBERSHIP_FILENAME
 
 from cosmonaut_app.config import MAINTAINER_EMAIL
+from cosmonaut_app.cosmonaut_job import CosmonautJob, _transform_csv
 from cosmonaut_app.email_service import send_mail
 from cosmonaut_app.logger import get_logger_config_worker
+from cosmonaut_app.osm_downloader import OsmDownloader
 
 log = logging.getLogger(__name__)
 
@@ -35,18 +37,13 @@ class UploadTask(Task):
 def process_upload_task(self, job_id, epsg_input):
     """Celery task to process membership upload post-processing.
 
-    Downloads OSM road data, performs initial street selection (keep largest),
-    and saves the result. This offloads the memory-intensive osmnx graph
-    construction from the web server process.
+    Downloads OSM road data and saves the result. This offloads the
+    memory-intensive osmnx graph construction from the web server process.
 
     Args:
         job_id: ID of the job to process.
         epsg_input: EPSG code of the uploaded membership data.
     """
-    from cosmonaut_app.cosmonaut_job import CosmonautJob, _transform_csv
-    from cosmonaut_app.osm_downloader import OsmDownloader
-    from cosmonaut_app.street_selector import StreetSelector
-
     dictConfig(get_logger_config_worker())
     log.info(f"Starting upload processing task for job_id={job_id}")
 
@@ -59,11 +56,6 @@ def process_upload_task(self, job_id, epsg_input):
         osm = OsmDownloader(classification_data, epsg_output=epsg_input)
         osm.run_osm_query(job.working_dir)
         log.info(f"OSM roads queried and saved for job {job_id}")
-
-        sel = StreetSelector(job)
-        sel.keep_largest(None)
-        sel.save()
-        log.info(f"Street selection completed for job {job_id}")
 
         job.model.membership_upload["street_processing"] = "COMPLETED"
         job.save()

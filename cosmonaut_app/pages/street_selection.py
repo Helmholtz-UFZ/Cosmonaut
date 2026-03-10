@@ -3,14 +3,17 @@
 # User documentation (This section is for user documentation and will appear in the user documentation.)
 
 This interactive page allows you to choose which OpenStreetMap roads should be
-included in your navigation route. The page provides multiple selection tools to
-help you build an optimal connected road network that covers your measurement
-locations.
+included in your navigation route. Every change you make is **immediately
+persisted** — if you leave the page and come back, your selections are
+preserved exactly as you left them.
 
 **Selection Features:**
 
-- **Tag Filtering**: Select road types using dropdown filters organized by
-  OSM highway classifications:
+- **Tag Filtering**: Toggle road types on or off using the switches. Roads of
+  a disabled type are removed from the working network and will not appear on
+  any other page or in the final route. Re-enabling a type brings those roads
+  back from the original OSM download. Available classifications:
+
   - Motorway (highways and ramps)
   - Trunk road (expressways)
   - Primary road (major routes)
@@ -20,42 +23,51 @@ locations.
 
   Use "Select All" / "Select None" buttons for quick bulk operations.
 
-- **Interactive Clicking**: Click individual road segments on the map to toggle
-  them in or out of your route network. Selected roads are highlighted in a
-  distinct color for visual feedback.
+- **Interactive Clicking**: Click individual road segments on the map to mark
+  them for removal. Marked roads are highlighted in a distinct color for
+  visual feedback. Press "Remove selected" to permanently delete them.
 
 - **Network Tools**:
-  - **Keep Largest**: Automatically select only the largest connected road network
-    component, removing isolated segments
-  - **Remove Disconnected**: Filter out road segments that aren't connected to
-    your main network
-  - **Reset**: Clear all selections and start over with a clean slate
+  - **Keep Largest**: Retain only the largest connected road network
+    component, removing isolated segments. This acts as a toggle — any
+    subsequent edit (tag change, road removal) automatically resets it so
+    that previously disconnected roads reappear for further editing.
+  - **Reset**: Clear all selections, deletions, and filters, restoring the
+    full original OSM download.
 
-The map displays selected roads with real-time visual feedback as you make
-selections. Your goal is to create a connected network of streets that efficiently
-covers your measurement locations while being traversable by your vehicle.
+The map displays the current working network with real-time visual feedback.
+Your goal is to create a connected network of streets that efficiently covers
+your measurement locations while being traversable by your vehicle.
 
 **Tips for Effective Selection:**
-- Start by selecting appropriate road types for your vehicle and terrain
-- Use "Keep Largest" to remove small disconnected segments automatically
-- Verify all measurement points are reachable from your selected network
-- Click individual segments to fine-tune network boundaries
 
-When satisfied with your street selection, proceed to configure routing parameters
-for the final route calculation.
+- Start by disabling road types that are unsuitable for your vehicle
+- Remove individual problematic segments by clicking and removing
+- Use "Keep Largest" as a final check to ensure network connectivity
+- Verify all measurement points are reachable from your selected network
+
+When satisfied with your street selection, proceed to configure routing
+parameters for the final route calculation.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
-Street selection state is persisted to the job's work directory as GeoJSON.
+Street selection state is persisted to ``street_edits.json`` in the job's
+work directory. The file records removed road IDs, selected tag filters, and
+a boolean flag for keep-largest. Every edit re-derives
+``osm_data_edited.geojson`` and ``osm_data_transformed.geojson`` from the
+immutable ``osm_data_download.geojson`` via :meth:`StreetSelector.apply_edits`.
+
 Interactive callbacks use Dash Leaflet click events with feature_id tracking.
-The StreetSelector class handles graph connectivity analysis and road network processing.
+The StreetSelector class handles graph connectivity analysis and road network
+processing.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import dash_bootstrap_components as dbc
 from dash import (
+    ALL,
     Input,
     Output,
     State,
@@ -74,13 +86,16 @@ from cosmonaut_app.constants.general import (
 )
 from cosmonaut_app.constants.html_ids import (
     CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
+    CLEAR_REMOVED_BUTTON_STREET_SELECTION_ID,
     CLICKED_ROADS_STORE_SHARED_ID,
     CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
     JOB_ID_STORE_SHARED_ID,
+    KEEP_LARGEST_HINT_STREET_SELECTION_ID,
     LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
     NEXT_BUTTON_STREET_SELECTION_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
     REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
+    REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID,
     RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
     STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
@@ -103,6 +118,53 @@ from cosmonaut_app.street_selector import StreetSelector
 
 log = logging.getLogger(__name__)
 
+# Height for ~5 list items before scrolling
+_REMOVED_LIST_MAX_HEIGHT = "12rem"
+
+
+def _build_keep_largest_hint(keep_largest: bool) -> list:
+    """Build the connectivity hint content based on keep_largest state."""
+    if keep_largest:
+        return [
+            html.I(className="bi bi-check-circle-fill me-1"),
+            "Largest road network kept",
+        ]
+    return [
+        html.I(className="bi bi-exclamation-triangle-fill me-1"),
+        "Road network might be disconnected",
+    ]
+
+
+def _build_removed_roads_list(removed_info: list[dict], is_active: bool) -> list:
+    """Build ListGroup items for the removed roads panel."""
+    if not removed_info:
+        return [
+            dbc.ListGroupItem(
+                "No roads removed", className="text-muted fst-italic", disabled=True
+            )
+        ]
+    items = []
+    for road in removed_info:
+        items.append(
+            dbc.ListGroupItem(
+                [
+                    html.Span(road["label"], className="flex-grow-1"),
+                    dbc.Button(
+                        html.I(className="bi bi-x-lg"),
+                        # Dynamic IDs for per-road restore buttons
+                        id={"type": "restore-road-btn", "index": road["id"]},  # nocheck
+                        size="sm",
+                        color="link",
+                        className="p-0 ms-2 text-danger",
+                        disabled=not is_active,
+                    ),
+                ],
+                className="d-flex align-items-center py-1 px-2",
+            )
+        )
+    return items
+
+
 register_page(
     __name__,
     path_template="/job/<job_id>/street_selection",
@@ -120,7 +182,7 @@ def layout(job_id: str):
         job_id: Current job identifier from the URL.
 
     Returns:
-        A composed layout with the map on the left and controls on the right.
+        A composed layout with controls for street editing.
     """
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
@@ -135,6 +197,8 @@ def layout(job_id: str):
         return _street_processing_wait_layout(job_id)
     elif sp_status == "FAILED":
         return _street_processing_failed_layout(job_id)
+
+    sel = StreetSelector(job)
 
     card_body = []
 
@@ -154,7 +218,7 @@ def layout(job_id: str):
                 "Select the desired roads in the map on the left. "
                 "Click a road to mark it. Use 'Remove selected' to remove the "
                 "marked roads. 'Keep largest' retains the largest connected "
-                "subset within the currently selected road types.",
+                "subset of the current road network.",
                 className="text-muted",
             ),
             dbc.Row(
@@ -205,8 +269,7 @@ def layout(job_id: str):
                 options=[
                     {"label": tag, "value": tag} for tag in OSM_TAGS_MAPPING.keys()
                 ],
-                # Initialize with all tags so we immediately render the network once data exists
-                value=list(OSM_TAGS_MAPPING.keys()),
+                value=sel.selected_road_tags,
                 switch=True,
                 inline=True,
                 input_class_name="form-check-input"
@@ -235,7 +298,7 @@ def layout(job_id: str):
                                     ],
                                     id=LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
                                     color="primary",
-                                    disabled=not is_active,
+                                    disabled=not is_active or sel.keep_largest_applied,
                                 ),
                                 dbc.Button(
                                     [
@@ -264,6 +327,46 @@ def layout(job_id: str):
                     ),
                 ],
                 className="g-2 align-items-center mt-2",
+            ),
+            # Removed roads panel
+            dbc.Label("Removed roads", className="mt-3 mb-1"),
+            html.Div(
+                dbc.ListGroup(
+                    _build_removed_roads_list(sel.get_removed_roads_info(), is_active),
+                    flush=True,
+                ),
+                id=REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID,
+                className="overflow-auto border rounded",
+                style={"max-height": _REMOVED_LIST_MAX_HEIGHT},
+            ),
+            dbc.Button(
+                [
+                    html.I(className="bi bi-trash me-1"),
+                    "Clear all",
+                ],
+                id=CLEAR_REMOVED_BUTTON_STREET_SELECTION_ID,
+                size="sm",
+                color="link",
+                className="mt-1 p-0",
+                disabled=not is_active or not sel.removed_roads,
+            ),
+            # Connectivity hint
+            html.Div(
+                html.Small(
+                    _build_keep_largest_hint(sel.keep_largest_applied),
+                    className="text-success"
+                    if sel.keep_largest_applied
+                    else "text-warning",
+                ),
+                id=KEEP_LARGEST_HINT_STREET_SELECTION_ID,
+                className="mt-3",
+            ),
+            dbc.Tooltip(
+                "When active, only the largest connected road component is kept. "
+                "Any edit (tag change, road removal) resets this filter so you "
+                "can re-evaluate connectivity.",
+                target=KEEP_LARGEST_HINT_STREET_SELECTION_ID,
+                placement="bottom",
             ),
             # Reset confirmation modal (for reset edits button)
             dbc.Modal(
@@ -405,7 +508,6 @@ def poll_street_processing_status(n_intervals, job_id):
     sp_status = job.get_street_processing_status()
 
     if sp_status == "COMPLETED":
-        # Trigger page reload by navigating to the same URL
         return (
             no_update,
             no_update,
@@ -432,11 +534,15 @@ def poll_street_processing_status(n_intervals, job_id):
 
 @callback(
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(
+        REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
+    ),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     [Input(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
         State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
         State(JOB_ID_STORE_SHARED_ID, "data"),
-        State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     ],
     prevent_initial_call=True,
 )
@@ -444,106 +550,111 @@ def remove_selected(
     n: Optional[int],
     hideout: Optional[Dict[str, Any]],
     job_id: Optional[str],
-    selected_roads: Optional[List[str]],
-) -> Dict[str, Any]:
+):
     """Remove the currently selected roads and update the edited GeoJSON."""
     if not n or not job_id:
         raise PreventUpdate
 
-    sel = StreetSelector(CosmonautJob(job_id=job_id))
-    if not sel.is_pending():
+    job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
         raise PreventUpdate
 
     clicked = (hideout or {})["selected"]
     if not clicked:
         raise PreventUpdate
 
+    sel = StreetSelector(job)
     sel.remove_roads(clicked)
-    sel.save()
-    return sel.visible_fc(selected_roads)
+    list_group = dbc.ListGroup(
+        _build_removed_roads_list(sel.get_removed_roads_info(), True), flush=True
+    )
+    hint = html.Small(
+        _build_keep_largest_hint(sel.keep_largest_applied),
+        className="text-success" if sel.keep_largest_applied else "text-warning",
+    )
+    return sel.visible_fc(), list_group, hint, "mt-3"
 
 
 @callback(
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     [Input(LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks")],
-    [
-        State(JOB_ID_STORE_SHARED_ID, "data"),
-        State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
-    ],
+    [State(JOB_ID_STORE_SHARED_ID, "data")],
     prevent_initial_call=True,
 )
 def keep_largest_subnetwork(
     n: Optional[int],
     job_id: Optional[str],
-    selected_roads: Optional[List[str]],
-) -> Dict[str, Any]:
-    """Keep the largest connected subnetwork within the current tag filter."""
+):
+    """Keep the largest connected subnetwork of the current road network."""
     if not n or not job_id:
         raise PreventUpdate
 
-    sel = StreetSelector(CosmonautJob(job_id=job_id))
-    if not sel.is_pending():
+    job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
         raise PreventUpdate
 
-    if not sel.keep_largest(selected_roads):
+    sel = StreetSelector(job)
+    if not sel.keep_largest():
         raise PreventUpdate
 
-    sel.save()
-    return sel.visible_fc(selected_roads)
+    hint = html.Small(
+        _build_keep_largest_hint(True),
+        className="text-success",
+    )
+    return sel.visible_fc(), hint, "mt-3"
 
 
 @callback(
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
+    Output(
+        REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
+    ),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     [Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks")],
-    [
-        State(JOB_ID_STORE_SHARED_ID, "data"),
-        State(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
-    ],
+    [State(JOB_ID_STORE_SHARED_ID, "data")],
     prevent_initial_call=True,
 )
 def reset_edits(
     n: Optional[int],
     job_id: Optional[str],
-    selected_roads: Optional[List[str]],
-) -> Dict[str, Any]:
-    """Reset edits by restoring the edited file from the download baseline."""
+):
+    """Reset edits by restoring all state to defaults."""
     if not n or not job_id:
         raise PreventUpdate
 
-    sel = StreetSelector(CosmonautJob(job_id=job_id))
+    job = CosmonautJob(job_id=job_id)
+    sel = StreetSelector(job)
     sel.reset()
-    return sel.visible_fc(selected_roads)
+    is_active = job.get_status() == JOB_STATUS_PENDING
+    list_group = dbc.ListGroup(_build_removed_roads_list([], is_active), flush=True)
+    hint = html.Small(
+        _build_keep_largest_hint(False),
+        className="text-warning",
+    )
+    return sel.visible_fc(), sel.selected_road_tags, list_group, hint, "mt-3"
 
 
 @callback(
     Output(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
-    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
     Input(TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     Input(TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID, "n_clicks"),
-    State(JOB_ID_STORE_SHARED_ID, "data"),
-    State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def tags_select_all_none(
     n_all: Optional[int],
     n_none: Optional[int],
-    job_id: Optional[str],
-    current_geojson: Optional[Dict[str, Any]],
-) -> Tuple[List[str], Dict[str, Any]]:
-    """Update tag selection to all or none and refresh the visible FeatureCollection."""
+) -> List[str]:
+    """Set checklist to all or none. The value change triggers update_tags_dropdown."""
     trig = ctx.triggered_id
     if trig == TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID:
-        new_selection = list(OSM_TAGS_MAPPING.keys())
-    elif trig == TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID:
-        new_selection = []
-    else:
-        raise PreventUpdate
-
-    if not job_id:
-        return new_selection, {"type": "FeatureCollection", "features": []}
-
-    sel = StreetSelector(CosmonautJob(job_id=job_id))
-    return new_selection, sel.visible_fc(new_selection)
+        return list(OSM_TAGS_MAPPING.keys())
+    if trig == TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID:
+        return []
+    raise PreventUpdate
 
 
 @callback(
@@ -600,21 +711,84 @@ def clear_selections(
 
 @callback(
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def update_tags_dropdown(
-    tags: Optional[List[str]], job_id: Optional[str]
-) -> Dict[str, Any]:
+def update_tags_dropdown(tags: Optional[List[str]], job_id: Optional[str]):
     """Persist selected tag values and refresh the map to match the filter."""
     if tags is None:
         raise PreventUpdate
 
     log.info(f"Job {job_id} road tags updated: {tags}")
-    job = CosmonautJob(job_id=job_id)
-    job.model.selected_road_tags = tags
-    job.save()
+    sel = StreetSelector(CosmonautJob(job_id=job_id))
+    sel.update_tags(tags)
+    hint = html.Small(
+        _build_keep_largest_hint(sel.keep_largest_applied),
+        className="text-success" if sel.keep_largest_applied else "text-warning",
+    )
+    return sel.visible_fc(), hint, "mt-3"
 
+
+@callback(
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(
+        REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
+    ),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
+    Input({"type": "restore-road-btn", "index": ALL}, "n_clicks"),  # nocheck
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    prevent_initial_call=True,
+)
+def restore_single_road(n_clicks_list, job_id):
+    """Restore a single road removed from the network."""
+    if not any(n_clicks_list) or not job_id:
+        raise PreventUpdate
+
+    road_id = ctx.triggered_id["index"]
+    job = CosmonautJob(job_id=job_id)
     sel = StreetSelector(job)
-    return sel.visible_fc(tags)
+    sel.restore_road(road_id)
+
+    removed_info = sel.get_removed_roads_info()
+    is_active = job.get_status() == JOB_STATUS_PENDING
+    list_group = dbc.ListGroup(
+        _build_removed_roads_list(removed_info, is_active), flush=True
+    )
+    hint = html.Small(
+        _build_keep_largest_hint(sel.keep_largest_applied),
+        className="text-success" if sel.keep_largest_applied else "text-warning",
+    )
+    return sel.visible_fc(), list_group, hint, "mt-3"
+
+
+@callback(
+    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(
+        REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
+    ),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
+    Input(CLEAR_REMOVED_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    prevent_initial_call=True,
+)
+def clear_all_removed_roads(n_clicks, job_id):
+    """Clear the entire removed roads list and restore all roads."""
+    if not n_clicks or not job_id:
+        raise PreventUpdate
+
+    job = CosmonautJob(job_id=job_id)
+    sel = StreetSelector(job)
+    sel.clear_removed_roads()
+
+    is_active = job.get_status() == JOB_STATUS_PENDING
+    list_group = dbc.ListGroup(_build_removed_roads_list([], is_active), flush=True)
+    hint = html.Small(
+        _build_keep_largest_hint(sel.keep_largest_applied),
+        className="text-success" if sel.keep_largest_applied else "text-warning",
+    )
+    return sel.visible_fc(), list_group, hint, "mt-3"

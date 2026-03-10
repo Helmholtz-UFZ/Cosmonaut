@@ -14,7 +14,6 @@ TEST_JOB_DATA = {
     "stage": 3,
     "status": "completed",
     "version": "1.0",
-    "selected_road_tags": ["motorway", "primary"],
     "membership_upload": {"file_name": "test.csv"},
     "predictor_upload": {"file_name": "test_predictors.csv"},
     "epsg": 4326,

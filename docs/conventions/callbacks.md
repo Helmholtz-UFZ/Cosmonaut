@@ -203,22 +203,40 @@ def process(n_clicks, data):
     # proceed
 ```
 
-### `ctx.triggered_id`
-Handle multiple trigger sources:
-```python
-from dash import ctx
+### Identifying the Trigger
 
-@callback(
-    Output(...),
-    Input(BUTTON_1_ID, "n_clicks"),
-    Input(BUTTON_2_ID, "n_clicks"),
-)
-def handle_buttons(n1, n2):
-    if ctx.triggered_id == BUTTON_1_ID:
-        # handle button 1
-    elif ctx.triggered_id == BUTTON_2_ID:
-        # handle button 2
+**Never use `ctx.triggered_id` or `triggered[0]`** — Dash can batch multiple input
+changes into a single callback invocation (e.g., a field change and a button click
+arriving together). `triggered[0]` picks whichever input appears first in the callback
+definition, silently ignoring the rest. `ctx.triggered_id` is syntactic sugar for the
+same thing.
+
+Build a set filtered by `value is not None` to handle both batching and
+`prevent_initial_call="initial_duplicate"` (where all inputs appear in `triggered`
+with null values on page load):
+
+```python
+from dash import callback_context
+
+triggered_ids = {
+    t["prop_id"].split(".")[0]
+    for t in callback_context.triggered
+    if t["value"] is not None
+}
+
+if BUTTON_1_ID in triggered_ids:
+    # handle button 1
+elif BUTTON_2_ID in triggered_ids:
+    # handle button 2
 ```
+
+**Why `is not None`:** In multi-page apps, navigating to a page re-renders its
+components. Dash fires callbacks with ALL inputs in `triggered`, but buttons that
+were never clicked have `n_clicks: null`. Without the filter, the set would contain
+every button on every page load.
+
+**When `triggered[0]` is acceptable:** Only in callbacks with a single `Input()` where
+batching is impossible. If there are two or more `Input()` entries, use the set.
 
 ---
 

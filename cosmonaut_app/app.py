@@ -28,7 +28,7 @@ app = Dash(
     __name__,
     use_pages=True,
     suppress_callback_exceptions=True,
-    prevent_initial_callbacks="initial_duplicate",
+    prevent_initial_callbacks=True,
     assets_url_path="/assets",
     title="COSMONAUT",
     on_error=handle_error,

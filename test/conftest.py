@@ -315,7 +315,7 @@ def celery_worker(request):
             "run",
             "celery",
             "-A",
-            "cosmonaut_app.background_job_manager.celery",
+            "cosmonaut_app.celery_app.celery",
             "worker",
             "--loglevel=debug",
             "--concurrency=1",

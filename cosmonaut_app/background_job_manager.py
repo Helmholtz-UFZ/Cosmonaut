@@ -1,7 +1,10 @@
 """Background job manager for COSMONAUT App.
 
 This module provides a centralized manager for all background job operations using Celery.
-It handles task registration, job submission, and status tracking.
+It handles job submission, status tracking, and task revocation.
+
+Task registration lives in celery_app.py (the worker entry point) to avoid a
+circular import: tasks/*.py → cosmonaut_job → this module → tasks/*.py.
 """
 
 import logging
@@ -12,10 +15,6 @@ from celery.result import AsyncResult
 from kombu.exceptions import OperationalError
 
 from cosmonaut_app.celery_config import CeleryConfig
-from cosmonaut_app.tasks.routing_tasks import RoutingTask, process_routing_job
-from cosmonaut_app.tasks.test_tasks import TestTask, test_sleep_task
-from cosmonaut_app.tasks.maintenance_tasks import MaintenanceTask, cleanup_task
-from cosmonaut_app.tasks.upload_tasks import UploadTask, process_upload_task
 
 log = logging.getLogger(__name__)
 
@@ -30,48 +29,8 @@ class BackgroundJobManager:
 
     def __init__(self):
         """Initialize the background job manager."""
-        self.app = self._create_celery_app()
-        self._register_tasks()
-
-    def _create_celery_app(self):
-        """Create and configure Celery application.
-
-        Returns:
-            Celery: Configured Celery application instance
-        """
-        app = Celery("cosmonaut")
-        app.config_from_object(CeleryConfig)
-        return app
-
-    def _register_tasks(self):
-        """Register task functions with Celery app.
-
-        This dynamically registers all task functions as Celery tasks,
-        making them available for background execution.
-        """
-        self.routing_task = self.app.task(
-            bind=True,
-            base=RoutingTask,
-            name=NAME_ROUTING_TASK,
-        )(process_routing_job)
-
-        self.test_sleep_task = self.app.task(
-            bind=True,
-            base=TestTask,
-            name=NAME_TEST_TASK,
-        )(test_sleep_task)
-
-        self.cleanup_task = self.app.task(
-            bind=True,
-            base=MaintenanceTask,
-            name=NAME_MAINTENANCE_CLEANUP_TASK,
-        )(cleanup_task)
-
-        self.upload_task = self.app.task(
-            bind=True,
-            base=UploadTask,
-            name=NAME_UPLOAD_TASK,
-        )(process_upload_task)
+        self.app = Celery("cosmonaut")
+        self.app.config_from_object(CeleryConfig)
 
     def submit_routing_job(self, job):
         """Submit a routing job to the Celery queue.
@@ -84,8 +43,8 @@ class BackgroundJobManager:
                    celery_task_id is None if submission failed
         """
         try:
-            result = self.routing_task.apply_async(
-                # Pass job_id, not job object (serialization)
+            result = self.app.send_task(
+                NAME_ROUTING_TASK,
                 args=[job.model.job_id],
                 queue="routing",
                 retry=True,
@@ -122,7 +81,8 @@ class BackgroundJobManager:
                    celery_task_id is None if submission failed
         """
         try:
-            result = self.upload_task.apply_async(
+            result = self.app.send_task(
+                NAME_UPLOAD_TASK,
                 args=[job.model.job_id, epsg_input],
                 queue="upload",
                 retry=True,
@@ -241,7 +201,8 @@ class BackgroundJobManager:
                    celery_task_id is None if submission failed
         """
         try:
-            result = self.test_sleep_task.apply_async(
+            result = self.app.send_task(
+                NAME_TEST_TASK,
                 queue="test",
             )
             # Store task name in Redis for revoked task retrieval
@@ -264,7 +225,8 @@ class BackgroundJobManager:
                    celery_task_id is None if submission failed
         """
         try:
-            result = self.cleanup_task.apply_async(
+            result = self.app.send_task(
+                NAME_MAINTENANCE_CLEANUP_TASK,
                 queue="default",
             )
             # Store task name in Redis for revoked task retrieval
@@ -281,10 +243,4 @@ class BackgroundJobManager:
 
 
 # Module-level singleton — instantiated on first import.
-# The Celery worker command needs `celery` at module scope anyway,
-# so lazy initialization would be defeated.
 background_job_manager = BackgroundJobManager()
-
-# Expose Celery app for worker command:
-# celery -A cosmonaut_app.background_job_manager.celery worker ...
-celery = background_job_manager.app

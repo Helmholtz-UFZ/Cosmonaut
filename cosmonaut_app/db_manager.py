@@ -16,7 +16,6 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     Column,
     Date,
@@ -404,7 +403,6 @@ class JobTable(Base):
     email = Column("email", String)
     membership_upload = Column("membership_upload", JSON)
     predictor_upload = Column("predictor_upload", JSON)
-    selected_road_tags = Column("selected_road_tags", ARRAY(String))
     submitted = Column("submitted", Boolean)
     notified_end = Column("notified_end", Boolean)
     stage = Column("stage", Integer)

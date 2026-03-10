@@ -37,7 +37,7 @@ USER appuser
 # Setup object storage and start Celery worker
 CMD echo "Starting Celery worker..."; \
     python3 -c "from cosmonaut_app.object_storage_manager import setup_remote; setup_remote()"; \
-    exec celery -A cosmonaut_app.background_job_manager.celery worker \
+    exec celery -A cosmonaut_app.celery_app.celery worker \
         --loglevel=info \
         --concurrency=4 \
         --queues=default,routing,test,upload \

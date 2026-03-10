@@ -19,6 +19,7 @@ LOG_RETENTION_DAYS = 30  # Days to retain logs in PostgreSQL database
 # OSM data file names
 OSM_DATA_DOWNLOAD_FILE = "osm_data_download.geojson"
 OSM_DATA_EDITED_FILE = "osm_data_edited.geojson"
+STREET_EDITS_FILE = "street_edits.json"
 
 # Mapping of road classification labels to OSM highway tag values
 OSM_TAGS_MAPPING = {
