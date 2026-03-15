@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+import time
 
 import psycopg2
 from psycopg2 import pool
@@ -52,11 +53,24 @@ class PostgreSQLHandler(logging.Handler):
             "keepalives_interval": 10,  # Send keepalive every 10s
             "keepalives_count": 5,  # 5 failed keepalives = dead connection
         }
-        self.connection_pool = pool.SimpleConnectionPool(
-            1,
-            10,  # min and max connections
-            **pool_params,
-        )
+        max_retries = 5
+        retry_delay_seconds = 2
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.connection_pool = pool.SimpleConnectionPool(
+                    1,
+                    10,  # min and max connections
+                    **pool_params,
+                )
+                break
+            except psycopg2.OperationalError:
+                if attempt == max_retries:
+                    raise
+                print(
+                    f"PostgreSQL not ready, retrying in {retry_delay_seconds}s "
+                    f"(attempt {attempt}/{max_retries})"
+                )
+                time.sleep(retry_delay_seconds)
 
     def emit(self, record):
         """Write the log record to the database.

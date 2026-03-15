@@ -91,11 +91,11 @@ def layout():
         "View logs", "Show logs of the webserver", bg_color="bg-info", rounded=False
     )
 
-    # Polling interval (starts disabled — live mode off by default)
+    # Polling interval (starts enabled — live mode on by default)
     interval = dcc.Interval(
         id=AUTO_POLL_INTERVAL_LOGS_ID,
         interval=10_000,
-        disabled=True,
+        disabled=False,
     )
 
     # Row 1: Date + Time range + Live toggle
@@ -105,6 +105,7 @@ def layout():
         dcc.DatePickerSingle(
             id=LOG_DATE_PICKER_LOGS_ID,
             date=now.date(),
+            disabled=True,
         ),
     ]
 
@@ -137,6 +138,7 @@ def layout():
                             value=end_hour,
                             min=0,
                             max=23,
+                            disabled=True,
                         ),
                         dbc.InputGroupText(":"),
                         dbc.Input(
@@ -145,6 +147,7 @@ def layout():
                             value=end_minute,
                             min=0,
                             max=59,
+                            disabled=True,
                         ),
                     ],
                     id=TIME_INPUT_GROUP_LOGS_ID,
@@ -159,7 +162,7 @@ def layout():
         dbc.Checklist(
             id=LIVE_MODE_CHECKLIST_LOGS_ID,
             options=[{"label": "Auto-refresh", "value": "on"}],
-            value=[],
+            value=["on"],
             switch=True,
         ),
     ]
@@ -221,6 +224,7 @@ def layout():
                 "Refresh",
                 id=REFRESH_BUTTON_LOGS_ID,
                 color="primary",
+                disabled=True,
             ),
             className="d-flex justify-content-end",
         ),
@@ -251,7 +255,7 @@ def layout():
                 refresh_row,
                 html.Div(
                     id=LOG_OUTPUT_DIV_LOGS_ID,
-                    children="Click Refresh or enable Live mode to view logs.",
+                    children="Live mode active — waiting for first refresh...",
                     className="border p-3 bg-light rounded",
                     style={"maxHeight": "70vh", "overflowY": "auto"},
                 ),

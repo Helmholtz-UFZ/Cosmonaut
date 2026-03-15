@@ -153,6 +153,69 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
     return violations
 
 
+def find_non_constant_callback_ids(file_path: Path) -> List[Tuple[int, str, str]]:
+    """Find Input/Output/State calls where the first arg is not an uppercase constant.
+
+    Uses AST to detect string literals, function calls (e.g. hidden_id(...)),
+    or any non-constant expression used as the component ID (first positional arg).
+
+    Returns:
+        List of (line_number, call_description, id_repr) tuples.
+    """
+    violations = []
+
+    with open(file_path, "r") as f:
+        source = f.read()
+    lines = source.splitlines()
+
+    try:
+        tree = ast.parse(source, filename=str(file_path))
+    except SyntaxError:
+        return violations
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+
+        # Match Input(...), Output(...), State(...)
+        func = node.func
+        if not (isinstance(func, ast.Name) and func.id in ("Input", "Output", "State")):
+            continue
+
+        # Must have at least one positional arg (the component ID)
+        if not node.args:
+            continue
+
+        first_arg = node.args[0]
+
+        # Check if the line has # nocheck
+        line_idx = first_arg.lineno - 1
+        if line_idx < len(lines) and (
+            "# nocheck" in lines[line_idx] or "#nocheck" in lines[line_idx]
+        ):
+            continue
+
+        # Acceptable: uppercase Name ending in _ID (constant from html_ids)
+        if (
+            isinstance(first_arg, ast.Name)
+            and first_arg.id.isupper()
+            and first_arg.id.endswith("_ID")
+        ):
+            continue
+
+        # Everything else is a violation
+        id_repr = ast.dump(first_arg)
+        if isinstance(first_arg, ast.Constant):
+            id_repr = repr(first_arg.value)
+        elif isinstance(first_arg, ast.Call) and isinstance(first_arg.func, ast.Name):
+            id_repr = f"{first_arg.func.id}(...)"
+
+        call_desc = f"{func.id}({id_repr}, ...)"
+        violations.append((first_arg.lineno, call_desc, id_repr))
+
+    return violations
+
+
 def check_if_constant_from_html_ids(
     id_value: str, html_ids_constants: Set[str]
 ) -> bool:
@@ -278,13 +341,18 @@ def test_no_string_literal_ids():
         if "__pycache__" in str(py_file):
             continue
 
+        # Check id= keyword patterns (html/dcc/dbc components)
         violations = find_id_usages_in_file(py_file)
-
         for line_num, matched_text, id_value in violations:
-            # Check if this is a constant from html_ids.py
             if not check_if_constant_from_html_ids(id_value, html_ids_constants):
                 rel_path = py_file.relative_to(cosmonaut_app.parent)
                 all_violations.append(f"{rel_path}:{line_num} - {matched_text}")
+
+        # Check first positional arg in Input/Output/State calls
+        callback_violations = find_non_constant_callback_ids(py_file)
+        for line_num, call_desc, id_repr in callback_violations:
+            rel_path = py_file.relative_to(cosmonaut_app.parent)
+            all_violations.append(f"{rel_path}:{line_num} - {call_desc}")
 
     if all_violations:
         error_msg = "\n\nVIOLATIONS: Found id= usages with string literals or non-html_ids constants:\n\n"
