@@ -1,117 +1,76 @@
-# Testing Conventions
+# Testing
 
-## Testing Approach
+All tests live in `test/` and run against real services via Docker.
 
-Integration testing using Playwright. No unit tests for Dash callbacks.
+## Critical Rules for Running Tests
 
----
+**ALWAYS run `./run_pytest.sh --help` before your first test execution in a session.**
+The help output is the single source of truth for available flags and usage. Do not
+guess flags or invent arguments — only use what `--help` shows.
 
-## Local Testing
+**NEVER run `pytest` or `uv run pytest` directly.** Always use `./run_pytest.sh`.
+The script manages `.env` backup/restore, Docker services, and cleanup. Running
+pytest directly will use the wrong `.env`, skip service setup, and leave stale state.
 
-### `./run_pytest.sh`
+**`--no-services` SKIPS most tests.** It passes `--no-services` to pytest, which
+causes `dash_app` and `celery_worker` fixtures to call `pytest.skip()`. All e2e
+tests and most module tests will be skipped. Only use it for tests that truly need
+no services (`test_env`, `test_html_id_enforcement`, `test_sensor_routing_descriptions`).
 
-Main test runner with automatic service management.
+**Check artifacts before rerunning.** On failure, `test/artifacts/<test-name>/`
+contains screenshots, traces, HTML snapshots, server logs, and worker logs. Read
+these first — they usually explain the failure without needing another run. Note
+that `run_pytest.sh` clears previous artifacts by default (use `--keep-artifacts`
+to preserve them across runs).
 
-```bash
-# Run all tests (headless) — this is the default and recommended command
-./run_pytest.sh
+## Code Rules
 
-# Run with visible browser (debugging)
-./run_pytest.sh --headed
+- All tests go in `test/` (flat directory, no subdirectories)
+- Use constants from `cosmonaut_app/constants/html_ids.py` for element IDs in
+  Playwright locators — never literal ID strings
+- All imports at top level
+- When adding a required env var, update `test_env.py`'s checks
 
-# Run specific test file
-./run_pytest.sh test/test_app.py
+## Test Types
 
-# Use local sensor-routing repo (sibling directory)
-./run_pytest.sh --local-sr test/test_app.py
+### E2E tests (`test_complete_routing_workflow.py`)
 
-# Run without artifact capture
-./run_pytest.sh --no-artifacts
-```
+- Use Playwright via `pytest-playwright` (`page` fixture)
+- App served by `dash_app` fixture (werkzeug make_server in background thread)
+- Require all services: Postgres, Redis, MinIO, Celery worker
+- Test full user workflows through the browser
+- Reusable helpers in `test/help_functions_tests.py`
 
-**`--no-services` flag — use with care:**
+### Module tests (everything else)
 
-This flag skips Docker service startup. Only use it when you already have
-services running in a separate terminal (see "Development tip" below), or
-when running a test that does not require services. Most tests require
-PostgreSQL, MinIO, or Redis — running them with `--no-services` and no
-background services will produce connection failures, not meaningful results.
+Service requirements vary by test:
 
-```bash
-# These tests DO NOT require services:
-./run_pytest.sh --no-services test/test_env.py
-./run_pytest.sh --no-services test/test_html_id_enforcement.py
+| Test file | Services needed |
+|-----------|----------------|
+| `test_db_manager.py` | Postgres |
+| `test_worker_management.py` | Redis, Celery worker |
+| `test_env.py` | None (reads env files only) |
+| `test_html_id_enforcement.py` | None (checks source code only) |
+| `test_sensor_routing_descriptions.py` | None (checks data structures only) |
 
-# These tests REQUIRE services — they will fail without them:
-# test/test_complete_routing_workflow.py
-# test/test_db_manager.py
-# test/test_worker_management.py
-```
+## Fixtures (`conftest.py`)
 
-**What the script does:**
+- `pytest_configure()` verifies all services are reachable before any tests run (gated by `--no-services`)
+- `dash_app` (session) — starts the Dash app via werkzeug make_server in a background thread, polls until responsive, shuts down cleanly
+- `page` (function) — wraps pytest-playwright's page fixture; captures HTML, console logs, server logs, and worker logs on failure
+- `celery_worker` (session) — starts a real Celery worker subprocess with log capture, terminates on teardown
+- `membership_file_path` / `predictor_file_path` (session) — copies test data files to temp dir
+- `logger` — configured logger with suppressed third-party noise
 
-1. Backs up and replaces `.env` with `env_test_local`
-2. Starts Docker services (postgres, minio, redis)
-3. Waits for services to be healthy (10 retry limit)
-4. Runs pytest with artifact flags (`--screenshot only-on-failure --tracing retain-on-failure --output test/artifacts`)
-5. Restores `.env`, stops services
+## Artifacts
 
-**Service Health Checks:**
-
-- PostgreSQL: `pg_isready`
-- MinIO: Health endpoint
-- Redis: `ping`
-
-**Development tip:** Keep services running for faster iterations:
-
-```bash
-# Terminal 1: Start services once
-docker compose up postgres minio redis -d
-
-# Terminal 2: Run tests quickly
-./run_pytest.sh --no-services test/test_app.py
-```
-
-### `./run_codegen_test.sh`
-
-Generate Playwright tests interactively.
-
-```bash
-./run_codegen_test.sh
-./run_codegen_test.sh -o test/test_new_feature.py
-```
-
-Opens browser, records interactions, outputs test file.
-
----
-
-## Test Artifacts
-
-On failure, Playwright tests automatically capture artifacts in `test/artifacts/`:
-
-```
-test/artifacts/
-  test-test-<name>-chromium/
-    test-failed-1.png    # Screenshot at moment of failure
-    trace.zip            # Playwright trace (DOM, network, actions)
-    page.html            # HTML snapshot of the page
-    console.log          # Browser console output
-    server.log           # Dash/Python server logs during the test
-    worker.log           # Celery worker stderr (task execution, errors)
-```
-
-**Viewing traces** (the most powerful debugging tool):
-
-```bash
-npx playwright show-trace test/artifacts/<test-dir>/trace.zip
-```
-
-**Key points:**
-
-- Artifacts are only generated on failure — passing tests produce nothing
-- The `test/artifacts/` directory is auto-cleaned at session start by pytest-playwright
-- `test/artifacts/` is in `.gitignore`
-- `--no-artifacts` flag disables capture (see `./run_pytest.sh --help`)
+Playwright artifacts are stored in `test/artifacts/` and include:
+- **Screenshots** (`--screenshot only-on-failure`): browser screenshots on test failure
+- **Traces** (`--tracing retain-on-failure`): Playwright traces viewable with `npx playwright show-trace`
+- **HTML snapshots**: rendered DOM at failure time
+- **Console logs**: browser console messages
+- **Server logs**: Python server-side logs (callbacks, validation errors, file operations)
+- **Worker logs**: Celery worker output
 
 **Which artifact to check first:**
 
@@ -124,8 +83,6 @@ npx playwright show-trace test/artifacts/<test-dir>/trace.zip
 | Routing task failure | `worker.log` — Celery worker output and task traces |
 | Layout / rendering issue | `page.html` — inspect the DOM structure |
 
----
-
 ## CI Pipeline
 
 Tests run in GitLab CI. See `.gitlab-ci.yml` for configuration.
@@ -135,33 +92,29 @@ All tests must pass in CI before merging.
 On failure, CI uploads `test/artifacts/` as a GitLab artifact (7-day retention).
 Download from the pipeline job page under "Job artifacts".
 
----
+## Examples
 
-## Test Organization
+### Do
 
-```
-test/
-├── test_app.py                         # Dash application tests
-├── test_complete_routing_workflow.py   # End-to-end workflow
-├── test_db_manager.py                  # Database manager tests
-├── test_debug.py                       # DEBUG env tests
-├── test_env.py                         # Environment tests
-├── test_html_id_enforcement.py         # ID pattern enforcement
-├── help_functions_tests.py             # Test helpers
-└── test_files/
-    └── memberships.csv                 # Sample data
+```python
+from playwright.sync_api import expect
+
+from cosmonaut_app.constants.html_ids import SOME_BUTTON_ID
+
+def test_something(page, dash_app):
+    page.goto(f"http://localhost:{PORT}/")
+    page.locator(f"#{SOME_BUTTON_ID}").click()
+    expect(page.locator(f"#{SOME_BUTTON_ID}")).to_be_visible()
 ```
 
----
+### Don't
 
-## conftest.py Patterns
+```python
+def test_something(page, dash_app):
+    page.locator("#some_button").click()  # Never use literal ID strings
+```
 
-- Custom pytest options via `pytest_addoption()`
-- Early validation in `pytest_configure()`
-- Session-scoped fixtures: `dash_app`, `celery_worker`
-- Daemon threads for background services
-- Conditional skip with `--no-services` flag
-- `page` fixture override — wraps pytest-playwright's `page` to capture:
-  - Browser console messages (via `page.on("console", ...)`)
-  - Python/Dash server logs (via `logging.Handler`)
-  - HTML snapshot and log files on failure
+## Notes
+
+- `check_all_errors(page)` in `test/help_functions_tests.py` is the standard post-action verification — checks console errors, JS errors, and broken images
+- Use `locator.scroll_into_view_if_needed()` before clicking elements that may be off-screen
