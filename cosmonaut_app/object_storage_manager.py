@@ -5,6 +5,7 @@ import subprocess
 import sys
 import time
 
+from cosmonaut_app.error_handling import ObjectStorageError
 from cosmonaut_app.config import (
     JOB_WORK_DIR_TEMPLATE,
     OBJECT_STORAGE_ACCESS_KEY,
@@ -14,13 +15,7 @@ from cosmonaut_app.config import (
     OBJECT_STORAGE_SECRET_KEY,
 )
 
-
-class ObjectStorageError(Exception):
-    """Exception raised for errors in the ObjectStorageManager class."""
-
-    def __init__(self, message="An error occurred while managing object storage."):
-        """Initialize the ObjectStorageError class."""
-        super().__init__(message)
+log = logging.getLogger(__name__)
 
 
 def check_result(params: list, result: subprocess.CompletedProcess) -> None:
@@ -41,11 +36,11 @@ def check_result(params: list, result: subprocess.CompletedProcess) -> None:
     call = call.replace(OBJECT_STORAGE_ACCESS_KEY, "****")
     if result.returncode != 0:
         if "QuotaExceeded" in error_msg:
-            logging.error(
+            log.error(
                 f"Object storage quota exceeded for command: {call}\n{error_msg}\n{output}"  # noqa
             )
         else:
-            logging.error(f"Command failed: {call}\n{error_msg}\n{output}")
+            log.error(f"Command failed: {call}\n{error_msg}\n{output}")
         raise ObjectStorageError
 
 
@@ -82,15 +77,11 @@ def run_rclone_with_retry(
                 timeout=5,
             )
             if check_result_proc.returncode != 0:
-                logging.error(
-                    f"MinIO connection check failed: {check_result_proc.stderr}"
-                )
+                log.error(f"MinIO connection check failed: {check_result_proc.stderr}")
                 raise ObjectStorageError("MinIO connection check failed")
-            logging.debug("MinIO connection check passed")
+            log.debug("MinIO connection check passed")
         except subprocess.TimeoutExpired:
-            logging.error(
-                "MinIO connection check timed out - storage may be unreachable"
-            )
+            log.error("MinIO connection check timed out - storage may be unreachable")
             raise ObjectStorageError("MinIO connection check timed out") from None
 
     for attempt in range(max_retries):
@@ -103,17 +94,13 @@ def run_rclone_with_retry(
             )
             check_result(params, result)
         except subprocess.TimeoutExpired:
-            logging.error(
-                f"Command timed out after {timeout} seconds: {' '.join(params)}"
-            )
+            log.error(f"Command timed out after {timeout} seconds: {' '.join(params)}")
             raise ObjectStorageError(
                 f"Command timed out after {timeout} seconds"
             ) from None
         except ObjectStorageError:
             if attempt < max_retries - 1:
-                logging.warning(
-                    f"{' '.join(params)} failed. Retry attempt {attempt + 1}"
-                )
+                log.warning(f"{' '.join(params)} failed. Retry attempt {attempt + 1}")
                 time.sleep(retry_delay)
             else:
                 raise
@@ -127,7 +114,7 @@ def setup_remote() -> None:
     Args:
         dirname: Name of the directory (used for error handling)
     """
-    logging.debug("Setting up rclone remote.")
+    log.debug("Setting up rclone remote.")
     config_params = [
         "rclone",
         "config",
@@ -151,7 +138,7 @@ def setup_remote() -> None:
     )
     check_result(config_params, result)
 
-    logging.debug(f"Successfully created remote {OBJECT_STORAGE_REMOTE_NAME}")
+    log.debug(f"Successfully created remote {OBJECT_STORAGE_REMOTE_NAME}")
 
 
 def get_files(dirname: str) -> None:
@@ -166,7 +153,7 @@ def get_files(dirname: str) -> None:
     Raises:
         ObjectStorageError: If download fails or verification fails
     """
-    logging.debug(f"Downloading files from object storage for {dirname}")
+    log.debug(f"Downloading files from object storage for {dirname}")
     local_path = JOB_WORK_DIR_TEMPLATE.format(job_id=dirname)
     remote_path = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}/{dirname}"
 
@@ -180,7 +167,7 @@ def get_files(dirname: str) -> None:
     ]
 
     result = run_rclone_with_retry(sync_params, timeout=600, check_connection=True)
-    logging.debug(f"Rclone sync result: {result.stdout}")
+    log.debug(f"Rclone sync result: {result.stdout}")
 
 
 def save_files(dirname: str) -> None:
@@ -194,7 +181,7 @@ def save_files(dirname: str) -> None:
     Raises:
         ObjectStorageError: If upload fails or verification fails
     """
-    logging.debug(f"Uploading files to object storage for {dirname}")
+    log.debug(f"Uploading files to object storage for {dirname}")
     local_path = JOB_WORK_DIR_TEMPLATE.format(job_id=dirname)
     remote_path = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}/{dirname}"
 
@@ -216,7 +203,7 @@ def delete_file_from_storage(filepath: str) -> None:
     Args:
         filepath: Path of the file to delete from object storage
     """
-    logging.debug(f"Deleting file {filepath} from object storage.")
+    log.debug(f"Deleting file {filepath} from object storage.")
 
     remote_path = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}/{filepath}"
 
@@ -228,7 +215,7 @@ def delete_file_from_storage(filepath: str) -> None:
 
     run_rclone_with_retry(delete_params, timeout=10)  # 10 seconds for delete
 
-    logging.debug(f"Successfully deleted file {filepath} from object storage")
+    log.debug(f"Successfully deleted file {filepath} from object storage")
 
 
 def delete_directory_from_storage(dirpath: str) -> None:
@@ -237,7 +224,7 @@ def delete_directory_from_storage(dirpath: str) -> None:
     Args:
         dirpath: Path of the directory to delete from object storage
     """
-    logging.debug(f"Deleting directory {dirpath} from object storage.")
+    log.debug(f"Deleting directory {dirpath} from object storage.")
 
     remote_path = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}/{dirpath}"
 
@@ -249,12 +236,12 @@ def delete_directory_from_storage(dirpath: str) -> None:
 
     run_rclone_with_retry(purge_params, timeout=10)  # 10 seconds for purge
 
-    logging.debug(f"Successfully deleted directory {dirpath} from object storage")
+    log.debug(f"Successfully deleted directory {dirpath} from object storage")
 
 
 def create_bucket() -> None:
     """Create the object storage bucket if it doesn't already exist."""
-    logging.debug(f"Creating bucket {OBJECT_STORAGE_BUCKET}")
+    log.debug(f"Creating bucket {OBJECT_STORAGE_BUCKET}")
 
     # Check if bucket already exists
     lsd_params = [
@@ -300,10 +287,10 @@ def main():
     try:
         if command == "setup_remote":
             setup_remote()
-            logging.info("Object storage remote setup completed successfully.")
+            log.info("Object storage remote setup completed successfully.")
         elif command == "create_bucket":
             create_bucket()
-            logging.info("Bucket creation completed successfully.")
+            log.info("Bucket creation completed successfully.")
         else:
             print(f"Unknown command: {command}")
             print(
@@ -311,7 +298,7 @@ def main():
             )
             sys.exit(1)
     except ObjectStorageError as e:
-        logging.error(f"Failed to execute {command}: {e}")
+        log.error(f"Failed to execute {command}: {e}")
         sys.exit(1)
 
 

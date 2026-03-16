@@ -38,6 +38,8 @@ from cosmonaut_app.config import (
 )
 from cosmonaut_app.error_handling import JobNotFound
 
+log = logging.getLogger(__name__)
+
 
 class SessionScope:
     """Context manager for managing database sessions with retry logic."""
@@ -57,22 +59,18 @@ class SessionScope:
                 return self.session  # success
             except OperationalError as e:
                 if attempt < self.max_retries:
-                    logging.warning(
-                        f"Database OperationalError: {e}", extra={"tag": "database"}
-                    )
-                    logging.warning(
+                    log.warning(f"Database OperationalError: {e}")
+                    log.warning(
                         f"Retrying operation (attempt {attempt + 1}/{self.max_retries + 1})",  # noqa
-                        extra={"tag": "database"},
                     )
                     time.sleep(self.retry_delay)
                 else:
-                    logging.error(
+                    log.error(
                         f"Max retries ({self.max_retries}) exceeded",
-                        extra={"tag": "database"},
                     )
                     raise
             except SQLAlchemyError as e:
-                logging.error(f"Database error: {e}", extra={"tag": "database"})
+                log.error(f"Database error: {e}")
                 raise
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -116,16 +114,27 @@ class DataBaseManager:
     on its job ID.
     """
 
-    database_url = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST_NAME}:{POSTGRES_PORT}/{POSTGRES_NAME}"
-    engine = create_engine(
-        database_url,
-        pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=10,
-        pool_timeout=30,
-        pool_recycle=1800,
-    )
-    Session = sessionmaker(bind=engine)
+    _engine = None
+    _Session = None
+
+    @classmethod
+    def _get_session(cls):
+        """Return the session factory, creating the engine on first call."""
+        if cls._Session is None:
+            database_url = (
+                f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
+                f"@{POSTGRES_HOST_NAME}:{POSTGRES_PORT}/{POSTGRES_NAME}"
+            )
+            cls._engine = create_engine(
+                database_url,
+                pool_pre_ping=True,
+                pool_size=5,
+                max_overflow=10,
+                pool_timeout=30,
+                pool_recycle=1800,
+            )
+            cls._Session = sessionmaker(bind=cls._engine)
+        return cls._Session
 
     @classmethod
     def check_existence(self, job_id):
@@ -140,8 +149,8 @@ class DataBaseManager:
         Returns:
         bool: True if a job with the given job ID exists, False otherwise.
         """
-        logging.debug(f"Check existence of job with ID: {job_id}")
-        with SessionScope(self.Session) as session:
+        log.debug(f"Check existence of job with ID: {job_id}")
+        with SessionScope(self._get_session()) as session:
             job_row = session.query(JobTable).filter_by(job_id=job_id).first()
             return job_row is not None
 
@@ -155,7 +164,7 @@ class DataBaseManager:
         data_to_insert (dict): A dictionary containing job information with keys
         equivalent to the cloumns ins JobTable.
         """
-        with SessionScope(self.Session) as session:
+        with SessionScope(self._get_session()) as session:
             job_row = JobTable(**data_to_insert)
             session.merge(job_row)
             session.commit()
@@ -167,7 +176,7 @@ class DataBaseManager:
         Raises:
         JobNotFound: If the job with the provided job ID does not exist.
         """
-        with SessionScope(self.Session) as session:
+        with SessionScope(self._get_session()) as session:
             job = session.query(JobTable).filter_by(job_id=job_id).first()
             if job is None:
                 raise JobNotFound(job_id)
@@ -192,7 +201,7 @@ class DataBaseManager:
         Raises:
         JobNotFound: If the job with the provided job ID does not exist.
         """
-        with SessionScope(self.Session) as session:
+        with SessionScope(self._get_session()) as session:
             job_row = session.query(JobTable).filter_by(job_id=job_id).first()
             if job_row:
                 job_columns = {
@@ -219,7 +228,7 @@ class DataBaseManager:
         Raises:
         JobNotFound: If the job with the provided job ID does not exist.
         """
-        with SessionScope(self.Session) as session:
+        with SessionScope(self._get_session()) as session:
             job_row = session.query(JobTable).filter_by(job_id=job_id).first()
             if job_row:
                 return job_row.stage
@@ -239,7 +248,7 @@ class DataBaseManager:
         Raises:
         JobNotFound: If the job with the provided job ID does not exist.
         """
-        with SessionScope(self.Session) as session:
+        with SessionScope(self._get_session()) as session:
             job = session.query(JobTable).filter_by(job_id=job_id).first()
             if job:
                 session.delete(job)
@@ -261,7 +270,7 @@ class DataBaseManager:
             - email (str): User email
             - celery_task_id (str|None): Celery task ID if submitted
         """
-        with SessionScope(cls.Session) as session:
+        with SessionScope(cls._get_session()) as session:
             job_rows = session.query(JobTable).all()
 
             job_info = {}
@@ -284,7 +293,7 @@ class DataBaseManager:
         list[str]
             Sorted list of unique module names.
         """
-        with SessionScope(cls.Session) as session:
+        with SessionScope(cls._get_session()) as session:
             rows = (
                 session.query(LogTable.module)
                 .distinct()
@@ -326,7 +335,7 @@ class DataBaseManager:
         excluded_modules : list[str], optional
             Module names to exclude from results
         """
-        logging.debug(
+        log.debug(
             f"Querying logs from {date} {start_hour}:{start_minute} "
             f"to {date} {end_hour}:{end_minute}"
         )
@@ -339,7 +348,7 @@ class DataBaseManager:
         )
 
         # Create session directly (not using SessionScope)
-        session = cls.Session()
+        session = cls._get_session()()
         try:
             query = session.query(LogTable).filter(
                 LogTable.timestamp >= start_datetime,
@@ -377,9 +386,9 @@ class DataBaseManager:
         int
             Number of log records deleted
         """
-        logging.info(f"Deleting logs older than {cutoff_datetime}")
+        log.info(f"Deleting logs older than {cutoff_datetime}")
 
-        with SessionScope(cls.Session) as session:
+        with SessionScope(cls._get_session()) as session:
             # Count logs before deletion
             count_query = session.query(LogTable).filter(
                 LogTable.timestamp < cutoff_datetime
@@ -390,7 +399,7 @@ class DataBaseManager:
             count_query.delete(synchronize_session=False)
             session.commit()
 
-            logging.info(f"Deleted {count} log records older than {cutoff_datetime}")
+            log.info(f"Deleted {count} log records older than {cutoff_datetime}")
             return count
 
 

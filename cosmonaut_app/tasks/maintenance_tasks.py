@@ -20,6 +20,8 @@ from cosmonaut_app.constants.general import LOG_RETENTION_DAYS
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.object_storage_manager import delete_directory_from_storage
 
+log = logging.getLogger(__name__)
+
 
 class MaintenanceTask(Task):
     """Base class for maintenance tasks with custom error handling."""
@@ -40,8 +42,8 @@ class MaintenanceTask(Task):
         einfo : ExceptionInfo
             Exception info object with traceback
         """
-        logging.error(f"Maintenance task {task_id} failed: {exc}")
-        logging.error(f"Traceback: {einfo}")
+        log.error(f"Maintenance task {task_id} failed: {exc}")
+        log.error(f"Traceback: {einfo}")
 
 
 def clean_up_jobs(
@@ -69,7 +71,7 @@ def clean_up_jobs(
         - local_dirs_deleted: Number of local directories cleaned up
         - storage_dirs_deleted: Number of object storage directories deleted
     """
-    logging.info("Starting job cleanup task")
+    log.info("Starting job cleanup task")
 
     kept_jobs = []
     deleted_jobs = []
@@ -80,7 +82,7 @@ def clean_up_jobs(
 
     # Query all jobs from database
     job_info_dict = DataBaseManager.list_jobs()
-    logging.debug(f"Found {len(job_info_dict)} total jobs in database")
+    log.debug(f"Found {len(job_info_dict)} total jobs in database")
 
     # Evaluate each job for deletion
     for job_id, job_info in job_info_dict.items():
@@ -99,7 +101,7 @@ def clean_up_jobs(
         else:
             kept_jobs.append(job_id)
 
-    logging.debug(
+    log.debug(
         f"Database cleanup complete: {len(deleted_jobs)} deleted, {len(kept_jobs)} kept"
     )
 
@@ -115,11 +117,11 @@ def clean_up_jobs(
 
         # Only delete if job was deleted from database
         if dir_name not in kept_jobs:
-            logging.debug(f"Deleting local directory: {dir_path}")
+            log.debug(f"Deleting local directory: {dir_path}")
             shutil.rmtree(dir_path)
             local_dirs_deleted += 1
 
-    logging.debug(f"Local directory cleanup complete: {local_dirs_deleted} deleted")
+    log.debug(f"Local directory cleanup complete: {local_dirs_deleted} deleted")
 
     # Clean up object storage directories
     storage_dirs_deleted = 0
@@ -128,7 +130,7 @@ def clean_up_jobs(
         delete_directory_from_storage(job_id)
         storage_dirs_deleted += 1
 
-    logging.debug(f"Object storage cleanup complete: {storage_dirs_deleted} deleted")
+    log.debug(f"Object storage cleanup complete: {storage_dirs_deleted} deleted")
 
 
 def cleanup_task(self):
@@ -143,17 +145,17 @@ def cleanup_task(self):
     dict
         Cleanup statistics from both operations
     """
-    logging.info("Starting maintenance cleanup task")
+    log.info("Starting maintenance cleanup task")
 
     # Clean up jobs
     clean_up_jobs()
 
     # Clean up logs
     cutoff_datetime = datetime.now() - timedelta(days=LOG_RETENTION_DAYS)
-    logging.info(
+    log.info(
         f"Cleaning up logs older than {LOG_RETENTION_DAYS} days "
         f"(before {cutoff_datetime})"
     )
 
     deleted_count = DataBaseManager.delete_logs_older_than(cutoff_datetime)
-    logging.debug(f"Deleted {deleted_count} old log entries from database")
+    log.debug(f"Deleted {deleted_count} old log entries from database")

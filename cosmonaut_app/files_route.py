@@ -11,6 +11,8 @@ from flask import send_from_directory, send_file, abort
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.error_handling import JobNotFound
 
+log = logging.getLogger(__name__)
+
 DOWNLOAD_WORKDIR_ROUTE_TEMPLATE = "/download/<job_id>/work_dir.zip"
 
 
@@ -36,16 +38,16 @@ def serve_files(app):
     @app.server.route("/pictures/<job_id>/<path:filename>")
     def serve_picture(job_id, filename):
         """Serve pictures."""
-        logging.debug(f"Serve picture {filename} for {job_id}")
+        log.debug(f"Serve picture {filename} for {job_id}")
         try:
             job = CosmonautJob(job_id=job_id)
         except JobNotFound:
-            logging.error(f"Job not found for job_id={job_id}")
+            log.error(f"Job not found for job_id={job_id}")
             abort(404, description="Job not found")
 
         picture_path = os.path.join(job.working_dir, filename)
         if not os.path.exists(picture_path):
-            logging.error(f"Picture not found at {picture_path}")
+            log.error(f"Picture not found at {picture_path}")
             abort(404, description="Picture not found")
         response = send_from_directory(job.working_dir, filename)
 
@@ -61,7 +63,7 @@ def serve_files(app):
     @app.server.route("/download/<job_id>/route.gpx")
     def download_gpx(job_id):
         """Serve GPX file for download."""
-        logging.debug(f"Serving GPX download for job_id={job_id}")
+        log.debug(f"Serving GPX download for job_id={job_id}")
 
         try:
             job = CosmonautJob(job_id=job_id)
@@ -70,7 +72,7 @@ def serve_files(app):
         gpx_path = os.path.join(job.working_dir, "route.gpx")
 
         if not os.path.exists(gpx_path):
-            logging.error(f"GPX file not found at {gpx_path}")
+            log.error(f"GPX file not found at {gpx_path}")
             abort(404, description="GPX file not found")
 
         return send_file(
@@ -88,7 +90,7 @@ def serve_files(app):
         database (existence check). The working directory path is taken from
         the validated job object, never from user input.
         """
-        logging.debug(f"Download work dir for {job_id}")
+        log.debug(f"Download work dir for {job_id}")
         try:
             job = CosmonautJob(job_id=job_id)
         except JobNotFound:

@@ -85,7 +85,9 @@ ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"  # nocheck
 
 Test validates ID usage: `test/test_html_id_enforcement.py`
 
-Run: `cd test && uv run pytest test_html_id_enforcement.py -v --noconftest`
+Run `./run_pytest.sh --help` first to check available flags. This test needs no
+services, so `./run_pytest.sh --no-services test/test_html_id_enforcement.py` is
+likely what you want.
 
 Checks:
 1. All `id=` usages use constants (no string literals)

@@ -12,8 +12,9 @@ on this page involves three key steps:
 2. **Upload Membership File**: Drag and drop or select a CSV/TXT file containing your
    membership data with coordinate columns. The system will parse your file,
    transform coordinates to WGS84 (EPSG:4326) for map display, and visualize
-   your locations on the interactive map. After uploading, the system automatically
-   queries OpenStreetMap for road networks within your data's geographic extent.
+   your locations on the interactive map. After uploading, the road network is
+   downloaded from OpenStreetMap **in the background** — you can continue with
+   the predictor upload while it runs. A status indicator shows the progress.
 
 3. **Upload Predictor File**: Upload a CSV file containing the predictor data
    (e.g. environmental covariates) used by the routing algorithm. The predictor
@@ -35,14 +36,30 @@ to choose which roads to include in your route.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
-File upload uses dcc.Upload with base64 encoding. The OsmDownloader class handles
-OpenStreetMap downloading with proper buffering around the data extent. Coordinate
-transformation uses pyproj with CRS validation via the pyproj.CRS class.
-Predictor upload is validated via parse_predictor_file and cross-checked against
-the membership file using validate_predictor_membership_consistency. The exact
-predictor file format is not duplicated here — it is sourced at runtime from
-DESCRIPTION_PREDICTOR in the sensor-routing package and displayed in the UI
-tooltip on the upload button.
+File upload uses dcc.Upload with base64 encoding. Coordinate transformation uses
+pyproj with CRS validation via the pyproj.CRS class. Predictor upload is validated
+via parse_predictor_file and cross-checked against the membership file using
+validate_predictor_membership_consistency. The exact predictor file format is not
+duplicated here — it is sourced at runtime from DESCRIPTION_PREDICTOR in the
+sensor-routing package and displayed in the UI tooltip on the upload button.
+
+**Road network background task flow:**
+
+After a successful membership upload, a Celery task (process_upload_task) is
+submitted to the ``upload`` queue via background_job_manager.submit_upload_job().
+The task uses osmnx to download a road graph from OpenStreetMap, reconstructs
+per-way geometries, and projects them to the user's EPSG. This runs in a worker
+to keep the memory-intensive osmnx graph construction off the web process.
+
+membership_upload["street_processing"] state machine:
+- ``"PENDING"``  — default, no task submitted yet
+- *Celery task ID* — task queued or running
+- ``"COMPLETED"`` — roads downloaded and saved
+- ``"FAILED"``   — task failed; user must re-upload
+
+A dcc.Interval polls every 3s. poll_street_processing calls
+get_street_processing_status(), which checks AsyncResult and persists terminal
+state to the database. Polling stops once terminal state is reached.
 """
 
 import logging
@@ -106,6 +123,8 @@ from cosmonaut_app.layout import (
 )
 from cosmonaut_app.map_utils import get_tile_url
 from cosmonaut_app.pydantic_models import check_epsg
+
+log = logging.getLogger(__name__)
 
 register_page(
     __name__,
@@ -392,13 +411,13 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
     if not contents or not filename:
         raise PreventUpdate
 
-    logging.info(
+    log.info(
         f"Uploading membership file {filename} for job {job_id} with EPSG {epsg_input}"
     )
     try:
         epsg_input = check_epsg(epsg_input)
     except ValueError as e:
-        logging.debug(f"Invalid EPSG code {epsg_input}: {e}")
+        log.debug(f"Invalid EPSG code {epsg_input}: {e}")
         result = _no_update_upload()
         result.update(
             {
@@ -432,13 +451,13 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         )
         return result
 
-    logging.debug("Upload finished, generating plots and submitting OSM task")
+    log.debug("Upload finished, generating plots and submitting OSM task")
 
     plot = ClassificationPlot(
         membership_df, job.working_dir, src_epsg=f"EPSG:{epsg_input}"
     )
     plot.generate_plots()
-    logging.debug("Classification plots generated.")
+    log.debug("Classification plots generated.")
 
     tile_url = get_tile_url(job_id, job.working_dir)
 
@@ -449,7 +468,7 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         job.model.membership_upload["street_processing"] = "FAILED"
     job.save()
 
-    logging.debug(f"Membership file uploaded and processed for job {job_id}")
+    log.debug(f"Membership file uploaded and processed for job {job_id}")
 
     if failed:
         sp_text = (
@@ -494,7 +513,7 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
     if not predictor_contents or not predictor_filename:
         raise PreventUpdate
 
-    logging.info(f"Uploading predictor file for job {job_id}")
+    log.info(f"Uploading predictor file for job {job_id}")
 
     job = CosmonautJob(job_id=job_id)
     try:
@@ -707,14 +726,12 @@ def delete_membership_file(n_clicks, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
-    logging.info(f"Delete membership button clicked for job {job_id}")
+    log.info(f"Delete membership button clicked for job {job_id}")
 
     job = CosmonautJob(job_id=job_id)
 
     if job.model.status != JOB_STATUS_PENDING:
-        logging.warning(
-            f"Cannot delete upload - job {job_id} status is {job.model.status}"
-        )
+        log.warning(f"Cannot delete upload - job {job_id} status is {job.model.status}")
         raise PreventUpdate
 
     job.delete_membership()
@@ -757,12 +774,12 @@ def delete_predictor_file(n_clicks, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
-    logging.info(f"Delete predictor button clicked for job {job_id}")
+    log.info(f"Delete predictor button clicked for job {job_id}")
 
     job = CosmonautJob(job_id=job_id)
 
     if job.model.status != JOB_STATUS_PENDING:
-        logging.warning(
+        log.warning(
             f"Cannot delete predictor - job {job_id} status is {job.model.status}"
         )
         raise PreventUpdate
@@ -786,7 +803,7 @@ def delete_predictor_file(n_clicks, job_id):
     State(DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data"),
 )
 def update_upload_state(epsg, file_uploaded):
-    logging.info(f"Validating EPSG code: {epsg}")
+    log.info(f"Validating EPSG code: {epsg}")
 
     try:
         check_epsg(epsg)

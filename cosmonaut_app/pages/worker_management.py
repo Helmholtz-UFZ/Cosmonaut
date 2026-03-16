@@ -82,6 +82,7 @@ def create_task_datatable(table_id, columns, selectable=False):
             col_def["presentation"] = "markdown"
         column_defs.append(col_def)
 
+    # style needed: Dash DataTable uses its own style_* API, not className
     table_style = {
         "cell": {"padding": "8px"},
         "header": {
@@ -307,8 +308,8 @@ def format_revoked_tasks(revoked_list: list, job_manager: BackgroundJobManager):
     for task_id in revoked_list:
         # Get AsyncResult to access task status
         result = AsyncResult(task_id, app=background_job_manager.app)
-        logging.debug(f"Revoked task {task_id} has status {result.status}")
-        logging.debug(result)
+        log.debug(f"Revoked task {task_id} has status {result.status}")
+        log.debug(result)
 
         # Get task name from Redis (stored at submission time)
         try:
@@ -317,7 +318,7 @@ def format_revoked_tasks(revoked_list: list, job_manager: BackgroundJobManager):
             ).decode()
             task_name = task_name_full.split(".")[-1]
         except AttributeError:
-            logging.warning(f"Task name not found in Redis for revoked task {task_id}")
+            log.warning(f"Task name not found in Redis for revoked task {task_id}")
             task_name = "Unknown"
 
         tasks.append(
@@ -369,7 +370,8 @@ def format_worker_stats(overview):
                 ]
             ),
             className="mb-2",
-            style={"backgroundColor": "rgb(240, 248, 255)"},
+            color="primary",
+            outline=True,
         )
         cards.append(card)
 
@@ -474,7 +476,7 @@ def layout():
     # Dummy component for triggering updates
     dummy = html.Div(
         id=WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID,
-        style={"display": "none"},
+        className="d-none",
     )
 
     # Assemble page layout
@@ -541,10 +543,10 @@ dash.clientside_callback(
 )
 def refresh_worker_data(refresh_clicks, dummy_data):
     """Fetch and display current worker and task data."""
-    logging.info("Refreshing worker data")
+    log.info("Refreshing worker data")
 
     overview = background_job_manager.get_all_tasks_overview()
-    logging.debug(f"Retrieved task overview: {overview}")
+    log.debug(f"Retrieved task overview: {overview}")
 
     active_data = format_active_tasks(overview["active"])
     reserved_data = format_reserved_tasks(overview["reserved"])

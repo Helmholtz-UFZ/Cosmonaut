@@ -33,8 +33,8 @@ from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     URL_SHARED_ID,
-    USER_INFO_EMAIL_INPUT_USER_INFO_ID,
-    USER_INFO_NEXT_BUTTON_USER_INFO_ID,
+    EMAIL_INPUT_USER_INFO_ID,
+    NEXT_BUTTON_USER_INFO_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
@@ -47,6 +47,8 @@ from cosmonaut_app.layout import (
 )
 from cosmonaut_app.pydantic_models import check_email
 
+log = logging.getLogger(__name__)
+
 register_page(
     __name__,
     path_template="/job/<job_id>/user-info",
@@ -57,7 +59,7 @@ register_page(
 
 
 def layout(job_id):
-    logging.info(f"Creating layout page {__name__} for {job_id}")
+    log.info(f"Creating layout page {__name__} for {job_id}")
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
@@ -81,11 +83,11 @@ def layout(job_id):
             ),
             dbc.Label(
                 "Email address",
-                html_for=USER_INFO_EMAIL_INPUT_USER_INFO_ID,
+                html_for=EMAIL_INPUT_USER_INFO_ID,
                 className="mt-2",
             ),
             dbc.Input(
-                id=USER_INFO_EMAIL_INPUT_USER_INFO_ID,
+                id=EMAIL_INPUT_USER_INFO_ID,
                 type="email",
                 value=job.model.email,
                 autoFocus=True,
@@ -110,7 +112,7 @@ def layout(job_id):
     card_body.append(dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id))
 
     footer = progress_footer(
-        next_id=USER_INFO_NEXT_BUTTON_USER_INFO_ID,
+        next_id=NEXT_BUTTON_USER_INFO_ID,
     )
     input_container = create_card_input(
         card_body,
@@ -123,14 +125,14 @@ def layout(job_id):
 
 
 @callback(
-    Output(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "valid"),
-    Output(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "invalid"),
-    Output(USER_INFO_NEXT_BUTTON_USER_INFO_ID, "disabled"),
-    Input(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "value"),
+    Output(EMAIL_INPUT_USER_INFO_ID, "valid"),
+    Output(EMAIL_INPUT_USER_INFO_ID, "invalid"),
+    Output(NEXT_BUTTON_USER_INFO_ID, "disabled"),
+    Input(EMAIL_INPUT_USER_INFO_ID, "value"),
 )
 def validate_email(value):
     """Live email validation -> toggles input valid/invalid and enables Next button."""
-    logging.debug(f"Validating email: {value}")
+    log.debug(f"Validating email: {value}")
     try:
         check_email(value)
         return True, False, False
@@ -140,8 +142,8 @@ def validate_email(value):
 
 @callback(
     Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
-    Input(USER_INFO_NEXT_BUTTON_USER_INFO_ID, "n_clicks"),
-    State(USER_INFO_EMAIL_INPUT_USER_INFO_ID, "value"),
+    Input(NEXT_BUTTON_USER_INFO_ID, "n_clicks"),
+    State(EMAIL_INPUT_USER_INFO_ID, "value"),
     State(URL_SHARED_ID, "pathname"),
     prevent_initial_call=True,
 )
@@ -159,6 +161,6 @@ def go_to_upload_page(n_clicks: int | None, email: str | None, pathname: str | N
     job.model.email = email
     job.save()
 
-    logging.info(f"Storing email {email} for job {job_id}")
+    log.info(f"Storing email {email} for job {job_id}")
 
     return build_url_step("data_upload", job_id)

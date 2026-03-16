@@ -55,7 +55,10 @@ def remove_disconnected_roads(G, largest_subnetwork, all_roads):
 
 def is_critical_road(road):
     """
-    Check if a road is critical (e.g., a bridge or highway).
+    Check if a road is critical (currently: bridges only).
+
+    The critical_highways list is intentionally empty — no highway types are
+    protected from removal. Only bridges are preserved.
 
     Parameters:
     road (dict): The road feature from the GeoJSON data.
@@ -63,9 +66,10 @@ def is_critical_road(road):
     Returns:
     bool: True if the road is critical, False otherwise.
     """
+    # highway and bridge are optional in the OSM schema — not every feature carries them
     highway_type = road["properties"].get("highway", "")
     is_bridge = road["properties"].get("bridge", False)
-    critical_highways = []  # ["motorway", "trunk", "primary", "secondary", "tertiary"]
+    critical_highways = []
 
     return is_bridge or highway_type in critical_highways
 

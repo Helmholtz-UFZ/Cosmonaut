@@ -91,16 +91,16 @@ from cosmonaut_app.constants.html_ids import (
     CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
     JOB_ID_STORE_SHARED_ID,
     KEEP_LARGEST_HINT_STREET_SELECTION_ID,
-    LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
+    LARGEST_BUTTON_STREET_SELECTION_ID,
     NEXT_BUTTON_STREET_SELECTION_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
-    REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
+    REMOVE_BUTTON_STREET_SELECTION_ID,
     REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID,
-    RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
+    RESET_CONFIRM_MODAL_STREET_SELECTION_ID,
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
     STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
     STREET_PROCESSING_POLL_STREET_SELECTION_ID,
-    TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+    TAGS_DROPDOWN_STREET_SELECTION_ID,
     TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
     URL_SHARED_ID,
@@ -226,7 +226,7 @@ def layout(job_id: str):
                     dbc.Col(
                         dbc.Label(
                             "Road type filter",
-                            html_for=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+                            html_for=TAGS_DROPDOWN_STREET_SELECTION_ID,
                             className="mt-2",
                         ),
                         width="auto",
@@ -265,7 +265,7 @@ def layout(job_id: str):
                 className="g-0",
             ),
             dbc.Checklist(
-                id=TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID,
+                id=TAGS_DROPDOWN_STREET_SELECTION_ID,
                 options=[
                     {"label": tag, "value": tag} for tag in OSM_TAGS_MAPPING.keys()
                 ],
@@ -287,7 +287,7 @@ def layout(job_id: str):
                                         html.I(className="bi bi-eraser me-1"),
                                         "Remove selected",
                                     ],
-                                    id=REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID,
+                                    id=REMOVE_BUTTON_STREET_SELECTION_ID,
                                     color="danger",
                                     disabled=not is_active,
                                 ),
@@ -296,7 +296,7 @@ def layout(job_id: str):
                                         html.I(className="bi bi-diagram-3 me-1"),
                                         "Keep largest",
                                     ],
-                                    id=LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID,
+                                    id=LARGEST_BUTTON_STREET_SELECTION_ID,
                                     color="primary",
                                     disabled=not is_active or sel.keep_largest_applied,
                                 ),
@@ -337,6 +337,7 @@ def layout(job_id: str):
                 ),
                 id=REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID,
                 className="overflow-auto border rounded",
+                # style needed: dynamic max-height from variable, no Bootstrap equivalent
                 style={"max-height": _REMOVED_LIST_MAX_HEIGHT},
             ),
             dbc.Button(
@@ -391,7 +392,7 @@ def layout(job_id: str):
                         ]
                     ),
                 ],
-                id=RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID,
+                id=RESET_CONFIRM_MODAL_STREET_SELECTION_ID,
                 is_open=False,
                 backdrop="static",
                 keyboard=False,
@@ -539,7 +540,7 @@ def poll_street_processing_status(n_intervals, job_id):
     ),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
-    [Input(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks")],
+    [Input(REMOVE_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
         State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
         State(JOB_ID_STORE_SHARED_ID, "data"),
@@ -579,7 +580,7 @@ def remove_selected(
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
-    [Input(LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks")],
+    [Input(LARGEST_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [State(JOB_ID_STORE_SHARED_ID, "data")],
     prevent_initial_call=True,
 )
@@ -608,7 +609,7 @@ def keep_largest_subnetwork(
 
 @callback(
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
-    Output(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
+    Output(TAGS_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
     Output(
         REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
     ),
@@ -639,7 +640,7 @@ def reset_edits(
 
 
 @callback(
-    Output(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
+    Output(TAGS_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
     Input(TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     Input(TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     prevent_initial_call=True,
@@ -658,13 +659,11 @@ def tags_select_all_none(
 
 
 @callback(
-    Output(
-        RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID, "is_open", allow_duplicate=True
-    ),
+    Output(RESET_CONFIRM_MODAL_STREET_SELECTION_ID, "is_open", allow_duplicate=True),
     Input(RESET_ROADS_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     Input(CANCEL_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
-    State(RESET_CONFIRM_MODAL_MODAL_STREET_SELECTION_ID, "is_open"),
+    State(RESET_CONFIRM_MODAL_STREET_SELECTION_ID, "is_open"),
     prevent_initial_call=True,
 )
 def toggle_reset_modal(
@@ -689,8 +688,8 @@ def toggle_reset_modal(
 
 @callback(
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout", allow_duplicate=True),
-    Input(REMOVE_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
-    Input(LARGEST_BUTTON_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(REMOVE_BUTTON_STREET_SELECTION_ID, "n_clicks"),
+    Input(LARGEST_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
     prevent_initial_call=True,
@@ -713,7 +712,7 @@ def clear_selections(
     Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
-    Input(TAGS_DROPDOWN_DROPDOWN_STREET_SELECTION_ID, "value"),
+    Input(TAGS_DROPDOWN_STREET_SELECTION_ID, "value"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )

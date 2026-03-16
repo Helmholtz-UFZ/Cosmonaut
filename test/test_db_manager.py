@@ -1,10 +1,7 @@
 """Test the db_manager class."""
 
-import os
-import sys
-
-# Add the parent directory to the path to import the db_manager
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.db_manager import DataBaseManager
 
 TEST_JOB_DATA = {
     "job_id": "job12345678",
@@ -23,24 +20,17 @@ TEST_JOB_DATA = {
 
 def test_db_manager():
     """Test the db_manager class."""
-    # Need to import here to assure that the .env is set up before import
-    from cosmonaut_app.db_manager import DataBaseManager
-
     DataBaseManager.add_entry(TEST_JOB_DATA)
     assert DataBaseManager.check_existence(TEST_JOB_DATA["job_id"])
 
 
 def test_if_test_job_exists():
     """Test if the test job exists in the database."""
-    from cosmonaut_app.db_manager import DataBaseManager
-
     assert DataBaseManager.check_existence(TEST_JOB_DATA["job_id"])
 
 
 def test_cosmonaut_job_pydantic_save_load():
     """Test CosmonautJob with Pydantic model save and load."""
-    from cosmonaut_app.cosmonaut_job import CosmonautJob
-
     # Create new job with defaults only
     job = CosmonautJob()
     job.save()

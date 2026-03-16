@@ -20,6 +20,8 @@ from cosmonaut_app.doc_pages_config import (
 )
 from cosmonaut_app.screenshot_generator import ScreenshotGenerator
 
+log = logging.getLogger(__name__)
+
 INTRO_TEMPLATE = """# COSMONAUT Documentation
 
 ### COSmic ray based soil MOisture Prediction NAvigation and UTility Tool
@@ -107,7 +109,7 @@ class DocumentationGenerator:
         self.user_workflow_pages = USER_WORKFLOW_PAGES
         self.admin_pages = ADMIN_PAGES
         self.excluded_pages = EXCLUDED_PAGES
-        logging.info("Documentation generator initialized", extra={"tag": "frontend"})
+        log.info("Documentation generator initialized")
 
     def extract_docstring(self, module_name: str) -> tuple[str, str]:
         """Extract docstring from a page module by parsing the file.
@@ -130,9 +132,7 @@ class DocumentationGenerator:
         docstring = ast.get_docstring(tree)
 
         if not docstring:
-            logging.warning(
-                f"No docstring found in {module_name}.py", extra={"tag": "frontend"}
-            )
+            log.warning(f"No docstring found in {module_name}.py")
             return module_name, f"*Documentation pending for {module_name} page.*"
 
         # Use regex to identify sections at line beginnings only
@@ -192,7 +192,7 @@ class DocumentationGenerator:
             # Add screenshot image with max-width styling
             workflow += (
                 f'<img src="/assets/docs/screenshots/{module_name}.png" '
-                f'alt="{page_title}" style="max-width: 100%; height: auto;" />\n\n'
+                f'alt="{page_title}" class="mw-100" />\n\n'
             )
 
             # Add specific next step name
@@ -223,7 +223,7 @@ class DocumentationGenerator:
             # Add screenshot image with max-width styling
             admin += (
                 f'<img src="/assets/docs/screenshots/{module_name}.png" '
-                f'alt="{page_title}" style="max-width: 100%; height: auto;" />\n\n'
+                f'alt="{page_title}" class="mw-100" />\n\n'
             )
 
         admin += "---\n\n"
@@ -235,7 +235,7 @@ class DocumentationGenerator:
         Returns:
             str: Complete markdown documentation
         """
-        logging.info("Generating documentation", extra={"tag": "frontend"})
+        log.info("Generating documentation")
 
         # Generate all sections
         intro = self.generate_introduction_section()
@@ -245,7 +245,7 @@ class DocumentationGenerator:
         # Combine all sections with footer
         full_doc = intro + workflow + admin + FOOTER_TEMPLATE + "\n"
 
-        logging.info("Documentation generated successfully", extra={"tag": "frontend"})
+        log.info("Documentation generated successfully")
         return full_doc
 
     def write_static_documentation(self, output_file: Path, version_file: Path) -> None:
@@ -288,7 +288,7 @@ def generate_documentation(job_id: str, headless: bool = True) -> int:
     """
     setup_logging()
 
-    logging.info(f"Generating documentation for COSMONAUT version {get_app_version()}")
+    log.info(f"Generating documentation for COSMONAUT version {get_app_version()}")
 
     # Define output paths
     docs_dir = Path(__file__).parent / "assets" / "docs"
@@ -299,8 +299,8 @@ def generate_documentation(job_id: str, headless: bool = True) -> int:
     screenshots_dir.mkdir(exist_ok=True)
 
     # Generate screenshots
-    logging.info("Starting screenshot generation...")
-    logging.info(f"Using job_id: {job_id}")
+    log.info("Starting screenshot generation...")
+    log.info(f"Using job_id: {job_id}")
 
     screenshot_gen = ScreenshotGenerator(job_id, headless=headless)
 
@@ -308,25 +308,25 @@ def generate_documentation(job_id: str, headless: bool = True) -> int:
         # Generate all screenshots (fails on first error)
         # Assumes dev server already running at localhost:8080
         screenshot_gen.generate_all_screenshots(screenshots_dir)
-        logging.info("All screenshots captured successfully")
+        log.info("All screenshots captured successfully")
 
         # Generate static documentation
-        logging.info("Generating static documentation files...")
+        log.info("Generating static documentation files...")
         doc_gen = DocumentationGenerator()
         doc_gen.write_static_documentation(
             output_file=docs_dir / "documentation.md",
             version_file=docs_dir / "doc_version.txt",
         )
 
-        logging.info("Documentation generated successfully!")
-        logging.info(f"  - Markdown: {docs_dir / 'documentation.md'}")
-        logging.info(f"  - Version: {docs_dir / 'doc_version.txt'}")
-        logging.info(f"  - Screenshots: {screenshots_dir}/ (9 files)")
+        log.info("Documentation generated successfully!")
+        log.info(f"  - Markdown: {docs_dir / 'documentation.md'}")
+        log.info(f"  - Version: {docs_dir / 'doc_version.txt'}")
+        log.info(f"  - Screenshots: {screenshots_dir}/ (9 files)")
 
         return 0
 
     except Exception as e:
-        logging.error(f"Documentation generation failed: {e}")
+        log.error(f"Documentation generation failed: {e}")
         return 1
 
 

@@ -23,24 +23,26 @@ from cosmonaut_app.constants.html_ids import (
 )
 from test.help_functions_tests import check_all_errors
 
+log = logging.getLogger(__name__)
+
 
 def test_submit_and_kill_task(page, dash_app, celery_worker):
     """Test submitting a test task, killing it, and verifying it appears in revoked tasks."""
     # Navigate to worker management page
     page.goto(f"http://localhost:{FLASK_PORT}/worker-management")
 
-    logging.info("Visited worker management page, waiting for loading to complete")
+    log.info("Visited worker management page, waiting for loading to complete")
     # Wait for initial loading to complete (page load triggers refresh)
     expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
         timeout=5000
     )
 
-    logging.info("Loading complete, submitting test task")
+    log.info("Loading complete, submitting test task")
 
     # Submit test task
     page.locator(f"#{TEST_TASK_BUTTON_WORKER_MANAGEMENT_ID}").click()
 
-    logging.info("Submitted test task, waiting for it to appear in active tasks table")
+    log.info("Submitted test task, waiting for it to appear in active tasks table")
 
     # Wait for the submit callback chain to complete (submit -> overlay -> refresh -> close overlay).
     # We only assert the overlay is gone, not that it appeared — the open/close cycle

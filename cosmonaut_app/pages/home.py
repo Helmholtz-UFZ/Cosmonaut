@@ -38,6 +38,8 @@ from cosmonaut_app.layout import (
     page_container_fullscreen_layout,
 )
 
+log = logging.getLogger(__name__)
+
 register_page(
     __name__,
     path="/",
@@ -84,7 +86,7 @@ def start_job(n_clicks):
     if not n_clicks:
         raise PreventUpdate
 
-    logging.info("Initializing new CosmonautJob")
+    log.info("Initializing new CosmonautJob")
     job = CosmonautJob()
 
     return build_url_step("user_info", job.model.job_id)

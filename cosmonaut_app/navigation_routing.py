@@ -8,6 +8,8 @@ import qrcode
 
 from cosmonaut_app.config import get_download_url
 
+log = logging.getLogger(__name__)
+
 
 class RouteCreator:
     """Creates a GPX file and QR code from GeoJSON route data."""
@@ -21,43 +23,35 @@ class RouteCreator:
         self.qr_code_filename = "qr_code.png"
         self.qr_code_path = os.path.join(self.working_dir, self.qr_code_filename)
         self.qr_code_url = get_download_url(self.job_id, self.gpx_filename)
-        logging.debug("RouteCreator initialized.")
+        log.debug("RouteCreator initialized.")
 
     def create_gpx(self):
-        """Creates debuga GPX file and QR code based on the provided GeoJSON data."""
-        logging.info("Starting GPX creation process.")
+        """Creates a GPX file and QR code based on the provided GeoJSON data."""
+        log.info("Starting GPX creation process.")
         if os.path.exists(self.qr_code_path):
-            logging.debug("GPX file already exists. Skipping creation.")
+            log.debug("GPX file already exists. Skipping creation.")
             return self.qr_code_url
-        logging.debug("Creating GPX file.")
+        log.debug("Creating GPX file.")
         with open(self.geojson_path, encoding="utf-8") as f:
             geojson_data = json.load(f)
 
-        # TODO place holder for actual conversion logic
-
-        # Save the GPX file
-        with open(self.gpx_path, "w", encoding="utf-8") as file:
-            json.dump(geojson_data, file)
-        logging.debug(f"Fake GPX file created at {self.gpx_path}.")
-        self._create_qr_code()
-
-        return self.qr_code_url
-        # TODO END place holder for actual conversion logic
         gpx = gpxpy.gpx.GPX()
 
         # Add metadata to GPX
         metadata = geojson_data["metadata"]
-        gpx.name = metadata.get("Optimization Objective", "Route")
-        gpx.description = f"Distance: {metadata.get('Distance', 'N/A')} km, Benefit: {metadata.get('Benefit', 'N/A')}"  # noqa
+        gpx.name = metadata["Optimization Objective"]
+        gpx.description = (
+            f"Distance: {metadata['Distance']} km, Benefit: {metadata['Benefit']}"
+        )
 
         # Create a single track
         gpx_track = gpxpy.gpx.GPXTrack()
 
         # Handle segments based on features like "slow"
-        slow_segments = metadata.get("slow", [])
+        slow_segments = metadata["slow"]
         current_segment = gpxpy.gpx.GPXTrackSegment()
 
-        for i, feature in enumerate(self.geojson_data["features"]):
+        for i, feature in enumerate(geojson_data["features"]):
             for coordinate in feature["geometry"]["coordinates"]:
                 point = gpxpy.gpx.GPXTrackPoint(coordinate[1], coordinate[0])
                 current_segment.points.append(point)
@@ -76,14 +70,14 @@ class RouteCreator:
         # Save the GPX file
         with open(self.gpx_path, "w", encoding="utf-8") as file:
             file.write(gpx.to_xml())
-        logging.debug(f"GPX file created at {self.gpx_path}.")
+        log.debug(f"GPX file created at {self.gpx_path}.")
         self._create_qr_code()
 
         return self.qr_code_url
 
     def _create_qr_code(self):
         """Creates a QR code image based on the provided URL."""
-        logging.debug("Creating QR code.")
+        log.debug("Creating QR code.")
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -101,4 +95,4 @@ class RouteCreator:
         with open(self.qr_code_path, "wb") as file:
             file.write(img_io.getvalue())
 
-        logging.debug(f"QR code created and saved at {self.qr_code_path}.")
+        log.debug(f"QR code created and saved at {self.qr_code_path}.")

@@ -242,5 +242,14 @@ class BackgroundJobManager:
             return None, True
 
 
-# Module-level singleton — instantiated on first import.
-background_job_manager = BackgroundJobManager()
+_background_job_manager = None
+
+
+def __getattr__(name):
+    """Lazy singleton — BackgroundJobManager is created on first access, not on import."""
+    global _background_job_manager
+    if name == "background_job_manager":
+        if _background_job_manager is None:
+            _background_job_manager = BackgroundJobManager()
+        return _background_job_manager
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

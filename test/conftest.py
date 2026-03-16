@@ -28,6 +28,7 @@ from cosmonaut_app.config import (
     REDIS_PORT,
 )
 from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.object_storage_manager import setup_remote, create_bucket
 
 
 def create_logger():
@@ -78,12 +79,12 @@ def pytest_configure(config):
         # Check PostgreSQL connectivity
         try:
             result = DataBaseManager.check_existence("test")
-            logging.info(f"Database connection successful. Test query result: {result}")
+            log.info(f"Database connection successful. Test query result: {result}")
         except OperationalError as e:
-            logging.error(f"Database connection failed with OperationalError: {e}")
+            log.error(f"Database connection failed with OperationalError: {e}")
             pytest.exit(f"PostgreSQL not available: {e}")
         except Exception as e:
-            logging.error(f"Unexpected error during database check: {e}")
+            log.error(f"Unexpected error during database check: {e}")
             pytest.exit(f"Database check failed: {e}")
 
         # Check Redis connectivity
@@ -101,30 +102,28 @@ def pytest_configure(config):
                 socket_connect_timeout=5,
             )
             redis_client.ping()
-            logging.info("Redis connection successful")
+            log.info("Redis connection successful")
         except (redis.ConnectionError, redis.TimeoutError) as e:
-            logging.error(f"Redis connection failed: {e}")
+            log.error(f"Redis connection failed: {e}")
             pytest.exit(f"Redis not available: {e}")
         except Exception as e:
-            logging.error(f"Unexpected error during Redis check: {e}")
+            log.error(f"Unexpected error during Redis check: {e}")
             pytest.exit(f"Redis check failed: {e}")
 
         # Check rclone can connect to MinIO via S3 protocol
         try:
-            from cosmonaut_app.object_storage_manager import setup_remote, create_bucket
-
             # Configure rclone remote
             setup_remote()
 
             # Try to create/verify bucket (this uses S3 protocol)
             create_bucket()
 
-            logging.info("rclone MinIO connectivity check passed")
+            log.info("rclone MinIO connectivity check passed")
         except Exception as e:
-            logging.error(f"rclone MinIO connectivity check failed: {e}")
+            log.error(f"rclone MinIO connectivity check failed: {e}")
             pytest.exit(f"MinIO S3 connectivity check failed: {e}")
     else:
-        logging.info("Skipping service health checks (--no-services flag set)")
+        log.info("Skipping service health checks (--no-services flag set)")
 
 
 @pytest.fixture
@@ -246,7 +245,7 @@ def dash_app(request):
     if skip_services:
         pytest.skip("Skipping dash_app fixture (--no-services flag set)")
 
-    # Import app here to avoid module-level import triggering service connections
+    # Inline import: app.py boots Dash, MinIO, Beat scheduler — must stay deferred
     from cosmonaut_app.app import app
 
     port = int(FLASK_PORT)

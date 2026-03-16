@@ -9,6 +9,8 @@ import dash_leaflet as dl
 from cosmonaut_app.config import TILESERVER_URL
 from cosmonaut_app.constants.general import MEMBERSHIP_TIF
 
+log = logging.getLogger(__name__)
+
 
 def create_tile_layer_component(
     job_id, tiff_filename, colormap_params, opacity=0.9, bounds=None
@@ -24,7 +26,7 @@ def create_tile_layer_component(
         f"{TILESERVER_URL}/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}@1x"
         f"?url={encoded_url}&maxzoom=15{colormap_params}"
     )
-    logging.info(f"Using map URL: {tile_url}")
+    log.info(f"Using map URL: {tile_url}")
 
     return dl.TileLayer(
         url=tile_url, opacity=opacity, crossOrigin="anonymous", bounds=bounds

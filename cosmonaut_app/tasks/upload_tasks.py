@@ -2,8 +2,7 @@
 
 This module contains Celery tasks for processing membership uploads.
 After the web process validates and saves the membership file, these tasks
-handle the heavy operations: OSM road network download, street selection,
-and initial graph construction.
+handle the heavy operations: OSM road network download and CRS projection.
 """
 
 import logging

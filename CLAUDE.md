@@ -23,6 +23,10 @@ one project often apply symmetrically to the other.
 
 ## Critical Anti-Patterns
 
+All conventions in this project are **norms, not hard rules**. A convention may be
+violated when there is a good reason — but the violation **must** be accompanied by a
+comment explaining why. Unexplained violations are the actual problem.
+
 **DO NOT:**
 
 1. **No defensive programming**

@@ -185,6 +185,7 @@ class OsmDownloader:
         used = set()
         counter = 1
         for feat in features:
+            # GeoJSON features may lack a top-level id; OSM props like osmid/id are also optional
             fid = feat.get("id")
             if isinstance(fid, int) and fid not in used:
                 used.add(fid)
@@ -210,6 +211,7 @@ class OsmDownloader:
         """Normalize oneway values for the routing engine."""
         for feat in features:
             props = feat["properties"]
+            # oneway is optional in OSM — absent means no oneway restriction
             ow = props.get("oneway")
             if isinstance(ow, bool):
                 props["oneway"] = "yes" if ow else "no"

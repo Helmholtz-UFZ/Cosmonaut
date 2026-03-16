@@ -59,7 +59,7 @@ def process_routing_job(self, job_id):
     3. Call sensor_routing_pipeline() function
     4. Flush handlers and switch logging back to web config
     """
-    logging.info(f"Starting routing job task for job_id={job_id}")
+    log.info(f"Starting routing job task for job_id={job_id}")
 
     # Load job to get work directory
     job = CosmonautJob(job_id=job_id)
@@ -73,16 +73,16 @@ def process_routing_job(self, job_id):
     )
 
     try:
-        logging.info(f"Starting routing job computation for job_id={job_id}")
+        log.info(f"Starting routing job computation for job_id={job_id}")
 
         sensor_routing_pipeline(job.working_dir)
 
         # Post-processing: Create GPX and QR code
-        logging.info(f"Starting post-processing for job {job.model.job_id}")
+        log.info(f"Starting post-processing for job {job.model.job_id}")
         qr_code_url = job.create_qr_code_routing()
-        logging.info(f"Post-processing complete. QR code: {qr_code_url}")
+        log.info(f"Post-processing complete. QR code: {qr_code_url}")
 
-        logging.info(f"Job {job_id} completed successfully")
+        log.info(f"Job {job_id} completed successfully")
 
         # Flush all handlers before switching back
         flush_all_handlers()
@@ -90,7 +90,7 @@ def process_routing_job(self, job_id):
         # Switch logging back to web config
         dictConfig(get_logger_config_worker())
 
-        logging.info(f"Routing job {job_id} finished")
+        log.info(f"Routing job {job_id} finished")
 
         job.model.status = JOB_STATUS_COMPLETED
         job.save()
@@ -98,7 +98,7 @@ def process_routing_job(self, job_id):
         _notify_user(job, JOB_STATUS_COMPLETED)
 
     except Exception as e:
-        logging.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
+        log.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
 
         # Flush handlers and switch back even on error
         flush_all_handlers()

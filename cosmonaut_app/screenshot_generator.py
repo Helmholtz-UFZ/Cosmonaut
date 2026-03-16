@@ -10,6 +10,8 @@ from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 # Import page lists from doc_pages_config (single source of truth)
 from cosmonaut_app.doc_pages_config import USER_WORKFLOW_PAGES, ADMIN_PAGES
 
+log = logging.getLogger(__name__)
+
 # Page URL configuration: maps module_name -> (url_path, wait_seconds)
 # This is the ONLY place where URLs and timing need to be configured
 PAGE_CONFIG = {
@@ -105,9 +107,8 @@ class ScreenshotGenerator:
         self.context: BrowserContext | None = None
         self.page: Page | None = None
 
-        logging.info(
+        log.info(
             f"Screenshot generator initialized for job_id: {job_id}",
-            extra={"tag": "frontend"},
         )
 
     def setup_browser(self) -> Page:
@@ -116,7 +117,7 @@ class ScreenshotGenerator:
         Returns:
             Playwright Page object ready for navigation
         """
-        logging.info("Starting Playwright browser", extra={"tag": "frontend"})
+        log.info("Starting Playwright browser")
 
         self.playwright = sync_playwright().start()
 
@@ -130,10 +131,9 @@ class ScreenshotGenerator:
 
         self.page = self.context.new_page()
 
-        logging.info(
+        log.info(
             f"Browser launched (headless={self.headless}, "
             f"viewport={self.viewport_size[0]}x{self.viewport_size[1]})",
-            extra={"tag": "frontend"},
         )
 
         return self.page
@@ -176,13 +176,11 @@ class ScreenshotGenerator:
                 )
             """)
 
-            logging.info("Page fully loaded", extra={"tag": "frontend"})
+            log.info("Page fully loaded")
             return True
 
         except Exception as e:
-            logging.warning(
-                f"Page load timeout or error: {e}", extra={"tag": "frontend"}
-            )
+            log.warning(f"Page load timeout or error: {e}")
             return False
 
     def capture_screenshot(
@@ -211,9 +209,8 @@ class ScreenshotGenerator:
         full_url = f"{self.base_url}{page_url}"
         output_path = output_dir / f"{page_name}.png"
 
-        logging.info(
+        log.info(
             f"Capturing screenshot: {page_name} from {full_url}",
-            extra={"tag": "frontend"},
         )
 
         try:
@@ -234,7 +231,7 @@ class ScreenshotGenerator:
                     f"and update PAGE_CONFIG in screenshot_generator.py accordingly.\n"
                     f"{'='*80}\n"
                 )
-                logging.error(error_msg, extra={"tag": "frontend"})
+                log.error(error_msg)
                 raise ValueError(error_msg)
 
             # Check for other HTTP errors (5xx, etc.)
@@ -242,7 +239,7 @@ class ScreenshotGenerator:
                 error_msg = (
                     f"HTTP {response.status} error for page '{page_name}' at {full_url}"
                 )
-                logging.error(error_msg, extra={"tag": "frontend"})
+                log.error(error_msg)
                 raise ValueError(error_msg)
 
             # Initial wait for page-specific content
@@ -254,15 +251,14 @@ class ScreenshotGenerator:
             # Capture screenshot
             self.page.screenshot(path=str(output_path), full_page=False)
 
-            logging.info(f"Screenshot saved: {output_path}", extra={"tag": "frontend"})
+            log.info(f"Screenshot saved: {output_path}")
 
         except ValueError:
             # Re-raise ValueError (404 errors) without wrapping
             raise
         except Exception as e:
-            logging.error(
+            log.error(
                 f"Failed to capture screenshot for {page_name}: {e}",
-                extra={"tag": "frontend"},
             )
             raise
 
@@ -278,23 +274,18 @@ class ScreenshotGenerator:
         # Setup browser
         self.setup_browser()
 
-        logging.info(
+        log.info(
             f"Generating screenshots for {len(PAGES_TO_SCREENSHOT)} pages",
-            extra={"tag": "frontend"},
         )
 
         try:
             for wait_time, page_name, page_url, page_title in PAGES_TO_SCREENSHOT:
                 self.capture_screenshot(page_name, page_url, output_dir, wait_time)
 
-            logging.info(
-                "All screenshots captured successfully", extra={"tag": "frontend"}
-            )
+            log.info("All screenshots captured successfully")
 
         except Exception as e:
-            logging.error(
-                f"Screenshot generation failed: {e}", extra={"tag": "frontend"}
-            )
+            log.error(f"Screenshot generation failed: {e}")
             raise
         finally:
             # Always cleanup even if screenshots fail
@@ -302,7 +293,7 @@ class ScreenshotGenerator:
 
     def cleanup(self) -> None:
         """Close browser and cleanup resources."""
-        logging.info("Cleaning up Playwright resources", extra={"tag": "frontend"})
+        log.info("Cleaning up Playwright resources")
 
         if self.page:
             self.page.close()
@@ -313,4 +304,4 @@ class ScreenshotGenerator:
         if self.playwright:
             self.playwright.stop()
 
-        logging.info("Cleanup complete", extra={"tag": "frontend"})
+        log.info("Cleanup complete")

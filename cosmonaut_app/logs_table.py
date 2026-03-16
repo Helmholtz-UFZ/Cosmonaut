@@ -13,7 +13,7 @@ def level_badge(level: str) -> dbc.Badge:
         "ERROR": "danger",
         "CRITICAL": "dark",
     }
-    return dbc.Badge(level, color=color_map.get(level, "primary"), className="me-1")
+    return dbc.Badge(level, color=color_map[level], className="me-1")
 
 
 def format_logs_list(logs: list, show_pid: bool = True) -> html.Ul:
@@ -42,7 +42,7 @@ def format_logs_list(logs: list, show_pid: bool = True) -> html.Ul:
         items.append(
             html.Li(
                 content,
-                style={"whiteSpace": "pre-wrap"},
+                style={"whiteSpace": "pre-wrap"},  # no Bootstrap class for pre-wrap
             )
         )
 

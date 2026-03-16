@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 from cosmonaut_app.config import env_vars, getenv
 
+log = logging.getLogger(__name__)
+
 
 def _test_single_env_file(env_filename: str, logger, additional_lines: List[str]):
     """Test a single .env file.
@@ -37,7 +39,7 @@ def _test_single_env_file(env_filename: str, logger, additional_lines: List[str]
     # Test each environment variable
     for env_var in env_vars:
         logger.info(f"Testing {env_var} from {env_filename}")
-        logging.info(getenv(env_var))
+        log.info(getenv(env_var))
 
 
 def test_all_env_files(logger):

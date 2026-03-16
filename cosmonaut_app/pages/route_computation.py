@@ -90,10 +90,10 @@ from cosmonaut_app.constants.html_ids import (
     RESTART_BUTTON_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     STATUS_BADGE_ROUTE_COMPUTATION_ID,
-    WORKER_STATUS_TEXT_ROUTE_COMPUTATION_ID,
-    TASK_STATUS_TEXT_ROUTE_COMPUTATION_ID,
-    WORKER_NAME_TEXT_ROUTE_COMPUTATION_ID,
-    LOG_VIEWER_ROUTE_COMPUTATION_ID,
+    WORKER_STATUS_SPAN_ROUTE_COMPUTATION_ID,
+    TASK_STATUS_SPAN_ROUTE_COMPUTATION_ID,
+    WORKER_NAME_SPAN_ROUTE_COMPUTATION_ID,
+    LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID,
     STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID,
     UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID,
 )
@@ -103,6 +103,8 @@ from cosmonaut_app.layout import (
     progress_footer,
     build_url_step,
 )
+
+log = logging.getLogger(__name__)
 
 register_page(
     __name__,
@@ -140,9 +142,9 @@ def layout(job_id):
         dbc.CardBody(
             html.Pre(
                 log_content,
-                id=LOG_VIEWER_ROUTE_COMPUTATION_ID,
+                id=LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID,
                 className="mb-0",
-                style={"whiteSpace": "pre-wrap"},
+                style={"whiteSpace": "pre-wrap"},  # no Bootstrap class for pre-wrap
             ),
             className="p-3",
         ),
@@ -243,8 +245,7 @@ def create_control_buttons(status):
         ],
         id=START_BUTTON_ROUTE_COMPUTATION_ID,
         color="success",
-        className="me-2",
-        style={"display": "inline-block" if status == JOB_STATUS_PENDING else "none"},
+        className=f"me-2 {'d-inline-block' if status == JOB_STATUS_PENDING else 'd-none'}",
     )
 
     # Cancel button (initially visible for RUNNING)
@@ -255,8 +256,7 @@ def create_control_buttons(status):
         ],
         id=CANCEL_BUTTON_ROUTE_COMPUTATION_ID,
         color="danger",
-        className="me-2",
-        style={"display": "inline-block" if status == JOB_STATUS_RUNNING else "none"},
+        className=f"me-2 {'d-inline-block' if status == JOB_STATUS_RUNNING else 'd-none'}",
     )
 
     # Restart button (initially visible for COMPLETED or FAILED)
@@ -267,12 +267,9 @@ def create_control_buttons(status):
         ],
         id=RESTART_BUTTON_ROUTE_COMPUTATION_ID,
         color="warning",
-        className="me-2",
-        style={
-            "display": "inline-block"
-            if status in [JOB_STATUS_COMPLETED, JOB_STATUS_FAILED]
-            else "none"
-        },
+        className=(
+            f"me-2 {'d-inline-block' if status in [JOB_STATUS_COMPLETED, JOB_STATUS_FAILED] else 'd-none'}"
+        ),
     )
 
     buttons = [start_button, cancel_button, restart_button]
@@ -293,7 +290,7 @@ def create_celery_info_card():
                                     html.Strong("Worker Availability: "),
                                     html.Span(
                                         "Checking...",
-                                        id=WORKER_STATUS_TEXT_ROUTE_COMPUTATION_ID,
+                                        id=WORKER_STATUS_SPAN_ROUTE_COMPUTATION_ID,
                                     ),
                                 ]
                             ),
@@ -302,7 +299,7 @@ def create_celery_info_card():
                                     html.Strong("Task Celery Status: "),
                                     html.Span(
                                         "N/A",
-                                        id=TASK_STATUS_TEXT_ROUTE_COMPUTATION_ID,
+                                        id=TASK_STATUS_SPAN_ROUTE_COMPUTATION_ID,
                                     ),
                                 ]
                             ),
@@ -311,7 +308,7 @@ def create_celery_info_card():
                                     html.Strong("Worker Name: "),
                                     html.Span(
                                         "N/A",
-                                        id=WORKER_NAME_TEXT_ROUTE_COMPUTATION_ID,
+                                        id=WORKER_NAME_SPAN_ROUTE_COMPUTATION_ID,
                                     ),
                                 ]
                             ),
@@ -337,7 +334,7 @@ def create_celery_info_card():
         "interval_disabled": Output(
             STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID, "disabled"
         ),
-        "log_content": Output(LOG_VIEWER_ROUTE_COMPUTATION_ID, "children"),
+        "log_content": Output(LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID, "children"),
         "next_disabled": Output(NEXT_BUTTON_ROUTE_COMPUTATION_ID, "disabled"),
         "start_style": Output(START_BUTTON_ROUTE_COMPUTATION_ID, "style"),
         "cancel_style": Output(CANCEL_BUTTON_ROUTE_COMPUTATION_ID, "style"),
@@ -385,9 +382,9 @@ def update_status(n_intervals, trigger, job_id):
 
 
 @callback(
-    Output(WORKER_STATUS_TEXT_ROUTE_COMPUTATION_ID, "children"),
-    Output(TASK_STATUS_TEXT_ROUTE_COMPUTATION_ID, "children"),
-    Output(WORKER_NAME_TEXT_ROUTE_COMPUTATION_ID, "children"),
+    Output(WORKER_STATUS_SPAN_ROUTE_COMPUTATION_ID, "children"),
+    Output(TASK_STATUS_SPAN_ROUTE_COMPUTATION_ID, "children"),
+    Output(WORKER_NAME_SPAN_ROUTE_COMPUTATION_ID, "children"),
     Input(UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, "data"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=False,
@@ -398,7 +395,7 @@ def update_celery_info(trigger, job_id):
     Only executes on initial load (n_intervals == 0) or when trigger == "celery_check".
     """
     # Only execute on initial load or explicit celery check trigger
-    logging.info(f"Updating Celery info for job {job_id}")
+    log.info(f"Updating Celery info for job {job_id}")
 
     job = CosmonautJob(job_id=job_id)
 
@@ -435,7 +432,7 @@ def update_celery_info(trigger, job_id):
                     worker_name_text = task["worker"]
                     break
 
-    logging.info(
+    log.info(
         f"Celery info for job {job_id}: Worker Status: {worker_status_text}, "
         f"Task Status: {task_status_text}, Worker Name: {worker_name_text}"
     )
@@ -487,16 +484,16 @@ def start_computation(n_clicks, job_id):
 
     # Prevent duplicate submission if already running
     if current_status == JOB_STATUS_RUNNING:
-        logging.warning(f"Job {job_id} already running, ignoring start request")
+        log.warning(f"Job {job_id} already running, ignoring start request")
         return False, no_update, no_update
 
     # Only start if PENDING or FAILED
     if current_status not in [JOB_STATUS_PENDING, JOB_STATUS_FAILED]:
-        logging.warning(f"Cannot start job {job_id} with status {current_status}")
+        log.warning(f"Cannot start job {job_id} with status {current_status}")
         return False, no_update, no_update
 
     job.submit()
-    logging.info(f"Started computation for job {job_id}")
+    log.info(f"Started computation for job {job_id}")
 
     # Close modal, enable interval, trigger celery check
     return False, False, "celery_check"
@@ -523,17 +520,17 @@ def cancel_computation(n_clicks, job_id):
 
     # Only cancel if actually running
     if current_status != JOB_STATUS_RUNNING:
-        logging.warning(
+        log.warning(
             f"Job {job_id} not running (status: {current_status}), ignoring cancel request"
         )
         return False, no_update
 
     if not job.model.celery_task_id:
-        logging.warning(f"Job {job_id} has no celery_task_id to cancel")
+        log.warning(f"Job {job_id} has no celery_task_id to cancel")
         return False, no_update
 
     background_job_manager.revoke_job(job.model.celery_task_id, terminate=True)
-    logging.info(f"Cancelled computation for job {job_id}")
+    log.info(f"Cancelled computation for job {job_id}")
 
     # Close modal, trigger status check
     return False, "status_check"
@@ -561,7 +558,7 @@ def restart_computation(n_clicks, job_id):
 
     # If currently running, don't restart (user should cancel first)
     if current_status == JOB_STATUS_RUNNING:
-        logging.warning(f"Job {job_id} is running, cannot restart. Cancel first.")
+        log.warning(f"Job {job_id} is running, cannot restart. Cancel first.")
         return False, no_update, no_update
 
     # Cancel existing task if it exists (safety check)
@@ -571,7 +568,7 @@ def restart_computation(n_clicks, job_id):
     job.reset()
     job.submit()
 
-    logging.info(f"Restarted computation for job {job_id}")
+    log.info(f"Restarted computation for job {job_id}")
 
     # Close modal, enable interval, trigger celery check
     return False, False, "celery_check"

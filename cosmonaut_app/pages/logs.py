@@ -257,6 +257,7 @@ def layout():
                     id=LOG_OUTPUT_DIV_LOGS_ID,
                     children="Live mode active — waiting for first refresh...",
                     className="border p-3 bg-light rounded",
+                    # style needed: no Bootstrap class for 70vh max-height
                     style={"maxHeight": "70vh", "overflowY": "auto"},
                 ),
             ],

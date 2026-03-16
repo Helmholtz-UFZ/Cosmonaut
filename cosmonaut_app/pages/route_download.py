@@ -73,6 +73,8 @@ from cosmonaut_app.layout import (
     progress_footer,
 )
 
+log = logging.getLogger(__name__)
+
 register_page(
     __name__,
     path_template="/job/<job_id>/route-download",
@@ -85,7 +87,7 @@ register_page(
 
 def layout(job_id):
     CosmonautJob(job_id=job_id)
-    logging.info(f"Route & Download layout called with job_id={job_id}")
+    log.info(f"Route & Download layout called with job_id={job_id}")
 
     # Construct full download URL
     download_url = get_download_url(job_id)

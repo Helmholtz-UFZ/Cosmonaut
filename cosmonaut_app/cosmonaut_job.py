@@ -50,6 +50,8 @@ from cosmonaut_app.object_storage_manager import (
 )
 from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel
 
+log = logging.getLogger(__name__)
+
 
 def _transform_csv(input_file, epsg_input, epsg_output):
     """Transform coordinates in a CSV file from one CRS to another.
@@ -62,10 +64,10 @@ def _transform_csv(input_file, epsg_input, epsg_output):
     Returns:
         DataFrame with transformed coordinates.
     """
-    logging.info(f"Starting transformation of CSV file: {input_file}")
+    log.info(f"Starting transformation of CSV file: {input_file}")
 
     if not input_file.endswith((".csv", ".txt")):
-        logging.error("Input file must be a CSV or TXT file.")
+        log.error("Input file must be a CSV or TXT file.")
         raise ValueError("Input file must be a CSV file.")
 
     with open(input_file, "r") as csvfile:
@@ -150,12 +152,12 @@ class CosmonautJob:
     def __init__(self, job_id=None):
         """Init class by id or make a new one."""
         if job_id is not None:
-            logging.info(f"Load job with id {job_id}")
+            log.info(f"Load job with id {job_id}")
             if not DataBaseManager.check_existence(job_id):
                 raise JobNotFound(job_id)
             self.load(job_id)
         else:
-            logging.info("Create new job")
+            log.info("Create new job")
             self._blank_job()
 
     def load(self, job_id):
@@ -202,7 +204,7 @@ class CosmonautJob:
 
     def save(self):
         """Save the job to the database and sync files to object storage."""
-        logging.info(f"Save job {self.model.job_id}")
+        log.info(f"Save job {self.model.job_id}")
 
         # Get all data from model
         data = self.model.model_dump(mode="json")
@@ -234,7 +236,7 @@ class CosmonautJob:
         Extracts only the fields from the Config model and writes them to
         a JSON file in the working directory.
         """
-        logging.info(f"Dumping routing parameters for job {self.model.job_id}")
+        log.info(f"Dumping routing parameters for job {self.model.job_id}")
 
         # Get all data from model
         data = self.model.model_dump(mode="json")
@@ -252,7 +254,7 @@ class CosmonautJob:
         with open(parameters_file, "w") as f:
             json.dump(config_data, f, indent=2)
 
-        logging.debug(f"Routing parameters written to {parameters_file}")
+        log.debug(f"Routing parameters written to {parameters_file}")
 
     def _calculate_map_position_from_bounds(self, bounds):
         """
@@ -293,7 +295,7 @@ class CosmonautJob:
 
     def delete(self):
         """Delete the job from the database and object storage."""
-        logging.debug(f"delete job {self.model.job_id}")
+        log.debug(f"delete job {self.model.job_id}")
         # delete job from database
         DataBaseManager.delete_job(self.model.job_id)
         # delete files from object storage
@@ -301,14 +303,14 @@ class CosmonautJob:
 
     def upload_membership(self, file_name, content, epsg_input):
         """Upload and process membership CSV file."""
-        logging.info(f"Upload membership file {file_name} with EPSG {epsg_input}")
+        log.info(f"Upload membership file {file_name} with EPSG {epsg_input}")
 
         # Remove previous membership file if it exists
         previous_file = self.model.membership_upload["file_name"]
         previous_file_path = os.path.join(self.working_dir, previous_file)
         if os.path.exists(previous_file_path):
             os.remove(previous_file_path)
-            logging.info(f"Removed previous membership file {previous_file}")
+            log.info(f"Removed previous membership file {previous_file}")
 
         _content_type, content_string = content.split(",", 1)
         decoded = base64.b64decode(content_string)
@@ -323,14 +325,14 @@ class CosmonautJob:
         try:
             membership_df = parse_membership_file(file_path)
         except Exception as e:
-            logging.info(f"Membership file validation failed: {e}")
+            log.info(f"Membership file validation failed: {e}")
             os.remove(file_path)
             raise FileValidationError(str(e))
 
         try:
             classification_data = _transform_csv(file_path, epsg_input, 4326)
         except ValueError as e:
-            logging.info(f"Error transforming CSV file: {e}")
+            log.info(f"Error transforming CSV file: {e}")
             os.remove(file_path)
             raise FileValidationError(str(e))
 
@@ -350,12 +352,12 @@ class CosmonautJob:
             "bounds": bounds,
         }
         self.save()
-        logging.debug("Finished uploading and processing membership file")
+        log.debug("Finished uploading and processing membership file")
         return file_path, bounds, membership_df
 
     def upload_predictor(self, content):
         """Upload and validate predictor CSV file."""
-        logging.info(f"Upload predictor file for job {self.model.job_id}")
+        log.info(f"Upload predictor file for job {self.model.job_id}")
 
         _content_type, content_string = content.split(",", 1)
         decoded = base64.b64decode(content_string)
@@ -370,7 +372,7 @@ class CosmonautJob:
         try:
             parse_predictor_file(file_path)
         except Exception as e:
-            logging.info(f"Predictor file validation failed: {e}")
+            log.info(f"Predictor file validation failed: {e}")
             os.remove(file_path)
             raise FileValidationError(str(e))
 
@@ -379,7 +381,7 @@ class CosmonautJob:
         try:
             validate_predictor_membership_consistency(file_path, membership_path)
         except Exception as e:
-            logging.info(f"Predictor-membership consistency check failed: {e}")
+            log.info(f"Predictor-membership consistency check failed: {e}")
             os.remove(file_path)
             raise FileValidationError(str(e))
 
@@ -388,22 +390,22 @@ class CosmonautJob:
             "len": len(decoded),
         }
         self.save()
-        logging.debug("Finished uploading and processing predictor file")
+        log.debug("Finished uploading and processing predictor file")
 
     def delete_predictor(self):
         """Delete predictor file and reset predictor_upload."""
-        logging.info(f"Deleting predictor data for job {self.model.job_id}")
+        log.info(f"Deleting predictor data for job {self.model.job_id}")
 
         file_path = os.path.join(self.working_dir, PREDICTOR_FILENAME)
         if os.path.exists(file_path):
             os.remove(file_path)
-            logging.debug(f"Deleted predictor file: {file_path}")
+            log.debug(f"Deleted predictor file: {file_path}")
 
         default_predictor_upload = JobModel.model_fields["predictor_upload"].default
         self.model.predictor_upload = default_predictor_upload.copy()
         self.save()
 
-        logging.info(f"Predictor data deleted for job {self.model.job_id}")
+        log.info(f"Predictor data deleted for job {self.model.job_id}")
 
     def get_street_processing_status(self):
         """Get street processing status, syncing from Celery if task is running.
@@ -429,15 +431,13 @@ class CosmonautJob:
 
     def delete_membership(self):
         """Delete membership file, predictor, OSM files, plots and reset state."""
-        logging.info(f"Deleting membership data for job {self.model.job_id}")
+        log.info(f"Deleting membership data for job {self.model.job_id}")
 
         # Revoke running upload task if street_processing holds a task ID
         sp = self.model.membership_upload["street_processing"]
         if sp not in ("PENDING", "COMPLETED", "FAILED"):
             background_job_manager.revoke_job(sp, terminate=True)
-            logging.info(
-                f"Revoked upload processing task {sp} for job {self.model.job_id}"
-            )
+            log.info(f"Revoked upload processing task {sp} for job {self.model.job_id}")
 
         # Cascade: delete predictor first
         self.delete_predictor()
@@ -446,7 +446,7 @@ class CosmonautJob:
         membership_path = os.path.join(self.working_dir, MEMBERSHIP_FILENAME)
         if os.path.exists(membership_path):
             os.remove(membership_path)
-            logging.debug(f"Deleted membership file: {membership_path}")
+            log.debug(f"Deleted membership file: {membership_path}")
 
         # Delete OSM data files
         for osm_name in [
@@ -458,16 +458,16 @@ class CosmonautJob:
             osm_path = os.path.join(self.working_dir, osm_name)
             if os.path.exists(osm_path):
                 os.remove(osm_path)
-                logging.debug(f"Deleted OSM file: {osm_path}")
+                log.debug(f"Deleted OSM file: {osm_path}")
 
         # Delete plot files (new name + legacy names)
         for plot_file in glob.glob(os.path.join(self.working_dir, "*_output*.tif")):
             os.remove(plot_file)
-            logging.debug(f"Deleted plot file: {plot_file}")
+            log.debug(f"Deleted plot file: {plot_file}")
         membership_tif = os.path.join(self.working_dir, "membership.tif")
         if os.path.exists(membership_tif):
             os.remove(membership_tif)
-            logging.debug(f"Deleted plot file: {membership_tif}")
+            log.debug(f"Deleted plot file: {membership_tif}")
 
         # Reset membership_upload to default values
         default_membership_upload = JobModel.model_fields["membership_upload"].default
@@ -475,10 +475,10 @@ class CosmonautJob:
 
         self.save()
 
-        logging.info(f"Membership data deleted for job {self.model.job_id}")
+        log.info(f"Membership data deleted for job {self.model.job_id}")
 
     def create_qr_code_routing(self):
-        logging.info(f"Creating QR code for routing job {self.model.job_id}")
+        log.info(f"Creating QR code for routing job {self.model.job_id}")
         geojson_path = os.path.join(self.working_dir, ROUTE_FILENAME)
 
         route_creator = RouteCreator(
@@ -506,7 +506,7 @@ class CosmonautJob:
 
     def submit(self):
         """Submit the job to background worker."""
-        logging.info(f"Submitting job {self.model.job_id} to background worker")
+        log.info(f"Submitting job {self.model.job_id} to background worker")
         try:
             # Mark as submitted and set status to RUNNING
             self.model.submitted = True
@@ -516,20 +516,18 @@ class CosmonautJob:
             celery_task_id, failed = background_job_manager.submit_routing_job(self)
 
             if failed:
-                logging.error(f"Failed to submit job {self.model.job_id}")
+                log.error(f"Failed to submit job {self.model.job_id}")
                 return None
 
             # Store task ID and save again
             self.model.celery_task_id = celery_task_id
             self.save()
 
-            logging.info(
-                f"Job {self.model.job_id} submitted with task_id={celery_task_id}"
-            )
+            log.info(f"Job {self.model.job_id} submitted with task_id={celery_task_id}")
             return celery_task_id
 
         except Exception as e:
-            logging.error(f"Failed to submit job {self.model.job_id}: {str(e)}")
+            log.error(f"Failed to submit job {self.model.job_id}: {str(e)}")
             raise
 
     def get_status(self) -> str:
@@ -553,11 +551,11 @@ class CosmonautJob:
             if celery_status == "SUCCESS":
                 self.model.status = JOB_STATUS_COMPLETED
                 self.save()
-                logging.info(f"Synced job {self.model.job_id} status to COMPLETED")
+                log.info(f"Synced job {self.model.job_id} status to COMPLETED")
             elif celery_status in ["FAILURE", "REVOKED"]:
                 self.model.status = JOB_STATUS_FAILED
                 self.save()
-                logging.warning(
+                log.warning(
                     f"Synced job {self.model.job_id} status to FAILED "
                     f"(Celery: {celery_status})"
                 )
@@ -579,7 +577,7 @@ class CosmonautJob:
         Returns:
             str: Job logs as a string
         """
-        logging.info(f"Retrieving logs for job {self.model.job_id}")
+        log.info(f"Retrieving logs for job {self.model.job_id}")
         log_file_path = os.path.join(self.working_dir, LOG_FILE_NAME)
         if os.path.exists(log_file_path):
             with open(log_file_path, "r") as f:
@@ -602,11 +600,11 @@ class CosmonautJob:
         - Clears celery_task_id and submitted flag
         - Saves changes to database and object storage
         """
-        logging.info(f"Resetting job {self.model.job_id}")
+        log.info(f"Resetting job {self.model.job_id}")
 
         # If job is currently running, cancel the Celery task first
         if self.model.status == JOB_STATUS_RUNNING and self.model.celery_task_id:
-            logging.info(f"Cancelling running task {self.model.celery_task_id}")
+            log.info(f"Cancelling running task {self.model.celery_task_id}")
             background_job_manager.revoke_job(self.model.celery_task_id, terminate=True)
 
         # Delete known output files
@@ -615,7 +613,7 @@ class CosmonautJob:
             fpath = os.path.join(self.working_dir, fname)
             if os.path.isfile(fpath):
                 os.unlink(fpath)
-                logging.debug(f"Deleted output file: {fpath}")
+                log.debug(f"Deleted output file: {fpath}")
 
         # Reset job state
         self.model.status = JOB_STATUS_PENDING
@@ -625,4 +623,4 @@ class CosmonautJob:
         # Save changes
         self.save()
 
-        logging.info(f"Job {self.model.job_id} reset to PENDING")
+        log.info(f"Job {self.model.job_id} reset to PENDING")

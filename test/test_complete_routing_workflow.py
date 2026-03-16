@@ -32,10 +32,12 @@ from cosmonaut_app.constants.html_ids import (
     PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     START_BUTTON_ROUTE_COMPUTATION_ID,
     START_JOB_BUTTON_HOME_ID,
-    USER_INFO_EMAIL_INPUT_USER_INFO_ID,
-    USER_INFO_NEXT_BUTTON_USER_INFO_ID,
+    EMAIL_INPUT_USER_INFO_ID,
+    NEXT_BUTTON_USER_INFO_ID,
 )
 from cosmonaut_app.db_manager import DataBaseManager
+
+log = logging.getLogger(__name__)
 
 
 def test_complete_routing_workflow(
@@ -53,12 +55,10 @@ def test_complete_routing_workflow(
     check_all_errors(page)
 
     # === User Info Page ===
-    email_input = page.locator(f"#{USER_INFO_EMAIL_INPUT_USER_INFO_ID}")
+    email_input = page.locator(f"#{EMAIL_INPUT_USER_INFO_ID}")
     email_input.fill("test@ufz.de")
-    expect(page.locator(f"#{USER_INFO_NEXT_BUTTON_USER_INFO_ID}")).to_be_enabled(
-        timeout=5000
-    )
-    page.locator(f"#{USER_INFO_NEXT_BUTTON_USER_INFO_ID}").click()
+    expect(page.locator(f"#{NEXT_BUTTON_USER_INFO_ID}")).to_be_enabled(timeout=5000)
+    page.locator(f"#{NEXT_BUTTON_USER_INFO_ID}").click()
     check_all_errors(page)
 
     # === Data Upload Page ===
@@ -148,7 +148,7 @@ def test_complete_routing_workflow(
         zip_data = io.BytesIO(response.data)
         with zipfile.ZipFile(zip_data) as zf:
             zip_file_names = sorted(zf.namelist())
-            logging.info(f"Zip file names: {zip_file_names}")
+            log.info(f"Zip file names: {zip_file_names}")
 
             # Verify zip matches work_dir on disk
             work_dir = os.path.join("cosmonaut_app/work_dir", job_id)
@@ -157,7 +157,7 @@ def test_complete_routing_workflow(
                 for root, _, files in os.walk(work_dir)
                 for f in files
             )
-            logging.info(f"Disk file names: {disk_file_names}")
+            log.info(f"Disk file names: {disk_file_names}")
             assert zip_file_names == disk_file_names, (
                 f"Zip contents don't match work_dir.\n"
                 f"Zip: {zip_file_names}\nDisk: {disk_file_names}"

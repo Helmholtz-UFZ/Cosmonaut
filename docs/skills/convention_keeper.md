@@ -18,6 +18,17 @@ Ask the user before starting:
 
 ## 2. Step-by-step Checklist
 
+### Step 0: Find dead and unreachable code
+
+Before checking conventions, scan for dead code. Use an Explore subagent to find:
+- Unreachable code after `return` statements
+- Unused functions/classes/variables (defined but never referenced)
+- Commented-out code blocks
+- TODO placeholders that bypass real logic (e.g. early returns before actual
+  implementation)
+
+Report findings and fix with user approval before proceeding to convention checks.
+
 ### Step 1: Read all convention documents
 
 Load the current rules by reading each convention doc:

@@ -100,7 +100,7 @@ card_body = form_factory.process_layout(form_factory.layout)
 
 
 def layout(job_id):
-    logging.info(f"Routing params layout called with job_id={job_id}")
+    log.info(f"Routing params layout called with job_id={job_id}")
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
@@ -178,7 +178,7 @@ def update_routing_params(**inputs):
         raise PreventUpdate
 
     valid, output_dict = form_factory.validate_callback(inputs)
-    logging.info(f"Routing params callback triggered by {triggered_ids}, valid={valid}")
+    log.info(f"Routing params callback triggered by {triggered_ids}, valid={valid}")
     if valid and NEXT_BUTTON_ROUTING_PARAMS_ID in triggered_ids:
         for key, value in inputs.items():
             if hasattr(job.model, key):

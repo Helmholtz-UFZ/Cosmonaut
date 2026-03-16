@@ -19,6 +19,8 @@ from cosmonaut_app.constants.html_ids import (
 )
 from cosmonaut_app.email_service import send_mail
 
+log = logging.getLogger(__name__)
+
 
 class JobNotFound(Exception):
     """Custom exception for when a job is not found."""
@@ -36,6 +38,15 @@ class WrongCeleryTaskId(Exception):
         """Add task_id as attribute and format error message."""
         self.task_id = task_id
         super().__init__(f"Invalid Celery task ID format: '{task_id}'")
+
+
+class ObjectStorageError(Exception):
+    """Exception raised for errors in the ObjectStorageManager class."""
+
+    def __init__(self, message="An error occurred while managing object storage."):
+        """Initialize the ObjectStorageError with a message."""
+        self.message = message
+        super().__init__(message)
 
 
 class FileValidationError(Exception):
@@ -90,6 +101,10 @@ error_responds_dict = {
         "File Validation Error",
         "The uploaded file could not be validated. Please check the file format and try again.",
     ),
+    ObjectStorageError: (
+        "Object Storage Error",
+        "An error occurred while accessing object storage. Please try again later.",
+    ),
 }
 error_modal = dbc.Modal(
     [
@@ -132,7 +147,7 @@ def _truncate_data(data):
 
 def handle_error(error):
     """Handle the error and return a formatted message."""
-    logging.debug(f"Error: {error}", extra={"tag": "frontend"})
+    log.debug(f"Error: {error}")
 
     # Define here the error that should be reported
     if not isinstance(
@@ -147,12 +162,12 @@ def handle_error(error):
             f"Input info: {json.dumps(truncated_triggered)}"
         )
         try:
-            logging.debug(f"Send mail to {MAINTAINER_EMAIL}")
+            log.debug(f"Send mail to {MAINTAINER_EMAIL}")
             send_mail(MAINTAINER_EMAIL, email_subject, email_body)
         except Exception:  # noqa - must not let email failure crash the error handler
-            logging.error("Failed to send maintainer error email", exc_info=True)
-        logging.error(f"Unhandled error: {error}")
-        logging.error(email_body)
+            log.error("Failed to send maintainer error email", exc_info=True)
+        log.error(f"Unhandled error: {error}")
+        log.error(email_body)
 
     error_type = type(error) if type(error) in error_responds_dict else Exception
     error_title = error_responds_dict[error_type][0]
@@ -170,8 +185,8 @@ def handle_error(error):
         # If the error does not have a task_id attribute, we just use the message as is.
         pass
 
-    logging.error(f"{error_title}: {error_message}")
-    logging.error(f"Error details: {traceback.format_exc()}")
+    log.error(f"{error_title}: {error_message}")
+    log.error(f"Error details: {traceback.format_exc()}")
     set_props(ERROR_MODAL_SHARED_ID, {"is_open": True})
     set_props(ERROR_MODAL_TITLE_SHARED_ID, {"children": error_title})
     set_props(ERROR_MODAL_MESSAGE_SHARED_ID, {"children": error_message})

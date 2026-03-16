@@ -18,7 +18,7 @@ from cosmonaut_app.constants.html_ids import (
     CURRENT_JOB_ID_MAP_STORE_ID,
     LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
-    MAP_INIT_INTERVAL_ID,
+    MAP_INIT_INTERVAL_SHARED_ID,
     MEMBERSHIP_TILE_LAYER_MAP_ID,
     NAVBAR_COLLAPSE_NAV_SHARED_ID,
     NAVBAR_TOGGLER_NAV_SHARED_ID,
@@ -34,6 +34,8 @@ from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.error_handling import JobNotFound, error_modal
 from cosmonaut_app.map_utils import get_tile_url
 from cosmonaut_app.street_selector import StreetSelector
+
+log = logging.getLogger(__name__)
 
 # ============================================================================
 # Helper Functions and Constants
@@ -166,7 +168,7 @@ def create_reset_banner(job_id: str, status: str) -> dbc.Alert:
                 className="align-items-center justify-content-between",
             )
         ],
-        color=color_map.get(status, "secondary"),
+        color=color_map[status],
         className="mb-3",
     )
 
@@ -344,7 +346,7 @@ def build_global_map():
         id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
         center=[51.70, 11.20],
         zoom=10,
-        style={"height": "100%"},
+        className="h-100",
     )
 
 
@@ -354,7 +356,9 @@ def app_layout():
         className="d-flex flex-column min-vh-100 bg-light",
         children=[
             dcc.Store(id=CURRENT_JOB_ID_MAP_STORE_ID, data=None),
-            dcc.Interval(id=MAP_INIT_INTERVAL_ID, interval=1000, max_intervals=1),
+            dcc.Interval(
+                id=MAP_INIT_INTERVAL_SHARED_ID, interval=1000, max_intervals=1
+            ),
             loading_overlay,
             error_modal,
             create_navbar(),
@@ -515,25 +519,6 @@ def steps_tab(name_step):
     )
 
 
-# Initial Sidebar for the Job Start
-side_bar = dbc.Col(
-    [
-        html.Div(),
-    ],
-    style={
-        "width": "500px",
-        "backgroundColor": "#DBE2EF",
-        "border": "2px solid #dee2e6",
-        # "position": "fixed",
-        # "top": "10vh",
-        # "right": 0,
-        # "bottom": 0,
-        "padding": "2rem 1rem",
-        "overflow": "auto",
-    },
-    className="responsive-sidebar",
-)
-
 # ============================================================================
 # Callback Registration Functions
 # ============================================================================
@@ -595,16 +580,16 @@ def register_reset_callbacks(app):
         if len(path_parts) >= 3 and path_parts[1] == "job":
             job_id = path_parts[2]
         else:
-            logging.error(f"Could not extract job_id from pathname: {pathname}")
+            log.error(f"Could not extract job_id from pathname: {pathname}")
             raise PreventUpdate
 
         # Load job and reset
         try:
             job = CosmonautJob(job_id=job_id)
             job.reset()
-            logging.info(f"Job {job_id} reset successfully from {pathname}")
+            log.info(f"Job {job_id} reset successfully from {pathname}")
         except Exception as e:
-            logging.error(f"Failed to reset job {job_id}: {e}")
+            log.error(f"Failed to reset job {job_id}: {e}")
             raise PreventUpdate
 
         # Return same pathname to reload page with new state
@@ -631,18 +616,18 @@ def register_map_callbacks(app):
         prevent_initial_call=True,
     )
     def update_map_layers(pathname, prev_job_id):
-        logging.info(f"Map update triggered by {ctx.triggered_id}: {pathname}")
+        log.info(f"Map update triggered by {ctx.triggered_id}: {pathname}")
         empty_fc = {"type": "FeatureCollection", "features": []}
         parts = pathname.split("/")
         if len(parts) < 3 or parts[1] != "job":
-            logging.info("Not a job page, returning empty")
+            log.info("Not a job page, returning empty")
             return no_update, "", empty_fc, empty_fc, None
 
         job_id = parts[2]
         try:
             job = CosmonautJob(job_id=job_id)
         except JobNotFound:
-            logging.info(f"Job {job_id} not found, returning empty")
+            log.info(f"Job {job_id} not found, returning empty")
             return no_update, "", empty_fc, empty_fc, None
 
         # Only recentre the map when the job changes
@@ -670,7 +655,7 @@ def register_map_callbacks(app):
                     "properties": {},
                 }
             ]
-        logging.info(
+        log.info(
             f"Returning tile_url={tile_url!r}, streets={len(streets_fc['features'])}, route_pts={len(raw_positions)}"
         )
         return viewport, tile_url, streets_fc, route_fc, job_id

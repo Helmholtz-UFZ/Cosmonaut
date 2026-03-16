@@ -163,7 +163,6 @@ class ExcludeSubmodulesFilter(logging.Filter):
 
     def filter(self, record):
         """Filter."""
-        # print("NAME:", record.name, "MODULE:", record.module)
         excluded_packages = [
             "matplotlib",
             "PIL",
