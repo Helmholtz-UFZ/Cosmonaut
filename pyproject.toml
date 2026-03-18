@@ -2,7 +2,6 @@
 name = "cosmonaut"
 version = "0.0.44"
 description = "Navigation route optimization for cosmic ray neutron sensor surveys"
-readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "celery[redis]>=5.4.0,<6",
