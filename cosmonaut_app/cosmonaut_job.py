@@ -479,12 +479,13 @@ class CosmonautJob:
 
     def create_qr_code_routing(self):
         log.info(f"Creating QR code for routing job {self.model.job_id}")
-        geojson_path = os.path.join(self.working_dir, ROUTE_FILENAME)
+        solution_path = os.path.join(self.working_dir, ROUTE_FILENAME)
 
         route_creator = RouteCreator(
-            geojson_path=geojson_path,
+            solution_path=solution_path,
             working_dir=self.working_dir,
             job_id=self.model.job_id,
+            source_epsg=self.model.epsg,
         )
         qr_code_url = route_creator.create_gpx()
         self.save()

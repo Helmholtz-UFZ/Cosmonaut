@@ -1,10 +1,11 @@
 import io
-import os
-import logging
 import json
+import logging
+import os
 
 import gpxpy
 import qrcode
+from pyproj import Transformer
 
 from cosmonaut_app.config import get_download_url
 
@@ -12,12 +13,13 @@ log = logging.getLogger(__name__)
 
 
 class RouteCreator:
-    """Creates a GPX file and QR code from GeoJSON route data."""
+    """Creates a GPX file and QR code from sensor-routing solution data."""
 
-    def __init__(self, geojson_path, working_dir, job_id):
-        self.geojson_path = geojson_path
+    def __init__(self, solution_path, working_dir, job_id, source_epsg):
+        self.solution_path = solution_path
         self.working_dir = working_dir
         self.job_id = job_id
+        self.source_epsg = source_epsg
         self.gpx_filename = "route.gpx"
         self.gpx_path = os.path.join(self.working_dir, self.gpx_filename)
         self.qr_code_filename = "qr_code.png"
@@ -26,48 +28,30 @@ class RouteCreator:
         log.debug("RouteCreator initialized.")
 
     def create_gpx(self):
-        """Creates a GPX file and QR code based on the provided GeoJSON data."""
+        """Creates a GPX file and QR code from the routing solution."""
         log.info("Starting GPX creation process.")
         if os.path.exists(self.qr_code_path):
             log.debug("GPX file already exists. Skipping creation.")
             return self.qr_code_url
         log.debug("Creating GPX file.")
-        with open(self.geojson_path, encoding="utf-8") as f:
-            geojson_data = json.load(f)
+        with open(self.solution_path, encoding="utf-8") as f:
+            solution = json.load(f)
 
         gpx = gpxpy.gpx.GPX()
+        gpx.name = f"Route ({solution['Optimization Objective']})"
+        gpx.description = f"Distance: {solution['Distance']:.2f} km"
 
-        # Add metadata to GPX
-        metadata = geojson_data["metadata"]
-        gpx.name = metadata["Optimization Objective"]
-        gpx.description = (
-            f"Distance: {metadata['Distance']} km, Benefit: {metadata['Benefit']}"
-        )
-
-        # Create a single track
         gpx_track = gpxpy.gpx.GPXTrack()
+        segment = gpxpy.gpx.GPXTrackSegment()
 
-        # Handle segments based on features like "slow"
-        slow_segments = metadata["slow"]
-        current_segment = gpxpy.gpx.GPXTrackSegment()
+        transformer = Transformer.from_crs(self.source_epsg, 4326, always_xy=True)
+        for x, y in solution["Path"]:
+            lon, lat = transformer.transform(x, y)
+            segment.points.append(gpxpy.gpx.GPXTrackPoint(lat, lon))
 
-        for i, feature in enumerate(geojson_data["features"]):
-            for coordinate in feature["geometry"]["coordinates"]:
-                point = gpxpy.gpx.GPXTrackPoint(coordinate[1], coordinate[0])
-                current_segment.points.append(point)
-
-            # Check if the current segment should end
-            if any(start <= i <= end for start, end in slow_segments):
-                gpx_track.segments.append(current_segment)
-                current_segment = gpxpy.gpx.GPXTrackSegment()
-
-        # Append the last segment
-        if current_segment.points:
-            gpx_track.segments.append(current_segment)
-
+        gpx_track.segments.append(segment)
         gpx.tracks.append(gpx_track)
 
-        # Save the GPX file
         with open(self.gpx_path, "w", encoding="utf-8") as file:
             file.write(gpx.to_xml())
         log.debug(f"GPX file created at {self.gpx_path}.")

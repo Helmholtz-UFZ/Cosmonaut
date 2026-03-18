@@ -19,7 +19,7 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import callback, html, no_update, register_page
 from dash.exceptions import PreventUpdate
-from dash.dash_table import DataTable
+import dash_ag_grid as dag
 from dash.dependencies import Input, Output, State
 from celery.result import AsyncResult
 
@@ -64,60 +64,50 @@ register_page(
 
 
 def create_task_datatable(table_id, columns, selectable=False):
-    """Create a consistently styled DataTable.
+    """Create a consistently styled AgGrid for task display.
 
     Args:
         table_id: HTML ID for the table
-        columns: List of column names
+        columns: List of column dicts with "id" and "name" keys
         selectable: Whether to enable row selection
 
     Returns:
-        DataTable: Configured DataTable component
+        dag.AgGrid: Configured AgGrid component
     """
     column_defs = []
     for col in columns:
-        col_def = {"name": col.replace("_", " ").title(), "id": col}
-        # Monospace font for task_id column
-        if col == "task_id":
-            col_def["presentation"] = "markdown"
+        col_def = {"field": col["id"], "headerName": col["name"]}
+        if col["id"] == "task_id":
+            col_def["cellStyle"] = {"fontFamily": "monospace", "fontSize": "12px"}
         column_defs.append(col_def)
 
-    # style needed: Dash DataTable uses its own style_* API, not className
-    table_style = {
-        "cell": {"padding": "8px"},
-        "header": {
-            "backgroundColor": "rgb(230, 230, 230)",
-            "fontWeight": "bold",
-            "padding": "8px",
-        },
-        "data": {
-            "whiteSpace": "normal",
-            "height": "auto",
-        },
+    grid_options = {
+        "pagination": True,
+        "paginationPageSize": 10,
     }
 
-    row_selectable = "single" if selectable else False
+    if selectable:
+        grid_options["rowSelection"] = {"mode": "singleRow"}
 
-    return DataTable(
+    return dag.AgGrid(
         id=table_id,
-        columns=column_defs,
-        data=[],
-        page_size=10,
-        style_cell=table_style["cell"],
-        style_header=table_style["header"],
-        style_data=table_style["data"],
-        style_data_conditional=[
-            {
-                "if": {"column_id": "task_id"},
-                "fontFamily": "monospace",
-                "fontSize": "12px",
-            },
-            {
-                "if": {"row_index": "odd"},
-                "backgroundColor": "rgb(248, 248, 248)",
-            },
-        ],
-        row_selectable=row_selectable,
+        columnDefs=column_defs,
+        rowData=[],
+        defaultColDef={
+            "cellStyle": {"textAlign": "left", "padding": "8px"},
+            "sortable": True,
+            "resizable": True,
+        },
+        dashGridOptions=grid_options,
+        getRowStyle={
+            "styleConditions": [
+                {
+                    "condition": "params.node.rowIndex % 2 !== 0",
+                    "style": {"backgroundColor": "#f8f9fa"},
+                },
+            ],
+        },
+        columnSize="responsiveSizeToFit",
     )
 
 
@@ -137,7 +127,7 @@ def create_task_section(
     Args:
         title: Section title
         description: Section description
-        table_id: ID for the DataTable
+        table_id: ID for the AgGrid table
         columns: List of column names
         button_id: Optional button ID
         button_label: Optional button label
@@ -295,7 +285,7 @@ def format_scheduled_tasks(scheduled_tasks):
 
 
 def format_revoked_tasks(revoked_list: list, job_manager: BackgroundJobManager):
-    """Format revoked tasks for DataTable display with enrichment from result backend.
+    """Format revoked tasks for AgGrid display with enrichment from result backend.
 
     Args:
         revoked_list: List of revoked task IDs (strings)
@@ -436,7 +426,14 @@ def layout():
         title="Active Tasks",
         description="Currently running tasks on workers",
         table_id=ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID,
-        columns=["task_id", "task_name", "worker", "start_time", "duration", "job_id"],
+        columns=[
+            {"id": "task_id", "name": "Task ID"},
+            {"id": "task_name", "name": "Task Name"},
+            {"id": "worker", "name": "Worker"},
+            {"id": "start_time", "name": "Start Time"},
+            {"id": "duration", "name": "Duration"},
+            {"id": "job_id", "name": "Job ID"},
+        ],
         button_id=WORKER_KILL_BTN_WORKER_MANAGEMENT_ID,
         button_label="Kill Selected Task",
         selectable=True,
@@ -449,7 +446,12 @@ def layout():
         title="Reserved Tasks",
         description="Tasks claimed by workers but not yet started",
         table_id=RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID,
-        columns=["task_id", "task_name", "queue", "worker"],
+        columns=[
+            {"id": "task_id", "name": "Task ID"},
+            {"id": "task_name", "name": "Task Name"},
+            {"id": "queue", "name": "Queue"},
+            {"id": "worker", "name": "Worker"},
+        ],
         selectable=True,
     )
 
@@ -458,7 +460,12 @@ def layout():
         title="Scheduled Tasks",
         description="Tasks scheduled for future execution",
         table_id=SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID,
-        columns=["task_id", "task_name", "eta", "queue"],
+        columns=[
+            {"id": "task_id", "name": "Task ID"},
+            {"id": "task_name", "name": "Task Name"},
+            {"id": "eta", "name": "ETA"},
+            {"id": "queue", "name": "Queue"},
+        ],
         button_id=WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID,
         button_label="Cancel Selected Task",
         selectable=True,
@@ -469,7 +476,11 @@ def layout():
         title="Revoked Tasks",
         description="Cancelled or killed tasks",
         table_id=REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID,
-        columns=["task_id", "task_name", "status"],
+        columns=[
+            {"id": "task_id", "name": "Task ID"},
+            {"id": "task_name", "name": "Task Name"},
+            {"id": "status", "name": "Status"},
+        ],
         selectable=False,
     )
 
@@ -514,23 +525,23 @@ dash.clientside_callback(
 
 @callback(
     output={
-        "active_data": Output(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
-        "reserved_data": Output(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
-        "scheduled_data": Output(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
-        "revoked_data": Output(REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
+        "active_data": Output(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "rowData"),
+        "reserved_data": Output(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "rowData"),
+        "scheduled_data": Output(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "rowData"),
+        "revoked_data": Output(REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "rowData"),
         "worker_cards": Output(WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID, "children"),
         "last_refresh": Output(
             WORKER_LAST_REFRESH_DIV_WORKER_MANAGEMENT_ID, "children"
         ),
         "loading": Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
         "active_selected": Output(
-            ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"
+            ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"
         ),
         "reserved_selected": Output(
-            RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"
+            RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"
         ),
         "scheduled_selected": Output(
-            SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"
+            SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"
         ),
     },
     inputs={
@@ -579,30 +590,23 @@ def refresh_worker_data(refresh_clicks, dummy_data):
 
 @callback(
     Output(SELECTED_TASK_ID_INPUT_WORKER_MANAGEMENT_ID, "value"),
-    Input(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"),
-    State(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
+    Input(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
 )
-def update_selected_task_id(selected_rows, table_data):
+def update_selected_task_id(selected_rows):
     """Copy task ID from selected row to input field."""
-    if selected_rows and len(selected_rows) > 0 and table_data:
-        row_index = selected_rows[0]
-        if row_index < len(table_data):
-            task_id = table_data[row_index]["task_id"]
-            return task_id
+    if selected_rows:
+        return selected_rows[0]["task_id"]
     return no_update
 
 
 @callback(
     Output(WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID, "disabled"),
-    Input(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"),
-    Input(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"),
+    Input(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
+    Input(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
 )
 def toggle_cancel_button(reserved_selected, scheduled_selected):
     """Enable cancel button when reserved or scheduled task selected."""
-    has_selection = (reserved_selected and len(reserved_selected) > 0) or (
-        scheduled_selected and len(scheduled_selected) > 0
-    )
-    return not has_selection
+    return not (reserved_selected or scheduled_selected)
 
 
 @callback(
@@ -635,29 +639,16 @@ def confirm_kill_task(n_clicks, task_id):
     ),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
     Input(WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID, "n_clicks"),
-    State(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"),
-    State(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
-    State(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selected_rows"),
-    State(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "data"),
+    State(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
+    State(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
     prevent_initial_call=True,
 )
-def confirm_cancel_task(
-    n_clicks, reserved_selected, reserved_data, scheduled_selected, scheduled_data
-):
+def confirm_cancel_task(n_clicks, reserved_selected, scheduled_selected):
     """Cancel the selected task."""
-    # Determine which table has selection
-    if (
-        reserved_selected
-        and reserved_data
-        and len(reserved_data) > reserved_selected[0]
-    ):
-        task = reserved_data[reserved_selected[0]]
-    elif (
-        scheduled_selected
-        and scheduled_data
-        and len(scheduled_data) > scheduled_selected[0]
-    ):
-        task = scheduled_data[scheduled_selected[0]]
+    if reserved_selected:
+        task = reserved_selected[0]
+    elif scheduled_selected:
+        task = scheduled_selected[0]
     else:
         return None, False
 

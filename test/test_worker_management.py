@@ -52,9 +52,11 @@ def test_submit_and_kill_task(page, dash_app, celery_worker):
     )
 
     # Wait for task to appear in active tasks table
-    # The Celery worker may take time to pick up the task, and DataTable cells
+    # The Celery worker may take time to pick up the task, and AgGrid cells
     # render asynchronously after the callback returns with new data.
-    active_task_cell_selector = f"#{ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID} .dash-cell"
+    active_task_cell_selector = (
+        f"#{ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID} .ag-row .ag-cell"
+    )
     first_cell = page.locator(active_task_cell_selector).first
 
     max_attempts = 15  # Total ~30s budget for worker pickup + render

@@ -83,12 +83,9 @@ testing:
     - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
     # Wait for MinIO to be ready
     - "until curl -sf http://minio:9000/minio/health/ready; do echo 'Waiting for MinIO...'; sleep 2; done"
-    # Create MinIO bucket using mc (MinIO client)
-    - "curl https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc"
-    - "chmod +x /usr/local/bin/mc"
-    - "mc alias set myminio http://minio:9000 minioadmin minioadmin"
-    - "mc mb myminio/cosmic-routing || true"
     - "cp env_test .env"
+    # Create MinIO bucket
+    - "source .env && rclone mkdir minio:${OBJECT_STORAGE_BUCKET}"
     - "mkdir -p test/artifacts"
   script:
     # Run all tests in headless mode (default)

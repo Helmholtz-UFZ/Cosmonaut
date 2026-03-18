@@ -25,7 +25,8 @@ import re
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import Input, Output, State, callback, dash_table, html
+import dash_ag_grid as dag
+from dash import Input, Output, State, callback, html
 
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
@@ -62,7 +63,7 @@ dash.register_page(
 
 
 def format_jobs_for_table(jobs_dict):
-    """Format jobs dictionary for DataTable display.
+    """Format jobs dictionary for AgGrid display.
 
     Parameters
     ----------
@@ -73,7 +74,7 @@ def format_jobs_for_table(jobs_dict):
     Returns
     -------
     list
-        List of dicts formatted for DataTable with columns:
+        List of dicts formatted for AgGrid with columns:
         - job_id (markdown link)
         - status (color-coded)
         - start_date (YYYY-MM-DD)
@@ -111,56 +112,49 @@ def format_jobs_for_table(jobs_dict):
 # ============================================================================
 
 
-table = dash_table.DataTable(
+table = dag.AgGrid(
     id=JOBS_TABLE_JOB_MANAGER_ID,
-    columns=[
-        {"id": "job_id", "name": "Job ID", "presentation": "markdown"},
-        {"id": "status", "name": "Status"},
-        {"id": "start_date", "name": "Start Date"},
-        {"id": "submitted", "name": "Submitted"},
+    columnDefs=[
+        {
+            "field": "job_id",
+            "headerName": "Job ID",
+            "cellRenderer": "markdown",
+            "cellStyle": {"textAlign": "left", "fontFamily": "monospace"},
+        },
+        {
+            "field": "status",
+            "headerName": "Status",
+            "cellStyle": {
+                "styleConditions": [
+                    {
+                        "condition": f"params.value === '{JOB_STATUS_COMPLETED}'",
+                        "style": {"backgroundColor": "#3498db"},
+                    },
+                    {
+                        "condition": f"params.value === '{JOB_STATUS_RUNNING}'",
+                        "style": {"backgroundColor": "#2ecc71"},
+                    },
+                    {
+                        "condition": f"params.value === '{JOB_STATUS_FAILED}'",
+                        "style": {"backgroundColor": "#e74c3c"},
+                    },
+                    {
+                        "condition": f"params.value === '{JOB_STATUS_PENDING}'",
+                        "style": {"backgroundColor": "#f39c12"},
+                    },
+                ],
+            },
+        },
+        {"field": "start_date", "headerName": "Start Date"},
+        {"field": "submitted", "headerName": "Submitted"},
     ],
-    data=[],
-    row_selectable="multi",
-    selected_rows=[],
-    style_cell={"textAlign": "center"},
-    cell_selectable=False,
-    style_data_conditional=[
-        {
-            "if": {
-                "column_id": "job_id",
-            },
-            "textAlign": "left",
-            "fontFamily": "monospace",
-        },
-        {
-            "if": {
-                "filter_query": f'{{status}} = "{JOB_STATUS_COMPLETED}"',
-                "column_id": "status",
-            },
-            "backgroundColor": "#3498db",
-        },
-        {
-            "if": {
-                "filter_query": f'{{status}} = "{JOB_STATUS_RUNNING}"',
-                "column_id": "status",
-            },
-            "backgroundColor": "#2ecc71",
-        },
-        {
-            "if": {
-                "filter_query": f'{{status}} = "{JOB_STATUS_FAILED}"',
-                "column_id": "status",
-            },
-            "backgroundColor": "#e74c3c",
-        },
-        {
-            "if": {
-                "filter_query": f'{{status}} = "{JOB_STATUS_PENDING}"',
-                "column_id": "status",
-            },
-            "backgroundColor": "#f39c12",
-        },
-    ],
+    rowData=[],
+    defaultColDef={"cellStyle": {"textAlign": "center"}},
+    dashGridOptions={
+        "rowSelection": {"mode": "multiRow"},
+        "suppressCellFocus": True,
+    },
+    columnSize="responsiveSizeToFit",
 )
 
 
@@ -242,17 +236,16 @@ def layout():
 
 
 @callback(
-    Output(JOBS_TABLE_JOB_MANAGER_ID, "data"),
-    Output(JOBS_TABLE_JOB_MANAGER_ID, "selected_rows"),
+    Output(JOBS_TABLE_JOB_MANAGER_ID, "rowData"),
+    Output(JOBS_TABLE_JOB_MANAGER_ID, "selectedRows"),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
     Input(REFRESH_BUTTON_JOB_MANAGER_ID, "n_clicks"),
     Input(DELETE_BUTTON_JOB_MANAGER_ID, "n_clicks"),
     Input(CLEAN_UP_BUTTON_JOB_MANAGER_ID, "n_clicks"),
-    State(JOBS_TABLE_JOB_MANAGER_ID, "selected_rows"),
-    State(JOBS_TABLE_JOB_MANAGER_ID, "data"),
+    State(JOBS_TABLE_JOB_MANAGER_ID, "selectedRows"),
     prevent_initial_call=True,
 )
-def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows, table_data):
+def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows):
     """Handle job management operations.
 
     This callback handles:
@@ -269,14 +262,12 @@ def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows, tabl
     clean_clicks : int
         Number of times clean up button was clicked
     selected_rows : list
-        Indices of selected rows in table
-    table_data : list
-        Current table data
+        List of selected row dicts from AgGrid
 
     Returns
     -------
     tuple
-        (table_data, selected_rows, loading_overlay_state)
+        (row_data, selected_rows, loading_overlay_state)
     """
     log.info("Job management callback triggered")
 
@@ -291,23 +282,17 @@ def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows, tabl
     if DELETE_BUTTON_JOB_MANAGER_ID in triggered_ids and selected_rows:
         log.info(f"Deleting {len(selected_rows)} selected jobs")
 
-        for row_index in selected_rows:
+        for row in selected_rows:
             # Extract job_id from markdown link format: [job_id](url)
-            job_id_markdown = table_data[row_index]["job_id"]
-            match = re.findall(r"\[(.*?)\]", job_id_markdown)
+            job_id = re.findall(r"\[(.*?)\]", row["job_id"])[0]
+            log.info(f"Deleting job: {job_id}")
 
-            if match:
-                job_id = match[0]
-                log.info(f"Deleting job: {job_id}")
-
-                try:
-                    job = CosmonautJob(job_id=job_id)
-                    job.delete()
-                    log.info(f"Successfully deleted job: {job_id}")
-                except Exception as e:
-                    log.error(f"Failed to delete job {job_id}: {e}")
-            else:
-                log.error(f"Could not extract job_id from: {job_id_markdown}")
+            try:
+                job = CosmonautJob(job_id=job_id)
+                job.delete()
+                log.info(f"Successfully deleted job: {job_id}")
+            except Exception as e:
+                log.error(f"Failed to delete job {job_id}: {e}")
 
     # Handle CLEANUP operation
     elif CLEAN_UP_BUTTON_JOB_MANAGER_ID in triggered_ids:
