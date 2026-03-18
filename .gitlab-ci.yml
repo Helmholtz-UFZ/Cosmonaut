@@ -15,13 +15,8 @@ variables:
   POSTGRES_PORT: "5432"
   POSTGRES_PASSWORD: password
   # MinIO
-  MINIO_ROOT_USER: minioadmin
-  MINIO_ROOT_PASSWORD: minioadmin
-  MINIO_ACCESS_KEY: minioadmin
-  MINIO_SECRET_KEY: minioadmin
-  MINIO_HOST: minio
-  MINIO_PORT: "9000"
-  MINIO_BUCKET: cosmic-routing
+  OBJECT_STORAGE_ACCESS_KEY: minioadmin
+  OBJECT_STORAGE_SECRET_KEY: minioadmin
   # App config
   WEB_WORK_DIR: "./cosmonaut_app/work_dir"
   FLASK_PORT: "8080"
@@ -67,6 +62,9 @@ testing:
     - name: "minio/minio:latest"
       alias: "minio"
       command: ["server", "/data", "--console-address", ":9001"]
+      variables:
+        MINIO_ROOT_USER: "${OBJECT_STORAGE_ACCESS_KEY}"
+        MINIO_ROOT_PASSWORD: "${OBJECT_STORAGE_SECRET_KEY}"
     - name: "redis:latest"
       alias: "redis"
   before_script:
@@ -85,6 +83,7 @@ testing:
     - "until curl -sf http://minio:9000/minio/health/ready; do echo 'Waiting for MinIO...'; sleep 2; done"
     - "cp env_test .env"
     # Create MinIO bucket
+    - "source .env && rclone config create minio s3 provider=Minio access_key_id=${OBJECT_STORAGE_ACCESS_KEY} secret_access_key=${OBJECT_STORAGE_SECRET_KEY} endpoint=${OBJECT_STORAGE_HOST}"
     - "source .env && rclone mkdir minio:${OBJECT_STORAGE_BUCKET}"
     - "mkdir -p test/artifacts"
   script:
