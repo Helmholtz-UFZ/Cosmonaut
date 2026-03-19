@@ -2,7 +2,7 @@
 
 ### COSmic ray based soil MOisture Prediction NAvigation and UTility Tool
 
-*Last updated: 2026-01-14 15:02:58*
+*Last updated: 2026-03-19 10:54:53*
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -68,7 +68,7 @@ From here, you'll proceed through the workflow to provide job information, uploa
 membership data, select streets from OpenStreetMap, configure routing parameters,
 and download your final GPX navigation file for use in the field.
 
-<img src="/assets/docs/screenshots/home.png" alt="Home Page" style="max-width: 100%; height: auto;" />
+<img src="/assets/docs/screenshots/home.png" alt="Home Page" class="mw-100" />
 
 **Next Step**: User Information →
 
@@ -86,51 +86,56 @@ your routing job. Email notifications will be sent when:
 - Any errors occur during processing
 
 The email field includes live validation to ensure proper formatting before you can
-proceed. Currently the email service is not enabled and further your email will be able
-to be accessed by anybody from within the UFZ network. Providing an email is optional
-but recommended for tracking long-running jobs that process in the background.
+proceed. Providing an email is optional but recommended for tracking long-running
+jobs that process in the background.
 
 Once you enter a valid email address (or skip this step by proceeding without one),
 click "Next" to continue to the data upload page where you'll provide your
 membership locations for route planning.
 
-<img src="/assets/docs/screenshots/user_info.png" alt="User Information" style="max-width: 100%; height: auto;" />
+<img src="/assets/docs/screenshots/user_info.png" alt="User Information" class="mw-100" />
 
 **Next Step**: Data Upload →
 
 ### 3. Data Upload
 
-Upload membership data and configure coordinate reference system.
+Upload membership and predictor data and configure coordinate reference system.
 
 
 
 This page is where you upload your cosmic ray neutron sensor measurement locations
 or sampling points that will be used to plan the navigation route. The workflow
-on this page involves two key steps:
+on this page involves three key steps:
 
 1. **Specify EPSG Code**: Enter the coordinate reference system (CRS) of your data.
    The application validates the EPSG code.
 
-2. **Upload CSV File**: Drag and drop or select a CSV/TXT file containing your
+2. **Upload Membership File**: Drag and drop or select a CSV/TXT file containing your
    membership data with coordinate columns. The system will parse your file,
    transform coordinates to WGS84 (EPSG:4326) for map display, and visualize
-   your locations on the interactive map.
+   your locations on the interactive map. After uploading, the road network is
+   downloaded from OpenStreetMap **in the background** — you can continue with
+   the predictor upload while it runs. A status indicator shows the progress.
 
-After uploading, your data is validated and the system automatically queries
-OpenStreetMap for road networks within your data's geographic extent. The buffered
-bounding box of your points determines which street data is retrieved for the next
-step (street selection).
+3. **Upload Predictor File**: Upload a CSV file containing the predictor data
+   (e.g. environmental covariates) used by the routing algorithm. The predictor
+   file must be consistent with the membership file. Hover over the upload
+   button to see the exact format requirements in the tooltip.
 
-**File Requirements:**
+**Membership File Requirements:**
 - Format: CSV or TXT with delimiter-separated values
 - Must include coordinate columns (latitude/longitude or projected coordinates)
 - Coordinates should match the specified EPSG code
 - Files are stored securely in your job's work directory
 
-Once your data is uploaded, validated, and displayed on the map, proceed to the
-street selection page to choose which roads to include in your route.
+**Predictor File Requirements:**
+- Format: CSV with delimiter-separated values
+- Must be consistent with the uploaded membership file
 
-<img src="/assets/docs/screenshots/data_upload.png" alt="Data Upload" style="max-width: 100%; height: auto;" />
+Once both files are uploaded and validated, proceed to the street selection page
+to choose which roads to include in your route.
+
+<img src="/assets/docs/screenshots/data_upload.png" alt="Data Upload" class="mw-100" />
 
 **Next Step**: Street Selection →
 
@@ -141,50 +146,53 @@ Select and refine street networks for route planning.
 
 
 This interactive page allows you to choose which OpenStreetMap roads should be
-included in your navigation route. The page provides multiple selection tools to
-help you build an optimal connected road network that covers your measurement
-locations.
+included in your navigation route. Every change you make is **immediately
+persisted** — if you leave the page and come back, your selections are
+preserved exactly as you left them.
 
 **Selection Features:**
 
-- **Tag Filtering**: Select road types using dropdown filters organized by
-  German road classifications:
-  - Autobahn (highways)
-  - Bundesstraßen (federal roads)
-  - Landstraße (country roads)
-  - Kreisstraße (district roads)
-  - Gemeindestraße (municipal roads)
-  - Sonstige (other roads including residential, service, tracks)
+- **Tag Filtering**: Toggle road types on or off using the switches. Roads of
+  a disabled type are removed from the working network and will not appear on
+  any other page or in the final route. Re-enabling a type brings those roads
+  back from the original OSM download. Available classifications:
+
+  - Motorway (highways and ramps)
+  - Trunk road (expressways)
+  - Primary road (major routes)
+  - Secondary road (regional routes)
+  - Tertiary road (local connectors)
+  - Unclassified, Residential, Living street, Track
 
   Use "Select All" / "Select None" buttons for quick bulk operations.
 
-- **Interactive Clicking**: Click individual road segments on the map to toggle
-  them in or out of your route network. Selected roads are highlighted in a
-  distinct color for visual feedback.
+- **Interactive Clicking**: Click individual road segments on the map to mark
+  them for removal. Marked roads are highlighted in a distinct color for
+  visual feedback. Press "Remove selected" to permanently delete them.
 
 - **Network Tools**:
-  - **Keep Largest**: Automatically select only the largest connected road network
-    component, removing isolated segments
-  - **Remove Disconnected**: Filter out road segments that aren't connected to
-    your main network
-  - **Undo**: Revert your last selection action using snapshot-based history
-  - **Reset**: Clear all selections and start over with a clean slate
+  - **Keep Largest**: Retain only the largest connected road network
+    component, removing isolated segments. This acts as a toggle — any
+    subsequent edit (tag change, road removal) automatically resets it so
+    that previously disconnected roads reappear for further editing.
+  - **Reset**: Clear all selections, deletions, and filters, restoring the
+    full original OSM download.
 
-The map displays selected roads with real-time visual feedback as you make
-selections. Your goal is to create a connected network of streets that efficiently
-covers your measurement locations while being traversable by your vehicle.
+The map displays the current working network with real-time visual feedback.
+Your goal is to create a connected network of streets that efficiently covers
+your measurement locations while being traversable by your vehicle.
 
 **Tips for Effective Selection:**
-- Start by selecting appropriate road types for your vehicle and terrain
-- Use "Keep Largest" to remove small disconnected segments automatically
+
+- Start by disabling road types that are unsuitable for your vehicle
+- Remove individual problematic segments by clicking and removing
+- Use "Keep Largest" as a final check to ensure network connectivity
 - Verify all measurement points are reachable from your selected network
-- Click individual segments to fine-tune network boundaries
-- Use Undo if you make a mistake
 
-When satisfied with your street selection, proceed to configure routing parameters
-for the final route calculation.
+When satisfied with your street selection, proceed to configure routing
+parameters for the final route calculation.
 
-<img src="/assets/docs/screenshots/street_selection.png" alt="Street Selection" style="max-width: 100%; height: auto;" />
+<img src="/assets/docs/screenshots/street_selection.png" alt="Street Selection" class="mw-100" />
 
 **Next Step**: Routing Parameters →
 
@@ -226,7 +234,7 @@ Simply review the default settings and modify any parameters you wish to customi
 When satisfied, click "Next" to proceed to the final page where you'll start the
 route calculation and download your GPX navigation file.
 
-<img src="/assets/docs/screenshots/routing_params.png" alt="Routing Parameters" style="max-width: 100%; height: auto;" />
+<img src="/assets/docs/screenshots/routing_params.png" alt="Routing Parameters" class="mw-100" />
 
 **Next Step**: Route Computation →
 
@@ -290,7 +298,7 @@ FAILED status), the full worker logs are displayed, containing:
 
 The logs are synced from the worker container after the job finishes.
 
-<img src="/assets/docs/screenshots/route_computation.png" alt="Route Computation" style="max-width: 100%; height: auto;" />
+<img src="/assets/docs/screenshots/route_computation.png" alt="Route Computation" class="mw-100" />
 
 **Next Step**: Route & Download →
 
@@ -346,7 +354,7 @@ The generated GPX file can be used in multiple ways:
 The QR code provides the quickest way to get the route onto your mobile device
 for immediate field use.
 
-<img src="/assets/docs/screenshots/route_download.png" alt="Route & Download" style="max-width: 100%; height: auto;" />
+<img src="/assets/docs/screenshots/route_download.png" alt="Route & Download" class="mw-100" />
 
 ---
 
@@ -366,6 +374,8 @@ system activity, debug issues, and monitor operations. You can:
 - Filter logs by date and time range
 - Select specific log levels (Debug, Info, Warning, Error, Critical)
 - Filter by process ID to track specific server processes
+- Exclude specific modules from the output
+- Enable live mode for automatic 10-second polling
 - View logs in a formatted, readable table
 - Refresh logs on demand to see latest entries
 
@@ -373,7 +383,7 @@ Logs are stored in the database and include timestamps, log levels, logger names
 and messages. This is the primary tool for understanding system behavior, diagnosing
 problems, and monitoring application execution.
 
-<img src="/assets/docs/screenshots/logs.png" alt="Application Logs" style="max-width: 100%; height: auto;" />
+<img src="/assets/docs/screenshots/logs.png" alt="Application Logs" class="mw-100" />
 
 ### Worker Management
 
@@ -385,7 +395,7 @@ This page provides real-time monitoring and control of Celery background workers
 Allows viewing active, reserved, scheduled, and revoked tasks, as well as killing
 or cancelling tasks.
 
-<img src="/assets/docs/screenshots/worker_management.png" alt="Worker Management" style="max-width: 100%; height: auto;" />
+<img src="/assets/docs/screenshots/worker_management.png" alt="Worker Management" class="mw-100" />
 
 ### Job Manager
 
@@ -406,7 +416,7 @@ The table uses color coding to quickly identify job statuses. You can select row
 perform bulk operations like deletion. Use the cleanup function to automatically remove
 jobs that exceed retention periods (2 days for unsubmitted, 60 days for submitted jobs).
 
-<img src="/assets/docs/screenshots/job_manager.png" alt="Job Manager" style="max-width: 100%; height: auto;" />
+<img src="/assets/docs/screenshots/job_manager.png" alt="Job Manager" class="mw-100" />
 
 ---
 

@@ -15,14 +15,15 @@ log = logging.getLogger(__name__)
 # Page URL configuration: maps module_name -> (url_path, wait_seconds)
 # This is the ONLY place where URLs and timing need to be configured
 PAGE_CONFIG = {
-    # User workflow pages
+    # User workflow pages (job_id_new up to and including routing_params)
     "home": ("/", 1),
-    "user_info": ("/job/{job_id}/user-info", 2),
-    "data_upload": ("/job/{job_id}/data-upload", 3),
-    "street_selection": ("/job/{job_id}/street_selection", 5),
-    "routing_params": ("/job/{job_id}/routing-params", 2),
-    "route_computation": ("/job/{job_id}/route-computation", 3),
-    "route_download": ("/job/{job_id}/route-download", 3),
+    "user_info": ("/job/{job_id_new}/user-info", 2),
+    "data_upload": ("/job/{job_id_new}/data-upload", 3),
+    "street_selection": ("/job/{job_id_new}/street_selection", 5),
+    "routing_params": ("/job/{job_id_new}/routing-params", 2),
+    # After Parameters: use finished job
+    "route_computation": ("/job/{job_id_finished}/route-computation", 3),
+    "route_download": ("/job/{job_id_finished}/route-download", 3),
     # Admin pages
     "logs": ("/logs", 1),
     "worker_management": ("/worker-management", 2),
@@ -84,7 +85,8 @@ class ScreenshotGenerator:
 
     def __init__(
         self,
-        job_id: str,
+        job_id_finished: str,
+        job_id_new: str,
         headless: bool = True,
         viewport_size: Tuple[int, int] = (1920, 1080),
         base_url: str = "http://localhost:8080",
@@ -92,12 +94,14 @@ class ScreenshotGenerator:
         """Initialize the screenshot generator.
 
         Args:
-            job_id: Job ID with complete workflow data for page screenshots
+            job_id_finished: Job ID with completed workflow data
+            job_id_new: Job ID for unfinished workflow (early pages)
             headless: Run browser in headless mode (default: True)
             viewport_size: Browser viewport dimensions (default: 1920x1080)
             base_url: Base URL of the running COSMONAUT application
         """
-        self.job_id = job_id
+        self.job_id_finished = job_id_finished
+        self.job_id_new = job_id_new
         self.headless = headless
         self.viewport_size = viewport_size
         self.base_url = base_url
@@ -108,7 +112,8 @@ class ScreenshotGenerator:
         self.page: Page | None = None
 
         log.info(
-            f"Screenshot generator initialized for job_id: {job_id}",
+            f"Screenshot generator initialized for job_id_finished: {job_id_finished}, "
+            f"job_id_new: {job_id_new}",
         )
 
     def setup_browser(self) -> Page:
@@ -202,9 +207,11 @@ class ScreenshotGenerator:
             ValueError: If page returns 404 Not Found
             Exception: If screenshot capture fails for other reasons
         """
-        # Substitute job_id in URL if needed
-        if "{job_id}" in page_url:
-            page_url = page_url.format(job_id=self.job_id)
+        # Substitute job_id placeholders in URL if needed
+        if "{job_id_finished}" in page_url:
+            page_url = page_url.format(job_id_finished=self.job_id_finished)
+        if "{job_id_new}" in page_url:
+            page_url = page_url.format(job_id_new=self.job_id_new)
 
         full_url = f"{self.base_url}{page_url}"
         output_path = output_dir / f"{page_name}.png"

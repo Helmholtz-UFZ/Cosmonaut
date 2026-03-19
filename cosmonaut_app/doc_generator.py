@@ -276,11 +276,14 @@ def setup_logging():
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
-def generate_documentation(job_id: str, headless: bool = True) -> int:
+def generate_documentation(
+    job_id_finished: str, job_id_new: str, headless: bool = True
+) -> int:
     """Main documentation generation workflow.
 
     Args:
-        job_id: Job ID with complete workflow data
+        job_id_finished: Job ID with completed workflow data
+        job_id_new: Job ID for unfinished workflow (early pages)
         headless: Run browser in headless mode (default: True)
 
     Returns:
@@ -300,9 +303,9 @@ def generate_documentation(job_id: str, headless: bool = True) -> int:
 
     # Generate screenshots
     log.info("Starting screenshot generation...")
-    log.info(f"Using job_id: {job_id}")
+    log.info(f"Using job_id_finished: {job_id_finished}, job_id_new: {job_id_new}")
 
-    screenshot_gen = ScreenshotGenerator(job_id, headless=headless)
+    screenshot_gen = ScreenshotGenerator(job_id_finished, job_id_new, headless=headless)
 
     try:
         # Generate all screenshots (fails on first error)
@@ -336,9 +339,14 @@ def main():
         description="Generate static documentation with screenshots for COSMONAUT"
     )
     parser.add_argument(
-        "job_id",
+        "job_id_new",
         type=str,
-        help="Completed job ID to use for screenshot generation (must have data through all workflow steps)",
+        help="Unfinished Job ID to use for screenshot generation",
+    )
+    parser.add_argument(
+        "job_id_finished",
+        type=str,
+        help="Finished Job ID to use for screenshot generation",
     )
     parser.add_argument(
         "--no-headless",
@@ -348,7 +356,11 @@ def main():
 
     args = parser.parse_args()
 
-    sys.exit(generate_documentation(args.job_id, headless=not args.no_headless))
+    sys.exit(
+        generate_documentation(
+            args.job_id_finished, args.job_id_new, headless=not args.no_headless
+        )
+    )
 
 
 if __name__ == "__main__":
