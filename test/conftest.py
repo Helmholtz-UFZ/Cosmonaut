@@ -28,6 +28,7 @@ from cosmonaut_app.config import (
     REDIS_PORT,
 )
 from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.error_handling import ObjectStorageError
 from cosmonaut_app.object_storage_manager import setup_remote, create_bucket
 
 
@@ -81,11 +82,8 @@ def pytest_configure(config):
             result = DataBaseManager.check_existence("test")
             log.info(f"Database connection successful. Test query result: {result}")
         except OperationalError as e:
-            log.error(f"Database connection failed with OperationalError: {e}")
+            log.error(f"Database connection failed: {e}")
             pytest.exit(f"PostgreSQL not available: {e}")
-        except Exception as e:
-            log.error(f"Unexpected error during database check: {e}")
-            pytest.exit(f"Database check failed: {e}")
 
         # Check Redis connectivity
         try:
@@ -106,20 +104,13 @@ def pytest_configure(config):
         except (redis.ConnectionError, redis.TimeoutError) as e:
             log.error(f"Redis connection failed: {e}")
             pytest.exit(f"Redis not available: {e}")
-        except Exception as e:
-            log.error(f"Unexpected error during Redis check: {e}")
-            pytest.exit(f"Redis check failed: {e}")
 
         # Check rclone can connect to MinIO via S3 protocol
         try:
-            # Configure rclone remote
             setup_remote()
-
-            # Try to create/verify bucket (this uses S3 protocol)
             create_bucket()
-
             log.info("rclone MinIO connectivity check passed")
-        except Exception as e:
+        except ObjectStorageError as e:
             log.error(f"rclone MinIO connectivity check failed: {e}")
             pytest.exit(f"MinIO S3 connectivity check failed: {e}")
     else:

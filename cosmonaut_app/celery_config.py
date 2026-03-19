@@ -47,9 +47,19 @@ class CeleryConfig:
         "cosmonaut_app.tasks.upload_tasks.*": {"queue": "upload"},
     }
 
+    # Task state tracking
+    task_send_sent_event = True  # Send task sent events
+    task_track_started = True  # Track when tasks start
+
+    # Result backend settings
+    result_expires = 3600  # 1 hour
+    result_persistent = True
+
     # Logging - prevent Celery from hijacking the root logger and removing
     # our PostgreSQL handler (which is configured in app.py / logger.py)
     worker_hijack_root_logger = False
+    worker_redirect_stdouts = False  # Don't redirect stdout/stderr
+    worker_log_color = False  # Disable color for database logging
 
     # Worker settings for better performance and reliability
     worker_prefetch_multiplier = 1  # Fair distribution of tasks
@@ -57,6 +67,11 @@ class CeleryConfig:
     # Restart worker after 50 tasks (memory cleanup)
     worker_max_tasks_per_child = 50
     worker_max_memory_per_child = 512000  # 512MB per worker process
+
+    # Beat scheduler settings
+    beat_schedule_filename = (
+        "/tmp/celerybeat-schedule"  # Use tmp directory to avoid permission issues
+    )
 
     # Celery Beat schedule - periodic tasks
     beat_schedule = {
