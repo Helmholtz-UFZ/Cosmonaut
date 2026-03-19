@@ -142,7 +142,7 @@ class BackgroundJobManager:
             ConnectionError: If unable to connect to Redis/Celery broker
         """
         try:
-            inspect = self.app.control.inspect(timeout=5)
+            inspect = self.app.control.inspect()
 
             # Get task data from all workers
             active = inspect.active() or {}
@@ -165,8 +165,9 @@ class BackgroundJobManager:
             for worker, task_ids in revoked_dict.items():
                 revoked_ids.extend(task_ids)
 
-            # Get list of online workers
-            workers = list(inspect.ping().keys()) if inspect.ping() else []
+            # Get list of online workers (single call to avoid race with worker shutdown)
+            ping_result = inspect.ping()
+            workers = list(ping_result.keys()) if ping_result else []
 
             return {
                 "active": flatten_tasks(active),

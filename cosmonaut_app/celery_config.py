@@ -31,7 +31,16 @@ class CeleryConfig:
     broker_url = _redis_url
     result_backend = _redis_url
     broker_connection_retry_on_startup = True
-    broker_connection_timeout = 10  # Fail fast instead of blocking forever
+    broker_connection_timeout = 5
+
+    # Socket timeouts for Redis operations — broker_connection_timeout only covers
+    # TCP connect. These cover actual Redis commands (PUBLISH, SET, SUBSCRIBE, …).
+    # Without them, a frozen Redis pod blocks all Celery calls forever.
+    broker_transport_options = {"socket_timeout": 5, "socket_connect_timeout": 5}
+    result_backend_transport_options = {
+        "socket_timeout": 5,
+        "socket_connect_timeout": 5,
+    }
 
     # Serialization
     task_serializer = "json"
