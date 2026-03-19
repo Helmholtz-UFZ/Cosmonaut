@@ -50,9 +50,9 @@ class BackgroundJobManager:
                 retry=True,
                 retry_policy={
                     "max_retries": 3,
-                    "interval_start": 60,  # First retry after 60s
-                    "interval_step": 60,  # Increment by 60s each retry
-                    "interval_max": 300,  # Max 300s between retries
+                    "interval_start": 10,
+                    "interval_step": 15,
+                    "interval_max": 30,
                 },
             )
             # Store task name in Redis for revoked task retrieval
@@ -88,9 +88,9 @@ class BackgroundJobManager:
                 retry=True,
                 retry_policy={
                     "max_retries": 3,
-                    "interval_start": 60,
-                    "interval_step": 60,
-                    "interval_max": 300,
+                    "interval_start": 10,
+                    "interval_step": 15,
+                    "interval_max": 30,
                 },
             )
             self.app.backend.client.set(

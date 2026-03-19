@@ -16,6 +16,7 @@ from cosmonaut_app.constants.html_ids import (
     ERROR_MODAL_MESSAGE_SHARED_ID,
     ERROR_MODAL_SHARED_ID,
     ERROR_MODAL_TITLE_SHARED_ID,
+    LOADING_OVERLAY_SHARED_ID,
 )
 from cosmonaut_app.email_service import send_mail
 
@@ -187,6 +188,7 @@ def handle_error(error):
 
     log.error(f"{error_title}: {error_message}")
     log.error(f"Error details: {traceback.format_exc()}")
+    set_props(LOADING_OVERLAY_SHARED_ID, {"is_open": False})
     set_props(ERROR_MODAL_SHARED_ID, {"is_open": True})
     set_props(ERROR_MODAL_TITLE_SHARED_ID, {"children": error_title})
     set_props(ERROR_MODAL_MESSAGE_SHARED_ID, {"children": error_message})
