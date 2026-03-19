@@ -161,13 +161,13 @@ def handle_error(error):
             f"Traceback info: {traceback.format_exc()}\n\n"
             f"Input info: {json.dumps(truncated_triggered)}"
         )
-        try:
-            log.debug(f"Send mail to {MAINTAINER_EMAIL}")
-            send_mail(MAINTAINER_EMAIL, email_subject, email_body)
-        except Exception:  # noqa - must not let email failure crash the error handler
-            log.error("Failed to send maintainer error email", exc_info=True)
+        # Log to DB first — email may block or fail
         log.error(f"Unhandled error: {error}")
         log.error(email_body)
+        try:
+            send_mail(MAINTAINER_EMAIL, email_subject, email_body)
+        except Exception:  # noqa — must not let email failure crash the error handler
+            log.error("Failed to send maintainer error email", exc_info=True)
 
     error_type = type(error) if type(error) in error_responds_dict else Exception
     error_title = error_responds_dict[error_type][0]

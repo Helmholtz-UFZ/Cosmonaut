@@ -177,6 +177,12 @@ class CosmonautJob:
         # Instantiate model with all fields
         self.model = JobModel(**job_data)
 
+        # Backfill street_processing for jobs saved before it was included
+        # in upload_membership(). Can be removed once all existing jobs have
+        # rotated out (retention ≤ DAYS_DELETE_SUBMITTED).
+        if "street_processing" not in self.model.membership_upload:
+            self.model.membership_upload["street_processing"] = "PENDING"
+
         # Set up filesystem paths
         self._create_working_dir()
 
@@ -350,6 +356,7 @@ class CosmonautJob:
             "center": position,
             "zoom": zoom,
             "bounds": bounds,
+            "street_processing": "PENDING",
         }
         self.save()
         log.debug("Finished uploading and processing membership file")
