@@ -35,5 +35,6 @@ POSTGRES_HOST_NAME="postgres-dev.intranet.ufz.de"
 
 ### Redis ###
 REDIS_PORT=6379
-REDIS_HOST="cosmonaut-redis"
+# Shared Helm chart with cosmopolitan — both projects use the same Redis service name
+REDIS_HOST="cosmopolitan-redis"
 REDIS_DB=0

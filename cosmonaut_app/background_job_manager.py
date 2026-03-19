@@ -142,7 +142,7 @@ class BackgroundJobManager:
             ConnectionError: If unable to connect to Redis/Celery broker
         """
         try:
-            inspect = self.app.control.inspect()
+            inspect = self.app.control.inspect(timeout=5)
 
             # Get task data from all workers
             active = inspect.active() or {}
