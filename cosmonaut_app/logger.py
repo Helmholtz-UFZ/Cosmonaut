@@ -8,7 +8,6 @@ import psycopg2
 from psycopg2 import pool
 
 from cosmonaut_app.config import (
-    COSMONAUT_TESTING,
     POSTGRES_NAME,
     POSTGRES_HOST_NAME,
     POSTGRES_PORT,
@@ -275,7 +274,7 @@ def get_logger_config_web():
     """
     return _build_stream_config(
         stream="ext://sys.stderr",
-        disable_existing_loggers=not COSMONAUT_TESTING,
+        disable_existing_loggers=False,
     )
 
 
