@@ -6,19 +6,15 @@ trap cleaning_up EXIT
 
 # Cleanup function - restores environment and stops services
 cleaning_up() {
-    echo "Cleaning up..."
-
     # Restore original .env
     if [ -f .env.bak ]; then
         mv .env.bak .env
     fi
 
     # Stop and remove containers
-    docker stop postgres_cosmonaut minio_cosmonaut redis_cosmonaut 2>/dev/null || true
-    docker rm postgres_cosmonaut minio_cosmonaut redis_cosmonaut 2>/dev/null || true
-    docker compose down 2>/dev/null || true
-
-    echo "Cleanup complete"
+    docker stop postgres_cosmonaut minio_cosmonaut redis_cosmonaut >/dev/null 2>&1 || true
+    docker rm postgres_cosmonaut minio_cosmonaut redis_cosmonaut >/dev/null 2>&1 || true
+    docker compose down >/dev/null 2>&1 || true
 }
 
 # Service health check with retry logic
@@ -28,19 +24,16 @@ check_service() {
     local max_retries=10
     local retry_count=0
 
-    echo "Checking ${service_name}..."
     until eval "$check_command"; do
         if [ $retry_count -ge $max_retries ]; then
-            echo "${service_name} failed to start after ${max_retries} attempts"
-            echo "Cleaning up..."
+            echo "FAIL: ${service_name} did not start after ${max_retries} attempts"
             cleaning_up
             exit 1
         fi
-        echo "Waiting for ${service_name}... (${retry_count}/${max_retries})"
         sleep 1
         retry_count=$((retry_count + 1))
     done
-    echo "${service_name} is ready"
+    echo "  ${service_name} ready"
 }
 
 # Help message
@@ -63,6 +56,7 @@ show_help() {
     echo "                    test_sensor_routing_descriptions)."
     echo "  --no-artifacts    Disable Playwright artifact capture (screenshots, traces)"
     echo "  --keep-artifacts  Keep artifacts from previous runs (default: clear on each run)"
+    echo "  -v, --verbose     Show full pytest output (default: minimal, logs go to artifacts)"
     echo "  -h, --help        Show this help message"
     echo ""
     echo "Test Selection:"
@@ -75,15 +69,16 @@ show_help() {
     echo "Only the options listed above are supported."
     echo ""
     echo "Examples:"
-    echo "  ./run_pytest.sh"
-    echo "  ./run_pytest.sh --headed"
-    echo "  ./run_pytest.sh test/test_complete_routing_workflow.py"
+    echo "  ./run_pytest.sh                                        # Run all tests"
+    echo "  ./run_pytest.sh --headed                               # Visible browser"
+    echo "  ./run_pytest.sh test/test_complete_routing_workflow.py  # Specific file"
     echo "  ./run_pytest.sh test/test_complete_routing_workflow.py::test_something"
     echo "  ./run_pytest.sh --keep-artifacts test/test_db_manager.py"
     echo "  ./run_pytest.sh --local-sr test/test_complete_routing_workflow.py"
     echo "  ./run_pytest.sh --no-services test/test_env.py"
     echo ""
-    echo "Artifacts (on failure): screenshots, traces, HTML, logs in test/artifacts/"
+    echo "Artifacts (on failure): screenshots, traces, HTML in test/artifacts/"
+    echo "Full pytest output: test/artifacts/pytest_output.log"
     echo "View traces: npx playwright show-trace test/artifacts/<test-name>/trace.zip"
     exit 0
 }
@@ -94,6 +89,7 @@ HEADED=false
 LOCAL_SR=false
 ARTIFACTS=true
 KEEP_ARTIFACTS=false
+VERBOSE=false
 TEST_PATH=""
 
 while [[ $# -gt 0 ]]; do
@@ -116,6 +112,10 @@ while [[ $# -gt 0 ]]; do
         ;;
     --keep-artifacts)
         KEEP_ARTIFACTS=true
+        shift
+        ;;
+    -v | --verbose)
+        VERBOSE=true
         shift
         ;;
     -h | --help)
@@ -155,9 +155,9 @@ if [ "$START_SERVICES" -eq 1 ]; then
     # Clean up existing containers
     docker compose down 2>/dev/null || true
 
-    # Start services
+    # Start services (quiet output)
     echo "Starting services: postgres, minio, redis"
-    docker compose up postgres minio redis -d
+    docker compose up postgres minio redis -d --quiet-pull
 
     # Wait for services with retry logic
     check_service "docker exec postgres_cosmonaut pg_isready -q 2>/dev/null" "PostgreSQL"
@@ -169,9 +169,9 @@ fi
 
 # Clear previous artifacts unless --keep-artifacts is set
 if [ "$KEEP_ARTIFACTS" = false ] && [ -d test/artifacts ]; then
-    echo "Clearing previous artifacts..."
     rm -rf test/artifacts/*
 fi
+mkdir -p test/artifacts
 
 # Build pytest command dynamically based on flags
 PYTEST_CMD="uv run pytest"
@@ -196,6 +196,29 @@ if [ -n "$TEST_PATH" ]; then
     PYTEST_CMD="$PYTEST_CMD $TEST_PATH"
 fi
 
-# Run pytest with all accumulated flags
-echo "Running: $PYTEST_CMD"
-$PYTEST_CMD
+# Run pytest — output goes to temp file, moved into artifacts after Playwright is done.
+# Playwright cleans --output dir when all tests pass, so writing there during the run
+# would lose the log.
+TMP_LOG=$(mktemp)
+LOG_FILE="test/artifacts/pytest_output.log"
+
+set +e
+if [ "$VERBOSE" = true ]; then
+    echo "Running: $PYTEST_CMD"
+    bash -c "$PYTEST_CMD" 2>&1 | tee "$TMP_LOG"
+    PYTEST_EXIT=${PIPESTATUS[0]}
+else
+    echo "Running tests (logs: $LOG_FILE) ..."
+    bash -c "$PYTEST_CMD" > "$TMP_LOG" 2>&1
+    PYTEST_EXIT=$?
+fi
+
+mkdir -p test/artifacts
+mv "$TMP_LOG" "$LOG_FILE"
+
+if [ "$VERBOSE" = false ]; then
+    echo ""
+    grep -E "^(FAILED|ERROR|=)" "$LOG_FILE" | tail -20 || true
+    echo "Full output: $LOG_FILE"
+fi
+exit $PYTEST_EXIT
