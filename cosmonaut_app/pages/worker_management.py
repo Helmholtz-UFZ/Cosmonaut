@@ -13,23 +13,28 @@ No additional developer notes for this page.
 
 import logging
 from datetime import datetime
-import re
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import callback, html, no_update, register_page
+from dash import Input, Output, State, callback, html, no_update, register_page
 from dash.exceptions import PreventUpdate
 import dash_ag_grid as dag
-from dash.dependencies import Input, Output, State
 from celery.result import AsyncResult
 
 from cosmonaut_app.constants.html_ids import (
     ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID,
+    CANCEL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID,
+    CANCEL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID,
+    CANCEL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID,
+    CANCEL_MODAL_WORKER_MANAGEMENT_ID,
+    KILL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID,
+    KILL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID,
+    KILL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID,
+    KILL_MODAL_WORKER_MANAGEMENT_ID,
     LOADING_OVERLAY_SHARED_ID,
     RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID,
     REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID,
     SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID,
-    SELECTED_TASK_ID_INPUT_WORKER_MANAGEMENT_ID,
     TEST_TASK_BUTTON_WORKER_MANAGEMENT_ID,
     WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID,
     WORKER_KILL_BTN_WORKER_MANAGEMENT_ID,
@@ -44,7 +49,6 @@ from cosmonaut_app.background_job_manager import (
     NAME_ROUTING_TASK,
     BackgroundJobManager,
 )
-from cosmonaut_app.error_handling import WrongCeleryTaskId
 
 
 log = logging.getLogger(__name__)
@@ -119,7 +123,6 @@ def create_task_section(
     button_id=None,
     button_label=None,
     selectable=False,
-    task_id_input_id=None,
     initially_disabled=True,
 ):
     """Create a task section with title, description, table, and optional button.
@@ -132,7 +135,6 @@ def create_task_section(
         button_id: Optional button ID
         button_label: Optional button label
         selectable: Whether table rows are selectable
-        task_id_input_id: Optional input field ID for selected task ID
         initially_disabled: Whether button is initially disabled
 
     Returns:
@@ -145,14 +147,6 @@ def create_task_section(
         html.P(description, className="text-muted mb-3"),
         table,
     ]
-
-    if task_id_input_id:
-        task_id_input = dbc.Input(
-            id=task_id_input_id,  # nocheck
-            placeholder="Select a task from the table above or enter task ID",
-            className="mt-3",
-        )
-        section_content.append(task_id_input)
 
     if button_id and button_label:
         button = dbc.Button(
@@ -238,7 +232,6 @@ def format_reserved_tasks(reserved_tasks):
     """
     formatted = []
     for task in reserved_tasks:
-        # Extract queue from delivery_info
         delivery_info = task["delivery_info"]
         queue = delivery_info["routing_key"]
 
@@ -264,12 +257,10 @@ def format_scheduled_tasks(scheduled_tasks):
     """
     formatted = []
     for task in scheduled_tasks:
-        # ETA is in task dict
         eta_str = datetime.fromisoformat(task["eta"].replace("Z", "+00:00")).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
 
-        # Extract queue
         delivery_info = task["delivery_info"]
         queue = delivery_info["routing_key"]
 
@@ -296,12 +287,10 @@ def format_revoked_tasks(revoked_list: list, job_manager: BackgroundJobManager):
     """
     tasks = []
     for task_id in revoked_list:
-        # Get AsyncResult to access task status
         result = AsyncResult(task_id, app=background_job_manager.app)
         log.debug(f"Revoked task {task_id} has status {result.status}")
         log.debug(result)
 
-        # Get task name from Redis (stored at submission time)
         try:
             task_name_full = background_job_manager.app.backend.client.get(
                 f"task_name:{task_id}"
@@ -340,7 +329,6 @@ def format_worker_stats(overview):
 
     cards = []
     for worker in workers:
-        # Count tasks for this worker
         active_count = sum(1 for task in active_tasks if task["worker"] == worker)
         reserved_count = sum(1 for task in reserved_tasks if task["worker"] == worker)
         scheduled_count = sum(1 for task in scheduled_tasks if task["worker"] == worker)
@@ -375,7 +363,6 @@ def format_worker_stats(overview):
 
 def layout():
     """Create the worker management page layout."""
-    # Header
     header = create_header(
         "Worker Management",
         "Monitor and control Celery background workers",
@@ -383,7 +370,6 @@ def layout():
         rounded=False,
     )
 
-    # Refresh controls
     refresh_controls = dbc.Row(
         [
             dbc.Col(
@@ -416,12 +402,10 @@ def layout():
         className="mb-4",
     )
 
-    # Worker stats cards (initially empty, populated by callback)
     worker_stats = html.Div(
         id=WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID, className="mb-4"
     )
 
-    # Active tasks section
     active_section = create_task_section(
         title="Active Tasks",
         description="Currently running tasks on workers",
@@ -437,11 +421,9 @@ def layout():
         button_id=WORKER_KILL_BTN_WORKER_MANAGEMENT_ID,
         button_label="Kill Selected Task",
         selectable=True,
-        task_id_input_id=SELECTED_TASK_ID_INPUT_WORKER_MANAGEMENT_ID,
-        initially_disabled=False,
+        initially_disabled=True,
     )
 
-    # Reserved tasks section
     reserved_section = create_task_section(
         title="Reserved Tasks",
         description="Tasks claimed by workers but not yet started",
@@ -455,7 +437,6 @@ def layout():
         selectable=True,
     )
 
-    # Scheduled tasks section
     scheduled_section = create_task_section(
         title="Scheduled Tasks",
         description="Tasks scheduled for future execution",
@@ -471,7 +452,6 @@ def layout():
         selectable=True,
     )
 
-    # Revoked tasks section
     revoked_section = create_task_section(
         title="Revoked Tasks",
         description="Cancelled or killed tasks",
@@ -484,13 +464,90 @@ def layout():
         selectable=False,
     )
 
-    # Dummy component for triggering updates
     dummy = html.Div(
         id=WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID,
         className="d-none",
     )
 
-    # Assemble page layout
+    # Kill Confirmation Modal
+    kill_modal = dbc.Modal(
+        [
+            dbc.ModalHeader("Confirm Task Termination"),
+            dbc.ModalBody(
+                [
+                    html.P(
+                        "WARNING: This will send SIGTERM to the worker process.",
+                        className="text-danger fw-bold",
+                    ),
+                    html.P("The worker process will be killed immediately."),
+                    html.Pre(
+                        id=KILL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID,
+                        className="bg-light p-2",
+                    ),
+                    html.P(
+                        "Are you sure you want to KILL this task?",
+                        className="fw-bold text-danger",
+                    ),
+                ]
+            ),
+            dbc.ModalFooter(
+                [
+                    dbc.Button(
+                        [html.I(className="bi bi-x-circle me-1"), "Cancel"],
+                        id=KILL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID,
+                        color="secondary",
+                    ),
+                    dbc.Button(
+                        [html.I(className="bi bi-x-octagon-fill me-1"), "Kill Task"],
+                        id=KILL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID,
+                        color="danger",
+                    ),
+                ]
+            ),
+        ],
+        id=KILL_MODAL_WORKER_MANAGEMENT_ID,
+        is_open=False,
+    )
+
+    # Cancel Confirmation Modal
+    cancel_modal = dbc.Modal(
+        [
+            dbc.ModalHeader("Confirm Task Cancellation"),
+            dbc.ModalBody(
+                [
+                    html.P("This will prevent the task from executing."),
+                    html.P(
+                        "If the task is already running, it will continue until completion."
+                    ),
+                    html.Pre(
+                        id=CANCEL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID,
+                        className="bg-light p-2",
+                    ),
+                    html.P(
+                        "Are you sure you want to CANCEL this task?",
+                        className="fw-bold",
+                    ),
+                ]
+            ),
+            dbc.ModalFooter(
+                [
+                    dbc.Button(
+                        [html.I(className="bi bi-x-circle me-1"), "Cancel"],
+                        id=CANCEL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID,
+                        color="secondary",
+                    ),
+                    dbc.Button(
+                        [html.I(className="bi bi-x-circle me-1"), "Cancel Task"],
+                        id=CANCEL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID,
+                        color="warning",
+                    ),
+                ]
+            ),
+        ],
+        id=CANCEL_MODAL_WORKER_MANAGEMENT_ID,
+        is_open=False,
+    )
+
     page_content = dbc.Container(
         [
             refresh_controls,
@@ -500,6 +557,8 @@ def layout():
             scheduled_section,
             revoked_section,
             dummy,
+            kill_modal,
+            cancel_modal,
         ],
         className="my-4",
         fluid=True,
@@ -513,8 +572,8 @@ def layout():
 # ============================================================================
 
 
-# Clientside: open overlay instantly in the browser, avoiding server-side
-# callback ordering issues with allow_duplicate.
+# Clientside: open overlay instantly in the browser for the refresh button.
+# Kill/cancel buttons open modals first; the confirm callbacks handle the overlay.
 dash.clientside_callback(
     "function(n) { return true; }",
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
@@ -589,14 +648,12 @@ def refresh_worker_data(refresh_clicks, dummy_data):
 
 
 @callback(
-    Output(SELECTED_TASK_ID_INPUT_WORKER_MANAGEMENT_ID, "value"),
+    Output(WORKER_KILL_BTN_WORKER_MANAGEMENT_ID, "disabled"),
     Input(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
 )
-def update_selected_task_id(selected_rows):
-    """Copy task ID from selected row to input field."""
-    if selected_rows:
-        return selected_rows[0]["task_id"]
-    return no_update
+def enable_kill_button(selected_rows):
+    """Enable kill button only when a task is selected."""
+    return not selected_rows
 
 
 @callback(
@@ -609,56 +666,166 @@ def toggle_cancel_button(reserved_selected, scheduled_selected):
     return not (reserved_selected or scheduled_selected)
 
 
+# --- Kill modal callbacks ---
+
+
 @callback(
-    Output(WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID, "children"),
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(KILL_MODAL_WORKER_MANAGEMENT_ID, "is_open"),
+    Output(KILL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID, "children"),
     Input(WORKER_KILL_BTN_WORKER_MANAGEMENT_ID, "n_clicks"),
-    State(SELECTED_TASK_ID_INPUT_WORKER_MANAGEMENT_ID, "value"),
+    State(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
     prevent_initial_call=True,
 )
-def confirm_kill_task(n_clicks, task_id):
-    """Kill the task specified in the input field."""
-    if task_id:
-        # Validate UUID format: 8-4-4-4-12 hex digits
-        uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        if not re.match(uuid_pattern, task_id, re.IGNORECASE):
-            raise WrongCeleryTaskId(task_id)
+def open_kill_modal(n_clicks, selected_rows):
+    """Open kill confirmation modal with task info."""
+    if not selected_rows:
+        return False, ""
 
-        background_job_manager.revoke_job(task_id, terminate=True)  # SIGTERM
+    task = selected_rows[0]
+    task_info = (
+        f"Task: {task['task_name']}\n"
+        f"ID: {task['task_id']}\n"
+        f"Worker: {task['worker']}\n"
+        f"Duration: {task['duration']}\n"
+    )
 
-        log.warning(f"Task {task_id} killed by user")
+    log.info(f"Opening kill modal for task {task['task_id']}")
 
-    return None, True  # Triggers refresh via callback and opens overlay
+    return True, task_info
 
 
 @callback(
+    Output(KILL_MODAL_WORKER_MANAGEMENT_ID, "is_open", allow_duplicate=True),
+    Output(
+        ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID,
+        "selectedRows",
+        allow_duplicate=True,
+    ),
+    Output(
+        WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID,
+        "children",
+    ),
+    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Input(KILL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID, "n_clicks"),
+    State(ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
+    prevent_initial_call=True,
+)
+def confirm_kill_task(n_clicks, selected_rows):
+    """Kill the selected task after modal confirmation."""
+    if n_clicks is None:
+        raise PreventUpdate
+    if not selected_rows:
+        log.warning("Kill task attempted with no selection")
+        return False, [], no_update, False
+
+    task = selected_rows[0]
+    task_id = task["task_id"]
+
+    background_job_manager.revoke_job(task_id, terminate=True)
+
+    log.warning(f"Task {task_id} killed by user")
+
+    return False, [], None, True
+
+
+@callback(
+    Output(KILL_MODAL_WORKER_MANAGEMENT_ID, "is_open", allow_duplicate=True),
+    Input(KILL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID, "n_clicks"),
+    prevent_initial_call=True,
+)
+def cancel_kill_modal(n_clicks):
+    """Close kill modal without action."""
+    return False
+
+
+# --- Cancel modal callbacks ---
+
+
+@callback(
+    Output(CANCEL_MODAL_WORKER_MANAGEMENT_ID, "is_open"),
+    Output(CANCEL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID, "children"),
+    Input(WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID, "n_clicks"),
+    State(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
+    State(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
+    prevent_initial_call=True,
+)
+def open_cancel_modal(n_clicks, reserved_selected, scheduled_selected):
+    """Open cancel confirmation modal with task info."""
+    task = None
+    if reserved_selected:
+        task = reserved_selected[0]
+    elif scheduled_selected:
+        task = scheduled_selected[0]
+
+    if not task:
+        return False, ""
+
+    task_info = (
+        f"Task: {task['task_name']}\n"
+        f"ID: {task['task_id']}\n"
+        f"Queue: {task['queue']}\n"
+    )
+
+    log.info(f"Opening cancel modal for task {task['task_id']}")
+
+    return True, task_info
+
+
+@callback(
+    Output(CANCEL_MODAL_WORKER_MANAGEMENT_ID, "is_open", allow_duplicate=True),
+    Output(
+        RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID,
+        "selectedRows",
+        allow_duplicate=True,
+    ),
+    Output(
+        SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID,
+        "selectedRows",
+        allow_duplicate=True,
+    ),
     Output(
         WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID,
         "children",
         allow_duplicate=True,
     ),
     Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
-    Input(WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID, "n_clicks"),
+    Input(CANCEL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID, "n_clicks"),
     State(RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
     State(SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID, "selectedRows"),
     prevent_initial_call=True,
 )
 def confirm_cancel_task(n_clicks, reserved_selected, scheduled_selected):
-    """Cancel the selected task."""
+    """Cancel the selected task after modal confirmation."""
+    if n_clicks is None:
+        raise PreventUpdate
+
+    task = None
     if reserved_selected:
         task = reserved_selected[0]
     elif scheduled_selected:
         task = scheduled_selected[0]
-    else:
-        return None, False
+
+    if not task:
+        log.warning("Cancel task attempted with no selection")
+        return False, [], [], no_update, False
 
     task_id = task["task_id"]
 
-    background_job_manager.revoke_job(task_id, terminate=False)  # Revoke only
+    background_job_manager.revoke_job(task_id, terminate=False)
 
     log.warning(f"Task {task_id} ({task['task_name']}) cancelled by user")
 
-    return None, True  # Triggers refresh via callback and opens overlay
+    return False, [], [], None, True
+
+
+@callback(
+    Output(CANCEL_MODAL_WORKER_MANAGEMENT_ID, "is_open", allow_duplicate=True),
+    Input(CANCEL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID, "n_clicks"),
+    prevent_initial_call=True,
+)
+def cancel_cancel_modal(n_clicks):
+    """Close cancel modal without action."""
+    return False
 
 
 @callback(
@@ -684,4 +851,4 @@ def submit_test_task(n_clicks):
     else:
         log.info(f"Test task submitted successfully with task_id={task_id}")
 
-    return None, True  # Triggers refresh via dummy component and opens overlay
+    return None, True

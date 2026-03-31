@@ -280,12 +280,30 @@ EMAIL_INPUT_USER_INFO_ID = "email-input-user-info-id"
 # ============================================================================
 
 # --- Buttons ---
+CANCEL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID = (
+    "cancel-modal-cancel-button-worker-management-id"
+)
+CANCEL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID = (
+    "cancel-modal-confirm-button-worker-management-id"
+)
+KILL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID = (
+    "kill-modal-cancel-button-worker-management-id"
+)
+KILL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID = (
+    "kill-modal-confirm-button-worker-management-id"
+)
 TEST_TASK_BUTTON_WORKER_MANAGEMENT_ID = "test-task-button-worker-management-id"
 WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID = "worker-cancel-btn-worker-management-id"
 WORKER_KILL_BTN_WORKER_MANAGEMENT_ID = "worker-kill-btn-worker-management-id"
 WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID = "worker-refresh-btn-worker-management-id"
 
 # --- Divs ---
+CANCEL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID = (
+    "cancel-modal-task-info-div-worker-management-id"
+)
+KILL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID = (
+    "kill-modal-task-info-div-worker-management-id"
+)
 WORKER_LAST_REFRESH_DIV_WORKER_MANAGEMENT_ID = (
     "worker-last-refresh-div-worker-management-id"
 )
@@ -296,10 +314,9 @@ WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID = (
     "worker-stats-card-div-worker-management-id"
 )
 
-# --- Inputs ---
-SELECTED_TASK_ID_INPUT_WORKER_MANAGEMENT_ID = (
-    "selected-task-id-input-worker-management-id"
-)
+# --- Modals ---
+CANCEL_MODAL_WORKER_MANAGEMENT_ID = "cancel-modal-worker-management-id"
+KILL_MODAL_WORKER_MANAGEMENT_ID = "kill-modal-worker-management-id"
 
 # --- Tables ---
 ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID = "active-tasks-table-worker-management-id"
