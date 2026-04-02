@@ -8,9 +8,9 @@ circular import: tasks/*.py → cosmonaut_job → this module → tasks/*.py.
 """
 
 import logging
-import time
 
 from celery import Celery
+from celery.exceptions import CeleryError
 from celery.result import AsyncResult
 from kombu.exceptions import OperationalError
 
@@ -32,7 +32,7 @@ class BackgroundJobManager:
         self.app = Celery("cosmonaut")
         self.app.config_from_object(CeleryConfig)
 
-    def submit_routing_job(self, job):
+    def submit_routing_job(self, job) -> tuple[str | None, bool]:
         """Submit a routing job to the Celery queue.
 
         Args:
@@ -65,11 +65,11 @@ class BackgroundJobManager:
                 f"Submitted routing job {job.model.job_id} with task_id={result.id}"
             )
             return result.id, False
-        except Exception as e:
-            log.error(f"Failed to submit routing job {job.model.job_id}: {str(e)}")
+        except (OperationalError, CeleryError) as e:
+            log.error(f"Failed to submit routing job {job.model.job_id}: {e}")
             return None, True
 
-    def submit_upload_job(self, job, epsg_input):
+    def submit_upload_job(self, job, epsg_input: int) -> tuple[str | None, bool]:
         """Submit an upload post-processing job to the Celery queue.
 
         Args:
@@ -102,11 +102,11 @@ class BackgroundJobManager:
                 f"Submitted upload job {job.model.job_id} with task_id={result.id}"
             )
             return result.id, False
-        except Exception as e:
-            log.error(f"Failed to submit upload job {job.model.job_id}: {str(e)}")
+        except (OperationalError, CeleryError) as e:
+            log.error(f"Failed to submit upload job {job.model.job_id}: {e}")
             return None, True
 
-    def get_job_status(self, task_id):
+    def get_job_status(self, task_id: str) -> dict:
         """Get status of a Celery task.
 
         Args:
@@ -127,7 +127,27 @@ class BackgroundJobManager:
             "traceback": result.traceback if result.failed() else None,
         }
 
-    def get_all_tasks_overview(self):
+    def get_task_result_info(self, task_id: str) -> dict:
+        """Get task name and status from result backend."""
+        task_name = "Unknown"
+        status = "REVOKED"
+
+        try:
+            result = AsyncResult(task_id, app=self.app)
+            if result.name:
+                task_name = result.name.split(".")[-1]
+            else:
+                stored_name = self.app.backend.client.get(f"task_name:{task_id}")
+                if stored_name:
+                    task_name = stored_name.decode().split(".")[-1]
+            if result.status:
+                status = result.status
+        except CeleryError as e:
+            log.debug(f"Could not get result info for task {task_id}: {e}")
+
+        return {"task_name": task_name, "status": status}
+
+    def get_all_tasks_overview(self) -> dict:
         """Get comprehensive task overview using Celery inspect API.
 
         Returns:
@@ -135,7 +155,7 @@ class BackgroundJobManager:
                   - active: List of running tasks with worker field
                   - reserved: List of claimed but not started tasks
                   - scheduled: List of future-scheduled tasks
-                  - revoked: List of revoked task IDs
+                  - revoked: List of revoked task dicts with "id" and "worker" keys
                   - workers: List of online worker names
 
         Raises:
@@ -150,20 +170,18 @@ class BackgroundJobManager:
             scheduled = inspect.scheduled() or {}
             revoked_dict = inspect.revoked() or {}
 
-            # Flatten task lists (they come grouped by worker)
-            def flatten_tasks(task_dict):
-                """Flatten task dict from {worker: [tasks]} to [tasks]."""
-                flattened = []
-                for worker, tasks in (task_dict or {}).items():
+            def flatten_tasks(worker_dict):
+                """Flatten {worker: [tasks]} to [tasks] with worker info."""
+                result = []
+                for worker, tasks in (worker_dict or {}).items():
                     for task in tasks:
-                        task["worker"] = worker
-                        flattened.append(task)
-                return flattened
-
-            # Flatten revoked task IDs
-            revoked_ids = []
-            for worker, task_ids in revoked_dict.items():
-                revoked_ids.extend(task_ids)
+                        if isinstance(task, dict):
+                            task["worker"] = worker
+                            result.append(task)
+                        else:
+                            # Revoked returns plain ID strings, not dicts
+                            result.append({"id": task, "worker": worker})
+                return result
 
             # Get list of online workers (single call to avoid race with worker shutdown)
             ping_result = inspect.ping()
@@ -173,7 +191,7 @@ class BackgroundJobManager:
                 "active": flatten_tasks(active),
                 "reserved": flatten_tasks(reserved),
                 "scheduled": flatten_tasks(scheduled),
-                "revoked": revoked_ids,
+                "revoked": flatten_tasks(revoked_dict),
                 "workers": workers,
             }
         except (OperationalError, ConnectionError) as e:
@@ -182,7 +200,7 @@ class BackgroundJobManager:
                 "Unable to connect to Celery broker. Ensure Redis is running and accessible."
             ) from e
 
-    def revoke_job(self, task_id, terminate=False):
+    def revoke_job(self, task_id: str, terminate: bool = False) -> None:
         """Revoke/cancel a running or queued task.
 
         Args:
@@ -191,10 +209,9 @@ class BackgroundJobManager:
                        If False, just prevent execution (cancel)
         """
         self.app.control.revoke(task_id, terminate=terminate)
-        log.info(f"{'Killed' if terminate else 'Cancelled'} task {task_id}")
-        time.sleep(0.5)
+        log.info(f"Task {task_id} revoked (terminate={terminate})")
 
-    def submit_test_task(self):
+    def submit_test_task(self) -> tuple[str | None, bool]:
         """Submit a test sleep task to the Celery queue.
 
         Returns:
@@ -214,11 +231,11 @@ class BackgroundJobManager:
             )
             log.info(f"Submitted test task with task_id={result.id}")
             return result.id, False
-        except Exception as e:
-            log.error(f"Failed to submit test task: {str(e)}")
+        except (OperationalError, CeleryError) as e:
+            log.error(f"Failed to submit test task: {e}")
             return None, True
 
-    def submit_cleanup_task(self):
+    def submit_cleanup_task(self) -> tuple[str | None, bool]:
         """Submit a maintenance cleanup task to the Celery queue.
 
         Returns:
@@ -238,8 +255,8 @@ class BackgroundJobManager:
             )
             log.info(f"Submitted cleanup task with task_id={result.id}")
             return result.id, False
-        except Exception as e:
-            log.error(f"Failed to submit cleanup task: {str(e)}")
+        except (OperationalError, CeleryError) as e:
+            log.error(f"Failed to submit cleanup task: {e}")
             return None, True
 
 

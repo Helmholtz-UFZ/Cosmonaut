@@ -2,9 +2,34 @@
 
 # User documentation (This section is for user documentation and will appear in the user documentation.)
 
-This page provides real-time monitoring and control of Celery background workers.
-Allows viewing active, reserved, scheduled, and revoked tasks, as well as killing
-or cancelling tasks.
+Monitor and manage background workers and tasks.
+
+This administrative page provides real-time visibility into the Celery background task
+system that processes prediction jobs and maintenance operations. Features include:
+
+**Worker Status:**
+- View active worker processes and their configuration
+- See worker pool types, concurrency settings, and queue assignments
+- Check worker availability and health
+
+**Task Monitoring:**
+- View currently executing tasks (active tasks)
+- See tasks waiting in worker queues (reserved tasks)
+- Monitor scheduled tasks waiting for their run time
+- Track revoked (cancelled) tasks
+- Display task details including name, arguments, and execution time
+
+**Task Control:**
+- Kill actively running tasks (forcefully terminate)
+- Cancel scheduled tasks before they execute
+- Confirmation dialogs prevent accidental terminations
+
+**Status Updates:**
+- Manual refresh to get latest worker and task information
+- Timestamp showing when data was last refreshed
+
+This page is essential for monitoring system load, debugging stuck tasks, and managing
+resource usage during peak periods.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
@@ -15,12 +40,15 @@ import logging
 from datetime import datetime
 
 import dash
+import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, html, no_update, register_page
 from dash.exceptions import PreventUpdate
-import dash_ag_grid as dag
-from celery.result import AsyncResult
 
+from cosmonaut_app.background_job_manager import (
+    NAME_ROUTING_TASK,
+    background_job_manager,
+)
 from cosmonaut_app.constants.html_ids import (
     ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID,
     CANCEL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID,
@@ -44,12 +72,6 @@ from cosmonaut_app.constants.html_ids import (
     WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID,
 )
 from cosmonaut_app.layout import create_header, page_container_column_layout
-from cosmonaut_app.background_job_manager import (
-    background_job_manager,
-    NAME_ROUTING_TASK,
-    BackgroundJobManager,
-)
-
 
 log = logging.getLogger(__name__)
 
@@ -178,6 +200,9 @@ def format_duration(start_timestamp):
     Returns:
         str: Duration in format like "2m 30s" or "1h 15m"
     """
+    if not start_timestamp:
+        return "N/A"
+
     duration_seconds = int(datetime.now().timestamp() - start_timestamp)
     if duration_seconds < 60:
         return f"{duration_seconds}s"
@@ -211,10 +236,14 @@ def format_active_tasks(active_tasks):
                 "task_id": task["id"],
                 "task_name": task["name"].split(".")[-1],
                 "worker": task["worker"],
-                "start_time": datetime.fromtimestamp(task["time_start"]).strftime(
-                    "%H:%M:%S"
+                "start_time": (
+                    datetime.fromtimestamp(task["time_start"]).strftime("%H:%M:%S")
+                    if task.get(
+                        "time_start"
+                    )  # time_start absent for tasks not yet started
+                    else "N/A"
                 ),
-                "duration": format_duration(task["time_start"]),
+                "duration": format_duration(task.get("time_start")),  # see above
                 "job_id": job_id,
             }
         )
@@ -232,14 +261,12 @@ def format_reserved_tasks(reserved_tasks):
     """
     formatted = []
     for task in reserved_tasks:
-        delivery_info = task["delivery_info"]
-        queue = delivery_info["routing_key"]
-
         formatted.append(
             {
                 "task_id": task["id"],
                 "task_name": task["name"].split(".")[-1],
-                "queue": queue,
+                # delivery_info may be absent for tasks without routing info
+                "queue": task.get("delivery_info", {}).get("routing_key", "default"),
                 "worker": task["worker"],
             }
         )
@@ -257,54 +284,44 @@ def format_scheduled_tasks(scheduled_tasks):
     """
     formatted = []
     for task in scheduled_tasks:
-        eta_str = datetime.fromisoformat(task["eta"].replace("Z", "+00:00")).strftime(
-            "%Y-%m-%d %H:%M:%S"
+        eta = task.get("eta")  # eta absent for tasks without scheduled time
+        eta_str = (
+            datetime.fromisoformat(eta).strftime("%Y-%m-%d %H:%M:%S") if eta else "N/A"
         )
-
-        delivery_info = task["delivery_info"]
-        queue = delivery_info["routing_key"]
 
         formatted.append(
             {
                 "task_id": task["id"],
                 "task_name": task["name"].split(".")[-1],
                 "eta": eta_str,
-                "queue": queue,
+                # delivery_info may be absent for tasks without routing info
+                "queue": task.get("delivery_info", {}).get("routing_key", "default"),
+                "worker": task["worker"],
             }
         )
     return formatted
 
 
-def format_revoked_tasks(revoked_list: list, job_manager: BackgroundJobManager):
+def format_revoked_tasks(revoked_list: list) -> list:
     """Format revoked tasks for AgGrid display with enrichment from result backend.
 
     Args:
-        revoked_list: List of revoked task IDs (strings)
-        job_manager: BackgroundJobManager instance for accessing Celery app
+        revoked_list: List of revoked tasks with id and worker fields
 
     Returns:
         list: List of task dictionaries formatted for table
     """
     tasks = []
-    for task_id in revoked_list:
-        result = AsyncResult(task_id, app=background_job_manager.app)
-        log.debug(f"Revoked task {task_id} has status {result.status}")
-        log.debug(result)
-
-        try:
-            task_name_full = background_job_manager.app.backend.client.get(
-                f"task_name:{task_id}"
-            ).decode()
-            task_name = task_name_full.split(".")[-1]
-        except AttributeError:
-            log.warning(f"Task name not found in Redis for revoked task {task_id}")
-            task_name = "Unknown"
+    for task in revoked_list:
+        task_id = task["id"]
+        result_info = background_job_manager.get_task_result_info(task_id)
 
         tasks.append(
             {
                 "task_id": task_id,
-                "task_name": task_name,
-                "status": result.status,
+                "task_name": result_info["task_name"],
+                "worker": task["worker"],
+                "status": result_info["status"],
             }
         )
     return tasks
@@ -459,6 +476,7 @@ def layout():
         columns=[
             {"id": "task_id", "name": "Task ID"},
             {"id": "task_name", "name": "Task Name"},
+            {"id": "worker", "name": "Worker"},
             {"id": "status", "name": "Status"},
         ],
         selectable=False,
@@ -621,7 +639,7 @@ def refresh_worker_data(refresh_clicks, dummy_data):
     active_data = format_active_tasks(overview["active"])
     reserved_data = format_reserved_tasks(overview["reserved"])
     scheduled_data = format_scheduled_tasks(overview["scheduled"])
-    revoked_data = format_revoked_tasks(overview["revoked"], background_job_manager)
+    revoked_data = format_revoked_tasks(overview["revoked"])
 
     worker_cards = format_worker_stats(overview)
 
@@ -761,9 +779,7 @@ def open_cancel_modal(n_clicks, reserved_selected, scheduled_selected):
         return False, ""
 
     task_info = (
-        f"Task: {task['task_name']}\n"
-        f"ID: {task['task_id']}\n"
-        f"Queue: {task['queue']}\n"
+        f"Task: {task['task_name']}\nID: {task['task_id']}\nQueue: {task['queue']}\n"
     )
 
     log.info(f"Opening cancel modal for task {task['task_id']}")
