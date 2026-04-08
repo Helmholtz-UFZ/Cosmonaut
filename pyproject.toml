@@ -1,6 +1,6 @@
 [project]
 name = "cosmonaut"
-version = "0.1.5"
+version = "0.1.6"
 description = "Navigation route optimization for cosmic ray neutron sensor surveys"
 requires-python = ">=3.13"
 dependencies = [
