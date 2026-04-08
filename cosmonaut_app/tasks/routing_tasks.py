@@ -87,7 +87,7 @@ def process_routing_job(self, job_id):
         # Flush all handlers before switching back
         flush_all_handlers()
 
-        # Switch logging back to web config
+        # Switch logging back to worker config
         dictConfig(get_logger_config_worker())
 
         log.info(f"Routing job {job_id} finished")

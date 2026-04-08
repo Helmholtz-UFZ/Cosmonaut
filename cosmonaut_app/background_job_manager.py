@@ -8,15 +8,25 @@ circular import: tasks/*.py → cosmonaut_job → this module → tasks/*.py.
 """
 
 import logging
+from logging.config import dictConfig
 
 from celery import Celery
 from celery.exceptions import CeleryError
 from celery.result import AsyncResult
+from celery.signals import worker_process_init
 from kombu.exceptions import OperationalError
 
 from cosmonaut_app.celery_config import CeleryConfig
+from cosmonaut_app.logger import get_logger_config_worker
 
 log = logging.getLogger(__name__)
+
+
+@worker_process_init.connect
+def configure_worker_logging(sender=None, conf=None, **kwargs):
+    """Configure database logging for Celery worker processes."""
+    dictConfig(get_logger_config_worker())
+
 
 NAME_ROUTING_TASK = "cosmonaut_app.tasks.routing_tasks.process_routing"
 NAME_TEST_TASK = "cosmonaut_app.tasks.test_tasks.test_sleep"
@@ -125,6 +135,7 @@ class BackgroundJobManager:
             "status": result.status,
             "result": result.result if result.ready() else None,
             "traceback": result.traceback if result.failed() else None,
+            "date_done": result.date_done,
         }
 
     def get_task_result_info(self, task_id: str) -> dict:
