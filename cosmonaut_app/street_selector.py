@@ -18,6 +18,7 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
+from shapely.geometry import mapping, shape
 from sensor_routing.constants import OSM_FILENAME
 
 from cosmonaut_app.constants.general import (
@@ -39,6 +40,11 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 _DEFAULT_TAGS = list(OSM_TAGS_MAPPING.keys())
+# Simplification tolerance in degrees (~11 m at mid-latitudes).
+# Only affects the display copy sent to the browser, not stored data.
+_SIMPLIFY_TOLERANCE = 0.0001
+# Properties the browser actually uses (style_handle, tooltips, click handler).
+_DISPLAY_PROPERTIES = {"highway", "tooltip"}
 
 
 class StreetSelector:
@@ -165,10 +171,17 @@ class StreetSelector:
     # -- read-only helpers ------------------------------------------------
 
     def visible_fc(self) -> dict:
-        """Return the current edited FeatureCollection with tooltips added."""
+        """Return a lightweight FeatureCollection for browser rendering.
+
+        Adds tooltips, then strips unused properties and simplifies
+        geometries so the payload is small and canvas rendering is fast.
+        """
         features = self._load_edit_features()
         self._add_tooltips(features)
-        return {"type": "FeatureCollection", "features": features}
+        return {
+            "type": "FeatureCollection",
+            "features": self._simplify_for_display(features),
+        }
 
     def get_removed_roads_info(self) -> list[dict]:
         """Return display info for each removed road from the download file.
@@ -256,6 +269,30 @@ class StreetSelector:
             name = properties.get("name") or properties.get("ref")
             highway = properties["highway"]
             properties["tooltip"] = f"{name}, {highway}" if name else highway
+
+    @staticmethod
+    def _simplify_for_display(features: list) -> list:
+        """Return lightweight copies of *features* for browser rendering.
+
+        Strips all properties the client doesn't need and simplifies
+        geometries so the JSON payload and canvas draw calls are smaller.
+        The original feature list (and the files on disk) are untouched.
+        """
+        light = []
+        for f in features:
+            geom = shape(f["geometry"]).simplify(
+                _SIMPLIFY_TOLERANCE, preserve_topology=True
+            )
+            props = {k: v for k, v in f["properties"].items() if k in _DISPLAY_PROPERTIES}
+            light.append(
+                {
+                    "id": f["id"],
+                    "type": "Feature",
+                    "geometry": mapping(geom),
+                    "properties": props,
+                }
+            )
+        return light
 
     @staticmethod
     def _filter_by_tags(features: list, selected_roads: list[str] | None) -> list:

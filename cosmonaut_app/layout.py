@@ -347,6 +347,7 @@ def build_global_map():
         center=[51.70, 11.20],
         zoom=10,
         className="h-100",
+        preferCanvas=True,
     )
 
 
