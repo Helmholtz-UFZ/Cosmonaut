@@ -81,6 +81,7 @@ CLICKED_ROADS_STORE_SHARED_ID = (
 )
 CURRENT_JOB_ID_MAP_STORE_ID = "current-job-id-map-store-id"
 JOB_ID_STORE_SHARED_ID = "job-id-store-shared-id"
+STREETS_REFRESH_TRIGGER_STORE_SHARED_ID = "streets-refresh-trigger-store-shared-id"
 
 
 # ============================================================================

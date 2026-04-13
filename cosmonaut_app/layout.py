@@ -28,6 +28,7 @@ from cosmonaut_app.constants.html_ids import (
     RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
     RESET_MODAL_SHARED_ID,
     ROUTE_POLYLINE_LAYER_MAP_ID,
+    STREETS_REFRESH_TRIGGER_STORE_SHARED_ID,
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -347,6 +348,7 @@ def build_global_map():
         center=[51.70, 11.20],
         zoom=10,
         className="h-100",
+        preferCanvas=True,
     )
 
 
@@ -356,6 +358,7 @@ def app_layout():
         className="d-flex flex-column min-vh-100 bg-light",
         children=[
             dcc.Store(id=CURRENT_JOB_ID_MAP_STORE_ID, data=None),
+            dcc.Store(id=STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, data=0),
             dcc.Interval(
                 id=MAP_INIT_INTERVAL_SHARED_ID, interval=1000, max_intervals=1
             ),
@@ -597,18 +600,21 @@ def register_reset_callbacks(app):
 
 
 def register_map_callbacks(app):
-    """Register the global map layer callback.
+    """Register the global map layer callbacks.
 
-    Populates all three map layers (membership tile, streets, route) and
-    repositions the viewport when the job changes.
+    ``update_map_layers`` handles viewport repositioning, membership tile,
+    route polyline, and job-id tracking on every SPA navigation.
 
-    Triggered by URL_SHARED_ID on every SPA pathname change.
+    ``update_viewport_streets`` is the single callback that populates the
+    street GeoJSON layer.  It fires when:
+    - the map viewport moves (``bounds`` change on moveend),
+    - an edit bumps the refresh trigger, or
+    - the active job changes.
     """
 
     @app.callback(
         Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True),
         Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
-        Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
         Output(ROUTE_POLYLINE_LAYER_MAP_ID, "data"),
         Output(CURRENT_JOB_ID_MAP_STORE_ID, "data"),
         Input(URL_SHARED_ID, "pathname"),
@@ -621,14 +627,14 @@ def register_map_callbacks(app):
         parts = pathname.split("/")
         if len(parts) < 3 or parts[1] != "job":
             log.info("Not a job page, returning empty")
-            return no_update, "", empty_fc, empty_fc, None
+            return no_update, "", empty_fc, None
 
         job_id = parts[2]
         try:
             job = CosmonautJob(job_id=job_id)
         except JobNotFound:
             log.info(f"Job {job_id} not found, returning empty")
-            return no_update, "", empty_fc, empty_fc, None
+            return no_update, "", empty_fc, None
 
         # Only recentre the map when the job changes
         if job_id != prev_job_id:
@@ -641,7 +647,6 @@ def register_map_callbacks(app):
             viewport = no_update
 
         tile_url = get_tile_url(job_id, job.working_dir)
-        streets_fc = StreetSelector(job).initial_fc()
         raw_positions = job.get_route_polyline() or []
         route_fc = {"type": "FeatureCollection", "features": []}
         if raw_positions:
@@ -656,6 +661,27 @@ def register_map_callbacks(app):
                 }
             ]
         log.info(
-            f"Returning tile_url={tile_url!r}, streets={len(streets_fc['features'])}, route_pts={len(raw_positions)}"
+            f"Returning tile_url={tile_url!r}, route_pts={len(raw_positions)}"
         )
-        return viewport, tile_url, streets_fc, route_fc, job_id
+        return viewport, tile_url, route_fc, job_id
+
+    @app.callback(
+        Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+        Input(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "bounds"),
+        Input(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
+        Input(CURRENT_JOB_ID_MAP_STORE_ID, "data"),
+        State(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "zoom"),
+        prevent_initial_call=True,
+    )
+    def update_viewport_streets(bounds, _data_version, job_id, zoom):
+        """Load street features for the current viewport and zoom level."""
+        empty_fc = {"type": "FeatureCollection", "features": []}
+        if not job_id or not bounds:
+            return empty_fc
+
+        try:
+            job = CosmonautJob(job_id=job_id)
+        except JobNotFound:
+            return empty_fc
+
+        return StreetSelector(job).viewport_fc(bounds, zoom or 10)

@@ -20,6 +20,7 @@ from cosmonaut_app.constants.general import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.email_service import send_mail
+from cosmonaut_app.street_selector import StreetSelector
 from cosmonaut_app.logger import get_logger_config_computation, get_logger_config_worker
 
 log = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ def process_routing_job(self, job_id):
     try:
         log.info(f"Starting routing job computation for job_id={job_id}")
 
+        StreetSelector(job).ensure_projected()
         sensor_routing_pipeline(job.working_dir)
 
         # Post-processing: Create GPX and QR code
