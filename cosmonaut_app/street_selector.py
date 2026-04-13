@@ -13,12 +13,14 @@ could mitigate this in the future.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
+
+import orjson
 from typing import TYPE_CHECKING
 
-from shapely.geometry import mapping, shape
+from shapely import STRtree
+from shapely.geometry import box, mapping, shape
 from sensor_routing.constants import OSM_FILENAME
 
 from cosmonaut_app.constants.general import (
@@ -40,11 +42,32 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 _DEFAULT_TAGS = list(OSM_TAGS_MAPPING.keys())
-# Simplification tolerance in degrees (~11 m at mid-latitudes).
-# Only affects the display copy sent to the browser, not stored data.
-_SIMPLIFY_TOLERANCE = 0.0001
 # Properties the browser actually uses (style_handle, tooltips, click handler).
 _DISPLAY_PROPERTIES = {"highway", "tooltip"}
+
+# Module-level cache: avoids re-parsing large GeoJSON files on every callback.
+# Keyed by absolute path → (mtime, features).  The download file is immutable
+# within a job so its entry lives until the process restarts.  The edit file
+# entry is refreshed every time _save_edit_file writes, so the viewport
+# callback that fires right after never re-reads from disk.
+_feature_cache: dict[str, tuple[float, list]] = {}
+
+
+def _zoom_to_tolerance(zoom: float) -> float:
+    """Map zoom level to simplification tolerance in degrees.
+
+    Higher zoom → less simplification (user sees more detail).
+    Lower zoom → more simplification (features are tiny anyway).
+    """
+    if zoom >= 15:
+        return 0.00001  # ~1 m — near-original detail
+    if zoom >= 13:
+        return 0.0001  # ~11 m
+    if zoom >= 11:
+        return 0.0005  # ~55 m
+    if zoom >= 9:
+        return 0.001  # ~110 m
+    return 0.005  # ~550 m — aggressive for overview
 
 
 class StreetSelector:
@@ -84,7 +107,7 @@ class StreetSelector:
             return
         self.removed_roads.extend(unique_new)
         self.keep_largest_applied = False
-        self.apply_edits()
+        self.apply_edits(defer_projection=True)
 
     def restore_road(self, road_id: int) -> None:
         """Remove a single road ID from the removed list and re-derive."""
@@ -92,7 +115,7 @@ class StreetSelector:
             return
         self.removed_roads.remove(road_id)
         self.keep_largest_applied = False
-        self.apply_edits()
+        self.apply_edits(defer_projection=True)
 
     def clear_removed_roads(self) -> None:
         """Clear the entire removed roads list and re-derive."""
@@ -100,13 +123,13 @@ class StreetSelector:
             return
         self.removed_roads = []
         self.keep_largest_applied = False
-        self.apply_edits()
+        self.apply_edits(defer_projection=True)
 
     def update_tags(self, tags: list[str]) -> None:
         """Set the active road-type tags and re-derive the edited network."""
         self.selected_road_tags = tags
         self.keep_largest_applied = False
-        self.apply_edits()
+        self.apply_edits(defer_projection=True)
 
     def keep_largest(self) -> bool:
         """Activate the keep-largest-component filter.
@@ -114,24 +137,29 @@ class StreetSelector:
         Returns False if the current network is empty (caller should guard).
         """
         self.keep_largest_applied = True
-        return self.apply_edits()
+        return self.apply_edits(defer_projection=True)
 
     def reset(self) -> None:
         """Restore all edit state to defaults and re-derive."""
         self.removed_roads = []
         self.selected_road_tags = list(_DEFAULT_TAGS)
         self.keep_largest_applied = False
-        self.apply_edits()
+        self.apply_edits(defer_projection=True)
 
     # -- apply / derive ---------------------------------------------------
 
-    def apply_edits(self) -> bool:
+    def apply_edits(self, *, defer_projection: bool = False) -> bool:
         """Re-derive the edited network from the download baseline.
 
         Applies operations in order:
         1. Filter by ``selected_road_tags``
         2. Remove features in ``removed_roads``
         3. Optionally keep only the largest connected component
+
+        When *defer_projection* is True the expensive reprojection step
+        (``project_and_save``) is skipped.  The caller must invoke
+        :meth:`ensure_projected` before the transformed file is needed
+        (i.e. before routing).
 
         Returns False if the resulting feature set is empty.
         """
@@ -147,6 +175,46 @@ class StreetSelector:
 
         fc = {"type": "FeatureCollection", "features": features}
         self._save_edit_file(fc)
+        if not defer_projection:
+            if features:
+                project_and_save(
+                    features,
+                    self.transformed_path,
+                    src_epsg=4326,
+                    dst_epsg=self.job.model.epsg,
+                )
+            else:
+                self._save_edit_file(fc, path=self.transformed_path)
+        self._save_edits()
+        self.job.save()
+
+        log.info(
+            "Applied edits: %d features, tags=%d, removed=%d, keep_largest=%s, deferred=%s",
+            len(features),
+            len(self.selected_road_tags),
+            len(self.removed_roads),
+            self.keep_largest_applied,
+            defer_projection,
+        )
+        return bool(features)
+
+    def ensure_projected(self) -> None:
+        """Project the edited network to the job's EPSG if not up-to-date.
+
+        Compares modification times: if the edited file is newer than the
+        transformed file, reprojection is needed.  Safe to call multiple
+        times — it's a no-op when the transformed file is already current.
+        """
+        if not os.path.exists(self.edit_path):
+            return
+        needs_projection = (
+            not os.path.exists(self.transformed_path)
+            or os.path.getmtime(self.edit_path)
+            > os.path.getmtime(self.transformed_path)
+        )
+        if not needs_projection:
+            return
+        features = self._load_edit_features()
         if features:
             project_and_save(
                 features,
@@ -155,18 +223,11 @@ class StreetSelector:
                 dst_epsg=self.job.model.epsg,
             )
         else:
-            self._save_edit_file(fc, path=self.transformed_path)
-        self._save_edits()
-        self.job.save()
-
-        log.info(
-            "Applied edits: %d features, tags=%d, removed=%d, keep_largest=%s",
-            len(features),
-            len(self.selected_road_tags),
-            len(self.removed_roads),
-            self.keep_largest_applied,
-        )
-        return bool(features)
+            self._save_edit_file(
+                {"type": "FeatureCollection", "features": []},
+                path=self.transformed_path,
+            )
+        log.info("Projected %d features to EPSG %s", len(features), self.job.model.epsg)
 
     # -- read-only helpers ------------------------------------------------
 
@@ -175,12 +236,13 @@ class StreetSelector:
 
         Adds tooltips, then strips unused properties and simplifies
         geometries so the payload is small and canvas rendering is fast.
+        Only used as a fallback — prefer :meth:`viewport_fc` for map updates.
         """
         features = self._load_edit_features()
         self._add_tooltips(features)
         return {
             "type": "FeatureCollection",
-            "features": self._simplify_for_display(features),
+            "features": self._simplify_for_display(features, _zoom_to_tolerance(12)),
         }
 
     def get_removed_roads_info(self) -> list[dict]:
@@ -217,6 +279,47 @@ class StreetSelector:
             return {"type": "FeatureCollection", "features": []}
         return self.visible_fc()
 
+    def viewport_fc(self, bounds: list, zoom: float) -> dict:
+        """Return features visible in *bounds*, simplified for *zoom*.
+
+        Args:
+            bounds: Leaflet bounds ``[[south, west], [north, east]]``.
+            zoom: Current map zoom level.
+
+        Only features whose geometry intersects the viewport bounding box
+        are included.  Geometries are simplified with a zoom-dependent
+        tolerance so zoomed-out views are lightweight while zoomed-in
+        views stay sharp.
+        """
+        if not os.path.exists(self.edit_path):
+            return {"type": "FeatureCollection", "features": []}
+
+        features = self._load_edit_features()
+        self._add_tooltips(features)
+
+        # Spatial filter — keep only features intersecting the viewport
+        south, west = bounds[0]
+        north, east = bounds[1]
+        viewport_box = box(west, south, east, north)
+
+        geometries = [shape(f["geometry"]) for f in features]
+        tree = STRtree(geometries)
+        indices = tree.query(viewport_box, predicate="intersects")
+        visible = [features[i] for i in indices]
+
+        tolerance = _zoom_to_tolerance(zoom)
+        log.debug(
+            "viewport_fc: %d/%d features visible at zoom=%.1f (tol=%.5f)",
+            len(visible),
+            len(features),
+            zoom,
+            tolerance,
+        )
+        return {
+            "type": "FeatureCollection",
+            "features": self._simplify_for_display(visible, tolerance),
+        }
+
     # -- private I/O helpers ----------------------------------------------
 
     def _load_edits(self) -> dict:
@@ -227,11 +330,11 @@ class StreetSelector:
             "keep_largest": False,
         }
         if os.path.exists(self.edits_path):
-            with open(self.edits_path, encoding="utf-8") as f:
-                return json.load(f)
+            with open(self.edits_path, "rb") as f:
+                return orjson.loads(f.read())
         # Create the file so it exists for future reads
-        with open(self.edits_path, "w", encoding="utf-8") as f:
-            json.dump(defaults, f, ensure_ascii=False)
+        with open(self.edits_path, "wb") as f:
+            f.write(orjson.dumps(defaults))
         return defaults
 
     def _save_edits(self) -> None:
@@ -241,24 +344,37 @@ class StreetSelector:
             "selected_road_tags": self.selected_road_tags,
             "keep_largest": self.keep_largest_applied,
         }
-        with open(self.edits_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False)
+        with open(self.edits_path, "wb") as f:
+            f.write(orjson.dumps(data))
 
     def _load_download_features(self) -> list:
-        with open(self.download_path, encoding="utf-8") as f:
-            return json.load(f)["features"]
+        return self._cached_load(self.download_path)
 
     def _load_edit_features(self) -> list:
-        with open(self.edit_path, encoding="utf-8") as f:
-            return json.load(f)["features"]
+        return self._cached_load(self.edit_path)
+
+    @staticmethod
+    def _cached_load(path: str) -> list:
+        """Load features from *path*, returning a cached copy when fresh."""
+        mtime = os.path.getmtime(path)
+        cached = _feature_cache.get(path)
+        if cached is not None and cached[0] == mtime:
+            return cached[1]
+        with open(path, "rb") as f:
+            features = orjson.loads(f.read())["features"]
+        _feature_cache[path] = (mtime, features)
+        return features
 
     def _save_edit_file(
         self, feature_collection: dict, path: str | None = None
     ) -> None:
         data = dict(feature_collection)
         data.pop("crs", None)
-        with open(path or self.edit_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False)
+        target = path or self.edit_path
+        with open(target, "wb") as f:
+            f.write(orjson.dumps(data))
+        # Warm the cache so the next _load_edit_features avoids a re-read.
+        _feature_cache[target] = (os.path.getmtime(target), data["features"])
 
     @staticmethod
     def _add_tooltips(features: list) -> None:
@@ -271,7 +387,7 @@ class StreetSelector:
             properties["tooltip"] = f"{name}, {highway}" if name else highway
 
     @staticmethod
-    def _simplify_for_display(features: list) -> list:
+    def _simplify_for_display(features: list, tolerance: float) -> list:
         """Return lightweight copies of *features* for browser rendering.
 
         Strips all properties the client doesn't need and simplifies
@@ -281,7 +397,7 @@ class StreetSelector:
         light = []
         for f in features:
             geom = shape(f["geometry"]).simplify(
-                _SIMPLIFY_TOLERANCE, preserve_topology=True
+                tolerance, preserve_topology=True
             )
             props = {k: v for k, v in f["properties"].items() if k in _DISPLAY_PROPERTIES}
             light.append(

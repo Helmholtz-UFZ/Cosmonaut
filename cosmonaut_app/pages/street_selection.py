@@ -100,6 +100,7 @@ from cosmonaut_app.constants.html_ids import (
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
     STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
     STREET_PROCESSING_POLL_STREET_SELECTION_ID,
+    STREETS_REFRESH_TRIGGER_STORE_SHARED_ID,
     TAGS_DROPDOWN_STREET_SELECTION_ID,
     TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
@@ -534,7 +535,7 @@ def poll_street_processing_status(n_intervals, job_id):
 
 
 @callback(
-    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data", allow_duplicate=True),
     Output(
         REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
     ),
@@ -544,6 +545,7 @@ def poll_street_processing_status(n_intervals, job_id):
     [
         State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
         State(JOB_ID_STORE_SHARED_ID, "data"),
+        State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     ],
     prevent_initial_call=True,
 )
@@ -551,6 +553,7 @@ def remove_selected(
     n: Optional[int],
     hideout: Optional[Dict[str, Any]],
     job_id: Optional[str],
+    version: Optional[int],
 ):
     """Remove the currently selected roads and update the edited GeoJSON."""
     if not n or not job_id:
@@ -573,20 +576,24 @@ def remove_selected(
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",
     )
-    return sel.visible_fc(), list_group, hint, "mt-3"
+    return (version or 0) + 1, list_group, hint, "mt-3"
 
 
 @callback(
-    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     [Input(LARGEST_BUTTON_STREET_SELECTION_ID, "n_clicks")],
-    [State(JOB_ID_STORE_SHARED_ID, "data")],
+    [
+        State(JOB_ID_STORE_SHARED_ID, "data"),
+        State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
+    ],
     prevent_initial_call=True,
 )
 def keep_largest_subnetwork(
     n: Optional[int],
     job_id: Optional[str],
+    version: Optional[int],
 ):
     """Keep the largest connected subnetwork of the current road network."""
     if not n or not job_id:
@@ -604,11 +611,11 @@ def keep_largest_subnetwork(
         _build_keep_largest_hint(True),
         className="text-success",
     )
-    return sel.visible_fc(), hint, "mt-3"
+    return (version or 0) + 1, hint, "mt-3"
 
 
 @callback(
-    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data", allow_duplicate=True),
     Output(TAGS_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
     Output(
         REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
@@ -616,12 +623,16 @@ def keep_largest_subnetwork(
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     [Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks")],
-    [State(JOB_ID_STORE_SHARED_ID, "data")],
+    [
+        State(JOB_ID_STORE_SHARED_ID, "data"),
+        State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
+    ],
     prevent_initial_call=True,
 )
 def reset_edits(
     n: Optional[int],
     job_id: Optional[str],
+    version: Optional[int],
 ):
     """Reset edits by restoring all state to defaults."""
     if not n or not job_id:
@@ -636,7 +647,7 @@ def reset_edits(
         _build_keep_largest_hint(False),
         className="text-warning",
     )
-    return sel.visible_fc(), sel.selected_road_tags, list_group, hint, "mt-3"
+    return (version or 0) + 1, sel.selected_road_tags, list_group, hint, "mt-3"
 
 
 @callback(
@@ -709,14 +720,17 @@ def clear_selections(
 
 
 @callback(
-    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     Input(TAGS_DROPDOWN_STREET_SELECTION_ID, "value"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
+    State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def update_tags_dropdown(tags: Optional[List[str]], job_id: Optional[str]):
+def update_tags_dropdown(
+    tags: Optional[List[str]], job_id: Optional[str], version: Optional[int]
+):
     """Persist selected tag values and refresh the map to match the filter."""
     if tags is None:
         raise PreventUpdate
@@ -728,11 +742,11 @@ def update_tags_dropdown(tags: Optional[List[str]], job_id: Optional[str]):
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",
     )
-    return sel.visible_fc(), hint, "mt-3"
+    return (version or 0) + 1, hint, "mt-3"
 
 
 @callback(
-    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data", allow_duplicate=True),
     Output(
         REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
     ),
@@ -740,9 +754,10 @@ def update_tags_dropdown(tags: Optional[List[str]], job_id: Optional[str]):
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     Input({"type": "restore-road-btn", "index": ALL}, "n_clicks"),  # nocheck
     State(JOB_ID_STORE_SHARED_ID, "data"),
+    State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def restore_single_road(n_clicks_list, job_id):
+def restore_single_road(n_clicks_list, job_id, version):
     """Restore a single road removed from the network."""
     if not any(n_clicks_list) or not job_id:
         raise PreventUpdate
@@ -761,11 +776,11 @@ def restore_single_road(n_clicks_list, job_id):
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",
     )
-    return sel.visible_fc(), list_group, hint, "mt-3"
+    return (version or 0) + 1, list_group, hint, "mt-3"
 
 
 @callback(
-    Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
+    Output(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data", allow_duplicate=True),
     Output(
         REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
     ),
@@ -773,9 +788,10 @@ def restore_single_road(n_clicks_list, job_id):
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     Input(CLEAR_REMOVED_BUTTON_STREET_SELECTION_ID, "n_clicks"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
+    State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def clear_all_removed_roads(n_clicks, job_id):
+def clear_all_removed_roads(n_clicks, job_id, version):
     """Clear the entire removed roads list and restore all roads."""
     if not n_clicks or not job_id:
         raise PreventUpdate
@@ -790,4 +806,4 @@ def clear_all_removed_roads(n_clicks, job_id):
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",
     )
-    return sel.visible_fc(), list_group, hint, "mt-3"
+    return (version or 0) + 1, list_group, hint, "mt-3"
