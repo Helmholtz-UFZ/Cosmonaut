@@ -85,6 +85,7 @@ from sensor_routing.full_pipeline_cli import (
 
 from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.classification_plot import ClassificationPlot
+from cosmonaut_app.object_storage_manager import save_files
 from cosmonaut_app.constants.general import (
     DEFAULT_MAP_CENTER,
     DEFAULT_MAP_ZOOM,
@@ -432,10 +433,10 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
 
     job = CosmonautJob(job_id=job_id)
     job.model.epsg = epsg_input
-    job.delete_membership()
+    job.delete_membership(sync_files=False)
     try:
         file_path, bounds, membership_df = job.upload_membership(
-            filename, contents, epsg_input
+            filename, contents, epsg_input, sync_files=False
         )
     except FileValidationError as e:
         result = _no_update_upload()
@@ -450,6 +451,13 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
             }
         )
         return result
+
+    # Single sync to object storage before plot generation — the worker pulls
+    # files via get_files() so the membership CSV must be in MinIO before the
+    # task starts.  Syncing here (before plots) keeps the payload small and fast.
+    # Previous intermediate saves used sync_files=False to avoid redundant rclone
+    # calls that blocked this synchronous callback for minutes on large uploads.
+    save_files(job.model.job_id)
 
     log.debug("Upload finished, generating plots and submitting OSM task")
 
@@ -466,7 +474,8 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         job.model.membership_upload["street_processing"] = task_id
     else:
         job.model.membership_upload["street_processing"] = "FAILED"
-    job.save()
+    # Skip sync — the worker's save() will sync everything when it finishes
+    job.save(sync_files=False)
 
     log.debug(f"Membership file uploaded and processed for job {job_id}")
 
