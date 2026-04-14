@@ -452,6 +452,13 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         )
         return result
 
+    # Single sync to object storage before plot generation — the worker pulls
+    # files via get_files() so the membership CSV must be in MinIO before the
+    # task starts.  Syncing here (before plots) keeps the payload small and fast.
+    # Previous intermediate saves used sync_files=False to avoid redundant rclone
+    # calls that blocked this synchronous callback for minutes on large uploads.
+    save_files(job.model.job_id)
+
     log.debug("Upload finished, generating plots and submitting OSM task")
 
     plot = ClassificationPlot(
@@ -461,12 +468,6 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
     log.debug("Classification plots generated.")
 
     tile_url = get_tile_url(job_id, job.working_dir)
-
-    # Single sync to object storage — the worker pulls files via get_files()
-    # so they must be in MinIO before the task starts.  Previous intermediate
-    # saves used sync_files=False to avoid redundant rclone calls that blocked
-    # this synchronous callback for minutes on large uploads.
-    save_files(job.model.job_id)
 
     task_id, failed = background_job_manager.submit_upload_job(job, epsg_input)
     if not failed:
