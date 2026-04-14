@@ -40,7 +40,7 @@ def serve_files(app):
         """Serve pictures."""
         log.debug(f"Serve picture {filename} for {job_id}")
         try:
-            job = CosmonautJob(job_id=job_id)
+            job = CosmonautJob(job_id=job_id, overwrite=True)
         except JobNotFound:
             log.error(f"Job not found for job_id={job_id}")
             abort(404, description="Job not found")
@@ -66,7 +66,7 @@ def serve_files(app):
         log.debug(f"Serving GPX download for job_id={job_id}")
 
         try:
-            job = CosmonautJob(job_id=job_id)
+            job = CosmonautJob(job_id=job_id, overwrite=True)
         except JobNotFound:
             abort(404, description="Job not found")
         gpx_path = os.path.join(job.working_dir, "route.gpx")
@@ -92,7 +92,7 @@ def serve_files(app):
         """
         log.debug(f"Download work dir for {job_id}")
         try:
-            job = CosmonautJob(job_id=job_id)
+            job = CosmonautJob(job_id=job_id, overwrite=True)
         except JobNotFound:
             abort(404, description="Job not found")
 

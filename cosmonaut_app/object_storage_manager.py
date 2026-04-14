@@ -141,33 +141,43 @@ def setup_remote() -> None:
     log.debug(f"Successfully created remote {OBJECT_STORAGE_REMOTE_NAME}")
 
 
-def get_files(dirname: str) -> None:
+def get_files(dirname: str, *, overwrite: bool = False) -> None:
     """Download files from object storage to local work directory.
 
-    This copies files from remote to local without deleting local files using rclone
-    copy.
+    By default, only downloads files that don't exist locally
+    (``--ignore-existing``).  This prevents stale remote copies from
+    overwriting recent local edits (e.g. street selection changes that
+    haven't been synced to MinIO yet) while still fetching new files
+    created by worker tasks on other pods.
+
+    With ``overwrite=True``, downloads all files using ``--checksum``
+    comparison, overwriting local copies.  Use this on worker pods where
+    the local directory should mirror the remote exactly.
 
     Args:
-        dirname: Name of the directory to download
+        dirname: Name of the directory to download.
+        overwrite: If True, overwrite local files with remote versions.
 
     Raises:
-        ObjectStorageError: If download fails or verification fails
+        ObjectStorageError: If download fails or verification fails.
     """
     log.debug(f"Downloading files from object storage for {dirname}")
     local_path = JOB_WORK_DIR_TEMPLATE.format(job_id=dirname)
     remote_path = f"{OBJECT_STORAGE_REMOTE_NAME}:{OBJECT_STORAGE_BUCKET}/{dirname}"
 
-    # Download: copy files from remote to local without deleting local files
     sync_params = [
         "rclone",
         "copy",
         remote_path,
         local_path,
-        "--checksum",
     ]
+    if overwrite:
+        sync_params.append("--checksum")
+    else:
+        sync_params.append("--ignore-existing")
 
     result = run_rclone_with_retry(sync_params, timeout=600, check_connection=True)
-    log.debug(f"Rclone sync result: {result.stdout}")
+    log.debug(f"Rclone download result: {result.stdout}")
 
 
 def save_files(dirname: str) -> None:

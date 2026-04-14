@@ -60,7 +60,7 @@ register_page(
 
 def layout(job_id):
     log.info(f"Creating layout page {__name__} for {job_id}")
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 

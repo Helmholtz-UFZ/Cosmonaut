@@ -101,7 +101,7 @@ card_body = form_factory.process_layout(form_factory.layout)
 
 def layout(job_id):
     log.info(f"Routing params layout called with job_id={job_id}")
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 
