@@ -118,7 +118,7 @@ register_page(
 
 def layout(job_id):
     """Create layout for routing computation page."""
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     status = job.get_status()
 
     # Status badge

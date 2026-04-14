@@ -588,7 +588,7 @@ def register_reset_callbacks(app):
 
         # Load job and reset
         try:
-            job = CosmonautJob(job_id=job_id, sync_files=False)
+            job = CosmonautJob(job_id=job_id)
             job.reset()
             log.info(f"Job {job_id} reset successfully from {pathname}")
         except Exception as e:

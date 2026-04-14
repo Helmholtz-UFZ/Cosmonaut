@@ -185,7 +185,7 @@ def layout(job_id: str):
     Returns:
         A composed layout with controls for street editing.
     """
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 

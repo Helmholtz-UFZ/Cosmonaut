@@ -155,7 +155,7 @@ def _help_icon(description):
 
 
 def layout(job_id):
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 

@@ -149,7 +149,9 @@ class CosmonautJob:
     Filesystem paths are stored as direct instance attributes.
     """
 
-    def __init__(self, job_id=None, *, sync_files: bool = True):
+    def __init__(
+        self, job_id=None, *, sync_files: bool = True, overwrite: bool = False
+    ):
         """Init class by id or make a new one.
 
         Args:
@@ -159,17 +161,22 @@ class CosmonautJob:
                 pod where local files are already current — this avoids a
                 slow rclone round-trip and prevents stale remote files from
                 overwriting recent local edits.
+            overwrite: When True, download all remote files even if they
+                exist locally (``--checksum``).  When False (default), only
+                download files missing locally (``--ignore-existing``),
+                preserving local edits.  Use True on worker pods that need
+                a clean copy from MinIO.
         """
         if job_id is not None:
             log.info(f"Load job with id {job_id}")
             if not DataBaseManager.check_existence(job_id):
                 raise JobNotFound(job_id)
-            self.load(job_id, sync_files=sync_files)
+            self.load(job_id, sync_files=sync_files, overwrite=overwrite)
         else:
             log.info("Create new job")
             self._blank_job()
 
-    def load(self, job_id, *, sync_files: bool = True):
+    def load(self, job_id, *, sync_files: bool = True, overwrite: bool = False):
         """
         Get job information from the database,
         load the data from object storage,
@@ -196,7 +203,7 @@ class CosmonautJob:
         self._create_working_dir()
 
         if sync_files:
-            get_files(self.model.job_id)
+            get_files(self.model.job_id, overwrite=overwrite)
 
     def _blank_job(self):
         """Create a new job with a unique ID."""

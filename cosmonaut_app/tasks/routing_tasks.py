@@ -63,7 +63,7 @@ def process_routing_job(self, job_id):
     log.info(f"Starting routing job task for job_id={job_id}")
 
     # Load job to get work directory
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, overwrite=True)
 
     # Send submission notification before computation starts
     _notify_submission(job)
