@@ -149,18 +149,27 @@ class CosmonautJob:
     Filesystem paths are stored as direct instance attributes.
     """
 
-    def __init__(self, job_id=None):
-        """Init class by id or make a new one."""
+    def __init__(self, job_id=None, *, sync_files: bool = True):
+        """Init class by id or make a new one.
+
+        Args:
+            job_id: Load an existing job. ``None`` creates a new job.
+            sync_files: When True (default), download files from object
+                storage on load.  Pass False in Dash callbacks on the web
+                pod where local files are already current — this avoids a
+                slow rclone round-trip and prevents stale remote files from
+                overwriting recent local edits.
+        """
         if job_id is not None:
             log.info(f"Load job with id {job_id}")
             if not DataBaseManager.check_existence(job_id):
                 raise JobNotFound(job_id)
-            self.load(job_id)
+            self.load(job_id, sync_files=sync_files)
         else:
             log.info("Create new job")
             self._blank_job()
 
-    def load(self, job_id):
+    def load(self, job_id, *, sync_files: bool = True):
         """
         Get job information from the database,
         load the data from object storage,
@@ -186,8 +195,8 @@ class CosmonautJob:
         # Set up filesystem paths
         self._create_working_dir()
 
-        # Always download files from object storage when loading existing job
-        get_files(self.model.job_id)
+        if sync_files:
+            get_files(self.model.job_id)
 
     def _blank_job(self):
         """Create a new job with a unique ID."""
@@ -403,7 +412,7 @@ class CosmonautJob:
             "file_name": PREDICTOR_FILENAME,
             "len": len(decoded),
         }
-        self.save()
+        self.save(sync_files=False)
         log.debug("Finished uploading and processing predictor file")
 
     def delete_predictor(self, *, sync_files: bool = True):
@@ -435,11 +444,11 @@ class CosmonautJob:
         celery_status = celery_info["status"]
         if celery_status == "SUCCESS":
             self.model.membership_upload["street_processing"] = "COMPLETED"
-            self.save()
+            self.save(sync_files=False)
             return "COMPLETED"
         elif celery_status in ("FAILURE", "REVOKED"):
             self.model.membership_upload["street_processing"] = "FAILED"
-            self.save()
+            self.save(sync_files=False)
             return "FAILED"
         return "RUNNING"
 
@@ -526,7 +535,9 @@ class CosmonautJob:
             # Mark as submitted and set status to RUNNING
             self.model.submitted = True
             self.model.status = JOB_STATUS_RUNNING
-            self.save()  # This calls dump_routing_params() automatically
+            # Sync files — the worker pulls from MinIO via get_files().
+            # Also writes parameters.json via dump_routing_params().
+            self.save()
 
             celery_task_id, failed = background_job_manager.submit_routing_job(self)
 
@@ -534,9 +545,9 @@ class CosmonautJob:
                 log.error(f"Failed to submit job {self.model.job_id}")
                 return None
 
-            # Store task ID and save again
+            # Store task ID — DB update only, worker already has the files
             self.model.celery_task_id = celery_task_id
-            self.save()
+            self.save(sync_files=False)
 
             log.info(f"Job {self.model.job_id} submitted with task_id={celery_task_id}")
             return celery_task_id
@@ -565,11 +576,11 @@ class CosmonautJob:
             # Map Celery states to job statuses
             if celery_status == "SUCCESS":
                 self.model.status = JOB_STATUS_COMPLETED
-                self.save()
+                self.save(sync_files=False)
                 log.info(f"Synced job {self.model.job_id} status to COMPLETED")
             elif celery_status in ["FAILURE", "REVOKED"]:
                 self.model.status = JOB_STATUS_FAILED
-                self.save()
+                self.save(sync_files=False)
                 log.warning(
                     f"Synced job {self.model.job_id} status to FAILED "
                     f"(Celery: {celery_status})"

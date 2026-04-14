@@ -185,7 +185,7 @@ def layout(job_id: str):
     Returns:
         A composed layout with controls for street editing.
     """
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 
@@ -506,7 +506,7 @@ def poll_street_processing_status(n_intervals, job_id):
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     sp_status = job.get_street_processing_status()
 
     if sp_status == "COMPLETED":
@@ -559,7 +559,7 @@ def remove_selected(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     if job.get_status() != JOB_STATUS_PENDING:
         raise PreventUpdate
 
@@ -599,7 +599,7 @@ def keep_largest_subnetwork(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     if job.get_status() != JOB_STATUS_PENDING:
         raise PreventUpdate
 
@@ -638,7 +638,7 @@ def reset_edits(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     sel = StreetSelector(job)
     sel.reset()
     is_active = job.get_status() == JOB_STATUS_PENDING
@@ -736,7 +736,7 @@ def update_tags_dropdown(
         raise PreventUpdate
 
     log.info(f"Job {job_id} road tags updated: {tags}")
-    sel = StreetSelector(CosmonautJob(job_id=job_id))
+    sel = StreetSelector(CosmonautJob(job_id=job_id, sync_files=False))
     sel.update_tags(tags)
     hint = html.Small(
         _build_keep_largest_hint(sel.keep_largest_applied),
@@ -763,7 +763,7 @@ def restore_single_road(n_clicks_list, job_id, version):
         raise PreventUpdate
 
     road_id = ctx.triggered_id["index"]
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     sel = StreetSelector(job)
     sel.restore_road(road_id)
 
@@ -796,7 +796,7 @@ def clear_all_removed_roads(n_clicks, job_id, version):
     if not n_clicks or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     sel = StreetSelector(job)
     sel.clear_removed_roads()
 

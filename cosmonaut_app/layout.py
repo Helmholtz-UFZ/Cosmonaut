@@ -588,7 +588,7 @@ def register_reset_callbacks(app):
 
         # Load job and reset
         try:
-            job = CosmonautJob(job_id=job_id)
+            job = CosmonautJob(job_id=job_id, sync_files=False)
             job.reset()
             log.info(f"Job {job_id} reset successfully from {pathname}")
         except Exception as e:
@@ -631,7 +631,7 @@ def register_map_callbacks(app):
 
         job_id = parts[2]
         try:
-            job = CosmonautJob(job_id=job_id)
+            job = CosmonautJob(job_id=job_id, sync_files=False)
         except JobNotFound:
             log.info(f"Job {job_id} not found, returning empty")
             return no_update, "", empty_fc, None
@@ -660,9 +660,7 @@ def register_map_callbacks(app):
                     "properties": {},
                 }
             ]
-        log.info(
-            f"Returning tile_url={tile_url!r}, route_pts={len(raw_positions)}"
-        )
+        log.info(f"Returning tile_url={tile_url!r}, route_pts={len(raw_positions)}")
         return viewport, tile_url, route_fc, job_id
 
     @app.callback(
@@ -680,7 +678,7 @@ def register_map_callbacks(app):
             return empty_fc
 
         try:
-            job = CosmonautJob(job_id=job_id)
+            job = CosmonautJob(job_id=job_id, sync_files=False)
         except JobNotFound:
             return empty_fc
 

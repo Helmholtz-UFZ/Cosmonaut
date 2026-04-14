@@ -288,7 +288,7 @@ def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows):
             log.info(f"Deleting job: {job_id}")
 
             try:
-                job = CosmonautJob(job_id=job_id)
+                job = CosmonautJob(job_id=job_id, sync_files=False)
                 job.delete()
                 log.info(f"Successfully deleted job: {job_id}")
             except Exception as e:

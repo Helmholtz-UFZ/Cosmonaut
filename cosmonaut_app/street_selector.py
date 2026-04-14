@@ -186,7 +186,11 @@ class StreetSelector:
             else:
                 self._save_edit_file(fc, path=self.transformed_path)
         self._save_edits()
-        self.job.save()
+        # Database must be current but skip rclone sync — interactive edits
+        # (tag changes, road removals, keep-largest) happen frequently and the
+        # rclone round-trip blocks the callback for seconds/minutes.  Files are
+        # saved locally; MinIO is synced when the routing job is submitted.
+        self.job.save(sync_files=False)
 
         log.info(
             "Applied edits: %d features, tags=%d, removed=%d, keep_largest=%s, deferred=%s",
@@ -207,11 +211,9 @@ class StreetSelector:
         """
         if not os.path.exists(self.edit_path):
             return
-        needs_projection = (
-            not os.path.exists(self.transformed_path)
-            or os.path.getmtime(self.edit_path)
-            > os.path.getmtime(self.transformed_path)
-        )
+        needs_projection = not os.path.exists(
+            self.transformed_path
+        ) or os.path.getmtime(self.edit_path) > os.path.getmtime(self.transformed_path)
         if not needs_projection:
             return
         features = self._load_edit_features()
@@ -396,10 +398,10 @@ class StreetSelector:
         """
         light = []
         for f in features:
-            geom = shape(f["geometry"]).simplify(
-                tolerance, preserve_topology=True
-            )
-            props = {k: v for k, v in f["properties"].items() if k in _DISPLAY_PROPERTIES}
+            geom = shape(f["geometry"]).simplify(tolerance, preserve_topology=True)
+            props = {
+                k: v for k, v in f["properties"].items() if k in _DISPLAY_PROPERTIES
+            }
             light.append(
                 {
                     "id": f["id"],
