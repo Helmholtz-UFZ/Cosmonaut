@@ -155,7 +155,7 @@ def _help_icon(description):
 
 
 def layout(job_id):
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 
@@ -431,7 +431,7 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         )
         return result
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     job.model.epsg = epsg_input
     job.delete_membership(sync_files=False)
     try:
@@ -524,7 +524,7 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
 
     log.info(f"Uploading predictor file for job {job_id}")
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     try:
         job.upload_predictor(predictor_contents)
     except FileValidationError as e:
@@ -737,7 +737,7 @@ def delete_membership_file(n_clicks, job_id):
 
     log.info(f"Delete membership button clicked for job {job_id}")
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
 
     if job.model.status != JOB_STATUS_PENDING:
         log.warning(f"Cannot delete upload - job {job_id} status is {job.model.status}")
@@ -785,7 +785,7 @@ def delete_predictor_file(n_clicks, job_id):
 
     log.info(f"Delete predictor button clicked for job {job_id}")
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
 
     if job.model.status != JOB_STATUS_PENDING:
         log.warning(
@@ -851,7 +851,7 @@ def poll_street_processing(n_intervals, job_id):
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     status = job.get_street_processing_status()
 
     if status == "COMPLETED":

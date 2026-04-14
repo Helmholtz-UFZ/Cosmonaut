@@ -101,7 +101,7 @@ card_body = form_factory.process_layout(form_factory.layout)
 
 def layout(job_id):
     log.info(f"Routing params layout called with job_id={job_id}")
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 
@@ -159,7 +159,7 @@ def layout(job_id):
 )
 def update_routing_params(**inputs):
     job_id = inputs.pop("job_id")
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
 
     triggered_ids = {
         t["prop_id"].split(".")[0]
@@ -183,7 +183,8 @@ def update_routing_params(**inputs):
         for key, value in inputs.items():
             if hasattr(job.model, key):
                 setattr(job.model, key, value)
-        job.save()
+        # Skip file sync — submit() syncs before the worker starts
+        job.save(sync_files=False)
         return {
             **output_dict,
             "url": build_url_step("route_computation", job_id),

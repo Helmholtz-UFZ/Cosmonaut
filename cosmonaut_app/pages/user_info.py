@@ -60,7 +60,7 @@ register_page(
 
 def layout(job_id):
     log.info(f"Creating layout page {__name__} for {job_id}")
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
 
@@ -157,9 +157,9 @@ def go_to_upload_page(n_clicks: int | None, email: str | None, pathname: str | N
         raise PreventUpdate
 
     job_id = pathname.split("/")[2]
-    job = CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id, sync_files=False)
     job.model.email = email
-    job.save()
+    job.save(sync_files=False)
 
     log.info(f"Storing email {email} for job {job_id}")
 
