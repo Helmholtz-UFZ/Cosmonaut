@@ -208,8 +208,15 @@ class CosmonautJob:
         self.working_dir = os.path.join(WEB_WORK_DIR, self.model.job_id)
         os.makedirs(self.working_dir, exist_ok=True)
 
-    def save(self):
-        """Save the job to the database and sync files to object storage."""
+    def save(self, *, sync_files: bool = True):
+        """Save the job to the database and optionally sync files to object storage.
+
+        Args:
+            sync_files: When False, skip the rclone sync to object storage.
+                Use this when multiple saves happen in quick succession and only the
+                last one needs to sync (e.g. during upload where delete → upload → save
+                would otherwise trigger 3+ slow rclone syncs).
+        """
         log.info(f"Save job {self.model.job_id}")
 
         # Get all data from model
@@ -232,8 +239,8 @@ class CosmonautJob:
 
         self.dump_routing_params()
 
-        # Auto-sync files to object storage
-        save_files(self.model.job_id)
+        if sync_files:
+            save_files(self.model.job_id)
 
     def dump_routing_params(self):
         """
@@ -307,7 +314,7 @@ class CosmonautJob:
         # delete files from object storage
         delete_directory_from_storage(self.model.job_id)
 
-    def upload_membership(self, file_name, content, epsg_input):
+    def upload_membership(self, file_name, content, epsg_input, *, sync_files=True):
         """Upload and process membership CSV file."""
         log.info(f"Upload membership file {file_name} with EPSG {epsg_input}")
 
@@ -358,7 +365,7 @@ class CosmonautJob:
             "bounds": bounds,
             "street_processing": "PENDING",
         }
-        self.save()
+        self.save(sync_files=sync_files)
         log.debug("Finished uploading and processing membership file")
         return file_path, bounds, membership_df
 
@@ -399,7 +406,7 @@ class CosmonautJob:
         self.save()
         log.debug("Finished uploading and processing predictor file")
 
-    def delete_predictor(self):
+    def delete_predictor(self, *, sync_files: bool = True):
         """Delete predictor file and reset predictor_upload."""
         log.info(f"Deleting predictor data for job {self.model.job_id}")
 
@@ -410,7 +417,7 @@ class CosmonautJob:
 
         default_predictor_upload = JobModel.model_fields["predictor_upload"].default
         self.model.predictor_upload = default_predictor_upload.copy()
-        self.save()
+        self.save(sync_files=sync_files)
 
         log.info(f"Predictor data deleted for job {self.model.job_id}")
 
@@ -436,7 +443,7 @@ class CosmonautJob:
             return "FAILED"
         return "RUNNING"
 
-    def delete_membership(self):
+    def delete_membership(self, *, sync_files: bool = True):
         """Delete membership file, predictor, OSM files, plots and reset state."""
         log.info(f"Deleting membership data for job {self.model.job_id}")
 
@@ -446,8 +453,8 @@ class CosmonautJob:
             background_job_manager.revoke_job(sp, terminate=True)
             log.info(f"Revoked upload processing task {sp} for job {self.model.job_id}")
 
-        # Cascade: delete predictor first
-        self.delete_predictor()
+        # Cascade: delete predictor first (skip sync — we sync at the end)
+        self.delete_predictor(sync_files=False)
 
         # Delete membership CSV file
         membership_path = os.path.join(self.working_dir, MEMBERSHIP_FILENAME)
@@ -480,7 +487,7 @@ class CosmonautJob:
         default_membership_upload = JobModel.model_fields["membership_upload"].default
         self.model.membership_upload = default_membership_upload.copy()
 
-        self.save()
+        self.save(sync_files=sync_files)
 
         log.info(f"Membership data deleted for job {self.model.job_id}")
 
