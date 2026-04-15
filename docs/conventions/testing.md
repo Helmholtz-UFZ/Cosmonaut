@@ -104,22 +104,49 @@ The image lives at:
 codebase.helmholtz.cloud:5050/ufz/tb5-smm/met/wg7/ufz-cosmonaut/ci:latest
 ```
 
-**When it is rebuilt:** `build-ci-image` runs on **every pipeline** using
-GitLab's own CI registry credentials — no local `docker login` required.
-`--cache-from` keeps it to ~1-2 minutes when deps haven't changed. If the image
-is ever deleted, the next pipeline push rebuilds it automatically.
+**When it is rebuilt:** `build-ci-image` runs only when `docker/ci.Dockerfile`,
+`pyproject.toml`, or `uv.lock` change (always on main, conditionally on feature
+branches). GitLab's own CI registry credentials handle the login — no local
+`docker login` is possible or needed (UFZ GitLab uses institutional SSO).
+`--build-arg BUILDKIT_INLINE_CACHE=1` embeds layer cache metadata in the pushed
+image so future `--cache-from` runs get proper hits on the autoscaler's fresh VMs.
+
+**Dockerfile ENV ordering matters for cache efficiency.** Only set an ENV before
+the `RUN` step that actually needs it. Runtime-only ENVs (`TZ`, `UV_NO_SYNC`)
+live *after* all expensive `RUN` steps — changing them then only busts the final
+cheap ENV layer, not the 60-second apt-get or 70-second playwright layers.
+
+**`UV_NO_SYNC=1` is required in the CI image.** The image is built at `/ci` but
+jobs run at `/builds/...`. When the celery worker starts via `uv run celery`,
+uv detects the path mismatch and tries to re-sync the venv — adding startup
+delay long enough to cause task-timing failures in tests. `UV_NO_SYNC=1` skips
+the sync entirely; the pre-built venv is used as-is.
 
 ### Two test jobs
 
-| Job | Command | Services | Purpose |
+| Job | Command | Services | Runs on |
 |-----|---------|----------|---------|
-| `test-unit` | `pytest --no-services` on 3 files | none | fast feedback on static/logic checks |
-| `test-integration` | `pytest` (all tests) | Postgres, MinIO, Redis | full E2E + module tests |
+| `test-unit` | `pytest --no-services` on 3 files | none | every push |
+| `test-integration` | `pytest` (all tests) | Postgres, MinIO, Redis | main + MRs only |
 
-Both run in parallel in the `test` stage. The no-service files are:
-`test_env.py`, `test_html_id_enforcement.py`, `test_sensor_routing_descriptions.py`.
-When adding a new test file that needs no services, add it to the `test-unit`
-script in `.gitlab-ci.yml`.
+`test-unit` and `test-integration` run in parallel when both are active.
+The no-service files are: `test_env.py`, `test_html_id_enforcement.py`,
+`test_sensor_routing_descriptions.py`. When adding a new test file that needs no
+services, add it to the `test-unit` script in `.gitlab-ci.yml`.
+
+**Why `test-integration` is restricted to main and MRs:** the full E2E workflow
+includes an OSM road-network download via the Overpass API (`osmnx.graph_from_polygon`)
+and a route-computation task. Together these take 8–12 minutes in CI. Running
+this on every feature branch push would make CI slower than it was before the
+pre-built image existed. Unit tests catch regressions on feature branches;
+integration tests gate merges.
+
+**OSM Overpass API timeout.** The street-selection page waits up to 300 seconds
+for the Celery worker to complete the OSM download. This is intentionally generous:
+the Overpass API can be slow from CI networks, and the task is genuinely
+still running (not failed) during that wait. Do not reduce this timeout — a
+smaller value causes the test to give up while the worker is still active,
+leaving the button disabled and the test failing.
 
 ## Examples
 

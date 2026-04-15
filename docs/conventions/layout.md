@@ -76,6 +76,23 @@ def main_callback():
     return result, False  # False closes the overlay
 ```
 
+### `dcc.Upload` — File Size Gotcha
+
+`dcc.Upload` base64-encodes the file **in the browser** before sending it as part of
+the Dash callback JSON payload. A 12 MB file becomes ~17 MB on the wire. This has
+three consequences:
+
+- **HAProxy ingress** needs `proxy-body-size: "50m"` — otherwise it silently drops
+  large uploads with no 413, just a hang.
+- **Gunicorn timeout** must be long enough to receive + process the full payload
+  (default 30s is not enough for large files).
+- **Memory**: the Gunicorn worker holds the full base64 string + decoded bytes +
+  DataFrame in memory simultaneously. Factor ~3× file size into memory estimates.
+
+There is no upload progress event in `dcc.Upload` — the loading overlay shows until
+the entire callback returns. See [Deployment](deployment.md) for the full production
+configuration.
+
 ### `create_card_input(card_body, card_footer=None, name_step=None, title=None, job_id=None)`
 
 Creates page cards with optional progress steps and title.
