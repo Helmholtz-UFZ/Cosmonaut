@@ -36,4 +36,4 @@ RUN chown -R 1000:1000 /python_docker/cosmonaut
 
 USER appuser
 
-CMD set -a && . ./.env && set +a && gunicorn --preload -w 4 -b 0.0.0.0:$FLASK_PORT cosmonaut_app.app:server
+CMD set -a && . ./.env && set +a && gunicorn --preload -w 2 -b 0.0.0.0:$FLASK_PORT --timeout 300 cosmonaut_app.app:server
