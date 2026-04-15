@@ -92,6 +92,35 @@ All tests must pass in CI before merging.
 On failure, CI uploads `test/artifacts/` as a GitLab artifact (7-day retention).
 Download from the pipeline job page under "Job artifacts".
 
+### CI image (`docker/ci.Dockerfile`)
+
+Test jobs use a pre-built image (`ci:latest`) that bakes in all slow setup:
+system dependencies (GDAL, PostgreSQL client, rclone), Python packages, and
+Playwright + Chromium. This avoids re-running `apt-get` and `uv sync` on every
+pipeline run.
+
+The image lives at:
+```
+codebase.helmholtz.cloud:5050/ufz/tb5-smm/met/wg7/ufz-cosmonaut/ci:latest
+```
+
+**When it is rebuilt:** `build-ci-image` runs on **every pipeline** using
+GitLab's own CI registry credentials — no local `docker login` required.
+`--cache-from` keeps it to ~1-2 minutes when deps haven't changed. If the image
+is ever deleted, the next pipeline push rebuilds it automatically.
+
+### Two test jobs
+
+| Job | Command | Services | Purpose |
+|-----|---------|----------|---------|
+| `test-unit` | `pytest --no-services` on 3 files | none | fast feedback on static/logic checks |
+| `test-integration` | `pytest` (all tests) | Postgres, MinIO, Redis | full E2E + module tests |
+
+Both run in parallel in the `test` stage. The no-service files are:
+`test_env.py`, `test_html_id_enforcement.py`, `test_sensor_routing_descriptions.py`.
+When adding a new test file that needs no services, add it to the `test-unit`
+script in `.gitlab-ci.yml`.
+
 ## Examples
 
 ### Do
