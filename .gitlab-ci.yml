@@ -1,4 +1,5 @@
 stages:
+  - "prepare"
   - "lint"
   - "test"
   - "build"
@@ -26,6 +27,8 @@ variables:
   DOCKER_GID: "1000"
   GUNICORN: "0"
   DEBUG: "0"
+  # Enable BuildKit for better Docker layer caching
+  DOCKER_BUILDKIT: "1"
 
 .docker_login: &docker_login
   - 'echo "${CI_REGISTRY_PASSWORD}" | docker login --username "$CI_REGISTRY_USER" --password-stdin "${CI_REGISTRY}"'
@@ -37,21 +40,59 @@ variables:
   tags:
     - "hifis"
 
+# Runs on every pipeline — GitLab's CI credentials handle the registry login,
+# so no local docker login is needed. --cache-from keeps it to ~1-2 min when
+# deps haven't changed. Running always also means no bootstrapping step required.
+build-ci-image:
+  stage: "prepare"
+  extends: ".base_before_build_script"
+  before_script:
+    - *docker_login
+  script:
+    - docker pull "${CI_REGISTRY_IMAGE}/ci:latest" || true
+    - >
+      docker build
+      --cache-from "${CI_REGISTRY_IMAGE}/ci:latest"
+      --tag "${CI_REGISTRY_IMAGE}/ci:latest"
+      -f docker/ci.Dockerfile .
+    - docker push "${CI_REGISTRY_IMAGE}/ci:latest"
+
+# Ruff is a Rust binary — it never executes Python code, so GDAL and package
+# installation are unnecessary. The official image runs in seconds.
 linting:
   stage: "lint"
-  image: "python:3.13"
-  before_script:
-    - "apt-get update && apt-get install -y libgdal-dev"
-    - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"
-    - "export C_INCLUDE_PATH=/usr/include/gdal"
-    - "pip install uv"
-    - "uv sync"
+  image: "ghcr.io/astral-sh/ruff:latest"
+  needs: []  # start immediately without waiting for the prepare stage
   script:
-    - "uv run ruff check ."
+    - "ruff check ."
 
-testing:
+# Unit tests: no external services needed.
+# Only files confirmed to work without DB/Redis/MinIO are listed here.
+# Add new service-free test files to this list as they are created.
+test-unit:
   stage: "test"
-  image: "python:3.13"
+  image: "${CI_REGISTRY_IMAGE}/ci:latest"
+  before_script:
+    - "cp env_test .env"
+    - "mkdir -p test/artifacts"
+  script:
+    - >
+      python -m pytest
+      test/test_env.py
+      test/test_html_id_enforcement.py
+      test/test_sensor_routing_descriptions.py
+      --no-services -v
+  artifacts:
+    when: on_failure
+    paths:
+      - test/artifacts/
+    expire_in: 7 days
+
+# Integration tests: full services + Playwright. Runs in parallel with test-unit.
+# No package installation needed — everything is baked into the CI image.
+test-integration:
+  stage: "test"
+  image: "${CI_REGISTRY_IMAGE}/ci:latest"
   services:
     - name: "postgis/postgis:latest"
       alias: "postgres"
@@ -68,13 +109,6 @@ testing:
     - name: "redis:latest"
       alias: "redis"
   before_script:
-    - "apt-get update && apt-get install -y libgdal-dev postgresql-client curl rclone"
-    - "export CPLUS_INCLUDE_PATH=/usr/include/gdal"
-    - "export C_INCLUDE_PATH=/usr/include/gdal"
-    - "pip install uv"
-    - "uv sync"
-    # Install Playwright browsers for headless testing
-    - "uv run playwright install --with-deps chromium"
     # Wait for PostgreSQL to be ready
     - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
     # Initialize database schema
@@ -87,8 +121,7 @@ testing:
     - "source .env && rclone mkdir minio:${OBJECT_STORAGE_BUCKET}"
     - "mkdir -p test/artifacts"
   script:
-    # Run all tests in headless mode (default)
-    - "uv run pytest -v --screenshot only-on-failure --tracing retain-on-failure --output test/artifacts"
+    - "python -m pytest -v --screenshot only-on-failure --tracing retain-on-failure --output test/artifacts"
   artifacts:
     when: on_failure
     paths:
