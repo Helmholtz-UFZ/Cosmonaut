@@ -12,6 +12,10 @@ ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 # Fixed location for Playwright browsers, independent of the running user
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+# Skip venv sync when uv run is called from the project directory.
+# The venv is pre-built in this image, so syncing is never needed and adds
+# startup delay to subprocess-spawned commands (e.g. the Celery worker in conftest.py).
+ENV UV_NO_SYNC=1
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
