@@ -104,9 +104,16 @@ test-unit:
 
 # Integration tests: full services + Playwright. Runs in parallel with test-unit.
 # No package installation needed — everything is baked into the CI image.
+# Restricted to main and merge requests — the full E2E workflow (OSM download,
+# route computation) takes 8–12 min and adds no value on every feature branch push.
+# Unit tests catch regressions there; integration tests gate merges.
 test-integration:
   stage: "test"
   image: "${CI_REGISTRY_IMAGE}/ci:latest"
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+    - when: "never"
   services:
     - name: "postgis/postgis:latest"
       alias: "postgres"
