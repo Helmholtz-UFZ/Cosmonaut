@@ -15,7 +15,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libgdal-dev postgresql-client curl rclone && \
+        gcc g++ libgdal-dev libpq-dev postgresql-client curl rclone && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python -m venv $VIRTUAL_ENV && pip install --no-cache-dir uv
