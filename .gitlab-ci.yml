@@ -57,13 +57,16 @@ build-ci-image:
       -f docker/ci.Dockerfile .
     - docker push "${CI_REGISTRY_IMAGE}/ci:latest"
 
-# Ruff is a Rust binary — it never executes Python code, so GDAL and package
-# installation are unnecessary. The official image runs in seconds.
+# Ruff is a Rust binary — it never executes Python code, so GDAL and the full
+# uv sync are unnecessary. The ruff wheel installs in ~3 seconds.
+# Note: the official ruff Docker image is distroless (no shell), so GitLab CI
+# cannot execute scripts in it — a slim Python image is used instead.
 linting:
   stage: "lint"
-  image: "ghcr.io/astral-sh/ruff:latest"
+  image: "python:3.13-slim"
   needs: []  # start immediately without waiting for the prepare stage
   script:
+    - "pip install --quiet ruff"
     - "ruff check ."
 
 # Unit tests: no external services needed.
