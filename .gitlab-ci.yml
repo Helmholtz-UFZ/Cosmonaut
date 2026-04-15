@@ -40,9 +40,12 @@ variables:
   tags:
     - "hifis"
 
-# Runs on every pipeline — GitLab's CI credentials handle the registry login,
-# so no local docker login is needed. --cache-from keeps it to ~1-2 min when
-# deps haven't changed. Running always also means no bootstrapping step required.
+# Rebuilds the CI image only when the Dockerfile or Python deps change.
+# On main, always runs to keep the image current. On feature branches, skipped
+# unless ci.Dockerfile, pyproject.toml, or uv.lock changed — the existing
+# ci:latest from main is used by the test jobs instead.
+# --build-arg BUILDKIT_INLINE_CACHE=1 embeds cache metadata in the pushed image
+# so future --cache-from runs get proper layer hits.
 build-ci-image:
   stage: "prepare"
   extends: ".base_before_build_script"
@@ -53,9 +56,17 @@ build-ci-image:
     - >
       docker build
       --cache-from "${CI_REGISTRY_IMAGE}/ci:latest"
+      --build-arg BUILDKIT_INLINE_CACHE=1
       --tag "${CI_REGISTRY_IMAGE}/ci:latest"
       -f docker/ci.Dockerfile .
     - docker push "${CI_REGISTRY_IMAGE}/ci:latest"
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    - changes:
+        - docker/ci.Dockerfile
+        - pyproject.toml
+        - uv.lock
+    - when: "never"
 
 # Ruff is a Rust binary — it never executes Python code, so GDAL and the full
 # uv sync are unnecessary. The ruff wheel installs in ~3 seconds.
