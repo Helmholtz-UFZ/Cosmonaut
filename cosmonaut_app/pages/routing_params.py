@@ -59,6 +59,8 @@ import dash_bootstrap_components as dbc
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
+    ADVANCED_COLLAPSE_ROUTING_PARAMS_ID,
+    ADVANCED_TOGGLE_ROUTING_PARAMS_ID,
     JOB_ID_STORE_SHARED_ID,
     NEXT_BUTTON_ROUTING_PARAMS_ID,
     URL_SHARED_ID,
@@ -86,14 +88,84 @@ register_page(
     dynamic=True,
 )
 
+ESSENTIAL_FIELDS = [
+    "segment_number",
+    "time_limit",
+    "max_distance",
+    "optimization_objective",
+    "num_points",
+]
 
-card_body_with_placeholder = []
-fields = list(FullPipelineConfig.model_fields.keys())
-for i in range(0, len(fields), 2):
-    col = [dbc.Col(InputField(fields[i]))]
-    if i + 1 < len(fields):
-        col.append(dbc.Col(InputField(fields[i + 1])))
-    card_body_with_placeholder.append(dbc.Row(col, className="g-2 mt-1"))
+ADVANCED_FIELDS = [
+    "lower_benefit_limit",
+    "max_aco_iteration",
+    "ant_no",
+    "is_reversed",
+    "working_directory",
+    "benefit_type",
+    "route_type",
+    "goal_ratio",
+    "use_fixed_seeds",
+    "debug_seed",
+    "allow_fewer_points",
+]
+
+assert set(ESSENTIAL_FIELDS + ADVANCED_FIELDS) == set(
+    FullPipelineConfig.model_fields.keys()
+), (
+    f"Field partition mismatch. Missing: "
+    f"{set(FullPipelineConfig.model_fields.keys()) - set(ESSENTIAL_FIELDS + ADVANCED_FIELDS)}. "
+    f"Extra: {set(ESSENTIAL_FIELDS + ADVANCED_FIELDS) - set(FullPipelineConfig.model_fields.keys())}"
+)
+
+
+def _build_rows(fields):
+    rows = []
+    for i in range(0, len(fields), 2):
+        col = [dbc.Col(InputField(fields[i]))]
+        if i + 1 < len(fields):
+            col.append(dbc.Col(InputField(fields[i + 1])))
+        rows.append(dbc.Row(col, className="g-2 mt-1"))
+    return rows
+
+
+_essential_rows = _build_rows(ESSENTIAL_FIELDS)
+
+# Insert objective helper caption right after the row containing optimization_objective.
+# optimization_objective is at index 3 in ESSENTIAL_FIELDS (0-based), so row index 1
+# (row 0: segment_number + time_limit, row 1: max_distance + optimization_objective).
+_objective_caption = dbc.Row(
+    dbc.Col(
+        dbc.FormText(
+            "Objective: 'd' = max distance, 't' = time limit.",
+        ),
+    ),
+    className="mt-1",
+)
+
+_advanced_rows = _build_rows(ADVANCED_FIELDS)
+
+_toggle_button = dbc.Button(
+    "Show advanced options ▾",
+    id=ADVANCED_TOGGLE_ROUTING_PARAMS_ID,
+    color="link",
+    className="mt-2 p-0",
+    n_clicks=0,
+)
+
+_advanced_collapse = dbc.Collapse(
+    _advanced_rows,
+    id=ADVANCED_COLLAPSE_ROUTING_PARAMS_ID,
+    is_open=False,
+)
+
+card_body_with_placeholder = [
+    *_essential_rows[:2],   # segment_number+time_limit, max_distance+optimization_objective
+    _objective_caption,
+    *_essential_rows[2:],   # num_points row
+    _toggle_button,
+    _advanced_collapse,
+]
 
 form_factory = FormFactory(FullPipelineConfig, card_body_with_placeholder)
 card_body = form_factory.process_layout(form_factory.layout)
@@ -140,6 +212,19 @@ def layout(job_id):
 # ============================================================================
 # Callbacks
 # ============================================================================
+
+
+@callback(
+    Output(ADVANCED_COLLAPSE_ROUTING_PARAMS_ID, "is_open"),
+    Output(ADVANCED_TOGGLE_ROUTING_PARAMS_ID, "children"),
+    Input(ADVANCED_TOGGLE_ROUTING_PARAMS_ID, "n_clicks"),
+    State(ADVANCED_COLLAPSE_ROUTING_PARAMS_ID, "is_open"),
+    prevent_initial_call=True,
+)
+def toggle_advanced_options(n_clicks, is_open):
+    new_open = not is_open
+    label = "Hide advanced options ▴" if new_open else "Show advanced options ▾"
+    return new_open, label
 
 
 @callback(
