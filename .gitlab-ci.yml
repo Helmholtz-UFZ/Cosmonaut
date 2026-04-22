@@ -156,7 +156,7 @@ test-integration-live-osm:
   stage: "test"
   image: "${CI_REGISTRY_IMAGE}/ci:latest"
   rules:
-    - if: "$CI_PIPELINE_SOURCE == 'schedule'"
+    - if: "$OSM_TEST_SCHEDULE == '1'"
     - when: "never"
   services:
     - name: "postgis/postgis:latest"
@@ -255,7 +255,6 @@ build-latest-tag:
     paths:
       - "deployment/ufz/prod/values.yaml"
   rules:
-    - if: "$CI_PIPELINE_SOURCE == 'schedule'"
     - if: "$CI_PIPELINE_SOURCE == 'web'"
     - when: "never"
 
