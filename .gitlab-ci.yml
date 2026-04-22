@@ -149,6 +149,52 @@ test-integration:
       - test/artifacts/
     expire_in: 7 days
 
+# Nightly live-Overpass smoke test: same as test-integration but hits the real
+# Overpass API instead of using cached fixtures. Catches contract regressions
+# between the local osmnx/Overpass integration. Runs on a daily schedule.
+test-integration-live-osm:
+  stage: "test"
+  image: "${CI_REGISTRY_IMAGE}/ci:latest"
+  rules:
+    - if: "$CI_PIPELINE_SOURCE == 'schedule'"
+    - when: "never"
+  services:
+    - name: "postgis/postgis:latest"
+      alias: "postgres"
+      variables:
+        POSTGRES_DB: cosmonaut_db
+        POSTGRES_USER: cosmonaut
+        POSTGRES_PASSWORD: password
+    - name: "minio/minio:latest"
+      alias: "minio"
+      command: ["server", "/data", "--console-address", ":9001"]
+      variables:
+        MINIO_ROOT_USER: "${OBJECT_STORAGE_ACCESS_KEY}"
+        MINIO_ROOT_PASSWORD: "${OBJECT_STORAGE_SECRET_KEY}"
+    - name: "redis:latest"
+      alias: "redis"
+  variables:
+    SKIP_OSM_CACHE: "1"
+  before_script:
+    # Wait for PostgreSQL to be ready
+    - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
+    # Initialize database schema
+    - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
+    # Wait for MinIO to be ready
+    - "until curl -sf http://minio:9000/minio/health/ready; do echo 'Waiting for MinIO...'; sleep 2; done"
+    - "cp env_test .env"
+    # Create MinIO bucket
+    - "source .env && rclone config create minio s3 provider=Minio access_key_id=${OBJECT_STORAGE_ACCESS_KEY} secret_access_key=${OBJECT_STORAGE_SECRET_KEY} endpoint=${OBJECT_STORAGE_HOST}"
+    - "source .env && rclone mkdir minio:${OBJECT_STORAGE_BUCKET}"
+    - "mkdir -p test/artifacts"
+  script:
+    - "python -m pytest -v --screenshot only-on-failure --tracing retain-on-failure --output test/artifacts"
+  artifacts:
+    when: on_failure
+    paths:
+      - test/artifacts/
+    expire_in: 7 days
+
 build-latest:
   stage: "build"
   extends: ".base_before_build_script"

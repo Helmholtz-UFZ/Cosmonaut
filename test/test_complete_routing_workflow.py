@@ -15,8 +15,10 @@ This test validates the end-to-end user journey:
 import io
 import logging
 import os
+import time
 import zipfile
 
+import pytest
 from playwright.sync_api import expect
 
 from test.help_functions_tests import check_all_errors
@@ -47,6 +49,7 @@ def test_complete_routing_workflow(
     membership_file_path,
     predictor_file_path,
     worker_log_path,
+    osm_cache_patch,
 ) -> None:
     """Test the complete routing workflow from job creation to route download."""
     # === Home Page ===
@@ -85,11 +88,29 @@ def test_complete_routing_workflow(
     # === Street Selection Page ===
     # Wait for street processing (OSM download) to complete — the page polls
     # and reloads when done, enabling the next button.
-    # OSM downloads via the Overpass API can be slow on CI networks — 300s matches
-    # what the route computation step is given.
-    expect(page.locator(f"#{NEXT_BUTTON_STREET_SELECTION_ID}")).to_be_enabled(
-        timeout=300000
-    )
+    # If the OSM step fails (street_processing == "FAILED"), fail fast instead of
+    # burning the full 300s timeout. Extract job_id from URL and poll DB.
+    job_id = page.url.split("/job/")[1].split("/")[0]
+    start_time = time.time()
+    timeout_seconds = 300
+    poll_interval = 2
+
+    while time.time() - start_time < timeout_seconds:
+        job_row = DataBaseManager.get_job_columns(job_id)
+        street_processing = job_row["membership_upload"].get("street_processing")
+
+        if street_processing == "FAILED":
+            pytest.fail(
+                f"Street processing failed during upload. Check logs for details."
+            )
+
+        try:
+            expect(page.locator(f"#{NEXT_BUTTON_STREET_SELECTION_ID}")).to_be_enabled(
+                timeout=poll_interval * 1000
+            )
+            break
+        except Exception:
+            time.sleep(poll_interval)
     page.locator(f"#{NEXT_BUTTON_STREET_SELECTION_ID}").click()
     check_all_errors(page)
 
@@ -117,8 +138,6 @@ def test_complete_routing_workflow(
     check_all_errors(page)
 
     # === Verify email notification was sent ===
-    # Extract job_id from the current URL (e.g. /job/<id>/route-download)
-    job_id = page.url.split("/job/")[1].split("/")[0]
     job_row = DataBaseManager.get_job_columns(job_id)
     assert (
         job_row["email"] == "test@ufz.de"

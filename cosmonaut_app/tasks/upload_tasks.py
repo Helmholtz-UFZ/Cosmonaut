@@ -8,6 +8,8 @@ handle the heavy operations: OSM road network download and CRS projection.
 import logging
 import os
 
+import requests.exceptions
+import urllib3.exceptions
 from celery import Task
 from sensor_routing.constants import MEMBERSHIP_FILENAME
 
@@ -57,6 +59,35 @@ def process_upload_task(self, job_id, epsg_input):
         job.save()
 
         log.info(f"Upload processing completed for job {job_id}")
+
+    except (
+        requests.exceptions.ConnectionError,
+        requests.exceptions.Timeout,
+        urllib3.exceptions.ReadTimeoutError,
+    ) as e:
+        countdown = 2 ** self.request.retries * 5
+        log.warning(
+            f"Transient network error in upload processing for job {job_id}, "
+            f"retry attempt {self.request.retries + 1}/3 in {countdown}s: {str(e)}"
+        )
+        self.retry(exc=e, countdown=countdown, max_retries=3)
+
+    except requests.exceptions.HTTPError as e:
+        if e.response and e.response.status_code in (429, 502, 503, 504):
+            countdown = 2 ** self.request.retries * 5
+            log.warning(
+                f"Overpass API transient error (HTTP {e.response.status_code}) "
+                f"for job {job_id}, retry attempt {self.request.retries + 1}/3 in {countdown}s"
+            )
+            self.retry(exc=e, countdown=countdown, max_retries=3)
+        else:
+            log.error(
+                f"Error processing upload for job {job_id}: {str(e)}", exc_info=True
+            )
+            job.model.membership_upload["street_processing"] = "FAILED"
+            job.save()
+            _notify_maintainer(job_id, e)
+            raise
 
     except Exception as e:
         log.error(f"Error processing upload for job {job_id}: {str(e)}", exc_info=True)

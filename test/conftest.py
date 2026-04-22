@@ -368,3 +368,49 @@ def celery_worker(request):
 def worker_log_path(celery_worker):
     """Expose the Celery worker log file path for test assertions."""
     return _worker_log_path
+
+
+@pytest.fixture
+def osm_cache_patch(monkeypatch):
+    """Monkeypatch OsmDownloader.run_osm_query to use cached test fixtures.
+
+    Instead of querying the live Overpass API (slow, flaky on CI), the integration
+    test uses precomputed OSM data cached in test/fixtures/osm_cache/. The cache
+    contains the three outputs for the fixed test AOI (test/memberships.csv, EPSG:25832).
+
+    This fixture is used in test_complete_routing_workflow to avoid Overpass
+    rate limits and network timeouts during CI runs. The cache is regenerated
+    only when the test AOI changes (via test/fixtures/regenerate_osm_cache.py).
+
+    In production (real users), the live Overpass query runs and may retry on
+    transient errors (Tier 2 of the fix plan).
+
+    The fixture is skipped if SKIP_OSM_CACHE=1 (set by the nightly test-integration-live-osm
+    job in .gitlab-ci.yml to test the live Overpass contract).
+    """
+    if os.getenv("SKIP_OSM_CACHE") == "1":
+        log.info("OSM cache patch skipped (SKIP_OSM_CACHE=1) — using live Overpass API")
+        return
+
+    cache_dir = os.path.join(
+        os.path.dirname(__file__), "fixtures", "osm_cache"
+    )
+
+    def _cached_run_osm_query(self, download_folder):
+        """Copy cached OSM files instead of querying Overpass."""
+        for file_name in [
+            "osm_data_download.geojson",
+            "osm_data_edited.geojson",
+            "osm_data_transformed.geojson",
+        ]:
+            src = os.path.join(cache_dir, file_name)
+            dst = os.path.join(download_folder, file_name)
+            if not os.path.exists(src):
+                raise FileNotFoundError(
+                    f"OSM cache missing: {file_name}. "
+                    f"Regenerate with: python test/fixtures/regenerate_osm_cache.py"
+                )
+            shutil.copy2(src, dst)
+
+    from cosmonaut_app.osm_downloader import OsmDownloader
+    monkeypatch.setattr(OsmDownloader, "run_osm_query", _cached_run_osm_query)
