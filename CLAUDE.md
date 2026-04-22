@@ -113,13 +113,13 @@ The options are:
 Always prefer the most specific home for the knowledge.
 
 ### Decision Log
-Before making any architecture or pattern decision, check `agent/decisions/`.
+Before making any architecture or pattern decision, check `docs/decisions/`.
 If a relevant decision exists, follow it. If you disagree with a past
 decision, don't silently override it. Reference the original, explain
 what changed, and create a new decision record.
 
 ### Session Continuity
-At the start of every session, read `agent/project-state.md` for current
+At the start of every session, read `docs/project-state.md` for current
 priorities, recent changes, and open questions. Before ending a session
 that involved significant decisions or new patterns, update this file.
 

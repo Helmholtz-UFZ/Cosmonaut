@@ -23,7 +23,7 @@ Do not use a Meta Session for small, well-scoped tasks — just do them.
 ```
 1. PLAN    — Developer + strong model have a conversation
              The model asks clarifying questions until scope is fully clear
-             Output: a plan file saved in agent/plan/
+             Output: a plan file saved in docs/plan/
 
 2. EXECUTE — A cost-efficient model executes the plan
              It does the leg work: file creation, edits, research
@@ -54,7 +54,7 @@ Model capabilities shift — what matters is the principle, not the specific nam
 
 ## Plan file format
 
-Plans live in `agent/plan/` (gitignored — local only). Use this structure:
+Plans live in `docs/plan/` (gitignored — local only). Use this structure:
 
 ```markdown
 # Plan: <Short Title>
@@ -82,12 +82,12 @@ Plans live in `agent/plan/` (gitignored — local only). Use this structure:
 Plans are artifacts of a specific conversation. They contain checkboxes and working
 notes useful during execution but become noise afterward. The valuable outcomes
 (conventions, skills, decisions, code) are pushed to the repo. The plan itself stays
-local in `agent/plan/`.
+local in `docs/plan/`.
 
 If a plan produces insights worth preserving, they go into:
-- `agent/conventions/` — coding pattern
-- `agent/decisions/` — architecture choice
-- `agent/project-state.md` — current priority or open question
+- `docs/conventions/` — coding pattern
+- `docs/decisions/` — architecture choice
+- `docs/project-state.md` — current priority or open question
 
 ---
 
@@ -98,7 +98,7 @@ If a plan produces insights worth preserving, they go into:
 
 ## Output
 
-A plan file at `agent/plan/<descriptive-name>.md` that:
+A plan file at `docs/plan/<descriptive-name>.md` that:
 1. States the context and motivation
 2. Breaks work into tiers or sections with checkbox items
 3. Specifies an execution checklist of concrete actions
