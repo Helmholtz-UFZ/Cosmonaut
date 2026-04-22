@@ -12,7 +12,9 @@ div:has(> #_pages_content) {
   flex-grow: 1;
 }
 
-/* Fix scrolling in input container (right sidebar) for Playwright compatibility */
+/* Fix scrolling in input container (right sidebar) for Playwright compatibility.
+   May be superseded by .content-panel { overflow-y: auto } added 2026-04-22.
+   Candidate for removal once E2E tests confirm no regression. */
 #input_container {
   overflow-y: auto;
   min-height: 0; /* Allow flex item to shrink and enable scrolling */
@@ -40,6 +42,17 @@ div:has(> #_pages_content) {
 }
 .map-panel {
     min-width: 0;
+}
+
+/* Map pages only: lock root to viewport so .content-panel scrolls, not the document */
+.app-root:not(:has(.no-map-page)) {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.content-panel {
+    overflow-y: auto;
+    min-height: 0; /* flex item must be able to shrink for overflow-y to engage */
 }
 
 /* Admin pages: hide map, full-width content */

@@ -355,7 +355,7 @@ def build_global_map():
 def app_layout():
     """Create the main page layout with navbar and content."""
     return html.Div(
-        className="d-flex flex-column min-vh-100 bg-light",
+        className="d-flex flex-column min-vh-100 bg-light app-root",
         children=[
             dcc.Store(id=CURRENT_JOB_ID_MAP_STORE_ID, data=None),
             dcc.Store(id=STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, data=0),
