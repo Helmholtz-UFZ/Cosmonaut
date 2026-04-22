@@ -2,7 +2,7 @@
 
 ### COSmic ray based soil MOisture Prediction NAvigation and UTility Tool
 
-*Last updated: 2026-03-19 10:54:53*
+*Last updated: 2026-04-22 16:06:48*
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -391,9 +391,34 @@ Worker Management Page for COSMONAUT App.
 
 
 
-This page provides real-time monitoring and control of Celery background workers.
-Allows viewing active, reserved, scheduled, and revoked tasks, as well as killing
-or cancelling tasks.
+Monitor and manage background workers and tasks.
+
+This administrative page provides real-time visibility into the Celery background task
+system that processes prediction jobs and maintenance operations. Features include:
+
+**Worker Status:**
+- View active worker processes and their configuration
+- See worker pool types, concurrency settings, and queue assignments
+- Check worker availability and health
+
+**Task Monitoring:**
+- View currently executing tasks (active tasks)
+- See tasks waiting in worker queues (reserved tasks)
+- Monitor scheduled tasks waiting for their run time
+- Track revoked (cancelled) tasks
+- Display task details including name, arguments, and execution time
+
+**Task Control:**
+- Kill actively running tasks (forcefully terminate)
+- Cancel scheduled tasks before they execute
+- Confirmation dialogs prevent accidental terminations
+
+**Status Updates:**
+- Manual refresh to get latest worker and task information
+- Timestamp showing when data was last refreshed
+
+This page is essential for monitoring system load, debugging stuck tasks, and managing
+resource usage during peak periods.
 
 <img src="/assets/docs/screenshots/worker_management.png" alt="Worker Management" class="mw-100" />
 
