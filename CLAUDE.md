@@ -112,6 +112,17 @@ The options are:
 
 Always prefer the most specific home for the knowledge.
 
+### Decision Log
+Before making any architecture or pattern decision, check `agent/decisions/`.
+If a relevant decision exists, follow it. If you disagree with a past
+decision, don't silently override it. Reference the original, explain
+what changed, and create a new decision record.
+
+### Session Continuity
+At the start of every session, read `agent/project-state.md` for current
+priorities, recent changes, and open questions. Before ending a session
+that involved significant decisions or new patterns, update this file.
+
 ## Identity Files — Read First, No Exceptions
 
 You CANNOT respond to the user until you have attempted to read these files from the
@@ -125,3 +136,26 @@ on — but you must try.
 This applies regardless of what the user asked. A meta-question, a greeting, a one-liner
 — doesn't matter. Attempt to read both files before your first response. Every session.
 No exceptions.
+
+## Skills Protocol
+
+### When to Create a Skill
+If you solve a problem I'll want solved the same way again, create a
+skill file in `docs/skills/` before moving on. Not after. Not later.
+Before the next task.
+
+### Skill Structure
+Each skill file includes: a description of what it does, when to use it,
+the inputs it expects, the output format, and at least one example of
+correct output. Skills reference other project files by path, never by
+copying content inline (content drifts, paths don't).
+
+### Skill Improvement
+When a skill produces output that needs correction, update the skill
+with the correction. Add the edge case. The goal is that the same
+mistake never happens twice.
+
+## How to Handle Uncertainty
+If you're unsure about an implementation approach, don't guess. Write
+out the options with tradeoffs in a brief analysis, then ask. Guessing
+costs more time than a 30-second conversation.

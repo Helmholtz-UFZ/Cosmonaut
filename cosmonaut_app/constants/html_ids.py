@@ -218,8 +218,12 @@ DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID = (
 # ============================================================================
 
 # --- Buttons ---
+ADVANCED_TOGGLE_ROUTING_PARAMS_ID = "advanced-toggle-routing-params-id"
 # Needed for testing purposes
 NEXT_BUTTON_ROUTING_PARAMS_ID = "next-button-routing-params-id"  # nocheck
+
+# --- Collapses ---
+ADVANCED_COLLAPSE_ROUTING_PARAMS_ID = "advanced-collapse-routing-params-id"
 
 
 # ============================================================================
