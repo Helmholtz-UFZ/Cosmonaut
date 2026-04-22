@@ -215,12 +215,10 @@ def layout(job_id: str):
             dcc.Store(
                 id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"
             ),
-            html.P(
-                "Select the desired roads in the map on the left. "
-                "Click a road to mark it. Use 'Remove selected' to remove the "
-                "marked roads. 'Keep largest' retains the largest connected "
-                "subset of the current road network.",
-                className="text-muted",
+            html.H6("Filter road types", className="fw-semibold mb-1 mt-2"),
+            dbc.FormText(
+                "Toggles apply immediately. Disabled types are removed from the network and won't appear in the final route.",
+                className="d-block mb-2",
             ),
             dbc.Row(
                 [
@@ -278,42 +276,32 @@ def layout(job_id: str):
                 else "form-check-input disabled",
                 className="" if is_active else "pe-none opacity-50",
             ),
+            html.Hr(className="my-3"),
+            html.H6("Edit individual roads", className="fw-semibold mb-1"),
+            dbc.FormText(
+                "Click roads on the map to mark them, then choose an action below.",
+                className="d-block mb-2",
+            ),
             dbc.Row(
                 [
                     dbc.Col(
-                        dbc.ButtonGroup(
+                        html.Div(
                             [
                                 dbc.Button(
                                     [
                                         html.I(className="bi bi-eraser me-1"),
-                                        "Remove selected",
+                                        "Remove clicked roads",
                                     ],
                                     id=REMOVE_BUTTON_STREET_SELECTION_ID,
                                     color="danger",
                                     disabled=not is_active,
                                 ),
-                                dbc.Button(
-                                    [
-                                        html.I(className="bi bi-diagram-3 me-1"),
-                                        "Keep largest",
-                                    ],
-                                    id=LARGEST_BUTTON_STREET_SELECTION_ID,
-                                    color="primary",
-                                    disabled=not is_active or sel.keep_largest_applied,
-                                ),
-                                dbc.Button(
-                                    [
-                                        html.I(
-                                            className="bi bi-arrow-counterclockwise me-1"
-                                        ),
-                                        "Reset edits",
-                                    ],
-                                    id=RESET_ROADS_BUTTON_STREET_SELECTION_ID,
-                                    color="secondary",
-                                    disabled=not is_active,
+                                dbc.FormText(
+                                    "Removes the roads you clicked on the map.",
+                                    className="mt-1",
                                 ),
                             ],
-                            size="md",
+                            className="d-flex flex-column",
                         ),
                         width="auto",
                     ),
@@ -324,10 +312,10 @@ def layout(job_id: str):
                             className="ms-2",
                         ),
                         width="auto",
-                        className="d-flex align-items-center",
+                        className="d-flex align-items-center ms-auto",
                     ),
                 ],
-                className="g-2 align-items-center mt-2",
+                className="g-3 align-items-center mt-2",
             ),
             # Removed roads panel
             dbc.Label("Removed roads", className="mt-3 mb-1"),
@@ -352,7 +340,9 @@ def layout(job_id: str):
                 className="mt-1 p-0",
                 disabled=not is_active or not sel.removed_roads,
             ),
-            # Connectivity hint
+            # Network connectivity section
+            html.Hr(className="my-3"),
+            html.H6("Network connectivity", className="fw-semibold mb-1 mt-3"),
             html.Div(
                 html.Small(
                     _build_keep_largest_hint(sel.keep_largest_applied),
@@ -361,7 +351,6 @@ def layout(job_id: str):
                     else "text-warning",
                 ),
                 id=KEEP_LARGEST_HINT_STREET_SELECTION_ID,
-                className="mt-3",
             ),
             dbc.Tooltip(
                 "When active, only the largest connected road component is kept. "
@@ -369,6 +358,46 @@ def layout(job_id: str):
                 "can re-evaluate connectivity.",
                 target=KEEP_LARGEST_HINT_STREET_SELECTION_ID,
                 placement="bottom",
+            ),
+            html.Div(
+                [
+                    dbc.Button(
+                        [
+                            html.I(className="bi bi-diagram-3 me-1"),
+                            "Keep largest network",
+                        ],
+                        id=LARGEST_BUTTON_STREET_SELECTION_ID,
+                        color="primary",
+                        disabled=not is_active or sel.keep_largest_applied,
+                    ),
+                    dbc.FormText(
+                        "Retains only the largest connected network. Any edit resets this.",
+                        className="mt-1",
+                    ),
+                ],
+                className="d-flex flex-column mt-2",
+            ),
+            # Footer — global undo
+            html.Hr(className="my-3"),
+            html.Div(
+                [
+                    dbc.Button(
+                        [
+                            html.I(className="bi bi-arrow-counterclockwise me-1"),
+                            "Reset all edits",
+                        ],
+                        id=RESET_ROADS_BUTTON_STREET_SELECTION_ID,
+                        outline=True,
+                        color="secondary",
+                        size="sm",
+                        disabled=not is_active,
+                    ),
+                    dbc.FormText(
+                        "Restores all roads, filters, and network settings to the original state.",
+                        className="d-block mt-1",
+                    ),
+                ],
+                className="d-flex flex-column",
             ),
             # Reset confirmation modal (for reset edits button)
             dbc.Modal(
