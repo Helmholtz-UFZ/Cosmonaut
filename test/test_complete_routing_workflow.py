@@ -101,7 +101,7 @@ def test_complete_routing_workflow(
 
         if street_processing == "FAILED":
             pytest.fail(
-                f"Street processing failed during upload. Check logs for details."
+                "Street processing failed during upload. Check logs for details."
             )
 
         try:

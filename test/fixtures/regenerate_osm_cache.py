@@ -29,7 +29,7 @@ def regenerate():
     csv_data = _transform_csv(TEST_MEMBERSHIP_CSV, epsg_input=25832, epsg_output=4326)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        print(f"Running OsmDownloader with test AOI...")
+        print("Running OsmDownloader with test AOI...")
         downloader = OsmDownloader(csv_data)
         downloader.run_osm_query(tmpdir)
 
@@ -46,9 +46,9 @@ def regenerate():
             shutil.copy2(src, dst)
             print(f"  Cached: {file_name}")
 
-    print(f"\n✓ Cache regenerated. Commit the changes:")
-    print(f"  git add test/fixtures/osm_cache/")
-    print(f"\nNote: Regenerate only when the test AOI (memberships.csv) changes.")
+    print("\n✓ Cache regenerated. Commit the changes:")
+    print("  git add test/fixtures/osm_cache/")
+    print("\nNote: Regenerate only when the test AOI (memberships.csv) changes.")
 
 
 if __name__ == "__main__":

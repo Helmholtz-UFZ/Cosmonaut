@@ -4,7 +4,6 @@ import unittest.mock as mock
 
 import pandas as pd
 import requests.exceptions
-import urllib3.exceptions
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 
