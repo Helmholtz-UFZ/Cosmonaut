@@ -8,7 +8,6 @@ import gpxpy
 import qrcode
 from pyproj import Transformer
 
-from cosmonaut_app.config import get_download_url
 from cosmonaut_app.object_storage_manager import get_presigned_download_url
 
 log = logging.getLogger(__name__)

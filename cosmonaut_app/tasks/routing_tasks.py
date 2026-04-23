@@ -13,7 +13,7 @@ from logging.config import dictConfig
 from celery import Task
 from sensor_routing.full_pipeline_cli import sensor_routing_pipeline
 
-from cosmonaut_app.config import FLASK_PORT, WEB_OUTSIDE_URL, get_download_url
+from cosmonaut_app.config import FLASK_PORT, WEB_OUTSIDE_URL
 from cosmonaut_app.object_storage_manager import get_presigned_download_url
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
@@ -83,7 +83,7 @@ def process_routing_job(self, job_id):
 
         # Post-processing: Create GPX and QR code
         log.info(f"Starting post-processing for job {job.model.job_id}")
-        qr_code_url = job.create_qr_code_routing()
+        job.create_qr_code_routing()
         log.info(f"Post-processing complete. QR code generated for job {job.model.job_id}")
 
         log.info(f"Job {job_id} completed successfully")
