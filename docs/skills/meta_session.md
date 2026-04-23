@@ -3,6 +3,7 @@
 A Meta Session is a structured planning conversation between a developer and a strong
 AI model. Its purpose is to produce a clear, actionable plan before any code is written.
 This prevents the more expensive mistake of executing in the wrong direction.
+NEVER EXECUTE THE PLAN IF NOT EXPLICITLY ASKED TO!
 
 ---
 

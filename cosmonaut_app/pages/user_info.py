@@ -159,6 +159,7 @@ def go_to_upload_page(n_clicks: int | None, email: str | None, pathname: str | N
     job_id = pathname.split("/")[2]
     job = CosmonautJob(job_id=job_id, sync_files=False)
     job.model.email = email
+    job.model.stage = max(job.model.stage, 1)
     job.save(sync_files=False)
 
     log.info(f"Storing email {email} for job {job_id}")

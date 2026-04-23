@@ -269,6 +269,7 @@ class DataBaseManager:
             - status (str): Job status
             - email (str): User email
             - celery_task_id (str|None): Celery task ID if submitted
+            - stage (int): Current workflow stage (0-4)
         """
         with SessionScope(cls._get_session()) as session:
             job_rows = session.query(JobTable).all()
@@ -281,6 +282,7 @@ class DataBaseManager:
                     "status": job_row.status,
                     "email": job_row.email or "N/A",
                     "celery_task_id": job_row.celery_task_id,
+                    "stage": job_row.stage,
                 }
             return job_info
 

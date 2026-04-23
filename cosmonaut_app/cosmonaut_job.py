@@ -451,6 +451,7 @@ class CosmonautJob:
         celery_status = celery_info["status"]
         if celery_status == "SUCCESS":
             self.model.membership_upload["street_processing"] = "COMPLETED"
+            self.model.stage = max(self.model.stage, 2)
             self.save(sync_files=False)
             return "COMPLETED"
         elif celery_status in ("FAILURE", "REVOKED"):
@@ -542,6 +543,7 @@ class CosmonautJob:
             # Mark as submitted and set status to RUNNING
             self.model.submitted = True
             self.model.status = JOB_STATUS_RUNNING
+            self.model.stage = max(self.model.stage, 4)
             # Sync files — the worker pulls from MinIO via get_files().
             # Also writes parameters.json via dump_routing_params().
             self.save()
@@ -652,6 +654,7 @@ class CosmonautJob:
         self.model.status = JOB_STATUS_PENDING
         self.model.celery_task_id = None
         self.model.submitted = False
+        self.model.stage = min(self.model.stage, 4)
 
         # Save changes
         self.save()
