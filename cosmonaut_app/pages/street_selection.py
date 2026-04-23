@@ -107,7 +107,6 @@ from cosmonaut_app.constants.html_ids import (
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.error_handling import JobNotFound
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
