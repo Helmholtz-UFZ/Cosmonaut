@@ -43,7 +43,7 @@ from cosmonaut_app.constants.html_ids import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
-from cosmonaut_app.layout import create_header, page_container_column_layout
+from cosmonaut_app.layout import create_header, page_container_column_layout, build_url_step
 from cosmonaut_app.tasks.maintenance_tasks import clean_up_jobs
 
 log = logging.getLogger(__name__)
@@ -62,6 +62,39 @@ dash.register_page(
 # ============================================================================
 
 
+_STAGE_TO_PAGE = {
+    0: "user_info",
+    1: "data_upload",
+    2: "street_selection",
+    3: "routing_params",
+    4: "route_computation",
+}
+
+
+def _resolve_reload_url(job_id: str, status: str, stage: int) -> str:
+    """Resolve the appropriate page URL when reloading a job from the job manager.
+
+    Maps status and stage to the page where the user should resume their work.
+    Status takes priority: COMPLETED always goes to route_download, RUNNING/FAILED to
+    route_computation. For PENDING jobs, stage determines the page.
+
+    Args:
+        job_id: The job ID
+        status: Job status (PENDING/RUNNING/COMPLETED/FAILED)
+        stage: Workflow stage (0-4), only used if status is PENDING
+
+    Returns:
+        URL path to navigate to
+    """
+    if status == JOB_STATUS_COMPLETED:
+        return build_url_step("route_download", job_id)
+    if status in (JOB_STATUS_RUNNING, JOB_STATUS_FAILED):
+        return build_url_step("route_computation", job_id)
+    # PENDING: use stage to determine page
+    page = _STAGE_TO_PAGE.get(stage, "user_info")
+    return build_url_step(page, job_id)
+
+
 def format_jobs_for_table(jobs_dict):
     """Format jobs dictionary for AgGrid display.
 
@@ -69,24 +102,22 @@ def format_jobs_for_table(jobs_dict):
     ----------
     jobs_dict : dict
         Dictionary from DataBaseManager.list_jobs()
-        Format: {job_id: {status, start_date, submitted, email, celery_task_id}}
+        Format: {job_id: {status, start_date, submitted, email, celery_task_id, stage}}
 
     Returns
     -------
     list
         List of dicts formatted for AgGrid with columns:
-        - job_id (markdown link)
+        - job_id (markdown link to smart reload page)
         - status (color-coded)
         - start_date (YYYY-MM-DD)
         - submitted (Yes/No)
     """
     rows = []
 
-    user_info_path_template = dash.page_registry["pages.user_info"]["path_template"]
-
     for job_id, job_data in jobs_dict.items():
-        # Create markdown link for job_id
-        job_link = user_info_path_template.replace("<job_id>", job_id)
+        # Create markdown link for job_id, navigating to the appropriate page based on status/stage
+        job_link = _resolve_reload_url(job_id, job_data["status"], job_data["stage"])
         job_id_markdown = f"[{job_id}]({job_link})"
 
         # Format submitted as Yes/No

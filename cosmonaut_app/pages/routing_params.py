@@ -176,6 +176,8 @@ def layout(job_id):
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
+    job.model.stage = max(job.model.stage, 3)
+    job.save(sync_files=False)
 
     # Create form with FormFactory (active parameter controls disabled state and styling)
     # IDs are always preserved for callbacks regardless of active state
@@ -268,6 +270,7 @@ def update_routing_params(**inputs):
         for key, value in inputs.items():
             if hasattr(job.model, key):
                 setattr(job.model, key, value)
+        job.model.stage = max(job.model.stage, 3)
         # Skip file sync — submit() syncs before the worker starts
         job.save(sync_files=False)
         return {

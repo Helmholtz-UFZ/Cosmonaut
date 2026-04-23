@@ -107,6 +107,7 @@ from cosmonaut_app.constants.html_ids import (
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.error_handling import JobNotFound
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
@@ -121,6 +122,16 @@ log = logging.getLogger(__name__)
 
 # Height for ~5 list items before scrolling
 _REMOVED_LIST_MAX_HEIGHT = "12rem"
+
+
+def _extract_job_id(pathname: str) -> Optional[str]:
+    """Extract job_id from URL pathname. Returns None if invalid format."""
+    if not pathname:
+        return None
+    parts = pathname.split("/")
+    if len(parts) >= 3 and parts[1] == "job":
+        return parts[2]
+    return None
 
 
 def _build_keep_largest_hint(keep_largest: bool) -> list:
@@ -188,6 +199,8 @@ def layout(job_id: str):
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
+    job.model.stage = max(job.model.stage, 2)
+    job.save(sync_files=False)
 
     log.info(f"Street selection layout for job {job_id}")
     log.debug(f"Job {job_id} membership_upload: {job.model.membership_upload}")
@@ -527,11 +540,12 @@ def _street_processing_failed_layout(job_id):
     Output(STREET_PROCESSING_POLL_STREET_SELECTION_ID, "disabled"),
     Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
     Input(STREET_PROCESSING_POLL_STREET_SELECTION_ID, "n_intervals"),
-    State(JOB_ID_STORE_SHARED_ID, "data"),
+    Input(URL_SHARED_ID, "pathname"),
     prevent_initial_call=True,
 )
-def poll_street_processing_status(n_intervals, job_id):
+def poll_street_processing_status(n_intervals, pathname):
     """Poll street processing and reload page when complete."""
+    job_id = _extract_job_id(pathname)
     if not job_id:
         raise PreventUpdate
 
@@ -573,7 +587,7 @@ def poll_street_processing_status(n_intervals, job_id):
     [Input(REMOVE_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
         State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
-        State(JOB_ID_STORE_SHARED_ID, "data"),
+        State(URL_SHARED_ID, "pathname"),
         State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     ],
     prevent_initial_call=True,
@@ -581,10 +595,11 @@ def poll_street_processing_status(n_intervals, job_id):
 def remove_selected(
     n: Optional[int],
     hideout: Optional[Dict[str, Any]],
-    job_id: Optional[str],
+    pathname: Optional[str],
     version: Optional[int],
 ):
     """Remove the currently selected roads and update the edited GeoJSON."""
+    job_id = _extract_job_id(pathname)
     if not n or not job_id:
         raise PreventUpdate
 
@@ -614,17 +629,18 @@ def remove_selected(
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     [Input(LARGEST_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
-        State(JOB_ID_STORE_SHARED_ID, "data"),
+        State(URL_SHARED_ID, "pathname"),
         State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     ],
     prevent_initial_call=True,
 )
 def keep_largest_subnetwork(
     n: Optional[int],
-    job_id: Optional[str],
+    pathname: Optional[str],
     version: Optional[int],
 ):
     """Keep the largest connected subnetwork of the current road network."""
+    job_id = _extract_job_id(pathname)
     if not n or not job_id:
         raise PreventUpdate
 
@@ -653,17 +669,18 @@ def keep_largest_subnetwork(
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     [Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks")],
     [
-        State(JOB_ID_STORE_SHARED_ID, "data"),
+        State(URL_SHARED_ID, "pathname"),
         State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     ],
     prevent_initial_call=True,
 )
 def reset_edits(
     n: Optional[int],
-    job_id: Optional[str],
+    pathname: Optional[str],
     version: Optional[int],
 ):
     """Reset edits by restoring all state to defaults."""
+    job_id = _extract_job_id(pathname)
     if not n or not job_id:
         raise PreventUpdate
 
@@ -753,15 +770,19 @@ def clear_selections(
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     Input(TAGS_DROPDOWN_STREET_SELECTION_ID, "value"),
-    State(JOB_ID_STORE_SHARED_ID, "data"),
+    State(URL_SHARED_ID, "pathname"),
     State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
 def update_tags_dropdown(
-    tags: Optional[List[str]], job_id: Optional[str], version: Optional[int]
+    tags: Optional[List[str]], pathname: Optional[str], version: Optional[int]
 ):
     """Persist selected tag values and refresh the map to match the filter."""
     if tags is None:
+        raise PreventUpdate
+
+    job_id = _extract_job_id(pathname)
+    if not job_id:
         raise PreventUpdate
 
     log.info(f"Job {job_id} road tags updated: {tags}")
@@ -782,12 +803,13 @@ def update_tags_dropdown(
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     Input({"type": "restore-road-btn", "index": ALL}, "n_clicks"),  # nocheck
-    State(JOB_ID_STORE_SHARED_ID, "data"),
+    State(URL_SHARED_ID, "pathname"),
     State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def restore_single_road(n_clicks_list, job_id, version):
+def restore_single_road(n_clicks_list, pathname, version):
     """Restore a single road removed from the network."""
+    job_id = _extract_job_id(pathname)
     if not any(n_clicks_list) or not job_id:
         raise PreventUpdate
 
@@ -816,12 +838,13 @@ def restore_single_road(n_clicks_list, job_id, version):
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
     Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
     Input(CLEAR_REMOVED_BUTTON_STREET_SELECTION_ID, "n_clicks"),
-    State(JOB_ID_STORE_SHARED_ID, "data"),
+    State(URL_SHARED_ID, "pathname"),
     State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
 )
-def clear_all_removed_roads(n_clicks, job_id, version):
+def clear_all_removed_roads(n_clicks, pathname, version):
     """Clear the entire removed roads list and restore all roads."""
+    job_id = _extract_job_id(pathname)
     if not n_clicks or not job_id:
         raise PreventUpdate
 
