@@ -29,7 +29,7 @@ def send_mail(recipients, subject, body):
     if EMAIL_SERVER == "test":
         log.info(
             f"Test mode — email not sent. "
-            f"To: {recipients}, Subject: {subject}, Body: {body}"
+            f"To: {recipients}, Subject: {subject}, Body length: {len(body)} chars"
         )
         return
 
