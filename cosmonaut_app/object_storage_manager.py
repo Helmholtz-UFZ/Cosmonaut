@@ -4,6 +4,10 @@ import logging
 import subprocess
 import sys
 import time
+from datetime import timedelta
+
+from minio import Minio
+from minio.error import S3Error
 
 from cosmonaut_app.error_handling import ObjectStorageError
 from cosmonaut_app.config import (
@@ -42,6 +46,40 @@ def check_result(params: list, result: subprocess.CompletedProcess) -> None:
         else:
             log.error(f"Command failed: {call}\n{error_msg}\n{output}")
         raise ObjectStorageError
+
+
+def get_presigned_download_url(object_key: str, expiry: timedelta) -> str:
+    """Generate a presigned GET URL for an object in S3-compatible storage.
+
+    Args:
+        object_key: Key of the object (e.g. "{job_id}/route.gpx")
+        expiry: Duration for which the URL is valid
+
+    Returns:
+        str: Presigned URL that can be downloaded without credentials
+
+    Raises:
+        ObjectStorageError: If S3 operation fails
+    """
+    secure = OBJECT_STORAGE_HOST.startswith("https://")
+    endpoint = OBJECT_STORAGE_HOST.replace("https://", "").replace("http://", "")
+    client = Minio(
+        endpoint=endpoint,
+        access_key=OBJECT_STORAGE_ACCESS_KEY,
+        secret_key=OBJECT_STORAGE_SECRET_KEY,
+        secure=secure,
+    )
+    try:
+        url = client.presigned_get_object(
+            OBJECT_STORAGE_BUCKET,
+            object_key,
+            expires=expiry,
+        )
+        log.debug(f"Generated presigned URL for {object_key}")
+        return url
+    except S3Error as e:
+        log.error(f"S3 error generating presigned URL for {object_key}: {e}")
+        raise ObjectStorageError(f"Presigning failed for {object_key}") from e
 
 
 def run_rclone_with_retry(

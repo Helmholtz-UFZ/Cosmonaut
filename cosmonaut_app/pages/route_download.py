@@ -86,8 +86,10 @@ register_page(
 
 
 def layout(job_id):
-    CosmonautJob(job_id=job_id)
+    job = CosmonautJob(job_id=job_id)
     log.info(f"Route & Download layout called with job_id={job_id}")
+
+    job.create_qr_code_routing()
 
     # Construct full download URL
     download_url = get_download_url(job_id)
