@@ -17,6 +17,7 @@ dependencies = [
     "gpxpy>=1.6.0,<2",
     "gunicorn>=22.0.0,<24",
     "matplotlib>=3.10.0,<4",
+    "minio>=7.2.0,<8",
     "networkx>=3.4.0,<4",
     "orjson>=3.10.0,<4",
     "osmnx>=2.0.0,<3",
