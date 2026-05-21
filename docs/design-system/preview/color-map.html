@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Map &amp; data-vis colors</title>
+<link rel="stylesheet" href="_card.css">
+</head>
+<body class="cn-card-host">
+<div style="display:grid; grid-template-columns:1.3fr 1fr; gap:18px; align-items:center;">
+  <div style="position:relative; height:200px; border-radius:8px; overflow:hidden; background:#e8efe5; border:1px solid #dee2e6;">
+    <svg viewBox="0 0 320 200" width="100%" height="100%" preserveAspectRatio="none" style="display:block;">
+      <defs>
+        <pattern id="g" width="32" height="32" patternUnits="userSpaceOnUse">
+          <path d="M32 0H0V32" fill="none" stroke="#c8d4be" stroke-width=".5"/>
+        </pattern>
+        <!-- Glow filter applied to the hovered street -->
+        <filter id="hoverGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="3.2" result="blur"/>
+          <feFlood flood-color="#ffffff" flood-opacity="0.95"/>
+          <feComposite in2="blur" operator="in" result="halo"/>
+          <feMerge>
+            <feMergeNode in="halo"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <rect width="320" height="200" fill="url(#g)"/>
+
+      <!-- streets default red, weight 3, opacity .85 -->
+      <g stroke="#e74c3c" stroke-width="3" fill="none" opacity=".85">
+        <path d="M10 160 Q 70 130 120 140 T 230 100 T 310 90"/>
+        <path d="M40 40  Q 90 60  140 50  T 250 100 T 310 140"/>
+        <path d="M180 20 L 180 190"/>
+        <path d="M20 100 Q 80 120 140 110"/>
+      </g>
+
+      <!-- HOVERED street: white halo (glow) + thicker red + full opacity -->
+      <path d="M10 90 L 120 80 L 220 100"
+            stroke="#ff6666" stroke-width="5" fill="none" opacity="1"
+            filter="url(#hoverGlow)"/>
+
+      <!-- Selected (clicked) — yellow -->
+      <path d="M60 50 L 130 90 L 180 80" stroke="#ffd400" stroke-width="4" fill="none" opacity="1"/>
+
+      <!-- Computed route, blue -->
+      <path d="M30 150 Q 100 120 160 130 T 290 80"
+            stroke="#1a73e8" stroke-width="4" fill="none" opacity=".9"/>
+
+      <!-- Cursor pointing at the hover line -->
+      <g transform="translate(140 73)">
+        <path d="M0 0 L 0 14 L 4 11 L 7 17 L 9 16 L 6 10 L 11 10 Z"
+              fill="#212529" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/>
+      </g>
+
+      <!-- Label callouts -->
+      <g font-family="Lato, sans-serif" font-size="9" fill="#2c3e50">
+        <text x="226" y="98" font-weight="700">hover</text>
+        <text x="190" y="76" font-weight="700" fill="#aa8800">selected</text>
+        <text x="295" y="75" text-anchor="end" font-weight="700" fill="#1a73e8">route</text>
+      </g>
+    </svg>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:8px; font-size:11px;">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="width:22px; height:3px; background:#e74c3c; opacity:.85;"></span>
+      <strong>Streets · default</strong>
+      <span class="cn-mono" style="color:var(--cn-fg-muted); margin-left:auto;">3px · α.85</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px; padding:4px 6px; margin:0 -6px; background:rgba(255,255,255,.7); border-radius:4px; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 1px 4px rgba(0,0,0,.12);">
+      <span style="width:22px; height:5px; background:#ff6666; border-radius:1px; box-shadow:0 0 6px 2px rgba(255,255,255,1);"></span>
+      <strong>Streets · hover</strong>
+      <span class="cn-mono" style="color:var(--cn-fg-muted); margin-left:auto;">5px · α1 · halo</span>
+    </div>
+    <div style="font-size:10px; color:var(--cn-fg-muted); margin:-2px 0 4px 30px; line-height:1.35;">
+      Thicker stroke + full opacity + white outer halo — pops off the basemap.
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="width:22px; height:4px; background:#ffd400;"></span>
+      <strong>Selected</strong>
+      <span class="cn-mono" style="color:var(--cn-fg-muted); margin-left:auto;">#FFD400 · 4px</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="width:22px; height:4px; background:#fd7e14;"></span>
+      <strong>Selected + hover</strong>
+      <span class="cn-mono" style="color:var(--cn-fg-muted); margin-left:auto;">#FD7E14</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="width:22px; height:4px; background:#1a73e8; opacity:.9;"></span>
+      <strong>Computed route</strong>
+      <span class="cn-mono" style="color:var(--cn-fg-muted); margin-left:auto;">#1A73E8</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

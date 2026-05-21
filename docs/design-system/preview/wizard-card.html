@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wizard card</title>
+<link rel="stylesheet" href="../assets/bootstrap-icons.min.css">
+<link rel="stylesheet" href="_card.css">
+<link rel="stylesheet" href="_flatly.css">
+</head>
+<body class="cn-card-host" style="background:#ecf0f1;">
+<div class="card" style="max-width:560px;">
+  <div class="card-header" style="padding-bottom:0;">
+    <h3 style="margin:0 0 .5rem; font-size:1.5rem; font-weight:500;">Upload classification data(b56ee901)</h3>
+    <ul class="nav-tabs" style="margin-bottom:-1px;">
+      <li><a class="nav-link disabled">Information</a></li>
+      <li><a class="nav-link active">Upload</a></li>
+      <li><a class="nav-link disabled">Selection</a></li>
+      <li><a class="nav-link disabled">Parameters</a></li>
+    </ul>
+  </div>
+  <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
+    <p style="margin:0; color:#95a5a6;">Please enter a valid EPSG code and then upload your membership data file.</p>
+    <div>
+      <label class="form-label" style="font-size:.875rem;">EPSG code</label>
+      <input class="form-control is-valid" value="25832">
+    </div>
+    <button class="btn btn-primary" style="align-self:flex-start;"><i class="bi bi-upload"></i>Upload membership file</button>
+  </div>
+  <div class="card-footer" style="display:flex; gap:8px; justify-content:flex-end;">
+    <button class="btn btn-primary"><i class="bi bi-arrow-left-circle"></i>Previous</button>
+    <button class="btn btn-primary"><i class="bi bi-arrow-right-circle"></i>Next</button>
+  </div>
+</div>
+</body>
+</html>

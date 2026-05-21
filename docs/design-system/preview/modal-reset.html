@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Modal · reset confirm</title>
+<link rel="stylesheet" href="../assets/bootstrap-icons.min.css">
+<link rel="stylesheet" href="_card.css">
+<link rel="stylesheet" href="_flatly.css">
+</head>
+<body class="cn-card-host" style="background:rgba(33,37,41,.5);">
+<div style="background:#fff; border-radius:.5rem; box-shadow:0 .5rem 1rem rgba(0,0,0,.15); max-width:480px; margin:8px auto; overflow:hidden;">
+  <div style="padding:1rem; border-bottom:1px solid #dee2e6; display:flex; align-items:center; justify-content:space-between;">
+    <strong style="font-size:1.25rem; font-weight:500;">Reset Job?</strong>
+    <span style="color:#95a5a6; font-size:20px;">×</span>
+  </div>
+  <div style="padding:1rem; font-size:14px; line-height:1.5;">
+    <p style="margin:0 0 .5rem;">This will delete all computation results (logs, routes, GPX files) and reset the job status to PENDING. You will need to restart the computation.</p>
+    <p style="margin:0; color:#95a5a6;">Your uploaded data and selected streets will be preserved.</p>
+  </div>
+  <div style="padding:.75rem 1rem; border-top:1px solid #dee2e6; display:flex; justify-content:flex-end; gap:8px;">
+    <button class="btn btn-outline-secondary">Cancel</button>
+    <button class="btn btn-danger"><i class="bi bi-exclamation-triangle"></i>Reset Job</button>
+  </div>
+</div>
+</body>
+</html>

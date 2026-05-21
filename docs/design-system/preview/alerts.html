@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Alerts &amp; banners</title>
+<link rel="stylesheet" href="../assets/bootstrap-icons.min.css">
+<link rel="stylesheet" href="_card.css">
+<link rel="stylesheet" href="_flatly.css">
+</head>
+<body class="cn-card-host">
+<div style="display:flex; flex-direction:column; gap:10px;">
+  <div class="alert alert-info" style="display:flex; align-items:center; gap:10px;">
+    <span>This job will be automatically deleted in 60 day(s).</span>
+  </div>
+  <div class="alert alert-primary" style="display:flex; align-items:center; justify-content:space-between; gap:14px;">
+    <span>This job is currently running. Reset to cancel and restart.</span>
+    <button class="btn btn-warning btn-sm"><i class="bi bi-arrow-counterclockwise"></i>Reset Job</button>
+  </div>
+  <div class="alert alert-warning" style="display:flex; align-items:center; gap:10px;">
+    <i class="bi bi-exclamation-triangle"></i>
+    <span><strong>Warning:</strong> Your email is visible from inside the UFZ network.</span>
+  </div>
+  <div class="alert alert-danger" style="display:flex; align-items:center; gap:10px;">
+    <i class="bi bi-exclamation-octagon"></i>
+    <span>Road network construction failed! Re-upload membership file.</span>
+  </div>
+</div>
+</body>
+</html>

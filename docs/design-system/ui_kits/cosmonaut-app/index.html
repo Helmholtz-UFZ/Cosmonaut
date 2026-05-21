@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>COSMONAUT UI Kit</title>
+
+<!-- Real Flatly Bootstrap CSS used by the live app -->
+<link rel="stylesheet" href="../../assets/flatly_bootstrap.css">
+<link rel="stylesheet" href="../../assets/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../../colors_and_type.css">
+
+<style>
+  html, body {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+    background: #ecf0f1;
+    font-family: var(--cn-font-sans);
+  }
+  #root { height: 100vh; display: flex; flex-direction: column; }
+  @keyframes cnSpin { to { transform: rotate(360deg); } }
+
+  /* Override Flatly's wide nav-link padding (1rem instead of 2rem),
+     to match cosmonaut_app/assets/style.css */
+  .nav-tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .nav-tabs .nav-link {
+    padding: 0.5rem 0.75rem;
+    white-space: nowrap;
+  }
+  .nav-tabs .nav-link.disabled { pointer-events: none; color: #b4bcc2; }
+
+  /* Custom form-switch (overrides Flatly's, since we use <label.form-switch>
+     not <div.form-check.form-switch>). Mirrors Bootstrap's switch look. */
+  label.form-switch {
+    display: inline-flex; align-items: center; gap: 8px;
+    cursor: pointer; user-select: none;
+  }
+  label.form-switch > input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 38px; height: 20px;
+    background: #dee2e6; border: 1px solid #c4cacf;
+    border-radius: 50rem; position: relative; cursor: pointer; outline: none;
+    transition: background .15s, border-color .15s;
+    flex-shrink: 0;
+  }
+  label.form-switch > input[type="checkbox"]:checked {
+    background: #2c3e50; border-color: #2c3e50;
+  }
+  label.form-switch > input[type="checkbox"]::before {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; background: #fff; border-radius: 50%;
+    transition: transform .15s;
+  }
+  label.form-switch > input[type="checkbox"]:checked::before {
+    transform: translateX(18px);
+  }
+
+  /* Form-control valid state shouldn't push padding so far right at narrow widths */
+  .form-control.is-valid { background-position: right calc(0.375em + 0.1875rem) center; }
+
+  /* Card title font-size tighter at narrow widths */
+  .card-header h3 { font-size: 1.5rem; }
+
+  /* Right-pane scrolls; map pane is fixed */
+  .app-panels { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+  .map-panel { flex: 0 0 58%; min-width: 0; }
+  .content-panel { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; background: #ecf0f1; }
+  .no-map .map-panel { display: none; }
+  .no-map .content-panel { flex: 1; max-width: 100%; }
+
+  /* Floating breadcrumb */
+  .cn-step-chip {
+    position: absolute;
+    bottom: 14px; left: 14px;
+    background: rgba(255,255,255,.92);
+    border: 1px solid #dee2e6;
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #2c3e50;
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
+    z-index: 5;
+  }
+</style>
+
+<!-- React 18 -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="pages.jsx"></script>
+<script type="text/babel" src="admin.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+const JOB_ID = "b56ee901";
+
+function App() {
+  // page: home | user_info | data_upload | street_selection | routing_params | route_computation | route_download | jobs | workers | logs | docs
+  const [page, setPage] = useState("home");
+  const [resetOpen, setResetOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // wizard-wide state
+  const [email, setEmail] = useState("max.musterfrau@ufz.de");
+  const [upload, setUpload] = useState({
+    epsg: "25832",
+    membershipUploaded: false,
+    predictorUploaded: false,
+    opacity: 0.7,
+    streetStatus: "PENDING",
+  });
+  const [streets, setStreets] = useState({
+    roadTypes: STEPS && [
+      { id:"motorway",    label:"Motorway",     on:false },
+      { id:"trunk",       label:"Trunk road",   on:false },
+      { id:"primary",     label:"Primary road", on:true  },
+      { id:"secondary",   label:"Secondary road",on:true },
+      { id:"tertiary",    label:"Tertiary road",on:true  },
+      { id:"unclassified",label:"Unclassified", on:false },
+      { id:"residential", label:"Residential",  on:false },
+      { id:"living",      label:"Living street",on:false },
+      { id:"track",       label:"Track",        on:true  },
+    ],
+    removedCount: 1,
+  });
+  const [params, setParams] = useState({
+    params: { segments:"1", timeLimit:"80", maxDistance:"50", objective:"d", numPoints:"50" },
+    advancedOpen: false,
+  });
+  const [compute, setCompute] = useState({ status:"PENDING", logs:[] });
+
+  const wizardOrder = ["user_info", "data_upload", "street_selection", "routing_params", "route_computation", "route_download"];
+
+  const handleNav = id => {
+    if (id === "home") setPage("home");
+    else if (id === "jobs") setPage("jobs");
+    else if (id === "workers") setPage("workers");
+    else if (id === "logs") setPage("logs");
+    else if (id === "docs") setPage("docs");
+  };
+
+  const handleCreateJob = () => {
+    setLoading(true);
+    setTimeout(() => { setLoading(false); setPage("user_info"); }, 600);
+  };
+
+  const nextStep = () => {
+    const i = wizardOrder.indexOf(page);
+    if (i >= 0 && i < wizardOrder.length - 1) setPage(wizardOrder[i + 1]);
+  };
+  const prevStep = () => {
+    const i = wizardOrder.indexOf(page);
+    if (i > 0) setPage(wizardOrder[i - 1]);
+  };
+
+  const isWizardStep = wizardOrder.includes(page);
+  const isAdminPage = ["jobs", "workers", "logs", "docs"].includes(page);
+  const stepIdx = wizardOrder.indexOf(page);
+
+  // Map config per page
+  const mapProps = {
+    showMembership: upload.membershipUploaded && page !== "route_download",
+    showStreets:    upload.streetStatus === "COMPLETED" && page !== "home",
+    showSelected:   page === "street_selection",
+    showRoute:      compute.status === "COMPLETED" && (page === "route_computation" || page === "route_download"),
+    membershipOpacity: upload.opacity,
+  };
+
+  return (
+    <>
+      <Navbar active={page} onNav={handleNav} />
+      <div className={`app-panels ${isAdminPage ? "no-map" : ""}`}>
+        {!isAdminPage && (
+          <div className="map-panel" style={{ position:"relative" }}>
+            <FauxMap {...mapProps} />
+            {isWizardStep && (
+              <div className="cn-step-chip">Step {stepIdx + 1} of 6 · {STEPS[stepIdx].tab}</div>
+            )}
+          </div>
+        )}
+        <div className="content-panel">
+          {page === "home" && <HomePage onCreate={handleCreateJob} />}
+          {page === "user_info" && (
+            <UserInfoPage jobId={JOB_ID} email={email} setEmail={setEmail} onNext={nextStep} />
+          )}
+          {page === "data_upload" && (
+            <DataUploadPage jobId={JOB_ID} state={upload} setState={setUpload}
+              onPrev={prevStep} onNext={nextStep} />
+          )}
+          {page === "street_selection" && (
+            <StreetSelectionPage jobId={JOB_ID} state={streets} setState={setStreets}
+              onPrev={prevStep} onNext={nextStep} />
+          )}
+          {page === "routing_params" && (
+            <RoutingParamsPage jobId={JOB_ID} state={params} setState={setParams}
+              onPrev={prevStep} onNext={nextStep} />
+          )}
+          {page === "route_computation" && (
+            <RouteComputationPage jobId={JOB_ID} state={compute} setState={setCompute}
+              onPrev={prevStep} onNext={nextStep} />
+          )}
+          {page === "route_download" && (
+            <RouteDownloadPage jobId={JOB_ID} onPrev={prevStep} />
+          )}
+          {page === "jobs"    && <JobManager onOpenJob={(id) => { setPage("user_info"); }} />}
+          {page === "workers" && <WorkerManagement />}
+          {page === "logs"    && <LogsPage />}
+          {page === "docs"    && <DocumentationPage />}
+        </div>
+      </div>
+
+      <LoadingModal open={loading} />
+      <ResetConfirmModal
+        open={resetOpen}
+        onCancel={() => setResetOpen(false)}
+        onConfirm={() => setResetOpen(false)}
+      />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
