@@ -101,7 +101,6 @@ from cosmonaut_app.constants.html_ids import (
     DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID,
     DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID,
     JOB_ID_STORE_SHARED_ID,
-    LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID,
     MEMBERSHIP_TILE_LAYER_MAP_ID,
@@ -205,9 +204,9 @@ def layout(job_id):
             dcc.Store(
                 id=DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, data=membership_uploaded
             ),
-            html.P(
-                "Please enter a valid EPSG code and then upload your membership data file.",
-                className="text-muted",
+            html.H6(
+                "Coordinate system",
+                className="text-uppercase text-muted small fw-bold mb-2",
             ),
             dbc.Label(
                 "EPSG code",
@@ -228,7 +227,10 @@ def layout(job_id):
             dbc.FormText(
                 id=DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID, className="fw-semibold"
             ),
-            # --- Membership upload section ---
+            html.H6(
+                "Membership data",
+                className="text-uppercase text-muted small fw-bold mt-4 mb-2",
+            ),
             dcc.Upload(
                 id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
                 accept=".csv,.txt",
@@ -297,7 +299,10 @@ def layout(job_id):
                 ],
                 className="mb-3",
             ),
-            # --- Predictor upload section ---
+            html.H6(
+                "Predictor data",
+                className="text-uppercase text-muted small fw-bold mt-4 mb-2",
+            ),
             dcc.Upload(
                 id=PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
                 accept=".csv,.txt",
@@ -361,21 +366,33 @@ def layout(job_id):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=job.get_completed_steps(),
     )
     return page_container_fullscreen_layout(input_container)
 
 
-# Clientside callback: open loading overlay instantly in the browser when a file
-# is selected.  A server-side callback here would queue behind the slow processing
-# callback (due to allow_duplicate), leaving the overlay stuck open.
+# Clientside callbacks: show "Uploading..." in the status row immediately when a
+# file is selected — before the slow server-side processing callback completes.
 dash.clientside_callback(
     """
-    function(filename, predictor_filename) {
-        return !!(filename || predictor_filename);
+    function(filename) {
+        if (!filename) { return window.dash_clientside.no_update; }
+        return "Uploading...";
     }
     """,
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
+    prevent_initial_call=True,
+)
+
+dash.clientside_callback(
+    """
+    function(filename) {
+        if (!filename) { return window.dash_clientside.no_update; }
+        return "Uploading...";
+    }
+    """,
+    Output(PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
     Input(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
     prevent_initial_call=True,
 )
@@ -389,7 +406,6 @@ def _no_update_upload():
         "next_disabled": no_update,
         "epsg_disabled": no_update,
         "upload_contents": no_update,
-        "loading": no_update,
         "delete_membership_disabled": no_update,
         "tile_url": no_update,
         "slider_disabled": no_update,
@@ -425,7 +441,6 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
                 "next_disabled": True,
                 "epsg_disabled": False,
                 "upload_contents": None,
-                "loading": False,
                 "membership_error": str(e),
             }
         )
@@ -446,7 +461,6 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
                 "next_disabled": True,
                 "epsg_disabled": False,
                 "upload_contents": None,
-                "loading": False,
                 "membership_error": str(e),
             }
         )
@@ -499,7 +513,6 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
             "next_disabled": True,
             "epsg_disabled": True,
             "upload_contents": None,
-            "loading": False,
             "delete_membership_disabled": False,
             "tile_url": tile_url,
             "slider_disabled": False,
@@ -532,7 +545,6 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
         result.update(
             {
                 "next_disabled": True,
-                "loading": False,
                 "predictor_file_info": "Not uploaded",
                 "predictor_error": str(e),
                 "delete_predictor_disabled": True,
@@ -545,7 +557,6 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
     result.update(
         {
             "next_disabled": False,
-            "loading": False,
             "predictor_file_info": "Uploaded",
             "predictor_error": "",
             "delete_predictor_disabled": False,
@@ -585,7 +596,6 @@ def _handle_init_store(init_trigger, job_id):
         "upload_contents": Output(
             DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"
         ),
-        "loading": Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
         "delete_membership_disabled": Output(
             DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "disabled"
         ),
@@ -690,7 +700,6 @@ def data_upload_manager(
         "viewport": Output(
             MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True
         ),
-        "loading": Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
         "tile_url": Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
         "slider_disabled": Output(
             DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
@@ -755,7 +764,6 @@ def delete_membership_file(n_clicks, job_id):
             "zoom": DEFAULT_MAP_ZOOM,
             "transition": "flyTo",
         },
-        "loading": False,
         "tile_url": "",
         "slider_disabled": True,
         "upload_disabled": False,

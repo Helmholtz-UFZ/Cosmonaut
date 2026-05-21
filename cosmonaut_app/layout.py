@@ -404,21 +404,31 @@ def page_container_column_layout(content):
 
 
 def create_card_input(
-    card_body, card_footer=None, name_step=None, title=None, job_id=None
+    card_body,
+    card_footer=None,
+    name_step=None,
+    title=None,
+    job_id=None,
+    completed_steps=None,
 ):
     """Create a modern card input layout with optional progress steps."""
     if name_step is not None:
         if job_id is None:
             raise ValueError("job_id must be provided when name_step is used.")
-        title = f"{steps_jobs[name_step][1]}({job_id})"
+        title = steps_jobs[name_step][1]
 
     if title is None:
         raise ValueError("Either title or name_step must be provided.")
 
-    card_header = [html.H3(title)]
+    card_header = []
 
     if name_step is not None:
-        card_header.append(steps_tab(name_step))
+        card_header.append(html.Code(job_id, className="text-muted small d-block mb-1"))
+
+    card_header.append(html.H3(title))
+
+    if name_step is not None:
+        card_header.append(steps_tab(name_step, job_id, completed_steps or []))
 
     card_content = [
         dbc.CardHeader(card_header),
@@ -503,22 +513,48 @@ def progress_footer(
     return dbc.CardFooter(actions)
 
 
-def steps_tab(name_step):
-    """Create a progress steps component for the job steps."""
-    # TODO dynamic enabling based on job progress
-    list_tabs = []
-    for step_name, step_info in steps_jobs.items():
-        list_tabs.append(
-            dbc.Tab(
-                label=step_info[0],
-                tab_id=step_name,  # nocheck
-                disabled=True,
-            )
-        )
+def steps_tab(name_step, job_id, completed_steps):
+    """Render a numbered stepper showing wizard progress.
 
-    return dbc.Tabs(
-        list_tabs,
-        active_tab=name_step,
+    Completed steps are clickable links (teal). Current step is highlighted
+    (navy). Future steps are muted and non-interactive.
+    """
+    step_items = []
+    for i, (step_name, step_info) in enumerate(steps_jobs.items(), start=1):
+        is_done = step_name in completed_steps
+        is_current = step_name == name_step
+
+        if is_current:
+            circle = html.Span(str(i), className="badge rounded-circle bg-primary")
+            label = html.Span(step_info[0], className="small ms-1 fw-semibold")
+            step_el = html.Span([circle, label], className="d-flex align-items-center")
+        elif is_done:
+            circle = html.Span(
+                html.I(className="bi bi-check-lg"),
+                className="badge rounded-circle bg-success",
+            )
+            label = html.Span(step_info[0], className="small ms-1 text-success")
+            step_el = dcc.Link(
+                [circle, label],
+                href=build_url_step(step_name, job_id),
+                className="d-flex align-items-center text-decoration-none",
+            )
+        else:
+            circle = html.Span(
+                str(i), className="badge rounded-circle bg-light text-muted border"
+            )
+            label = html.Span(step_info[0], className="small ms-1 text-muted")
+            step_el = html.Span([circle, label], className="d-flex align-items-center")
+
+        step_items.append(step_el)
+        if i < len(steps_jobs):
+            step_items.append(
+                html.I(className="bi bi-chevron-right text-muted mx-2 align-middle")
+            )
+
+    return html.Div(
+        step_items,
+        className="d-flex flex-wrap align-items-center py-2",
     )
 
 

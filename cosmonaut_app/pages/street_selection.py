@@ -178,7 +178,7 @@ def _build_removed_roads_list(removed_info: list[dict], is_active: bool) -> list
 
 register_page(
     __name__,
-    path_template="/job/<job_id>/street_selection",
+    path_template="/job/<job_id>/street-selection",
     name="Street Selection",
     title="Street Selection",
     description="Select streets for the routing process.",
@@ -201,15 +201,17 @@ def layout(job_id: str):
     job.model.stage = max(job.model.stage, 2)
     job.save(sync_files=False)
 
+    completed_steps = job.get_completed_steps()
+
     log.info(f"Street selection layout for job {job_id}")
     log.debug(f"Job {job_id} membership_upload: {job.model.membership_upload}")
 
     # Gate on street processing status
     sp_status = job.get_street_processing_status()
     if sp_status == "RUNNING":
-        return _street_processing_wait_layout(job_id)
+        return _street_processing_wait_layout(job_id, completed_steps)
     elif sp_status == "FAILED":
-        return _street_processing_failed_layout(job_id)
+        return _street_processing_failed_layout(job_id, completed_steps)
 
     sel = StreetSelector(job)
 
@@ -460,11 +462,12 @@ def layout(job_id: str):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=completed_steps,
     )
     return page_container_fullscreen_layout(input_container)
 
 
-def _street_processing_wait_layout(job_id):
+def _street_processing_wait_layout(job_id, completed_steps):
     """Render a waiting layout while street processing is in progress."""
     card_body = [
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
@@ -496,11 +499,12 @@ def _street_processing_wait_layout(job_id):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=completed_steps,
     )
     return page_container_fullscreen_layout(input_container)
 
 
-def _street_processing_failed_layout(job_id):
+def _street_processing_failed_layout(job_id, completed_steps):
     """Render a failure layout when street processing has failed."""
     card_body = [
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
@@ -529,6 +533,7 @@ def _street_processing_failed_layout(job_id):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=completed_steps,
     )
     return page_container_fullscreen_layout(input_container)
 
@@ -556,7 +561,7 @@ def poll_street_processing_status(n_intervals, pathname):
             no_update,
             no_update,
             True,
-            f"/job/{job_id}/street_selection",
+            f"/job/{job_id}/street-selection",
         )
     elif sp_status == "FAILED":
         return (

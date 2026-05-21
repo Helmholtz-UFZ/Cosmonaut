@@ -195,6 +195,7 @@ def layout(job_id):
         card_footer=footer,
         name_step="route_computation",
         job_id=job_id,
+        completed_steps=job.get_completed_steps(),
     )
 
     return page_container_fullscreen_layout(input_container)

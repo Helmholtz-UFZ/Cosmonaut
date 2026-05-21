@@ -606,6 +606,32 @@ class CosmonautJob:
         deletion_date = self.model.start_date + timedelta(days=retention_days)
         return (deletion_date - date.today()).days
 
+    def get_completed_steps(self) -> list[str]:
+        """Return step keys that are done, based on existing model state.
+
+        Stage thresholds (set by each page on layout entry, except user_info
+        which bumps on Next click):
+          stage >= 1  →  user_info done
+          stage >= 2  →  data_upload done (entering street_selection)
+          stage >= 3  →  street_selection done (entering routing_params)
+          stage >= 4  →  routing_params done (entering route_computation)
+          status == COMPLETED  →  route_computation done
+
+        route_download is terminal — never marked done.
+        """
+        completed = []
+        if self.model.stage >= 1:
+            completed.append("user_info")
+        if self.model.stage >= 2:
+            completed.append("data_upload")
+        if self.model.stage >= 3:
+            completed.append("street_selection")
+        if self.model.stage >= 4:
+            completed.append("routing_params")
+        if self.model.status == JOB_STATUS_COMPLETED:
+            completed.append("route_computation")
+        return completed
+
     def get_logs(self) -> str:
         """Retrieve logs for the job from object storage.
 

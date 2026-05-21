@@ -49,6 +49,7 @@ register_page(
 )
 
 card_body = [
+    html.Img(src="/static/front_banner.png", className="img-fluid rounded mb-3"),
     html.P(
         "Create a new routing job and follow the steps to upload your data, select streets, and download navigation.",
         className="text-muted mb-3",
