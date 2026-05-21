@@ -57,6 +57,7 @@ GPX files are stored in MinIO object storage and retrieved via Flask routes.
 
 import logging
 
+import dash_bootstrap_components as dbc
 from dash import dcc, html, register_page
 
 from cosmonaut_app.config import get_download_url
@@ -64,7 +65,6 @@ from cosmonaut_app.constants.html_ids import (
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
     JOB_ID_STORE_SHARED_ID,
 )
-from cosmonaut_app.files_route import create_download_button
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
     build_url_step,
@@ -98,38 +98,47 @@ def layout(job_id):
 
     card_body = [
         html.P(
-            "Scan the QR code to download the GPX file of the final route.",
-            className="mb-3 fs-5",
+            "Download the GPX file of the route, or scan the QR code to transfer it to a phone.",
+            className="mb-3",
+        ),
+        html.A(
+            [
+                html.I(className="bi bi-download me-1"),
+                "Download GPX File",
+            ],
+            href=f"/download/{job_id}/route.gpx",
+            download="route.gpx",
+            className="btn btn-primary btn-lg w-100",
+        ),
+        html.Div(
+            html.Code(
+                download_url,
+                id=DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
+            ),
+            className="text-muted small d-block text-break my-2",
+        ),
+        dbc.Button(
+            "Download work_dir",
+            color="secondary",
+            outline=True,
+            href=f"/download/{job_id}/work_dir.zip",
+            external_link=True,
+            className="w-100 mt-2",
         ),
         html.Div(
             [
+                # max-width:260px — no Bootstrap utility for exact px, mw-25/mw-50 are wrong granularity
                 html.Img(
                     src=f"/pictures/{job_id}/qr_code.png",
-                    className="mt-3 mw-100",
+                    style={"maxWidth": "260px"},
+                    className="d-block mx-auto",
                 ),
-                html.Div(
-                    [
-                        html.A(
-                            [
-                                html.I(className="bi bi-download me-1"),
-                                "Download GPX File",
-                            ],
-                            href=f"/download/{job_id}/route.gpx",
-                            download="route.gpx",
-                            className="btn btn-primary mt-3",
-                        ),
-                        html.Br(),
-                        create_download_button(job_id, class_name="mt-2"),
-                        html.Br(),
-                        html.Code(
-                            download_url,
-                            id=DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
-                        ),
-                    ],
-                    className="text-center mt-3",
+                html.Small(
+                    "Scan to transfer to a phone.",
+                    className="d-block text-muted text-center",
                 ),
             ],
-            className="text-center",
+            className="mt-3",
         ),
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
     ]

@@ -184,6 +184,7 @@ table = dag.AgGrid(
     dashGridOptions={
         "rowSelection": {"mode": "multiRow"},
         "suppressCellFocus": True,
+        "overlayNoRowsTemplate": "<div class='text-muted py-3'>No jobs found.</div>",
     },
     columnSize="responsiveSizeToFit",
 )

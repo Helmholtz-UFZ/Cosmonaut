@@ -16,6 +16,7 @@ from cosmonaut_app.constants.general import (
 )
 from cosmonaut_app.constants.html_ids import (
     CURRENT_JOB_ID_MAP_STORE_ID,
+    JOB_ID_KICKER_CODE_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MAP_INIT_INTERVAL_SHARED_ID,
@@ -423,7 +424,16 @@ def create_card_input(
     card_header = []
 
     if name_step is not None:
-        card_header.append(html.Code(job_id, className="text-muted small d-block mb-1"))
+        card_header.append(
+            html.Code(
+                job_id,
+                id=JOB_ID_KICKER_CODE_SHARED_ID,
+                className="text-muted small d-block mb-1",
+                title="Copy job ID",
+                # cursor-pointer: no Bootstrap utility class in v5.2 for cursor
+                style={"cursor": "pointer"},
+            )
+        )
 
     card_header.append(html.H3(title))
 
@@ -719,3 +729,25 @@ def register_map_callbacks(app):
             return empty_fc
 
         return StreetSelector(job).viewport_fc(bounds, zoom or 10)
+
+
+# Copy job ID to clipboard on click, flash background to confirm.
+dash.clientside_callback(
+    """
+    function(n_clicks) {
+        if (!n_clicks) { return window.dash_clientside.no_update; }
+        var el = document.getElementById('""" + JOB_ID_KICKER_CODE_SHARED_ID + """');
+        if (!el) { return window.dash_clientside.no_update; }
+        navigator.clipboard.writeText(el.innerText).then(function() {
+            el.classList.add('bg-success', 'bg-opacity-25');
+            setTimeout(function() {
+                el.classList.remove('bg-success', 'bg-opacity-25');
+            }, 600);
+        });
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output(JOB_ID_KICKER_CODE_SHARED_ID, "className"),
+    Input(JOB_ID_KICKER_CODE_SHARED_ID, "n_clicks"),
+    prevent_initial_call=True,
+)

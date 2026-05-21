@@ -104,9 +104,11 @@ from cosmonaut_app.constants.html_ids import (
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID,
     MEMBERSHIP_TILE_LAYER_MAP_ID,
+    MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID,
     PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
+    PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
     PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     STREET_PROCESSING_POLL_DATA_UPLOAD_ID,
     STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
@@ -151,6 +153,19 @@ def _help_icon(description):
         className="bi bi-info-circle text-muted ms-1",
         title=description.strip(),
     )
+
+
+def _file_status(uploaded: bool):
+    """Return a coloured icon + label for a file upload status row."""
+    if uploaded:
+        return [
+            html.I(className="bi bi-check-circle-fill text-success me-1"),
+            html.Span("Uploaded", className="text-success fw-semibold small"),
+        ]
+    return [
+        html.I(className="bi bi-dash-circle text-muted me-1"),
+        html.Span("Not uploaded", className="text-muted small"),
+    ]
 
 
 def layout(job_id):
@@ -231,36 +246,41 @@ def layout(job_id):
                 "Membership data",
                 className="text-uppercase text-muted small fw-bold mt-4 mb-2",
             ),
-            dcc.Upload(
-                id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
-                accept=".csv,.txt",
-                children=dbc.Button(
-                    [
-                        html.I(className="bi bi-upload me-2"),
-                        "Upload membership file",
-                    ],
-                    color="primary",
-                ),
-                multiple=False,
-                disabled=True,
-                className="my-3",
-            ),
-            html.Span(
+            dbc.Collapse(
                 [
-                    html.Small(
-                        _first_sentence(DESCRIPTION_MEMBERSHIP),
-                        className="text-muted",
+                    dcc.Upload(
+                        id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+                        accept=".csv,.txt",
+                        children=dbc.Button(
+                            [
+                                html.I(className="bi bi-upload me-2"),
+                                "Upload membership file",
+                            ],
+                            color="primary",
+                        ),
+                        multiple=False,
+                        disabled=True,
+                        className="my-3",
                     ),
-                    _help_icon(DESCRIPTION_MEMBERSHIP),
+                    html.Span(
+                        [
+                            html.Small(
+                                _first_sentence(DESCRIPTION_MEMBERSHIP),
+                                className="text-muted",
+                            ),
+                            _help_icon(DESCRIPTION_MEMBERSHIP),
+                        ],
+                    ),
                 ],
+                id=MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
+                is_open=not membership_uploaded,
             ),
             html.Div(
                 id=MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID, className="text-danger small"
             ),
             html.Div(
-                "Uploaded" if membership_uploaded else "Not uploaded",
+                _file_status(membership_uploaded),
                 id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
-                className="text-muted",
             ),
             dbc.Button(
                 [
@@ -303,36 +323,41 @@ def layout(job_id):
                 "Predictor data",
                 className="text-uppercase text-muted small fw-bold mt-4 mb-2",
             ),
-            dcc.Upload(
-                id=PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
-                accept=".csv,.txt",
-                children=dbc.Button(
-                    [
-                        html.I(className="bi bi-upload me-2"),
-                        "Upload predictor file",
-                    ],
-                    color="primary",
-                ),
-                multiple=False,
-                disabled=predictor_upload_disabled,
-                className="my-3",
-            ),
-            html.Span(
+            dbc.Collapse(
                 [
-                    html.Small(
-                        _first_sentence(DESCRIPTION_PREDICTOR),
-                        className="text-muted",
+                    dcc.Upload(
+                        id=PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+                        accept=".csv,.txt",
+                        children=dbc.Button(
+                            [
+                                html.I(className="bi bi-upload me-2"),
+                                "Upload predictor file",
+                            ],
+                            color="primary",
+                        ),
+                        multiple=False,
+                        disabled=predictor_upload_disabled,
+                        className="my-3",
                     ),
-                    _help_icon(DESCRIPTION_PREDICTOR),
+                    html.Span(
+                        [
+                            html.Small(
+                                _first_sentence(DESCRIPTION_PREDICTOR),
+                                className="text-muted",
+                            ),
+                            _help_icon(DESCRIPTION_PREDICTOR),
+                        ],
+                    ),
                 ],
+                id=PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
+                is_open=not predictor_uploaded,
             ),
             html.Div(
                 id=PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID, className="text-danger small"
             ),
             html.Div(
-                "Uploaded" if predictor_uploaded else "Not uploaded",
+                _file_status(predictor_uploaded),
                 id=PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
-                className="text-muted",
             ),
             dbc.Button(
                 [
@@ -411,11 +436,13 @@ def _no_update_upload():
         "slider_disabled": no_update,
         "upload_disabled": no_update,
         "membership_error": no_update,
+        "membership_collapse_open": no_update,
         "predictor_upload_disabled": no_update,
         "predictor_file_info": no_update,
         "predictor_error": no_update,
         "delete_predictor_disabled": no_update,
         "predictor_contents": no_update,
+        "predictor_collapse_open": no_update,
         "tile_opacity": no_update,
         "sp_text": no_update,
         "sp_class": no_update,
@@ -509,7 +536,7 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
     result.update(
         {
             "viewport": {"bounds": bounds, "transition": "flyTo"},
-            "file_info": "Uploaded",
+            "file_info": _file_status(True),
             "next_disabled": True,
             "epsg_disabled": True,
             "upload_contents": None,
@@ -518,10 +545,12 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
             "slider_disabled": False,
             "upload_disabled": True,
             "membership_error": "",
+            "membership_collapse_open": False,
             "predictor_upload_disabled": False,
-            "predictor_file_info": "Not uploaded",
+            "predictor_file_info": _file_status(False),
             "predictor_error": "",
             "delete_predictor_disabled": True,
+            "predictor_collapse_open": True,
             "sp_text": sp_text,
             "sp_class": sp_class,
             "sp_poll_disabled": sp_poll_disabled,
@@ -545,7 +574,7 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
         result.update(
             {
                 "next_disabled": True,
-                "predictor_file_info": "Not uploaded",
+                "predictor_file_info": _file_status(False),
                 "predictor_error": str(e),
                 "delete_predictor_disabled": True,
                 "predictor_contents": None,
@@ -557,11 +586,12 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
     result.update(
         {
             "next_disabled": False,
-            "predictor_file_info": "Uploaded",
+            "predictor_file_info": _file_status(True),
             "predictor_error": "",
             "delete_predictor_disabled": False,
             "predictor_contents": None,
             "predictor_upload_disabled": True,
+            "predictor_collapse_open": False,
         }
     )
     return result
@@ -581,7 +611,13 @@ def _handle_init_store(init_trigger, job_id):
     """Handle initial page load with existing upload."""
     result = _no_update_upload()
     if init_trigger and job_id:
-        result.update({"slider_disabled": False, "upload_disabled": True})
+        result.update(
+            {
+                "slider_disabled": False,
+                "upload_disabled": True,
+                "membership_collapse_open": False,
+            }
+        )
     else:
         result["slider_disabled"] = True
     return result
@@ -609,6 +645,9 @@ def _handle_init_store(init_trigger, job_id):
             allow_duplicate=True,
         ),
         "membership_error": Output(MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID, "children"),
+        "membership_collapse_open": Output(
+            MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open"
+        ),
         "predictor_upload_disabled": Output(
             PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled"
         ),
@@ -621,6 +660,9 @@ def _handle_init_store(init_trigger, job_id):
         ),
         "predictor_contents": Output(
             PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"
+        ),
+        "predictor_collapse_open": Output(
+            PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open"
         ),
         "tile_opacity": Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "opacity"),
         "sp_text": Output(
@@ -712,6 +754,9 @@ def data_upload_manager(
         "init_store": Output(
             DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data", allow_duplicate=True
         ),
+        "membership_collapse_open": Output(
+            MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open", allow_duplicate=True
+        ),
         "predictor_upload_disabled": Output(
             PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
         ),
@@ -720,6 +765,9 @@ def data_upload_manager(
         ),
         "delete_predictor_disabled": Output(
             DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+        "predictor_collapse_open": Output(
+            PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open", allow_duplicate=True
         ),
         "sp_text": Output(
             STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
@@ -755,7 +803,7 @@ def delete_membership_file(n_clicks, job_id):
     job.delete_membership()
 
     return {
-        "file_info": "Not uploaded",
+        "file_info": _file_status(False),
         "epsg_disabled": False,
         "delete_membership_disabled": True,
         "next_disabled": True,
@@ -768,9 +816,11 @@ def delete_membership_file(n_clicks, job_id):
         "slider_disabled": True,
         "upload_disabled": False,
         "init_store": False,
+        "membership_collapse_open": True,
         "predictor_upload_disabled": True,
-        "predictor_file_info": "Not uploaded",
+        "predictor_file_info": _file_status(False),
         "delete_predictor_disabled": True,
+        "predictor_collapse_open": True,
         "sp_text": "Road network will be constructed in the background",
         "sp_class": "text-muted small",
         "sp_poll_disabled": True,
@@ -782,6 +832,7 @@ def delete_membership_file(n_clicks, job_id):
     Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open", allow_duplicate=True),
     Input(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
@@ -804,10 +855,11 @@ def delete_predictor_file(n_clicks, job_id):
     job.delete_predictor()
 
     return (
-        "Not uploaded",  # predictor file info
+        _file_status(False),  # predictor file info
         True,  # disable delete predictor button
         True,  # disable next button (predictor required)
         False,  # re-enable predictor upload button
+        True,  # show predictor upload collapse again
     )
 
 

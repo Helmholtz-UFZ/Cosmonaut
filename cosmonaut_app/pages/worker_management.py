@@ -110,6 +110,7 @@ def create_task_datatable(table_id, columns, selectable=False):
     grid_options = {
         "pagination": True,
         "paginationPageSize": 10,
+        "overlayNoRowsTemplate": "<div class='text-muted py-3'>No active tasks — workers are idle.</div>",
     }
 
     if selectable:

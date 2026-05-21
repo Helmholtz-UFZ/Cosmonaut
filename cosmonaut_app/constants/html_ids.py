@@ -71,6 +71,9 @@ ERROR_MODAL_TITLE_SHARED_ID = "error-title"  # nocheck
 LOADING_OVERLAY_SHARED_ID = "loading-overlay-shared-id"
 RESET_MODAL_SHARED_ID = "reset-modal-shared-id"
 
+# --- Codes ---
+JOB_ID_KICKER_CODE_SHARED_ID = "job-id-kicker-code-shared-id"
+
 # --- Navbars ---
 NAVBAR_COLLAPSE_NAV_SHARED_ID = "navbar-collapse-nav-shared-id"
 NAVBAR_TOGGLER_NAV_SHARED_ID = "navbar-toggler-nav-shared-id"
@@ -92,6 +95,10 @@ STREETS_REFRESH_TRIGGER_STORE_SHARED_ID = "streets-refresh-trigger-store-shared-
 DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID = "delete-membership-button-data-upload-id"
 DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID = "delete-predictor-button-data-upload-id"
 NEXT_BUTTON_DATA_UPLOAD_ID = "next-button-data-upload-id"
+
+# --- Collapses ---
+MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID = "membership-upload-collapse-data-upload-id"
+PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID = "predictor-upload-collapse-data-upload-id"
 
 # --- Divs ---
 DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID = (
@@ -275,6 +282,14 @@ RESET_CONFIRM_MODAL_STREET_SELECTION_ID = "reset-confirm-modal-street-selection-
 
 # --- Buttons ---
 NEXT_BUTTON_USER_INFO_ID = "next-button-user-info-id"
+
+# --- Collapses ---
+EMAIL_VISIBILITY_NOTICE_COLLAPSE_USER_INFO_ID = (
+    "email-visibility-notice-collapse-user-info-id"
+)
+
+# --- Divs ---
+EMAIL_HELPER_TEXT_USER_INFO_ID = "email-helper-text-user-info-id"
 
 # --- Inputs ---
 EMAIL_INPUT_USER_INFO_ID = "email-input-user-info-id"

@@ -90,9 +90,9 @@ from cosmonaut_app.constants.html_ids import (
     RESTART_BUTTON_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     STATUS_BADGE_ROUTE_COMPUTATION_ID,
-    WORKER_STATUS_SPAN_ROUTE_COMPUTATION_ID,
     TASK_STATUS_SPAN_ROUTE_COMPUTATION_ID,
     WORKER_NAME_SPAN_ROUTE_COMPUTATION_ID,
+    WORKER_STATUS_SPAN_ROUTE_COMPUTATION_ID,
     LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID,
     STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID,
     UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID,
@@ -154,11 +154,45 @@ def layout(job_id):
     )
 
     ttl_days = job.time_to_live()
-    ttl_alert = dbc.Alert(
-        f"This job will be automatically deleted in {ttl_days} day(s).",
-        color="info",
-        className="mb-3",
+    ttl_notice = html.Small(
+        f"This job will be auto-deleted in {ttl_days} day(s).",
+        className="text-muted d-block mb-3",
     )
+
+    success_card = None
+    if status == JOB_STATUS_COMPLETED:
+        route_download_path = build_url_step("route_download", job_id)
+        success_card = dbc.Alert(
+            dbc.Row(
+                [
+                    dbc.Col(
+                        html.I(className="bi bi-check-circle-fill fs-3"),
+                        width="auto",
+                        className="d-flex align-items-center",
+                    ),
+                    dbc.Col(
+                        [
+                            html.H5("Route is ready", className="mb-1"),
+                            html.P(
+                                "The computed route is ready for download.",
+                                className="mb-2",
+                            ),
+                            dcc.Link(
+                                dbc.Button(
+                                    "Go to download →",
+                                    color="primary",
+                                    size="lg",
+                                ),
+                                href=route_download_path,
+                            ),
+                        ]
+                    ),
+                ],
+                className="g-2 align-items-center",
+            ),
+            color="success",
+            className="mb-3",
+        )
 
     card_body = [
         html.P(
@@ -167,18 +201,27 @@ def layout(job_id):
         ),
         status_badge,
         control_buttons,
-        ttl_alert,
-        html.Hr(),
-        html.H5("Celery Worker Information", className="mt-3"),
-        celery_info_card,
-        html.Hr(),
-        html.H5("Computation Logs", className="mt-3"),
-        log_viewer,
-        html.Div(create_download_button(job_id), className="mb-3"),
-        interval,
-        dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
-        dcc.Store(id=UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, data=None),
     ]
+
+    if success_card:
+        card_body.append(success_card)
+
+    card_body.append(ttl_notice)
+
+    card_body.extend(
+        [
+            html.Hr(),
+            html.H5("Celery Worker Information", className="mt-3"),
+            celery_info_card,
+            html.Hr(),
+            html.H5("Computation Logs", className="mt-3"),
+            log_viewer,
+            html.Div(create_download_button(job_id), className="mb-3"),
+            interval,
+            dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
+            dcc.Store(id=UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, data=None),
+        ]
+    )
 
     routing_params_path = build_url_step("routing_params", job_id)
     route_download_path = build_url_step("route_download", job_id)

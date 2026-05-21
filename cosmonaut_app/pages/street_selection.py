@@ -381,6 +381,7 @@ def layout(job_id: str):
                             "Keep largest network",
                         ],
                         id=LARGEST_BUTTON_STREET_SELECTION_ID,
+                        outline=True,
                         color="primary",
                         disabled=not is_active or sel.keep_largest_applied,
                     ),
