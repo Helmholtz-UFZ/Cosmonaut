@@ -390,7 +390,7 @@ wheels = [
 
 [[package]]
 name = "cosmonaut"
-version = "0.1.14"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "celery", extra = ["redis"] },
