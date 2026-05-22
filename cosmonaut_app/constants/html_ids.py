@@ -110,8 +110,8 @@ STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID = (
 )
 
 # --- Icons ---
-MEMBERSHIP_HELP_ICON_ID = "membership-help-icon-data-upload-id"
-PREDICTOR_HELP_ICON_ID = "predictor-help-icon-data-upload-id"
+MEMBERSHIP_HELP_ICON_ID = "membership-help-icon-data-upload-id"  # nocheck dbc.Tooltip target only
+PREDICTOR_HELP_ICON_ID = "predictor-help-icon-data-upload-id"  # nocheck dbc.Tooltip target only
 
 # --- Inputs ---
 DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID = "data-upload-epsg-input-data-upload-id"

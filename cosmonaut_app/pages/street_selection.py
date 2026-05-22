@@ -65,6 +65,7 @@ processing.
 import logging
 from typing import Any, Dict, List, Optional
 
+import dash
 import dash_bootstrap_components as dbc
 from dash import (
     ALL,
@@ -72,7 +73,6 @@ from dash import (
     Output,
     State,
     callback,
-    clientside_callback,
     ctx,
     dcc,
     html,
@@ -848,7 +848,7 @@ def clear_all_removed_roads(n_clicks, pathname, version):
 # Live-update the "Selected: N" badge from the GeoJSON layer's hideout.selected list.
 # Clicks on map features mutate hideout.selected clientside (see layout.py's onEachFeature
 # handler), so a clientside callback keeps the badge in sync with no server round-trip.
-clientside_callback(
+dash.clientside_callback(
     """
     function(hideout) {
         const n = (hideout && hideout.selected) ? hideout.selected.length : 0;

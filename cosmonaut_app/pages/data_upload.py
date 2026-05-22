@@ -161,7 +161,7 @@ def _help_icon(icon_id, description):
     return html.Span(
         [
             html.I(
-                id=icon_id,
+                id=icon_id,  # nocheck dynamically passed constant
                 className="bi bi-info-circle text-muted ms-1",
             ),
             dbc.Tooltip(description.strip(), target=icon_id),

@@ -78,7 +78,7 @@ def layout(job_id):
         _initial_helper = (
             "Optional — without an email you won't receive job-completion notifications."
         )
-        _initial_helper_cls = "text-warning small"
+        _initial_helper_cls = "text-warning small mt-2"
         _initial_valid = False
         _initial_invalid = False
         _initial_collapse_open = False
@@ -86,13 +86,13 @@ def layout(job_id):
         try:
             check_email(stored_email)
             _initial_helper = "Looks good — you'll be notified when this job completes."
-            _initial_helper_cls = "text-success small"
+            _initial_helper_cls = "text-success small mt-2"
             _initial_valid = True
             _initial_invalid = False
             _initial_collapse_open = True
         except ValueError:
             _initial_helper = "Please enter a valid email address."
-            _initial_helper_cls = "text-danger small"
+            _initial_helper_cls = "text-danger small mt-2"
             _initial_valid = False
             _initial_invalid = True
             _initial_collapse_open = False
@@ -122,7 +122,7 @@ def layout(job_id):
                 dbc.FormText(
                     "Warning: Your email is visible from inside the UFZ network.",
                     color="warning",
-                    className="d-block",
+                    className="d-block mt-2",
                 ),
                 id=EMAIL_VISIBILITY_NOTICE_COLLAPSE_USER_INFO_ID,
                 is_open=_initial_collapse_open,
@@ -138,6 +138,7 @@ def layout(job_id):
                     "We never share your email.",
                 ],
                 color="secondary",
+                className="d-block mt-2",
             ),
         ]
     )
@@ -180,7 +181,7 @@ def validate_email(value):
             False,
             False,
             "Optional — without an email you won't receive job-completion notifications.",
-            "text-warning small",
+            "text-warning small mt-2",
             False,
         )
     try:
@@ -193,7 +194,7 @@ def validate_email(value):
                 html.I(className="bi bi-check-lg me-1"),
                 "You'll be notified when this job completes.",
             ],
-            "text-success small",
+            "text-success small mt-2",
             True,
         )
     except ValueError:
@@ -202,7 +203,7 @@ def validate_email(value):
             True,
             True,
             "Please enter a valid email address.",
-            "text-danger small",
+            "text-danger small mt-2",
             False,
         )
 
