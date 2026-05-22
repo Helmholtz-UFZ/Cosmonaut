@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Form input</title>
+<link rel="stylesheet" href="../assets/bootstrap-icons.min.css">
+<link rel="stylesheet" href="_card.css">
+<link rel="stylesheet" href="_flatly.css">
+</head>
+<body class="cn-card-host">
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:18px 24px;">
+  <div>
+    <label class="form-label">EPSG code</label>
+    <input class="form-control" value="">
+    <div class="form-text">Common choices: 4326, 25832, 3857, …</div>
+  </div>
+  <div>
+    <label class="form-label">EPSG code</label>
+    <input class="form-control is-valid" value="25832">
+    <div class="form-text" style="color:#18bc9c; font-weight:600;">EPSG accepted</div>
+  </div>
+  <div>
+    <label class="form-label">EPSG code</label>
+    <input class="form-control is-invalid" value="9999">
+    <div class="form-text" style="color:#e74c3c; font-weight:600;">Please enter a valid EPSG code.</div>
+  </div>
+  <div>
+    <label class="form-label">Email address</label>
+    <input class="form-control is-valid" value="max.musterfrau@ufz.de">
+    <div class="form-text"><i class="bi bi-shield-check"></i> We never share your email.</div>
+  </div>
+</div>
+</body>
+</html>

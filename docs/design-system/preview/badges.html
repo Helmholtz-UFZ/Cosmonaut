@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Status pills · badges</title>
+<link rel="stylesheet" href="../assets/bootstrap-icons.min.css">
+<link rel="stylesheet" href="_card.css">
+<link rel="stylesheet" href="_flatly.css">
+</head>
+<body class="cn-card-host">
+<div class="cn-label-xs" style="margin-bottom:10px;">Inline badges · monitor card</div>
+<div style="display:flex; flex-wrap:wrap; gap:10px; font-size:14px; align-items:center;">
+  <span class="badge bg-success">COMPLETED</span>
+  <span class="badge bg-primary">RUNNING</span>
+  <span class="badge bg-warning">PENDING</span>
+  <span class="badge bg-danger">FAILED</span>
+  <span class="badge bg-info">SUCCESS</span>
+</div>
+<div class="cn-label-xs" style="margin-top:18px; margin-bottom:10px;">In context</div>
+<div style="font-size:14px; display:flex; flex-direction:column; gap:6px;">
+  <div><strong>Job Status:</strong> &nbsp;<span class="badge bg-success">COMPLETED</span></div>
+  <div><strong>Worker Availability:</strong> 1 worker(s) available</div>
+  <div><strong>Task Celery Status:</strong> SUCCESS</div>
+</div>
+</body>
+</html>

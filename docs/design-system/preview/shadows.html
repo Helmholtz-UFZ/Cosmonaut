@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Shadows / elevation</title>
+<link rel="stylesheet" href="_card.css">
+</head>
+<body class="cn-card-host" style="background:#ecf0f1;">
+<div style="display:flex; gap:24px; align-items:center; justify-content:center; padding:18px 0;">
+  <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+    <div style="width:140px; height:90px; background:#fff; border:1px solid #dee2e6; border-radius:6px;"></div>
+    <div class="cn-label-xs">flat · no shadow</div>
+    <div class="cn-mono" style="font-size:10px; color:var(--cn-fg-muted);">page surfaces</div>
+  </div>
+  <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+    <div style="width:140px; height:90px; background:#fff; border:1px solid #dee2e6; border-radius:6px; box-shadow:0 .125rem .25rem rgba(0,0,0,.075);"></div>
+    <div class="cn-label-xs">shadow-sm</div>
+    <div class="cn-mono" style="font-size:10px; color:var(--cn-fg-muted);">.shadow-sm · cards</div>
+  </div>
+  <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+    <div style="width:140px; height:90px; background:#fff; border:1px solid #dee2e6; border-radius:6px; box-shadow:0 .5rem 1rem rgba(0,0,0,.15);"></div>
+    <div class="cn-label-xs">shadow</div>
+    <div class="cn-mono" style="font-size:10px; color:var(--cn-fg-muted);">.shadow · modals</div>
+  </div>
+</div>
+</body>
+</html>

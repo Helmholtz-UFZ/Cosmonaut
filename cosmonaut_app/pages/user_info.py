@@ -33,7 +33,9 @@ from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     URL_SHARED_ID,
+    EMAIL_HELPER_TEXT_USER_INFO_ID,
     EMAIL_INPUT_USER_INFO_ID,
+    EMAIL_VISIBILITY_NOTICE_COLLAPSE_USER_INFO_ID,
     NEXT_BUTTON_USER_INFO_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -70,16 +72,37 @@ def layout(job_id):
     if not is_active:
         card_body.append(create_reset_banner(job_id, status))
 
+    # Determine initial helper text and collapse state from stored email
+    stored_email = job.model.email
+    if not stored_email:
+        _initial_helper = (
+            "Optional — without an email you won't receive job-completion notifications."
+        )
+        _initial_helper_cls = "text-warning small mt-2"
+        _initial_valid = False
+        _initial_invalid = False
+        _initial_collapse_open = False
+    else:
+        try:
+            check_email(stored_email)
+            _initial_helper = "Looks good — you'll be notified when this job completes."
+            _initial_helper_cls = "text-success small mt-2"
+            _initial_valid = True
+            _initial_invalid = False
+            _initial_collapse_open = True
+        except ValueError:
+            _initial_helper = "Please enter a valid email address."
+            _initial_helper_cls = "text-danger small mt-2"
+            _initial_valid = False
+            _initial_invalid = True
+            _initial_collapse_open = False
+
     # Add form components
     card_body.extend(
         [
             html.P(
                 "Enter your email to receive notifications for this job.",
                 className="text-muted",
-            ),
-            dbc.Alert(
-                "Warning: Your email is visible from inside the UFZ network.",
-                color="warning",
             ),
             dbc.Label(
                 "Email address",
@@ -89,9 +112,25 @@ def layout(job_id):
             dbc.Input(
                 id=EMAIL_INPUT_USER_INFO_ID,
                 type="email",
-                value=job.model.email,
+                value=stored_email,
+                valid=_initial_valid,
+                invalid=_initial_invalid,
                 autoFocus=True,
                 disabled=not is_active,
+            ),
+            dbc.Collapse(
+                dbc.FormText(
+                    "Warning: Your email is visible from inside the UFZ network.",
+                    color="warning",
+                    className="d-block mt-2",
+                ),
+                id=EMAIL_VISIBILITY_NOTICE_COLLAPSE_USER_INFO_ID,
+                is_open=_initial_collapse_open,
+            ),
+            html.Div(
+                _initial_helper,
+                id=EMAIL_HELPER_TEXT_USER_INFO_ID,
+                className=_initial_helper_cls,
             ),
             dbc.FormText(
                 [
@@ -99,9 +138,8 @@ def layout(job_id):
                     "We never share your email.",
                 ],
                 color="secondary",
+                className="d-block mt-2",
             ),
-            dbc.FormFeedback("Looks good!", type="valid"),
-            dbc.FormFeedback("Please enter a valid email.", type="invalid"),
         ]
     )
 
@@ -119,6 +157,7 @@ def layout(job_id):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=job.get_completed_steps(),
     )
 
     return page_container_fullscreen_layout(input_container)
@@ -128,16 +167,45 @@ def layout(job_id):
     Output(EMAIL_INPUT_USER_INFO_ID, "valid"),
     Output(EMAIL_INPUT_USER_INFO_ID, "invalid"),
     Output(NEXT_BUTTON_USER_INFO_ID, "disabled"),
+    Output(EMAIL_HELPER_TEXT_USER_INFO_ID, "children"),
+    Output(EMAIL_HELPER_TEXT_USER_INFO_ID, "className"),
+    Output(EMAIL_VISIBILITY_NOTICE_COLLAPSE_USER_INFO_ID, "is_open"),
     Input(EMAIL_INPUT_USER_INFO_ID, "value"),
 )
 def validate_email(value):
-    """Live email validation -> toggles input valid/invalid and enables Next button."""
+    """Live email validation — three states: empty (optional), invalid, valid."""
     log.debug(f"Validating email: {value}")
+    if not value:
+        return (
+            False,
+            False,
+            False,
+            "Optional — without an email you won't receive job-completion notifications.",
+            "text-warning small mt-2",
+            False,
+        )
     try:
         check_email(value)
-        return True, False, False
+        return (
+            True,
+            False,
+            False,
+            [
+                html.I(className="bi bi-check-lg me-1"),
+                "You'll be notified when this job completes.",
+            ],
+            "text-success small mt-2",
+            True,
+        )
     except ValueError:
-        return False, True, True
+        return (
+            False,
+            True,
+            True,
+            "Please enter a valid email address.",
+            "text-danger small mt-2",
+            False,
+        )
 
 
 @callback(
@@ -152,7 +220,7 @@ def go_to_upload_page(n_clicks: int | None, email: str | None, pathname: str | N
         raise PreventUpdate
 
     try:
-        check_email(email)
+        check_email(email or "")
     except ValueError:
         raise PreventUpdate
 

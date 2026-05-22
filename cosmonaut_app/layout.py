@@ -16,6 +16,7 @@ from cosmonaut_app.constants.general import (
 )
 from cosmonaut_app.constants.html_ids import (
     CURRENT_JOB_ID_MAP_STORE_ID,
+    JOB_ID_KICKER_CODE_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MAP_INIT_INTERVAL_SHARED_ID,
@@ -53,11 +54,12 @@ _default_name_space.dump = lambda assets_folder=_assets_folder: _original_dump(
 style_handle = assign(
     """
 function(feature, context){
-    const {selected, zoom} = context.hideout;
+    const {selected, zoom, dimmed} = context.hideout;
     // Increase base weight to make lines easier to click. Keep adaptive thinning on zoom in.
     const lineWeight = zoom ? Math.max(3, 18 / zoom) : 4; // at zoom=10 -> ~3
     const color = selected.includes(feature.id) ? 'yellow' : 'red';
-    return {color: color, weight: lineWeight, opacity: 0.85};
+    const opacity = dimmed ? 0.4 : 0.85;
+    return {color: color, weight: lineWeight, opacity: opacity};
 }
 """
 )
@@ -66,10 +68,11 @@ function(feature, context){
 hover_style_handle = assign(
     """
 function(feature, context){
-    const {selected, zoom} = context.hideout;
+    const {selected, zoom, dimmed} = context.hideout;
     const lineWeight = zoom ? Math.max(4, 22 / zoom) : 5;
     const color = selected.includes(feature.id) ? 'orange' : '#ff6666';
-    return {color: color, weight: lineWeight, opacity: 1.0};
+    const opacity = dimmed ? 0.5 : 1.0;
+    return {color: color, weight: lineWeight, opacity: opacity};
 }
 """
 )
@@ -95,7 +98,7 @@ osm_layer = dl.TileLayer(
     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution="© OpenStreetMap contributors",
 )
-default_map_layers = [osm_layer, dl.FullScreenControl()]
+default_map_layers = [osm_layer, dl.FullScreenControl(title="Toggle full screen")]
 steps_jobs = {
     "user_info": ["Information", "Provide user information"],
     "data_upload": ["Upload", "Upload classification data"],
@@ -323,7 +326,7 @@ def build_global_map():
                     options={"style": style_handle},
                     hoverStyle=hover_style_handle,
                     eventHandlers=dict(click=click_handler),
-                    hideout=dict(selected=[], zoom=10),
+                    hideout=dict(selected=[], zoom=10, dimmed=True),
                 ),
                 name="Streets",
                 checked=True,
@@ -343,7 +346,7 @@ def build_global_map():
         position="topright",
     )
     return dl.Map(
-        [osm_layer, dl.FullScreenControl(), layers_control],
+        [osm_layer, dl.FullScreenControl(title="Toggle full screen"), layers_control],
         id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
         center=[51.70, 11.20],
         zoom=10,
@@ -404,21 +407,40 @@ def page_container_column_layout(content):
 
 
 def create_card_input(
-    card_body, card_footer=None, name_step=None, title=None, job_id=None
+    card_body,
+    card_footer=None,
+    name_step=None,
+    title=None,
+    job_id=None,
+    completed_steps=None,
 ):
     """Create a modern card input layout with optional progress steps."""
     if name_step is not None:
         if job_id is None:
             raise ValueError("job_id must be provided when name_step is used.")
-        title = f"{steps_jobs[name_step][1]}({job_id})"
+        title = steps_jobs[name_step][1]
 
     if title is None:
         raise ValueError("Either title or name_step must be provided.")
 
-    card_header = [html.H3(title)]
+    card_header = []
 
     if name_step is not None:
-        card_header.append(steps_tab(name_step))
+        card_header.append(
+            html.Code(
+                job_id,
+                id=JOB_ID_KICKER_CODE_SHARED_ID,
+                className="text-muted small d-inline-block mb-1 bg-light px-2 py-1 rounded",
+                title="Copy job ID",
+                # cursor-pointer: no Bootstrap utility class in v5.2 for cursor
+                style={"cursor": "pointer"},
+            )
+        )
+
+    card_header.append(html.H3(title))
+
+    if name_step is not None:
+        card_header.append(steps_tab(name_step, job_id, completed_steps or []))
 
     card_content = [
         dbc.CardHeader(card_header),
@@ -503,22 +525,48 @@ def progress_footer(
     return dbc.CardFooter(actions)
 
 
-def steps_tab(name_step):
-    """Create a progress steps component for the job steps."""
-    # TODO dynamic enabling based on job progress
-    list_tabs = []
-    for step_name, step_info in steps_jobs.items():
-        list_tabs.append(
-            dbc.Tab(
-                label=step_info[0],
-                tab_id=step_name,  # nocheck
-                disabled=True,
-            )
-        )
+def steps_tab(name_step, job_id, completed_steps):
+    """Render a numbered stepper showing wizard progress.
 
-    return dbc.Tabs(
-        list_tabs,
-        active_tab=name_step,
+    Completed steps are clickable links (teal). Current step is highlighted
+    (navy). Future steps are muted and non-interactive.
+    """
+    step_items = []
+    for i, (step_name, step_info) in enumerate(steps_jobs.items(), start=1):
+        is_done = step_name in completed_steps
+        is_current = step_name == name_step
+
+        if is_current:
+            circle = html.Span(str(i), className="badge rounded-circle bg-primary")
+            label = html.Span(step_info[0], className="small ms-1 fw-semibold")
+            step_el = html.Span([circle, label], className="d-flex align-items-center")
+        elif is_done:
+            circle = html.Span(
+                html.I(className="bi bi-check-lg"),
+                className="badge rounded-circle bg-success",
+            )
+            label = html.Span(step_info[0], className="small ms-1 text-success")
+            step_el = dcc.Link(
+                [circle, label],
+                href=build_url_step(step_name, job_id),
+                className="d-flex align-items-center text-decoration-none",
+            )
+        else:
+            circle = html.Span(
+                str(i), className="badge rounded-circle bg-light text-muted border"
+            )
+            label = html.Span(step_info[0], className="small ms-1 text-muted")
+            step_el = html.Span([circle, label], className="d-flex align-items-center")
+
+        step_items.append(step_el)
+        if i < len(steps_jobs):
+            step_items.append(
+                html.I(className="bi bi-chevron-right text-muted mx-2 align-middle")
+            )
+
+    return html.Div(
+        step_items,
+        className="d-flex flex-wrap align-items-center py-2",
     )
 
 
@@ -683,3 +731,41 @@ def register_map_callbacks(app):
             return empty_fc
 
         return StreetSelector(job).viewport_fc(bounds, zoom or 10)
+
+    @app.callback(
+        Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout", allow_duplicate=True),
+        Input(URL_SHARED_ID, "pathname"),
+        State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
+        prevent_initial_call=True,
+    )
+    def toggle_map_dim_on_page(pathname, current_hideout):
+        """Dim the map on all pages except street_selection."""
+        if not pathname or not current_hideout:
+            # leave hideout untouched — returning None would clobber the
+            # GeoJSON layer's state and the style_handle would crash on
+            # context.hideout.dimmed
+            raise PreventUpdate
+        dimmed = not pathname.endswith("/street-selection")
+        return {**current_hideout, "dimmed": dimmed}
+
+
+# Copy job ID to clipboard on click, flash background to confirm.
+dash.clientside_callback(
+    """
+    function(n_clicks) {
+        if (!n_clicks) { return window.dash_clientside.no_update; }
+        var el = document.getElementById('""" + JOB_ID_KICKER_CODE_SHARED_ID + """');
+        if (!el) { return window.dash_clientside.no_update; }
+        navigator.clipboard.writeText(el.innerText).then(function() {
+            el.classList.add('bg-success', 'bg-opacity-25');
+            setTimeout(function() {
+                el.classList.remove('bg-success', 'bg-opacity-25');
+            }, 600);
+        });
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output(JOB_ID_KICKER_CODE_SHARED_ID, "className"),
+    Input(JOB_ID_KICKER_CODE_SHARED_ID, "n_clicks"),
+    prevent_initial_call=True,
+)

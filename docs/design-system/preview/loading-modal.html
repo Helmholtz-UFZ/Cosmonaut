@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Loading modal</title>
+<link rel="stylesheet" href="../assets/bootstrap-icons.min.css">
+<link rel="stylesheet" href="_card.css">
+<style>
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid #ecf0f1;
+    border-top-color: #2c3e50;
+    border-radius: 50%;
+    animation: spin .75s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="cn-card-host" style="background:rgba(33,37,41,.5);">
+<div style="background:#fff; border-radius:.5rem; box-shadow:0 .5rem 1rem rgba(0,0,0,.15); width:240px; margin:14px auto; padding:24px; text-align:center;">
+  <div class="spinner"></div>
+  <div style="font-size:18px; font-weight:500;">Loading…</div>
+</div>
+<div style="text-align:center; font-size:11px; color:var(--cn-fg-muted); margin-top:6px;">
+  <span class="cn-mono">backdrop="static" · keyboard=False · centered · size="sm"</span>
+</div>
+</body>
+</html>

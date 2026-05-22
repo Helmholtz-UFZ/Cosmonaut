@@ -1,0 +1,32 @@
+/* Shared base for every preview card in /preview/.
+   Keep this tiny — cards are scaled into ~700×height previews. */
+@import url("../colors_and_type.css");
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--cn-white);
+  color: var(--cn-fg-default);
+  font-family: var(--cn-font-sans);
+}
+
+body.cn-card-host {
+  padding: 24px 28px;
+}
+
+/* Inline-flex chrome for tag-like swatches and tokens.
+   No global element styles beyond what colors_and_type.css already sets. */
+.cn-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
+.cn-col { display: flex; flex-direction: column; gap: 12px; }
+
+.cn-label-xs {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cn-fg-muted);
+  font-weight: 700;
+}
+
+.cn-mono { font-family: var(--cn-font-mono); }

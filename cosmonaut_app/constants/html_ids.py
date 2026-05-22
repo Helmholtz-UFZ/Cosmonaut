@@ -71,14 +71,14 @@ ERROR_MODAL_TITLE_SHARED_ID = "error-title"  # nocheck
 LOADING_OVERLAY_SHARED_ID = "loading-overlay-shared-id"
 RESET_MODAL_SHARED_ID = "reset-modal-shared-id"
 
+# --- Codes ---
+JOB_ID_KICKER_CODE_SHARED_ID = "job-id-kicker-code-shared-id"
+
 # --- Navbars ---
 NAVBAR_COLLAPSE_NAV_SHARED_ID = "navbar-collapse-nav-shared-id"
 NAVBAR_TOGGLER_NAV_SHARED_ID = "navbar-toggler-nav-shared-id"
 
 # --- Stores ---
-CLICKED_ROADS_STORE_SHARED_ID = (
-    "clicked-roads-store-shared-id"  # nocheck used as dcc.Store only
-)
 CURRENT_JOB_ID_MAP_STORE_ID = "current-job-id-map-store-id"
 JOB_ID_STORE_SHARED_ID = "job-id-store-shared-id"
 STREETS_REFRESH_TRIGGER_STORE_SHARED_ID = "streets-refresh-trigger-store-shared-id"
@@ -93,6 +93,10 @@ DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID = "delete-membership-button-data-upload-
 DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID = "delete-predictor-button-data-upload-id"
 NEXT_BUTTON_DATA_UPLOAD_ID = "next-button-data-upload-id"
 
+# --- Collapses ---
+MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID = "membership-upload-collapse-data-upload-id"
+PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID = "predictor-upload-collapse-data-upload-id"
+
 # --- Divs ---
 DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID = (
     "data-upload-epsg-helper-text-data-upload-id"
@@ -104,6 +108,10 @@ PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID = "predictor-file-info-div-data-upload-id
 STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID = (
     "street-processing-status-div-data-upload-id"
 )
+
+# --- Icons ---
+MEMBERSHIP_HELP_ICON_ID = "membership-help-icon-data-upload-id"  # nocheck dbc.Tooltip target only
+PREDICTOR_HELP_ICON_ID = "predictor-help-icon-data-upload-id"  # nocheck dbc.Tooltip target only
 
 # --- Inputs ---
 DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID = "data-upload-epsg-input-data-upload-id"
@@ -235,6 +243,9 @@ STREET_PROCESSING_ALERT_STREET_SELECTION_ID = (
     "street-processing-alert-street-selection-id"
 )
 
+# --- Badges ---
+SELECTED_BADGE_STREET_SELECTION_ID = "selected-badge-street-selection-id"
+
 # --- Buttons ---
 CANCEL_RESET_BUTTON_STREET_SELECTION_ID = "cancel-reset-button-street-selection-id"
 CLEAR_REMOVED_BUTTON_STREET_SELECTION_ID = "clear-removed-button-street-selection-id"
@@ -275,6 +286,14 @@ RESET_CONFIRM_MODAL_STREET_SELECTION_ID = "reset-confirm-modal-street-selection-
 
 # --- Buttons ---
 NEXT_BUTTON_USER_INFO_ID = "next-button-user-info-id"
+
+# --- Collapses ---
+EMAIL_VISIBILITY_NOTICE_COLLAPSE_USER_INFO_ID = (
+    "email-visibility-notice-collapse-user-info-id"
+)
+
+# --- Divs ---
+EMAIL_HELPER_TEXT_USER_INFO_ID = "email-helper-text-user-info-id"
 
 # --- Inputs ---
 EMAIL_INPUT_USER_INFO_ID = "email-input-user-info-id"

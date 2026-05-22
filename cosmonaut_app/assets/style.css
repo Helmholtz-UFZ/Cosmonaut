@@ -63,3 +63,10 @@ div:has(> #_pages_content) {
     flex: 1;
     max-width: 100%;
 }
+
+/* Card header as fieldset legend — sits on top border */
+.cn-card-legend {
+    margin-top: -12px;
+    width: fit-content;
+    margin-left: 12px;
+}

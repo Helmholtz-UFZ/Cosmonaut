@@ -1,0 +1,174 @@
+/* ============================================================================
+   COSMONAUT Design Tokens
+   ============================================================================
+   Source: Bootswatch Flatly v5.2.3 + COSMONAUT overrides.
+   Used by the Plotly Dash app at cosmonaut_app/assets/flatly_bootstrap.css.
+   Pair with: assets/bootstrap-icons.min.css for iconography.
+   ============================================================================ */
+
+/* ----- 1. Webfont stack -----
+   Flatly's body font is Lato. There is no self-hosted .ttf in the codebase;
+   the browser loads Lato from the OS when present, otherwise falls back to
+   system sans-serif. For mocks, load Lato from Google Fonts. */
+@import url("https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap");
+
+:root {
+  /* ============ COLOR PRIMITIVES (Flatly palette) ============ */
+
+  /* Brand / primary — the dark navy used in the COSMONAUT navbar */
+  --cn-blue:        #2c3e50;   /* navbar, primary buttons, brand */
+  --cn-blue-rgb:    44, 62, 80;
+
+  /* Semantic accents (Bootstrap mapping) */
+  --cn-success:     #18bc9c;   /* used as link colour + success state */
+  --cn-success-hov: #13967d;
+  --cn-info:        #3498db;   /* page-header banners */
+  --cn-warning:     #f39c12;   /* reset / clean buttons, "running" job badge */
+  --cn-danger:      #e74c3c;   /* delete buttons, error banner */
+
+  /* Neutrals */
+  --cn-gray-100:    #f8f9fa;   /* zebra row in tables */
+  --cn-gray-200:    #ecf0f1;   /* .bg-light app shell */
+  --cn-gray-300:    #dee2e6;   /* default border colour */
+  --cn-gray-400:    #ced4da;
+  --cn-gray-500:    #b4bcc2;
+  --cn-gray-600:    #95a5a6;   /* secondary buttons, muted text helpers */
+  --cn-gray-700:    #7b8a8b;   /* .bg-dark in Flatly */
+  --cn-gray-800:    #343a40;
+  --cn-gray-900:    #212529;   /* body text */
+  --cn-white:       #ffffff;
+  --cn-black:       #000000;
+
+  /* Map / data-vis (taken from layout.py and constants) */
+  --cn-map-street-default: #e74c3c;   /* red road network polylines */
+  --cn-map-street-hover:   #ff6666;   /* hovered street */
+  --cn-map-street-selected:#ffd400;   /* "yellow" in source */
+  --cn-map-route:          #1a73e8;   /* computed route polyline (blue) */
+  --cn-map-route-active:   #fd7e14;   /* "orange" for selected/hover */
+
+  /* ============ SEMANTIC TOKENS ============ */
+  --cn-bg-app:      var(--cn-gray-200);    /* outer app frame */
+  --cn-bg-surface:  var(--cn-white);       /* cards, modals, panels */
+  --cn-bg-muted:    var(--cn-gray-100);    /* tabbed-row backgrounds */
+  --cn-bg-navbar:   var(--cn-blue);        /* top nav, dark always */
+  --cn-bg-header:   var(--cn-info);        /* page header banner */
+
+  --cn-fg-default:  var(--cn-gray-900);    /* body copy */
+  --cn-fg-muted:    var(--cn-gray-600);    /* text-muted, help text */
+  --cn-fg-on-dark:  var(--cn-white);       /* text on navbar / header */
+  --cn-fg-link:     var(--cn-success);     /* link colour (Flatly) */
+  --cn-fg-link-hov: var(--cn-success-hov);
+
+  --cn-border:      var(--cn-gray-300);
+  --cn-border-strong: var(--cn-gray-900);  /* col card uses `border-dark` */
+
+  /* ============ ELEVATION / SHAPE ============ */
+  --cn-radius-sm:   0.25rem;   /*  4px */
+  --cn-radius:      0.375rem;  /*  6px */
+  --cn-radius-lg:   0.5rem;    /*  8px */
+  --cn-radius-xl:   1rem;      /* 16px */
+  --cn-radius-pill: 50rem;
+
+  --cn-shadow-sm:   0 .125rem .25rem rgba(0, 0, 0, .075);   /* shadow-sm */
+  --cn-shadow:      0 .5rem 1rem  rgba(0, 0, 0, .15);       /* shadow    */
+  --cn-shadow-lg:   0 1rem 3rem   rgba(0, 0, 0, .175);      /* shadow-lg */
+
+  /* ============ SPACING ============ (Bootstrap utility scale) */
+  --cn-space-0: 0;
+  --cn-space-1: 0.25rem;   /*  4px */
+  --cn-space-2: 0.5rem;    /*  8px */
+  --cn-space-3: 1rem;      /* 16px */
+  --cn-space-4: 1.5rem;    /* 24px */
+  --cn-space-5: 3rem;      /* 48px */
+
+  /* ============ TYPOGRAPHY ============ */
+  --cn-font-sans: Lato, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                  Roboto, "Helvetica Neue", Arial, sans-serif;
+  --cn-font-mono: SFMono-Regular, Menlo, Monaco, Consolas,
+                  "Liberation Mono", "Courier New", monospace;
+
+  /* Body */
+  --cn-body-size:   1rem;       /* 16px */
+  --cn-body-line:   1.5;
+  --cn-body-weight: 400;
+
+  /* Headings (Flatly: weight 500, line-height 1.2) */
+  --cn-h1-size:     3rem;       /* 48px (≥1200px viewport) */
+  --cn-h2-size:     2.5rem;     /* 40px */
+  --cn-h3-size:     2rem;       /* 32px */
+  --cn-h4-size:     1.5rem;     /* 24px */
+  --cn-h5-size:     1.25rem;    /* 20px */
+  --cn-h6-size:     1rem;       /* 16px */
+  --cn-heading-weight: 500;
+  --cn-heading-line: 1.2;
+
+  /* Helper text */
+  --cn-small-size:  0.875em;    /* Bootstrap .small */
+}
+
+/* ============================================================================
+   SEMANTIC CSS — minimal "what something IS" styling.
+   Lean on Bootstrap utility classes for layout; these rules cover defaults.
+   ============================================================================ */
+
+html, body {
+  font-family:     var(--cn-font-sans);
+  font-size:       var(--cn-body-size);
+  line-height:     var(--cn-body-line);
+  font-weight:     var(--cn-body-weight);
+  color:           var(--cn-fg-default);
+  background:      var(--cn-bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-weight: var(--cn-heading-weight);
+  line-height: var(--cn-heading-line);
+  color: var(--cn-fg-default);
+}
+h1 { font-size: var(--cn-h1-size); }
+h2 { font-size: var(--cn-h2-size); }
+h3 { font-size: var(--cn-h3-size); }
+h4 { font-size: var(--cn-h4-size); }
+h5 { font-size: var(--cn-h5-size); }
+h6 { font-size: var(--cn-h6-size); }
+
+p { margin-top: 0; margin-bottom: 1rem; }
+
+a {
+  color: var(--cn-fg-link);
+  text-decoration: underline;
+  text-underline-offset: 0.1em;
+}
+a:hover { color: var(--cn-fg-link-hov); }
+
+small, .small { font-size: var(--cn-small-size); }
+
+.text-muted { color: var(--cn-fg-muted) !important; }
+
+code, kbd, samp, pre {
+  font-family: var(--cn-font-mono);
+  font-size: 0.875em;
+}
+code { color: #e83e8c; }   /* Flatly's pink code colour */
+
+/* Page-header banner (used at top of admin/job_manager/logs pages) */
+.cn-page-header {
+  background: var(--cn-bg-header);
+  color:      var(--cn-fg-on-dark);
+  padding:    var(--cn-space-3) var(--cn-space-4);
+  border-top-left-radius:  var(--cn-radius);
+  border-top-right-radius: var(--cn-radius);
+  text-align: center;
+}
+
+/* Card defaults (Flatly Card + shadow-sm) */
+.cn-card {
+  background:    var(--cn-bg-surface);
+  border:        1px solid var(--cn-border);
+  border-radius: var(--cn-radius);
+  box-shadow:    var(--cn-shadow-sm);
+}

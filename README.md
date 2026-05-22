@@ -99,3 +99,7 @@ These are skill documents and configuration files designed for AI-assisted devel
 - [Run and Fix Testing](docs/skills/run_and_fix_testing.md) - Guide for running tests, diagnosing failures, and applying fixes.
 - [Convention Keeper](docs/skills/convention_keeper.md) - Systematic audit of the codebase against all project conventions.
 - [Adopt User-Generated Playwright Test](docs/skills/adopt_user_generate_playwright_test.md) - Prompt for cleaning up tests generated with the codegen tool.
+
+## Design
+
+- [Design System](docs/design-system/README.md) — Tokens, brand voice, UI kit, iconography.

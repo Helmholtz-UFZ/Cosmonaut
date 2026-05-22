@@ -19,7 +19,7 @@ PAGE_CONFIG = {
     "home": ("/", 1),
     "user_info": ("/job/{job_id_new}/user-info", 2),
     "data_upload": ("/job/{job_id_new}/data-upload", 3),
-    "street_selection": ("/job/{job_id_new}/street_selection", 5),
+    "street_selection": ("/job/{job_id_new}/street-selection", 5),
     "routing_params": ("/job/{job_id_new}/routing-params", 2),
     # After Parameters: use finished job
     "route_computation": ("/job/{job_id_finished}/route-computation", 3),

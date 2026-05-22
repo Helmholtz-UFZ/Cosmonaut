@@ -46,6 +46,7 @@ import logging
 from dash import (
     register_page,
     dcc,
+    html,
     callback,
     Output,
     State,
@@ -146,10 +147,13 @@ _objective_caption = dbc.Row(
 _advanced_rows = _build_rows(ADVANCED_FIELDS)
 
 _toggle_button = dbc.Button(
-    "Show advanced options ▾",
+    [
+        html.I(className="bi bi-caret-down-fill me-1"),
+        "Show advanced options",
+    ],
     id=ADVANCED_TOGGLE_ROUTING_PARAMS_ID,
     color="link",
-    className="mt-2 p-0",
+    className="text-muted text-decoration-none p-0 small",
     n_clicks=0,
 )
 
@@ -207,6 +211,7 @@ def layout(job_id):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=job.get_completed_steps(),
     )
     return page_container_fullscreen_layout(input_container)
 
@@ -219,14 +224,18 @@ def layout(job_id):
 @callback(
     Output(ADVANCED_COLLAPSE_ROUTING_PARAMS_ID, "is_open"),
     Output(ADVANCED_TOGGLE_ROUTING_PARAMS_ID, "children"),
+    Output(ADVANCED_TOGGLE_ROUTING_PARAMS_ID, "className"),
     Input(ADVANCED_TOGGLE_ROUTING_PARAMS_ID, "n_clicks"),
     State(ADVANCED_COLLAPSE_ROUTING_PARAMS_ID, "is_open"),
     prevent_initial_call=True,
 )
 def toggle_advanced_options(n_clicks, is_open):
     new_open = not is_open
-    label = "Hide advanced options ▴" if new_open else "Show advanced options ▾"
-    return new_open, label
+    caret = "bi bi-caret-up-fill me-1" if new_open else "bi bi-caret-down-fill me-1"
+    text = "Hide advanced options" if new_open else "Show advanced options"
+    label = [html.I(className=caret), text]
+    className = "text-muted text-decoration-none p-0 small"
+    return new_open, label, className
 
 
 @callback(

@@ -101,13 +101,16 @@ from cosmonaut_app.constants.html_ids import (
     DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID,
     DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID,
     JOB_ID_STORE_SHARED_ID,
-    LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID,
+    MEMBERSHIP_HELP_ICON_ID,
     MEMBERSHIP_TILE_LAYER_MAP_ID,
+    MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID,
     PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
+    PREDICTOR_HELP_ICON_ID,
+    PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
     PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     STREET_PROCESSING_POLL_DATA_UPLOAD_ID,
     STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
@@ -146,12 +149,37 @@ def _first_sentence(text):
     return stripped[: dot + 1]
 
 
-def _help_icon(description):
-    """Create a question-mark icon with a native browser tooltip."""
-    return html.I(
-        className="bi bi-info-circle text-muted ms-1",
-        title=description.strip(),
+def _help_icon(icon_id, description):
+    """Create a question-mark icon with a dbc.Tooltip.
+
+    Wrapped in an html.Span so the helper returns a single component, not a
+    list. Returning a raw list and placing it inside another list (e.g. as a
+    sibling inside html.Span's children) leaves React with a nested array
+    that dash-renderer doesn't reliably flatten — crashes the page with
+    React error #31 ("Objects are not valid as a React child").
+    """
+    return html.Span(
+        [
+            html.I(
+                id=icon_id,  # nocheck dynamically passed constant
+                className="bi bi-info-circle text-muted ms-1",
+            ),
+            dbc.Tooltip(description.strip(), target=icon_id),
+        ]
     )
+
+
+def _file_status(uploaded: bool):
+    """Return a coloured icon + label for a file upload status row."""
+    if uploaded:
+        return [
+            html.I(className="bi bi-check-circle-fill text-success me-1"),
+            html.Span("Uploaded", className="text-success fw-semibold small"),
+        ]
+    return [
+        html.I(className="bi bi-dash-circle text-muted me-1"),
+        html.Span("Not uploaded", className="text-muted small"),
+    ]
 
 
 def layout(job_id):
@@ -205,140 +233,189 @@ def layout(job_id):
             dcc.Store(
                 id=DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, data=membership_uploaded
             ),
-            html.P(
-                "Please enter a valid EPSG code and then upload your membership data file.",
-                className="text-muted",
-            ),
-            dbc.Label(
-                "EPSG code",
-                html_for=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
-                className="mt-2",
-            ),
-            dbc.Input(
-                id=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
-                type="text",
-                value=job.model.epsg,
-                disabled=epsg_disabled,
-            ),
-            dbc.FormText(
-                "Common choices: 4326, 25832, 3857, …",
-                color="secondary",
-                className="mb-1",
-            ),
-            dbc.FormText(
-                id=DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID, className="fw-semibold"
-            ),
-            # --- Membership upload section ---
-            dcc.Upload(
-                id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
-                accept=".csv,.txt",
-                children=dbc.Button(
-                    [
-                        html.I(className="bi bi-upload me-2"),
-                        "Upload membership file",
-                    ],
-                    color="primary",
-                ),
-                multiple=False,
-                disabled=True,
-                className="my-3",
-            ),
-            html.Span(
+            dbc.Card(
                 [
-                    html.Small(
-                        _first_sentence(DESCRIPTION_MEMBERSHIP),
-                        className="text-muted",
+                    dbc.CardHeader(
+                        "Coordinate system",
+                        className="cn-card-legend bg-white border-0 fw-bold",
                     ),
-                    _help_icon(DESCRIPTION_MEMBERSHIP),
-                ],
-            ),
-            html.Div(
-                id=MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID, className="text-danger small"
-            ),
-            html.Div(
-                "Uploaded" if membership_uploaded else "Not uploaded",
-                id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
-                className="text-muted",
-            ),
-            dbc.Button(
-                [
-                    html.I(className="bi bi-trash me-1"),
-                    "Delete Membership",
-                ],
-                id=DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID,
-                color="danger",
-                size="sm",
-                className="mt-2",
-                disabled=delete_membership_disabled,
-            ),
-            html.Div(
-                sp_text,
-                id=STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
-                className=sp_class,
-            ),
-            dcc.Interval(
-                id=STREET_PROCESSING_POLL_DATA_UPLOAD_ID,
-                interval=3000,
-                disabled=sp_poll_disabled,
-            ),
-            html.Div(
-                [
-                    dbc.Label("Map Opacity:", className="fw-bold mt-3"),
-                    dcc.Slider(
-                        id=DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID,
-                        min=0,
-                        max=1,
-                        step=0.1,
-                        value=0.7,
-                        marks={0: "0%", 0.5: "50%", 1: "100%"},
-                        tooltip={"placement": "bottom", "always_visible": False},
-                        disabled=slider_disabled,
+                    dbc.CardBody(
+                        [
+                            dbc.Label(
+                                "EPSG code",
+                                html_for=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
+                                className="mt-2",
+                            ),
+                            dbc.Input(
+                                id=DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID,
+                                type="text",
+                                value=job.model.epsg,
+                                disabled=epsg_disabled,
+                            ),
+                            dbc.FormText(
+                                "Common choices: 4326, 25832, 3857, …",
+                                color="secondary",
+                                className="mb-1",
+                            ),
+                            dbc.FormText(
+                                id=DATA_UPLOAD_EPSG_HELPER_TEXT_DATA_UPLOAD_ID,
+                                className="fw-semibold",
+                            ),
+                        ]
                     ),
                 ],
-                className="mb-3",
+                className="mb-3 shadow-sm",
             ),
-            # --- Predictor upload section ---
-            dcc.Upload(
-                id=PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
-                accept=".csv,.txt",
-                children=dbc.Button(
-                    [
-                        html.I(className="bi bi-upload me-2"),
-                        "Upload predictor file",
-                    ],
-                    color="primary",
-                ),
-                multiple=False,
-                disabled=predictor_upload_disabled,
-                className="my-3",
-            ),
-            html.Span(
+            dbc.Card(
                 [
-                    html.Small(
-                        _first_sentence(DESCRIPTION_PREDICTOR),
-                        className="text-muted",
+                    dbc.CardHeader(
+                        "Membership data",
+                        className="cn-card-legend bg-white border-0 fw-bold",
                     ),
-                    _help_icon(DESCRIPTION_PREDICTOR),
+                    dbc.CardBody(
+                        [
+                            dbc.Collapse(
+                                [
+                                    dcc.Upload(
+                                        id=DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+                                        accept=".csv,.txt",
+                                        children=dbc.Button(
+                                            [
+                                                html.I(className="bi bi-upload me-2"),
+                                                "Upload membership file",
+                                            ],
+                                            color="primary",
+                                        ),
+                                        multiple=False,
+                                        disabled=True,
+                                        className="my-3",
+                                    ),
+                                    html.Span(
+                                        [
+                                            html.Small(
+                                                _first_sentence(DESCRIPTION_MEMBERSHIP),
+                                                className="text-muted",
+                                            ),
+                                            _help_icon(MEMBERSHIP_HELP_ICON_ID, DESCRIPTION_MEMBERSHIP),
+                                        ],
+                                    ),
+                                ],
+                                id=MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
+                                is_open=not membership_uploaded,
+                            ),
+                            html.Div(
+                                id=MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID,
+                                className="text-danger small",
+                            ),
+                            html.Div(
+                                _file_status(membership_uploaded),
+                                id=DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID,
+                            ),
+                            dbc.Button(
+                                [
+                                    html.I(className="bi bi-trash me-1"),
+                                    "Delete Membership",
+                                ],
+                                id=DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID,
+                                color="danger",
+                                size="sm",
+                                className="mt-2",
+                                disabled=delete_membership_disabled,
+                            ),
+                            html.Div(
+                                sp_text,
+                                id=STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
+                                className=sp_class,
+                            ),
+                            dcc.Interval(
+                                id=STREET_PROCESSING_POLL_DATA_UPLOAD_ID,
+                                interval=3000,
+                                disabled=sp_poll_disabled,
+                            ),
+                            html.Div(
+                                [
+                                    dbc.Label("Map Opacity:", className="fw-bold mt-3"),
+                                    dcc.Slider(
+                                        id=DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID,
+                                        min=0,
+                                        max=1,
+                                        step=0.1,
+                                        value=0.7,
+                                        marks={0: "0%", 0.5: "50%", 1: "100%"},
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": False,
+                                        },
+                                        disabled=slider_disabled,
+                                    ),
+                                ],
+                                className="mb-3",
+                            ),
+                        ]
+                    ),
                 ],
+                className="mb-3 shadow-sm",
             ),
-            html.Div(
-                id=PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID, className="text-danger small"
-            ),
-            html.Div(
-                "Uploaded" if predictor_uploaded else "Not uploaded",
-                id=PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
-                className="text-muted",
-            ),
-            dbc.Button(
+            dbc.Card(
                 [
-                    html.I(className="bi bi-trash me-1"),
-                    "Delete Predictor",
+                    dbc.CardHeader(
+                        "Predictor data",
+                        className="cn-card-legend bg-white border-0 fw-bold",
+                    ),
+                    dbc.CardBody(
+                        [
+                            dbc.Collapse(
+                                [
+                                    dcc.Upload(
+                                        id=PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
+                                        accept=".csv,.txt",
+                                        children=dbc.Button(
+                                            [
+                                                html.I(className="bi bi-upload me-2"),
+                                                "Upload predictor file",
+                                            ],
+                                            color="primary",
+                                        ),
+                                        multiple=False,
+                                        disabled=predictor_upload_disabled,
+                                        className="my-3",
+                                    ),
+                                    html.Span(
+                                        [
+                                            html.Small(
+                                                _first_sentence(DESCRIPTION_PREDICTOR),
+                                                className="text-muted",
+                                            ),
+                                            _help_icon(PREDICTOR_HELP_ICON_ID, DESCRIPTION_PREDICTOR),
+                                        ],
+                                    ),
+                                ],
+                                id=PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
+                                is_open=not predictor_uploaded,
+                            ),
+                            html.Div(
+                                id=PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID,
+                                className="text-danger small",
+                            ),
+                            html.Div(
+                                _file_status(predictor_uploaded),
+                                id=PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
+                            ),
+                            dbc.Button(
+                                [
+                                    html.I(className="bi bi-trash me-1"),
+                                    "Delete Predictor",
+                                ],
+                                id=DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID,
+                                color="danger",
+                                size="sm",
+                                className="mt-2",
+                                disabled=delete_predictor_disabled,
+                            ),
+                        ]
+                    ),
                 ],
-                id=DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID,
-                color="danger",
-                size="sm",
-                className="mt-2",
-                disabled=delete_predictor_disabled,
+                className="mb-3 shadow-sm",
             ),
         ]
     )
@@ -361,21 +438,33 @@ def layout(job_id):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=job.get_completed_steps(),
     )
     return page_container_fullscreen_layout(input_container)
 
 
-# Clientside callback: open loading overlay instantly in the browser when a file
-# is selected.  A server-side callback here would queue behind the slow processing
-# callback (due to allow_duplicate), leaving the overlay stuck open.
+# Clientside callbacks: show "Uploading..." in the status row immediately when a
+# file is selected — before the slow server-side processing callback completes.
 dash.clientside_callback(
     """
-    function(filename, predictor_filename) {
-        return !!(filename || predictor_filename);
+    function(filename) {
+        if (!filename) { return window.dash_clientside.no_update; }
+        return "Uploading...";
     }
     """,
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(DATA_UPLOAD_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
     Input(DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
+    prevent_initial_call=True,
+)
+
+dash.clientside_callback(
+    """
+    function(filename) {
+        if (!filename) { return window.dash_clientside.no_update; }
+        return "Uploading...";
+    }
+    """,
+    Output(PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID, "children", allow_duplicate=True),
     Input(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "filename"),
     prevent_initial_call=True,
 )
@@ -389,17 +478,18 @@ def _no_update_upload():
         "next_disabled": no_update,
         "epsg_disabled": no_update,
         "upload_contents": no_update,
-        "loading": no_update,
         "delete_membership_disabled": no_update,
         "tile_url": no_update,
         "slider_disabled": no_update,
         "upload_disabled": no_update,
         "membership_error": no_update,
+        "membership_collapse_open": no_update,
         "predictor_upload_disabled": no_update,
         "predictor_file_info": no_update,
         "predictor_error": no_update,
         "delete_predictor_disabled": no_update,
         "predictor_contents": no_update,
+        "predictor_collapse_open": no_update,
         "tile_opacity": no_update,
         "sp_text": no_update,
         "sp_class": no_update,
@@ -425,7 +515,6 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
                 "next_disabled": True,
                 "epsg_disabled": False,
                 "upload_contents": None,
-                "loading": False,
                 "membership_error": str(e),
             }
         )
@@ -446,7 +535,6 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
                 "next_disabled": True,
                 "epsg_disabled": False,
                 "upload_contents": None,
-                "loading": False,
                 "membership_error": str(e),
             }
         )
@@ -495,20 +583,21 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
     result.update(
         {
             "viewport": {"bounds": bounds, "transition": "flyTo"},
-            "file_info": "Uploaded",
+            "file_info": _file_status(True),
             "next_disabled": True,
             "epsg_disabled": True,
             "upload_contents": None,
-            "loading": False,
             "delete_membership_disabled": False,
             "tile_url": tile_url,
             "slider_disabled": False,
             "upload_disabled": True,
             "membership_error": "",
+            "membership_collapse_open": False,
             "predictor_upload_disabled": False,
-            "predictor_file_info": "Not uploaded",
+            "predictor_file_info": _file_status(False),
             "predictor_error": "",
             "delete_predictor_disabled": True,
+            "predictor_collapse_open": True,
             "sp_text": sp_text,
             "sp_class": sp_class,
             "sp_poll_disabled": sp_poll_disabled,
@@ -532,8 +621,7 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
         result.update(
             {
                 "next_disabled": True,
-                "loading": False,
-                "predictor_file_info": "Not uploaded",
+                "predictor_file_info": _file_status(False),
                 "predictor_error": str(e),
                 "delete_predictor_disabled": True,
                 "predictor_contents": None,
@@ -545,12 +633,12 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
     result.update(
         {
             "next_disabled": False,
-            "loading": False,
-            "predictor_file_info": "Uploaded",
+            "predictor_file_info": _file_status(True),
             "predictor_error": "",
             "delete_predictor_disabled": False,
             "predictor_contents": None,
             "predictor_upload_disabled": True,
+            "predictor_collapse_open": False,
         }
     )
     return result
@@ -570,7 +658,13 @@ def _handle_init_store(init_trigger, job_id):
     """Handle initial page load with existing upload."""
     result = _no_update_upload()
     if init_trigger and job_id:
-        result.update({"slider_disabled": False, "upload_disabled": True})
+        result.update(
+            {
+                "slider_disabled": False,
+                "upload_disabled": True,
+                "membership_collapse_open": False,
+            }
+        )
     else:
         result["slider_disabled"] = True
     return result
@@ -585,7 +679,6 @@ def _handle_init_store(init_trigger, job_id):
         "upload_contents": Output(
             DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"
         ),
-        "loading": Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
         "delete_membership_disabled": Output(
             DELETE_MEMBERSHIP_BUTTON_DATA_UPLOAD_ID, "disabled"
         ),
@@ -599,6 +692,9 @@ def _handle_init_store(init_trigger, job_id):
             allow_duplicate=True,
         ),
         "membership_error": Output(MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID, "children"),
+        "membership_collapse_open": Output(
+            MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open"
+        ),
         "predictor_upload_disabled": Output(
             PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled"
         ),
@@ -611,6 +707,9 @@ def _handle_init_store(init_trigger, job_id):
         ),
         "predictor_contents": Output(
             PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "contents"
+        ),
+        "predictor_collapse_open": Output(
+            PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open"
         ),
         "tile_opacity": Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "opacity"),
         "sp_text": Output(
@@ -690,7 +789,6 @@ def data_upload_manager(
         "viewport": Output(
             MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True
         ),
-        "loading": Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
         "tile_url": Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
         "slider_disabled": Output(
             DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
@@ -703,6 +801,9 @@ def data_upload_manager(
         "init_store": Output(
             DATA_UPLOAD_INIT_STORE_DATA_UPLOAD_ID, "data", allow_duplicate=True
         ),
+        "membership_collapse_open": Output(
+            MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open", allow_duplicate=True
+        ),
         "predictor_upload_disabled": Output(
             PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
         ),
@@ -711,6 +812,9 @@ def data_upload_manager(
         ),
         "delete_predictor_disabled": Output(
             DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True
+        ),
+        "predictor_collapse_open": Output(
+            PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open", allow_duplicate=True
         ),
         "sp_text": Output(
             STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
@@ -746,7 +850,7 @@ def delete_membership_file(n_clicks, job_id):
     job.delete_membership()
 
     return {
-        "file_info": "Not uploaded",
+        "file_info": _file_status(False),
         "epsg_disabled": False,
         "delete_membership_disabled": True,
         "next_disabled": True,
@@ -755,14 +859,15 @@ def delete_membership_file(n_clicks, job_id):
             "zoom": DEFAULT_MAP_ZOOM,
             "transition": "flyTo",
         },
-        "loading": False,
         "tile_url": "",
         "slider_disabled": True,
         "upload_disabled": False,
         "init_store": False,
+        "membership_collapse_open": True,
         "predictor_upload_disabled": True,
-        "predictor_file_info": "Not uploaded",
+        "predictor_file_info": _file_status(False),
         "delete_predictor_disabled": True,
+        "predictor_collapse_open": True,
         "sp_text": "Road network will be constructed in the background",
         "sp_class": "text-muted small",
         "sp_poll_disabled": True,
@@ -774,6 +879,7 @@ def delete_membership_file(n_clicks, job_id):
     Output(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(NEXT_BUTTON_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
     Output(PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID, "disabled", allow_duplicate=True),
+    Output(PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID, "is_open", allow_duplicate=True),
     Input(DELETE_PREDICTOR_BUTTON_DATA_UPLOAD_ID, "n_clicks"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
     prevent_initial_call=True,
@@ -796,10 +902,11 @@ def delete_predictor_file(n_clicks, job_id):
     job.delete_predictor()
 
     return (
-        "Not uploaded",  # predictor file info
+        _file_status(False),  # predictor file info
         True,  # disable delete predictor button
         True,  # disable next button (predictor required)
         False,  # re-enable predictor upload button
+        True,  # show predictor upload collapse again
     )
 
 

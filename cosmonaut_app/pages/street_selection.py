@@ -65,6 +65,7 @@ processing.
 import logging
 from typing import Any, Dict, List, Optional
 
+import dash
 import dash_bootstrap_components as dbc
 from dash import (
     ALL,
@@ -87,7 +88,6 @@ from cosmonaut_app.constants.general import (
 from cosmonaut_app.constants.html_ids import (
     CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
     CLEAR_REMOVED_BUTTON_STREET_SELECTION_ID,
-    CLICKED_ROADS_STORE_SHARED_ID,
     CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
     JOB_ID_STORE_SHARED_ID,
     KEEP_LARGEST_HINT_STREET_SELECTION_ID,
@@ -98,6 +98,7 @@ from cosmonaut_app.constants.html_ids import (
     REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID,
     RESET_CONFIRM_MODAL_STREET_SELECTION_ID,
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
+    SELECTED_BADGE_STREET_SELECTION_ID,
     STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
     STREET_PROCESSING_POLL_STREET_SELECTION_ID,
     STREETS_REFRESH_TRIGGER_STORE_SHARED_ID,
@@ -146,39 +147,46 @@ def _build_keep_largest_hint(keep_largest: bool) -> list:
     ]
 
 
-def _build_removed_roads_list(removed_info: list[dict], is_active: bool) -> list:
-    """Build ListGroup items for the removed roads panel."""
+def _build_removed_roads_panel(removed_info: list[dict], is_active: bool):
+    """Build the removed-roads panel content.
+
+    Empty state: plain muted line, no chrome.
+    Populated:    bordered scrollable list.
+    """
     if not removed_info:
-        return [
-            dbc.ListGroupItem(
-                "No roads removed", className="text-muted fst-italic", disabled=True
-            )
-        ]
-    items = []
-    for road in removed_info:
-        items.append(
-            dbc.ListGroupItem(
-                [
-                    html.Span(road["label"], className="flex-grow-1"),
-                    dbc.Button(
-                        html.I(className="bi bi-x-lg"),
-                        # Dynamic IDs for per-road restore buttons
-                        id={"type": "restore-road-btn", "index": road["id"]},  # nocheck
-                        size="sm",
-                        color="link",
-                        className="p-0 ms-2 text-danger",
-                        disabled=not is_active,
-                    ),
-                ],
-                className="d-flex align-items-center py-1 px-2",
-            )
+        return html.P(
+            "No roads removed.",
+            className="text-muted small mb-0 mt-1",
         )
-    return items
+    items = [
+        dbc.ListGroupItem(
+            [
+                html.Span(road["label"], className="flex-grow-1"),
+                dbc.Button(
+                    html.I(className="bi bi-x-lg"),
+                    # Dynamic IDs for per-road restore buttons
+                    id={"type": "restore-road-btn", "index": road["id"]},  # nocheck
+                    size="sm",
+                    color="link",
+                    className="p-0 ms-2 text-danger",
+                    disabled=not is_active,
+                ),
+            ],
+            className="d-flex align-items-center py-1 px-2",
+        )
+        for road in removed_info
+    ]
+    return html.Div(
+        dbc.ListGroup(items, flush=True),
+        className="overflow-auto border rounded",
+        # max-height — no Bootstrap utility for a dynamic px value
+        style={"max-height": _REMOVED_LIST_MAX_HEIGHT},
+    )
 
 
 register_page(
     __name__,
-    path_template="/job/<job_id>/street_selection",
+    path_template="/job/<job_id>/street-selection",
     name="Street Selection",
     title="Street Selection",
     description="Select streets for the routing process.",
@@ -201,15 +209,17 @@ def layout(job_id: str):
     job.model.stage = max(job.model.stage, 2)
     job.save(sync_files=False)
 
+    completed_steps = job.get_completed_steps()
+
     log.info(f"Street selection layout for job {job_id}")
     log.debug(f"Job {job_id} membership_upload: {job.model.membership_upload}")
 
     # Gate on street processing status
     sp_status = job.get_street_processing_status()
     if sp_status == "RUNNING":
-        return _street_processing_wait_layout(job_id)
+        return _street_processing_wait_layout(job_id, completed_steps)
     elif sp_status == "FAILED":
-        return _street_processing_failed_layout(job_id)
+        return _street_processing_failed_layout(job_id, completed_steps)
 
     sel = StreetSelector(job)
 
@@ -224,56 +234,43 @@ def layout(job_id: str):
         [
             # Shared stores required by cross-page callbacks (map, routing, etc.)
             dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
-            dcc.Store(
-                id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"
+            html.Div(
+                [
+                    html.H6(
+                        "Filter road types",
+                        className="fw-semibold mb-0",
+                    ),
+                    dbc.ButtonGroup(
+                        [
+                            dbc.Button(
+                                [
+                                    html.I(className="bi bi-check-all me-1"),
+                                    "Select all",
+                                ],
+                                id=TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
+                                size="sm",
+                                color="link",
+                                disabled=not is_active,
+                            ),
+                            dbc.Button(
+                                [
+                                    html.I(className="bi bi-x-circle me-1"),
+                                    "Select none",
+                                ],
+                                id=TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
+                                size="sm",
+                                color="link",
+                                disabled=not is_active,
+                            ),
+                        ],
+                        size="sm",
+                    ),
+                ],
+                className="d-flex align-items-center justify-content-between mt-2 mb-1",
             ),
-            html.H6("Filter road types", className="fw-semibold mb-1 mt-2"),
             dbc.FormText(
                 "Toggles apply immediately. Disabled types are removed from the network and won't appear in the final route.",
                 className="d-block mb-2",
-            ),
-            dbc.Row(
-                [
-                    dbc.Col(
-                        dbc.Label(
-                            "Road type filter",
-                            html_for=TAGS_DROPDOWN_STREET_SELECTION_ID,
-                            className="mt-2",
-                        ),
-                        width="auto",
-                    ),
-                    dbc.Col(
-                        dbc.ButtonGroup(
-                            [
-                                dbc.Button(
-                                    [
-                                        html.I(className="bi bi-check-all me-1"),
-                                        "Select all",
-                                    ],
-                                    id=TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
-                                    size="sm",
-                                    color="link",
-                                    disabled=not is_active,
-                                ),
-                                dbc.Button(
-                                    [
-                                        html.I(className="bi bi-x-circle me-1"),
-                                        "Select none",
-                                    ],
-                                    id=TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
-                                    size="sm",
-                                    color="link",
-                                    disabled=not is_active,
-                                ),
-                            ],
-                            size="sm",
-                            className="ms-2",
-                        ),
-                        width="auto",
-                        className="d-flex align-items-end",
-                    ),
-                ],
-                className="g-0",
             ),
             dbc.Checklist(
                 id=TAGS_DROPDOWN_STREET_SELECTION_ID,
@@ -289,57 +286,47 @@ def layout(job_id: str):
                 className="" if is_active else "pe-none opacity-50",
             ),
             html.Hr(className="my-3"),
-            html.H6("Edit individual roads", className="fw-semibold mb-1"),
+            html.Div(
+                [
+                    html.H6("Edit individual roads", className="fw-semibold mb-0"),
+                    dbc.Badge(
+                        "Selected: 0",
+                        id=SELECTED_BADGE_STREET_SELECTION_ID,
+                        color="secondary",
+                        className="ms-2",
+                    ),
+                ],
+                className="d-flex align-items-center gap-2 mb-1",
+            ),
             dbc.FormText(
                 "Click roads on the map to mark them, then choose an action below.",
                 className="d-block mb-2",
             ),
-            dbc.Row(
+            html.Div(
                 [
-                    dbc.Col(
-                        html.Div(
-                            [
-                                dbc.Button(
-                                    [
-                                        html.I(className="bi bi-eraser me-1"),
-                                        "Remove clicked roads",
-                                    ],
-                                    id=REMOVE_BUTTON_STREET_SELECTION_ID,
-                                    color="danger",
-                                    disabled=not is_active,
-                                ),
-                                dbc.FormText(
-                                    "Removes the roads you clicked on the map.",
-                                    className="mt-1",
-                                ),
-                            ],
-                            className="d-flex flex-column",
-                        ),
-                        width="auto",
+                    dbc.Button(
+                        [
+                            html.I(className="bi bi-eraser me-1"),
+                            "Remove clicked roads",
+                        ],
+                        id=REMOVE_BUTTON_STREET_SELECTION_ID,
+                        color="danger",
+                        disabled=not is_active,
                     ),
-                    dbc.Col(
-                        dbc.Badge(
-                            "Selected: 0",
-                            color="info",
-                            className="ms-2",
-                        ),
-                        width="auto",
-                        className="d-flex align-items-center ms-auto",
+                    dbc.FormText(
+                        "Removes the roads you clicked on the map.",
+                        className="mt-1",
                     ),
                 ],
-                className="g-3 align-items-center mt-2",
+                className="d-flex flex-column mt-2",
             ),
             # Removed roads panel
             dbc.Label("Removed roads", className="mt-3 mb-1"),
             html.Div(
-                dbc.ListGroup(
-                    _build_removed_roads_list(sel.get_removed_roads_info(), is_active),
-                    flush=True,
+                _build_removed_roads_panel(
+                    sel.get_removed_roads_info(), is_active
                 ),
                 id=REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID,
-                className="overflow-auto border rounded",
-                # style needed: dynamic max-height from variable, no Bootstrap equivalent
-                style={"max-height": _REMOVED_LIST_MAX_HEIGHT},
             ),
             dbc.Button(
                 [
@@ -379,6 +366,7 @@ def layout(job_id: str):
                             "Keep largest network",
                         ],
                         id=LARGEST_BUTTON_STREET_SELECTION_ID,
+                        outline=True,
                         color="primary",
                         disabled=not is_active or sel.keep_largest_applied,
                     ),
@@ -460,15 +448,15 @@ def layout(job_id: str):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=completed_steps,
     )
     return page_container_fullscreen_layout(input_container)
 
 
-def _street_processing_wait_layout(job_id):
+def _street_processing_wait_layout(job_id, completed_steps):
     """Render a waiting layout while street processing is in progress."""
     card_body = [
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
-        dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
         dbc.Alert(
             "Road network is being built, please wait...",
             id=STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
@@ -496,15 +484,15 @@ def _street_processing_wait_layout(job_id):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=completed_steps,
     )
     return page_container_fullscreen_layout(input_container)
 
 
-def _street_processing_failed_layout(job_id):
+def _street_processing_failed_layout(job_id, completed_steps):
     """Render a failure layout when street processing has failed."""
     card_body = [
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
-        dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
         dbc.Alert(
             "Road network construction failed. Please go back to Data Upload "
             "and re-upload your membership file. If the problem persists, "
@@ -529,6 +517,7 @@ def _street_processing_failed_layout(job_id):
         card_footer=footer,
         name_step=__name__.replace("pages.", ""),
         job_id=job_id,
+        completed_steps=completed_steps,
     )
     return page_container_fullscreen_layout(input_container)
 
@@ -556,7 +545,7 @@ def poll_street_processing_status(n_intervals, pathname):
             no_update,
             no_update,
             True,
-            f"/job/{job_id}/street_selection",
+            f"/job/{job_id}/street-selection",
         )
     elif sp_status == "FAILED":
         return (
@@ -612,14 +601,12 @@ def remove_selected(
 
     sel = StreetSelector(job)
     sel.remove_roads(clicked)
-    list_group = dbc.ListGroup(
-        _build_removed_roads_list(sel.get_removed_roads_info(), True), flush=True
-    )
+    panel = _build_removed_roads_panel(sel.get_removed_roads_info(), True)
     hint = html.Small(
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",
     )
-    return (version or 0) + 1, list_group, hint, "mt-3"
+    return (version or 0) + 1, panel, hint, "mt-3"
 
 
 @callback(
@@ -687,12 +674,12 @@ def reset_edits(
     sel = StreetSelector(job)
     sel.reset()
     is_active = job.get_status() == JOB_STATUS_PENDING
-    list_group = dbc.ListGroup(_build_removed_roads_list([], is_active), flush=True)
+    panel = _build_removed_roads_panel([], is_active)
     hint = html.Small(
         _build_keep_largest_hint(False),
         className="text-warning",
     )
-    return (version or 0) + 1, sel.selected_road_tags, list_group, hint, "mt-3"
+    return (version or 0) + 1, sel.selected_road_tags, panel, hint, "mt-3"
 
 
 @callback(
@@ -819,14 +806,12 @@ def restore_single_road(n_clicks_list, pathname, version):
 
     removed_info = sel.get_removed_roads_info()
     is_active = job.get_status() == JOB_STATUS_PENDING
-    list_group = dbc.ListGroup(
-        _build_removed_roads_list(removed_info, is_active), flush=True
-    )
+    panel = _build_removed_roads_panel(removed_info, is_active)
     hint = html.Small(
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",
     )
-    return (version or 0) + 1, list_group, hint, "mt-3"
+    return (version or 0) + 1, panel, hint, "mt-3"
 
 
 @callback(
@@ -852,9 +837,26 @@ def clear_all_removed_roads(n_clicks, pathname, version):
     sel.clear_removed_roads()
 
     is_active = job.get_status() == JOB_STATUS_PENDING
-    list_group = dbc.ListGroup(_build_removed_roads_list([], is_active), flush=True)
+    panel = _build_removed_roads_panel([], is_active)
     hint = html.Small(
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",
     )
-    return (version or 0) + 1, list_group, hint, "mt-3"
+    return (version or 0) + 1, panel, hint, "mt-3"
+
+
+# Live-update the "Selected: N" badge from the GeoJSON layer's hideout.selected list.
+# Clicks on map features mutate hideout.selected clientside (see layout.py's onEachFeature
+# handler), so a clientside callback keeps the badge in sync with no server round-trip.
+dash.clientside_callback(
+    """
+    function(hideout) {
+        const n = (hideout && hideout.selected) ? hideout.selected.length : 0;
+        const color = n > 0 ? "info" : "secondary";
+        return [n === 0 ? "Selected: 0" : "Selected: " + n, color];
+    }
+    """,
+    [Output(SELECTED_BADGE_STREET_SELECTION_ID, "children"),
+     Output(SELECTED_BADGE_STREET_SELECTION_ID, "color")],
+    Input(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
+)

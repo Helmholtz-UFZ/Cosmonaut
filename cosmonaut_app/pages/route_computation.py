@@ -90,9 +90,9 @@ from cosmonaut_app.constants.html_ids import (
     RESTART_BUTTON_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     STATUS_BADGE_ROUTE_COMPUTATION_ID,
-    WORKER_STATUS_SPAN_ROUTE_COMPUTATION_ID,
     TASK_STATUS_SPAN_ROUTE_COMPUTATION_ID,
     WORKER_NAME_SPAN_ROUTE_COMPUTATION_ID,
+    WORKER_STATUS_SPAN_ROUTE_COMPUTATION_ID,
     LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID,
     STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID,
     UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID,
@@ -124,7 +124,7 @@ def layout(job_id):
     job.save(sync_files=False)
 
     # Status badge
-    status_badge = create_status_badge(status)
+    status_badge = create_status_badge(status, job_id)
 
     # Control buttons
     control_buttons = create_control_buttons(status)
@@ -154,10 +154,9 @@ def layout(job_id):
     )
 
     ttl_days = job.time_to_live()
-    ttl_alert = dbc.Alert(
-        f"This job will be automatically deleted in {ttl_days} day(s).",
-        color="info",
-        className="mb-3",
+    ttl_notice = html.Small(
+        f"This job will be auto-deleted in {ttl_days} day(s).",
+        className="text-muted d-block mb-3",
     )
 
     card_body = [
@@ -167,18 +166,24 @@ def layout(job_id):
         ),
         status_badge,
         control_buttons,
-        ttl_alert,
-        html.Hr(),
-        html.H5("Celery Worker Information", className="mt-3"),
-        celery_info_card,
-        html.Hr(),
-        html.H5("Computation Logs", className="mt-3"),
-        log_viewer,
-        html.Div(create_download_button(job_id), className="mb-3"),
-        interval,
-        dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
-        dcc.Store(id=UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, data=None),
     ]
+
+    card_body.append(ttl_notice)
+
+    card_body.extend(
+        [
+            html.Hr(),
+            html.H5("Celery Worker Information", className="mt-3"),
+            celery_info_card,
+            html.Hr(),
+            html.H5("Computation Logs", className="mt-3"),
+            log_viewer,
+            html.Div(create_download_button(job_id), className="mb-3"),
+            interval,
+            dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id),
+            dcc.Store(id=UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, data=None),
+        ]
+    )
 
     routing_params_path = build_url_step("routing_params", job_id)
     route_download_path = build_url_step("route_download", job_id)
@@ -195,13 +200,22 @@ def layout(job_id):
         card_footer=footer,
         name_step="route_computation",
         job_id=job_id,
+        completed_steps=job.get_completed_steps(),
     )
 
     return page_container_fullscreen_layout(input_container)
 
 
-def create_status_badge(status):
-    """Create a status badge with appropriate color."""
+def create_status_badge(status, job_id):
+    """Create a status badge with appropriate color.
+
+    When COMPLETED, wraps the badge in a dcc.Link to /route-download so the
+    pill itself becomes the navigation target (Option B from the design review).
+    The Badge ID stays on the Badge so polling callbacks can update text/color
+    without touching the Link. A mid-view RUNNING→COMPLETED flip will update
+    text/color but won't add the Link wrapper — acceptable; the wizard footer
+    Next is always available.
+    """
     color_map = {
         JOB_STATUS_PENDING: "secondary",
         JOB_STATUS_RUNNING: "primary",
@@ -215,17 +229,28 @@ def create_status_badge(status):
         else None
     )
 
+    badge = dbc.Badge(
+        status,
+        id=STATUS_BADGE_ROUTE_COMPUTATION_ID,
+        color=color_map[status],
+    )
+
+    if status == JOB_STATUS_COMPLETED:
+        badge_or_link = dcc.Link(
+            badge,
+            href=build_url_step("route_download", job_id),
+            className="text-decoration-none",
+            title="Go to download",
+            # cursor: pointer — Bootstrap v5.2 has no cursor-pointer utility class
+            style={"cursor": "pointer"},  # nocheck
+        )
+    else:
+        badge_or_link = badge
+
     return dbc.Row(
         [
             dbc.Col(html.Strong("Job Status:"), width="auto"),
-            dbc.Col(
-                dbc.Badge(
-                    status,
-                    id=STATUS_BADGE_ROUTE_COMPUTATION_ID,
-                    color=color_map[status],
-                ),
-                width="auto",
-            ),
+            dbc.Col(badge_or_link, width="auto"),
             dbc.Col(spinner, width="auto") if spinner else None,
         ],
         className="mb-3 align-items-center",
