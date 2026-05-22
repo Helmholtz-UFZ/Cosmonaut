@@ -54,11 +54,12 @@ _default_name_space.dump = lambda assets_folder=_assets_folder: _original_dump(
 style_handle = assign(
     """
 function(feature, context){
-    const {selected, zoom} = context.hideout;
+    const {selected, zoom, dimmed} = context.hideout;
     // Increase base weight to make lines easier to click. Keep adaptive thinning on zoom in.
     const lineWeight = zoom ? Math.max(3, 18 / zoom) : 4; // at zoom=10 -> ~3
     const color = selected.includes(feature.id) ? 'yellow' : 'red';
-    return {color: color, weight: lineWeight, opacity: 0.85};
+    const opacity = dimmed ? 0.4 : 0.85;
+    return {color: color, weight: lineWeight, opacity: opacity};
 }
 """
 )
@@ -67,10 +68,11 @@ function(feature, context){
 hover_style_handle = assign(
     """
 function(feature, context){
-    const {selected, zoom} = context.hideout;
+    const {selected, zoom, dimmed} = context.hideout;
     const lineWeight = zoom ? Math.max(4, 22 / zoom) : 5;
     const color = selected.includes(feature.id) ? 'orange' : '#ff6666';
-    return {color: color, weight: lineWeight, opacity: 1.0};
+    const opacity = dimmed ? 0.5 : 1.0;
+    return {color: color, weight: lineWeight, opacity: opacity};
 }
 """
 )
@@ -96,7 +98,7 @@ osm_layer = dl.TileLayer(
     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution="© OpenStreetMap contributors",
 )
-default_map_layers = [osm_layer, dl.FullScreenControl()]
+default_map_layers = [osm_layer, dl.FullScreenControl(title="Toggle full screen")]
 steps_jobs = {
     "user_info": ["Information", "Provide user information"],
     "data_upload": ["Upload", "Upload classification data"],
@@ -324,7 +326,7 @@ def build_global_map():
                     options={"style": style_handle},
                     hoverStyle=hover_style_handle,
                     eventHandlers=dict(click=click_handler),
-                    hideout=dict(selected=[], zoom=10),
+                    hideout=dict(selected=[], zoom=10, dimmed=True),
                 ),
                 name="Streets",
                 checked=True,
@@ -344,7 +346,7 @@ def build_global_map():
         position="topright",
     )
     return dl.Map(
-        [osm_layer, dl.FullScreenControl(), layers_control],
+        [osm_layer, dl.FullScreenControl(title="Toggle full screen"), layers_control],
         id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
         center=[51.70, 11.20],
         zoom=10,
@@ -428,7 +430,7 @@ def create_card_input(
             html.Code(
                 job_id,
                 id=JOB_ID_KICKER_CODE_SHARED_ID,
-                className="text-muted small d-block mb-1",
+                className="text-muted small d-inline-block mb-1 bg-light px-2 py-1 rounded",
                 title="Copy job ID",
                 # cursor-pointer: no Bootstrap utility class in v5.2 for cursor
                 style={"cursor": "pointer"},
@@ -729,6 +731,22 @@ def register_map_callbacks(app):
             return empty_fc
 
         return StreetSelector(job).viewport_fc(bounds, zoom or 10)
+
+    @app.callback(
+        Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout", allow_duplicate=True),
+        Input(URL_SHARED_ID, "pathname"),
+        State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
+        prevent_initial_call=True,
+    )
+    def toggle_map_dim_on_page(pathname, current_hideout):
+        """Dim the map on all pages except street_selection."""
+        if not pathname or not current_hideout:
+            # leave hideout untouched — returning None would clobber the
+            # GeoJSON layer's state and the style_handle would crash on
+            # context.hideout.dimmed
+            raise PreventUpdate
+        dimmed = not pathname.endswith("/street-selection")
+        return {**current_hideout, "dimmed": dimmed}
 
 
 # Copy job ID to clipboard on click, flash background to confirm.

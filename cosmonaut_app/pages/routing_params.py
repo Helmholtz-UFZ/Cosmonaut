@@ -149,7 +149,7 @@ _toggle_button = dbc.Button(
     "Show advanced options ▾",
     id=ADVANCED_TOGGLE_ROUTING_PARAMS_ID,
     color="link",
-    className="mt-2 p-0",
+    className="mt-2 p-0 text-muted small text-decoration-none",
     n_clicks=0,
 )
 
@@ -220,6 +220,7 @@ def layout(job_id):
 @callback(
     Output(ADVANCED_COLLAPSE_ROUTING_PARAMS_ID, "is_open"),
     Output(ADVANCED_TOGGLE_ROUTING_PARAMS_ID, "children"),
+    Output(ADVANCED_TOGGLE_ROUTING_PARAMS_ID, "className"),
     Input(ADVANCED_TOGGLE_ROUTING_PARAMS_ID, "n_clicks"),
     State(ADVANCED_COLLAPSE_ROUTING_PARAMS_ID, "is_open"),
     prevent_initial_call=True,
@@ -227,7 +228,8 @@ def layout(job_id):
 def toggle_advanced_options(n_clicks, is_open):
     new_open = not is_open
     label = "Hide advanced options ▴" if new_open else "Show advanced options ▾"
-    return new_open, label
+    className = "mt-2 p-0 text-muted small text-decoration-none"
+    return new_open, label, className
 
 
 @callback(

@@ -3,15 +3,17 @@ window.dashExtensions = Object.assign({}, window.dashExtensions, {
         function0: function(feature, context) {
                 const {
                     selected,
-                    zoom
+                    zoom,
+                    dimmed
                 } = context.hideout;
                 // Increase base weight to make lines easier to click. Keep adaptive thinning on zoom in.
                 const lineWeight = zoom ? Math.max(3, 18 / zoom) : 4; // at zoom=10 -> ~3
                 const color = selected.includes(feature.id) ? 'yellow' : 'red';
+                const opacity = dimmed ? 0.4 : 0.85;
                 return {
                     color: color,
                     weight: lineWeight,
-                    opacity: 0.85
+                    opacity: opacity
                 };
             }
 
@@ -19,14 +21,16 @@ window.dashExtensions = Object.assign({}, window.dashExtensions, {
         function1: function(feature, context) {
                 const {
                     selected,
-                    zoom
+                    zoom,
+                    dimmed
                 } = context.hideout;
                 const lineWeight = zoom ? Math.max(4, 22 / zoom) : 5;
                 const color = selected.includes(feature.id) ? 'orange' : '#ff6666';
+                const opacity = dimmed ? 0.5 : 1.0;
                 return {
                     color: color,
                     weight: lineWeight,
-                    opacity: 1.0
+                    opacity: opacity
                 };
             }
 

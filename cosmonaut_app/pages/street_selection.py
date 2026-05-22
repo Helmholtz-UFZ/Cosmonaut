@@ -295,7 +295,7 @@ def layout(job_id: str):
                     dbc.Badge(
                         "Selected: 0",
                         id=SELECTED_BADGE_STREET_SELECTION_ID,
-                        color="info",
+                        color="secondary",
                         className="ms-2",
                     ),
                 ],
@@ -863,9 +863,11 @@ clientside_callback(
     """
     function(hideout) {
         const n = (hideout && hideout.selected) ? hideout.selected.length : 0;
-        return "Selected: " + n;
+        const color = n > 0 ? "info" : "secondary";
+        return [n === 0 ? "Selected: 0" : "Selected: " + n, color];
     }
     """,
-    Output(SELECTED_BADGE_STREET_SELECTION_ID, "children"),
+    [Output(SELECTED_BADGE_STREET_SELECTION_ID, "children"),
+     Output(SELECTED_BADGE_STREET_SELECTION_ID, "color")],
     Input(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
 )

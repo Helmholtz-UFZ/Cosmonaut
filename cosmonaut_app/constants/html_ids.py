@@ -109,6 +109,10 @@ STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID = (
     "street-processing-status-div-data-upload-id"
 )
 
+# --- Icons ---
+MEMBERSHIP_HELP_ICON_ID = "membership-help-icon-data-upload-id"
+PREDICTOR_HELP_ICON_ID = "predictor-help-icon-data-upload-id"
+
 # --- Inputs ---
 DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID = "data-upload-epsg-input-data-upload-id"
 DATA_UPLOAD_OPACITY_SLIDER_DATA_UPLOAD_ID = "data-upload-opacity-slider-data-upload-id"

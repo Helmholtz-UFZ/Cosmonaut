@@ -104,15 +104,6 @@ def layout(job_id):
                 "Enter your email to receive notifications for this job.",
                 className="text-muted",
             ),
-            dbc.Collapse(
-                dbc.Alert(
-                    "Warning: Your email is visible from inside the UFZ network.",
-                    color="warning",
-                    className="mb-2",
-                ),
-                id=EMAIL_VISIBILITY_NOTICE_COLLAPSE_USER_INFO_ID,
-                is_open=_initial_collapse_open,
-            ),
             dbc.Label(
                 "Email address",
                 html_for=EMAIL_INPUT_USER_INFO_ID,
@@ -127,17 +118,26 @@ def layout(job_id):
                 autoFocus=True,
                 disabled=not is_active,
             ),
+            dbc.Collapse(
+                dbc.FormText(
+                    "Warning: Your email is visible from inside the UFZ network.",
+                    color="warning",
+                    className="d-block",
+                ),
+                id=EMAIL_VISIBILITY_NOTICE_COLLAPSE_USER_INFO_ID,
+                is_open=_initial_collapse_open,
+            ),
+            html.Div(
+                _initial_helper,
+                id=EMAIL_HELPER_TEXT_USER_INFO_ID,
+                className=_initial_helper_cls,
+            ),
             dbc.FormText(
                 [
                     html.I(className="bi bi-shield-check me-1"),
                     "We never share your email.",
                 ],
                 color="secondary",
-            ),
-            html.Div(
-                _initial_helper,
-                id=EMAIL_HELPER_TEXT_USER_INFO_ID,
-                className=_initial_helper_cls,
             ),
         ]
     )
@@ -189,7 +189,10 @@ def validate_email(value):
             True,
             False,
             False,
-            "Looks good — you'll be notified when this job completes.",
+            [
+                html.I(className="bi bi-check-lg me-1"),
+                "You'll be notified when this job completes.",
+            ],
             "text-success small",
             True,
         )

@@ -123,7 +123,7 @@ def layout(job_id):
             outline=True,
             href=f"/download/{job_id}/work_dir.zip",
             external_link=True,
-            className="w-100 mt-2",
+            className="mt-2",
         ),
         html.Div(
             [

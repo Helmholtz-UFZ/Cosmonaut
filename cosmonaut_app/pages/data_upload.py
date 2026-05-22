@@ -103,11 +103,13 @@ from cosmonaut_app.constants.html_ids import (
     JOB_ID_STORE_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MEMBERSHIP_ERROR_DIV_DATA_UPLOAD_ID,
+    MEMBERSHIP_HELP_ICON_ID,
     MEMBERSHIP_TILE_LAYER_MAP_ID,
     MEMBERSHIP_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     PREDICTOR_ERROR_DIV_DATA_UPLOAD_ID,
     PREDICTOR_FILE_INFO_DIV_DATA_UPLOAD_ID,
+    PREDICTOR_HELP_ICON_ID,
     PREDICTOR_UPLOAD_COLLAPSE_DATA_UPLOAD_ID,
     PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     STREET_PROCESSING_POLL_DATA_UPLOAD_ID,
@@ -147,11 +149,23 @@ def _first_sentence(text):
     return stripped[: dot + 1]
 
 
-def _help_icon(description):
-    """Create a question-mark icon with a native browser tooltip."""
-    return html.I(
-        className="bi bi-info-circle text-muted ms-1",
-        title=description.strip(),
+def _help_icon(icon_id, description):
+    """Create a question-mark icon with a dbc.Tooltip.
+
+    Wrapped in an html.Span so the helper returns a single component, not a
+    list. Returning a raw list and placing it inside another list (e.g. as a
+    sibling inside html.Span's children) leaves React with a nested array
+    that dash-renderer doesn't reliably flatten — crashes the page with
+    React error #31 ("Objects are not valid as a React child").
+    """
+    return html.Span(
+        [
+            html.I(
+                id=icon_id,
+                className="bi bi-info-circle text-muted ms-1",
+            ),
+            dbc.Tooltip(description.strip(), target=icon_id),
+        ]
     )
 
 
@@ -223,7 +237,7 @@ def layout(job_id):
                 [
                     dbc.CardHeader(
                         "Coordinate system",
-                        className="text-uppercase text-muted small fw-bold",
+                        className="cn-card-legend bg-white border-0 fw-bold",
                     ),
                     dbc.CardBody(
                         [
@@ -256,7 +270,7 @@ def layout(job_id):
                 [
                     dbc.CardHeader(
                         "Membership data",
-                        className="text-uppercase text-muted small fw-bold",
+                        className="cn-card-legend bg-white border-0 fw-bold",
                     ),
                     dbc.CardBody(
                         [
@@ -282,7 +296,7 @@ def layout(job_id):
                                                 _first_sentence(DESCRIPTION_MEMBERSHIP),
                                                 className="text-muted",
                                             ),
-                                            _help_icon(DESCRIPTION_MEMBERSHIP),
+                                            _help_icon(MEMBERSHIP_HELP_ICON_ID, DESCRIPTION_MEMBERSHIP),
                                         ],
                                     ),
                                 ],
@@ -346,7 +360,7 @@ def layout(job_id):
                 [
                     dbc.CardHeader(
                         "Predictor data",
-                        className="text-uppercase text-muted small fw-bold",
+                        className="cn-card-legend bg-white border-0 fw-bold",
                     ),
                     dbc.CardBody(
                         [
@@ -372,7 +386,7 @@ def layout(job_id):
                                                 _first_sentence(DESCRIPTION_PREDICTOR),
                                                 className="text-muted",
                                             ),
-                                            _help_icon(DESCRIPTION_PREDICTOR),
+                                            _help_icon(PREDICTOR_HELP_ICON_ID, DESCRIPTION_PREDICTOR),
                                         ],
                                     ),
                                 ],

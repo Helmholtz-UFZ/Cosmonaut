@@ -2,7 +2,7 @@
 
 ### COSmic ray based soil MOisture Prediction NAvigation and UTility Tool
 
-*Last updated: 2026-05-22 12:37:23*
+*Last updated: 2026-05-22 14:46:26*
 
 ## Table of Contents
 1. [Introduction](#introduction)
