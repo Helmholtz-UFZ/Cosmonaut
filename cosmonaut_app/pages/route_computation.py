@@ -124,7 +124,7 @@ def layout(job_id):
     job.save(sync_files=False)
 
     # Status badge
-    status_badge = create_status_badge(status)
+    status_badge = create_status_badge(status, job_id)
 
     # Control buttons
     control_buttons = create_control_buttons(status)
@@ -159,41 +159,6 @@ def layout(job_id):
         className="text-muted d-block mb-3",
     )
 
-    success_card = None
-    if status == JOB_STATUS_COMPLETED:
-        route_download_path = build_url_step("route_download", job_id)
-        success_card = dbc.Alert(
-            dbc.Row(
-                [
-                    dbc.Col(
-                        html.I(className="bi bi-check-circle-fill fs-3"),
-                        width="auto",
-                        className="d-flex align-items-center",
-                    ),
-                    dbc.Col(
-                        [
-                            html.H5("Route is ready", className="mb-1"),
-                            html.P(
-                                "The computed route is ready for download.",
-                                className="mb-2",
-                            ),
-                            dcc.Link(
-                                dbc.Button(
-                                    "Go to download →",
-                                    color="primary",
-                                    size="lg",
-                                ),
-                                href=route_download_path,
-                            ),
-                        ]
-                    ),
-                ],
-                className="g-2 align-items-center",
-            ),
-            color="success",
-            className="mb-3",
-        )
-
     card_body = [
         html.P(
             "Monitor the routing computation status and manage the computation job.",
@@ -202,9 +167,6 @@ def layout(job_id):
         status_badge,
         control_buttons,
     ]
-
-    if success_card:
-        card_body.append(success_card)
 
     card_body.append(ttl_notice)
 
@@ -244,8 +206,16 @@ def layout(job_id):
     return page_container_fullscreen_layout(input_container)
 
 
-def create_status_badge(status):
-    """Create a status badge with appropriate color."""
+def create_status_badge(status, job_id):
+    """Create a status badge with appropriate color.
+
+    When COMPLETED, wraps the badge in a dcc.Link to /route-download so the
+    pill itself becomes the navigation target (Option B from the design review).
+    The Badge ID stays on the Badge so polling callbacks can update text/color
+    without touching the Link. A mid-view RUNNING→COMPLETED flip will update
+    text/color but won't add the Link wrapper — acceptable; the wizard footer
+    Next is always available.
+    """
     color_map = {
         JOB_STATUS_PENDING: "secondary",
         JOB_STATUS_RUNNING: "primary",
@@ -259,17 +229,28 @@ def create_status_badge(status):
         else None
     )
 
+    badge = dbc.Badge(
+        status,
+        id=STATUS_BADGE_ROUTE_COMPUTATION_ID,
+        color=color_map[status],
+    )
+
+    if status == JOB_STATUS_COMPLETED:
+        badge_or_link = dcc.Link(
+            badge,
+            href=build_url_step("route_download", job_id),
+            className="text-decoration-none",
+            title="Go to download",
+            # cursor: pointer — Bootstrap v5.2 has no cursor-pointer utility class
+            style={"cursor": "pointer"},  # nocheck
+        )
+    else:
+        badge_or_link = badge
+
     return dbc.Row(
         [
             dbc.Col(html.Strong("Job Status:"), width="auto"),
-            dbc.Col(
-                dbc.Badge(
-                    status,
-                    id=STATUS_BADGE_ROUTE_COMPUTATION_ID,
-                    color=color_map[status],
-                ),
-                width="auto",
-            ),
+            dbc.Col(badge_or_link, width="auto"),
             dbc.Col(spinner, width="auto") if spinner else None,
         ],
         className="mb-3 align-items-center",

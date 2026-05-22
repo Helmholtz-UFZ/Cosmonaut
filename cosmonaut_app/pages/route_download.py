@@ -127,10 +127,10 @@ def layout(job_id):
         ),
         html.Div(
             [
-                # max-width:260px — no Bootstrap utility for exact px, mw-25/mw-50 are wrong granularity
+                # max-width:240px — no Bootstrap utility for exact px, mw-25/mw-50 are wrong granularity
                 html.Img(
                     src=f"/pictures/{job_id}/qr_code.png",
-                    style={"maxWidth": "260px"},
+                    style={"maxWidth": "240px"},
                     className="d-block mx-auto",
                 ),
                 html.Small(

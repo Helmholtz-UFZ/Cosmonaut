@@ -79,9 +79,6 @@ NAVBAR_COLLAPSE_NAV_SHARED_ID = "navbar-collapse-nav-shared-id"
 NAVBAR_TOGGLER_NAV_SHARED_ID = "navbar-toggler-nav-shared-id"
 
 # --- Stores ---
-CLICKED_ROADS_STORE_SHARED_ID = (
-    "clicked-roads-store-shared-id"  # nocheck used as dcc.Store only
-)
 CURRENT_JOB_ID_MAP_STORE_ID = "current-job-id-map-store-id"
 JOB_ID_STORE_SHARED_ID = "job-id-store-shared-id"
 STREETS_REFRESH_TRIGGER_STORE_SHARED_ID = "streets-refresh-trigger-store-shared-id"
@@ -241,6 +238,9 @@ ADVANCED_COLLAPSE_ROUTING_PARAMS_ID = "advanced-collapse-routing-params-id"
 STREET_PROCESSING_ALERT_STREET_SELECTION_ID = (
     "street-processing-alert-street-selection-id"
 )
+
+# --- Badges ---
+SELECTED_BADGE_STREET_SELECTION_ID = "selected-badge-street-selection-id"
 
 # --- Buttons ---
 CANCEL_RESET_BUTTON_STREET_SELECTION_ID = "cancel-reset-button-street-selection-id"

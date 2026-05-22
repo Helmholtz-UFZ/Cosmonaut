@@ -72,6 +72,7 @@ from dash import (
     Output,
     State,
     callback,
+    clientside_callback,
     ctx,
     dcc,
     html,
@@ -87,7 +88,6 @@ from cosmonaut_app.constants.general import (
 from cosmonaut_app.constants.html_ids import (
     CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
     CLEAR_REMOVED_BUTTON_STREET_SELECTION_ID,
-    CLICKED_ROADS_STORE_SHARED_ID,
     CONFIRM_RESET_BUTTON_STREET_SELECTION_ID,
     JOB_ID_STORE_SHARED_ID,
     KEEP_LARGEST_HINT_STREET_SELECTION_ID,
@@ -98,6 +98,7 @@ from cosmonaut_app.constants.html_ids import (
     REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID,
     RESET_CONFIRM_MODAL_STREET_SELECTION_ID,
     RESET_ROADS_BUTTON_STREET_SELECTION_ID,
+    SELECTED_BADGE_STREET_SELECTION_ID,
     STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
     STREET_PROCESSING_POLL_STREET_SELECTION_ID,
     STREETS_REFRESH_TRIGGER_STORE_SHARED_ID,
@@ -226,9 +227,6 @@ def layout(job_id: str):
         [
             # Shared stores required by cross-page callbacks (map, routing, etc.)
             dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
-            dcc.Store(
-                id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"
-            ),
             html.H6("Filter road types", className="fw-semibold mb-1 mt-2"),
             dbc.FormText(
                 "Toggles apply immediately. Disabled types are removed from the network and won't appear in the final route.",
@@ -291,45 +289,39 @@ def layout(job_id: str):
                 className="" if is_active else "pe-none opacity-50",
             ),
             html.Hr(className="my-3"),
-            html.H6("Edit individual roads", className="fw-semibold mb-1"),
+            html.Div(
+                [
+                    html.H6("Edit individual roads", className="fw-semibold mb-0"),
+                    dbc.Badge(
+                        "Selected: 0",
+                        id=SELECTED_BADGE_STREET_SELECTION_ID,
+                        color="info",
+                        className="ms-2",
+                    ),
+                ],
+                className="d-flex align-items-center gap-2 mb-1",
+            ),
             dbc.FormText(
                 "Click roads on the map to mark them, then choose an action below.",
                 className="d-block mb-2",
             ),
-            dbc.Row(
+            html.Div(
                 [
-                    dbc.Col(
-                        html.Div(
-                            [
-                                dbc.Button(
-                                    [
-                                        html.I(className="bi bi-eraser me-1"),
-                                        "Remove clicked roads",
-                                    ],
-                                    id=REMOVE_BUTTON_STREET_SELECTION_ID,
-                                    color="danger",
-                                    disabled=not is_active,
-                                ),
-                                dbc.FormText(
-                                    "Removes the roads you clicked on the map.",
-                                    className="mt-1",
-                                ),
-                            ],
-                            className="d-flex flex-column",
-                        ),
-                        width="auto",
+                    dbc.Button(
+                        [
+                            html.I(className="bi bi-eraser me-1"),
+                            "Remove clicked roads",
+                        ],
+                        id=REMOVE_BUTTON_STREET_SELECTION_ID,
+                        color="danger",
+                        disabled=not is_active,
                     ),
-                    dbc.Col(
-                        dbc.Badge(
-                            "Selected: 0",
-                            color="info",
-                            className="ms-2",
-                        ),
-                        width="auto",
-                        className="d-flex align-items-center ms-auto",
+                    dbc.FormText(
+                        "Removes the roads you clicked on the map.",
+                        className="mt-1",
                     ),
                 ],
-                className="g-3 align-items-center mt-2",
+                className="d-flex flex-column mt-2",
             ),
             # Removed roads panel
             dbc.Label("Removed roads", className="mt-3 mb-1"),
@@ -472,7 +464,6 @@ def _street_processing_wait_layout(job_id, completed_steps):
     """Render a waiting layout while street processing is in progress."""
     card_body = [
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
-        dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
         dbc.Alert(
             "Road network is being built, please wait...",
             id=STREET_PROCESSING_ALERT_STREET_SELECTION_ID,
@@ -509,7 +500,6 @@ def _street_processing_failed_layout(job_id, completed_steps):
     """Render a failure layout when street processing has failed."""
     card_body = [
         dcc.Store(id=JOB_ID_STORE_SHARED_ID, data=job_id, storage_type="session"),
-        dcc.Store(id=CLICKED_ROADS_STORE_SHARED_ID, data=[], storage_type="session"),
         dbc.Alert(
             "Road network construction failed. Please go back to Data Upload "
             "and re-upload your membership file. If the problem persists, "
@@ -864,3 +854,18 @@ def clear_all_removed_roads(n_clicks, pathname, version):
         className="text-success" if sel.keep_largest_applied else "text-warning",
     )
     return (version or 0) + 1, list_group, hint, "mt-3"
+
+
+# Live-update the "Selected: N" badge from the GeoJSON layer's hideout.selected list.
+# Clicks on map features mutate hideout.selected clientside (see layout.py's onEachFeature
+# handler), so a clientside callback keeps the badge in sync with no server round-trip.
+clientside_callback(
+    """
+    function(hideout) {
+        const n = (hideout && hideout.selected) ? hideout.selected.length : 0;
+        return "Selected: " + n;
+    }
+    """,
+    Output(SELECTED_BADGE_STREET_SELECTION_ID, "children"),
+    Input(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
+)
