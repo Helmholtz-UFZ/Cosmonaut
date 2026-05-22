@@ -46,6 +46,7 @@ import logging
 from dash import (
     register_page,
     dcc,
+    html,
     callback,
     Output,
     State,
@@ -146,10 +147,13 @@ _objective_caption = dbc.Row(
 _advanced_rows = _build_rows(ADVANCED_FIELDS)
 
 _toggle_button = dbc.Button(
-    "Show advanced options ▾",
+    [
+        html.I(className="bi bi-caret-down-fill me-1"),
+        "Show advanced options",
+    ],
     id=ADVANCED_TOGGLE_ROUTING_PARAMS_ID,
     color="link",
-    className="mt-2 p-0 text-muted small text-decoration-none",
+    className="text-muted text-decoration-none p-0 small",
     n_clicks=0,
 )
 
@@ -227,8 +231,10 @@ def layout(job_id):
 )
 def toggle_advanced_options(n_clicks, is_open):
     new_open = not is_open
-    label = "Hide advanced options ▴" if new_open else "Show advanced options ▾"
-    className = "mt-2 p-0 text-muted small text-decoration-none"
+    caret = "bi bi-caret-up-fill me-1" if new_open else "bi bi-caret-down-fill me-1"
+    text = "Hide advanced options" if new_open else "Show advanced options"
+    label = [html.I(className=caret), text]
+    className = "text-muted text-decoration-none p-0 small"
     return new_open, label, className
 
 
