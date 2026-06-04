@@ -61,3 +61,40 @@ When a pod restarts unexpectedly:
 
 OOMKill is the most common frontend crash and always shows the pattern:
 "works with small files, crashes with large ones."
+
+## values.yaml image tag is automated — re-tag after infra changes
+
+The image tag in `deployment/ufz/prod/values.yaml` is **not** hand-maintained.
+GitLab CI writes it back to `main`: `build-release` on a release tag, and
+`build-latest-tag` → `bump_version_for_cluster` for the nightly rebuild (which
+exists to pick up base-image / OS security patches — the daily image is
+`<tag>-YYYY.MM.DD`).
+
+The catch: `build-latest-tag` does `git checkout <latest git tag>` and commits
+**that tag's** `values.yaml` back to main (with `git pull --strategy-option=ours`).
+The tag predates your latest infra edits, so:
+
+> **Any change made directly to `deployment/ufz/prod/values.yaml` on main —
+> `ingress.className`, annotations, resources, env vars, … — is reverted by the
+> next tag/nightly run, because the checked-out tag is older than your change.**
+
+This already bit the sister project Cosmopolitan: an ingress `className` edit
+(`nginx` → `haproxy`) was reverted by the nightly, producing a self-signed
+`Kubernetes Ingress Controller Fake Certificate` + 404 while ArgoCD stayed
+healthy.
+
+### Rule
+
+- **After any infra change to `values.yaml`, cut a new git tag** from main. The
+  tag/nightly pipeline then checks out a tag that contains your change and stops
+  reverting it.
+
+### Nightly schedule
+
+`build-latest-tag` / `bump_version_for_cluster` only run on a `web` trigger or
+when gated by a dedicated schedule variable (e.g. `NIGHTLY_BUILD`). If you wire
+up a nightly schedule, gate it on its **own** variable — keep it separate from
+the OSM smoke-test schedule (`$OSM_TEST_SCHEDULE`), otherwise each schedule
+triggers the other's job. Note this pipeline deploys **prod** (there is no
+separate stage `values.yaml`), so a broken nightly build ships straight to prod
+— keep dependencies pinned.
