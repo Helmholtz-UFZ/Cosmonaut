@@ -13,7 +13,7 @@ import shutil
 import tempfile
 
 from cosmonaut_app.cosmonaut_job import _transform_csv
-from cosmonaut_app.osm_downloader import OsmDownloader
+from cosmonaut_app.osm import OsmDownloader
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "osm_cache")
 TEST_MEMBERSHIP_CSV = os.path.join(os.path.dirname(__file__), "..", "memberships.csv")

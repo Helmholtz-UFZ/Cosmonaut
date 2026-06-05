@@ -31,7 +31,7 @@ def test_process_upload_task_retries_on_connection_error():
         "cosmonaut_app.tasks.upload_tasks._transform_csv",
         return_value=_create_dummy_classification_data(),
     ), mock.patch(
-        "cosmonaut_app.osm_downloader.OsmDownloader.run_osm_query",
+        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
         side_effect=requests.exceptions.ConnectionError("Connection failed"),
     ):
         process_upload_task(task_mock, job_id, 4326)
@@ -57,7 +57,7 @@ def test_process_upload_task_retries_on_timeout():
         "cosmonaut_app.tasks.upload_tasks._transform_csv",
         return_value=_create_dummy_classification_data(),
     ), mock.patch(
-        "cosmonaut_app.osm_downloader.OsmDownloader.run_osm_query",
+        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
         side_effect=requests.exceptions.Timeout("Request timed out"),
     ):
         process_upload_task(task_mock, job_id, 4326)
@@ -86,7 +86,7 @@ def test_process_upload_task_retries_on_http_429():
         "cosmonaut_app.tasks.upload_tasks._transform_csv",
         return_value=_create_dummy_classification_data(),
     ), mock.patch(
-        "cosmonaut_app.osm_downloader.OsmDownloader.run_osm_query",
+        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
         side_effect=requests.exceptions.HTTPError(response=response),
     ):
         process_upload_task(task_mock, job_id, 4326)
@@ -112,7 +112,7 @@ def test_process_upload_task_retries_on_http_503():
         "cosmonaut_app.tasks.upload_tasks._transform_csv",
         return_value=_create_dummy_classification_data(),
     ), mock.patch(
-        "cosmonaut_app.osm_downloader.OsmDownloader.run_osm_query",
+        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
         side_effect=requests.exceptions.HTTPError(response=response),
     ):
         process_upload_task(task_mock, job_id, 4326)
@@ -140,7 +140,7 @@ def test_process_upload_task_does_not_retry_on_non_transient_http_error():
         "cosmonaut_app.tasks.upload_tasks._transform_csv",
         return_value=_create_dummy_classification_data(),
     ), mock.patch(
-        "cosmonaut_app.osm_downloader.OsmDownloader.run_osm_query",
+        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
         side_effect=requests.exceptions.HTTPError(response=response),
     ):
         try:

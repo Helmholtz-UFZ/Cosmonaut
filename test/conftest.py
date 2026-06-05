@@ -412,5 +412,5 @@ def osm_cache_patch(monkeypatch):
                 )
             shutil.copy2(src, dst)
 
-    from cosmonaut_app.osm_downloader import OsmDownloader
+    from cosmonaut_app.osm import OsmDownloader
     monkeypatch.setattr(OsmDownloader, "run_osm_query", _cached_run_osm_query)
