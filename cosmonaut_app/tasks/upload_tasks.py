@@ -16,7 +16,7 @@ from sensor_routing.constants import MEMBERSHIP_FILENAME
 from cosmonaut_app.config import MAINTAINER_EMAIL
 from cosmonaut_app.cosmonaut_job import CosmonautJob, _transform_csv
 from cosmonaut_app.email_service import send_mail
-from cosmonaut_app.osm_downloader import OsmDownloader
+from cosmonaut_app.osm import OsmDownloader
 
 log = logging.getLogger(__name__)
 

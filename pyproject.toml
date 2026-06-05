@@ -27,6 +27,7 @@ dependencies = [
     "python-dotenv>=1.1.0,<2",
     "qrcode[pil]>=7.4.0,<8",
     "rasterio>=1.4.0,<2",
+    "requests>=2.32.0,<3",
     "sensor-routing==0.2.6",
     "shapely>=2.0.0,<3",
     "sqlalchemy>=2.0.40,<3",
