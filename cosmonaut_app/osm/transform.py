@@ -9,7 +9,8 @@ encodes routing connectivity), a normalized ``oneway``, and the highway tags.
 
 import logging
 
-from shapely.geometry import Point
+import numpy as np
+import shapely
 
 log = logging.getLogger(__name__)
 
@@ -56,28 +57,24 @@ def _truncate_by_edge(nodes, coords, polygon):
         (None, None) if the way fragments into multiple runs — osmnx would yield
         a MultiLineString there, which the current pipeline drops.
     """
-    inside = [polygon.contains(Point(lon, lat)) for lon, lat in coords]
+    xy = np.asarray(coords, dtype=float)
+    # Vectorized point-in-polygon over the way's own nodes (per-way, transient —
+    # no extra memory held vs the prior per-node shapely.Point objects). Honors
+    # shapely.prepare(polygon) set once by the caller for a fast prepared index.
+    inside = shapely.contains_xy(polygon, xy[:, 0], xy[:, 1])
     # Segment (i, i+1) survives if either endpoint is inside the polygon.
-    keep = [inside[i] or inside[i + 1] for i in range(len(nodes) - 1)]
+    keep = inside[:-1] | inside[1:]
 
-    runs = []
-    current = []
-    for i, keep_segment in enumerate(keep):
-        if keep_segment:
-            current.append(i)
-        elif current:
-            runs.append(current)
-            current = []
-    if current:
-        runs.append(current)
-
-    if len(runs) != 1:
-        # 0 runs is impossible (Overpass poly guarantees >=1 inside node);
-        # >1 run means the way left and re-entered the polygon -> fragmented.
+    kept = np.flatnonzero(keep)
+    if kept.size == 0:
+        # Impossible via Overpass poly (>=1 inside node), guarded for direct use.
+        return None, None
+    first_segment, last_segment = int(kept[0]), int(kept[-1])
+    if last_segment - first_segment + 1 != kept.size:
+        # A gap between kept segments means the way left and re-entered the
+        # polygon -> multiple runs -> fragmented -> dropped.
         return None, None
 
-    first_segment = runs[0][0]
-    last_segment = runs[0][-1]
     # A run of segments [a..b] covers nodes [a .. b+1] inclusive.
     return nodes[first_segment : last_segment + 2], coords[first_segment : last_segment + 2]
 
@@ -125,6 +122,10 @@ def ways_to_features(ways, polygon):
     Returns:
         list[dict]: GeoJSON LineString features ready for projection/export.
     """
+    # Build a prepared spatial index on the polygon once, so the per-way
+    # contains_xy calls below are fast point-in-polygon lookups.
+    shapely.prepare(polygon)
+
     features = []
     for way in ways:
         coords = [(point["lon"], point["lat"]) for point in way["geometry"]]
