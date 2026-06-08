@@ -104,8 +104,13 @@ against the **same** Overpass endpoint (osmnx cache disabled):
 
 ## Follow-ups
 
-- Swap `cosmonaut_app/tasks/upload_tasks.py` from `cosmonaut_app.osm_downloader` to
-  `cosmonaut_app.osm` (one import); then remove the old module.
+- ~~Swap `cosmonaut_app/tasks/upload_tasks.py` to `cosmonaut_app.osm`; then remove the
+  old module.~~ **Done** — `upload_tasks.py` swapped, `cosmonaut_app/osm_downloader.py`
+  **deleted**, `osmnx` removed from cosmonaut's direct deps, and
+  `compare_osm_backends.py` reworked (measurement + optional `--reference` file diff,
+  no osmnx baseline). **Caveat: osmnx is still installed transitively** — it's a
+  dependency of `sensor-routing==0.2.6`, so the image/CI does not get lighter until
+  sensor-routing drops it (raise with Can; sensor-routing may not actually use it).
 - Decide the production Overpass source (self-hosted wiktorn vs `.pbf` reader) and add it
   to the deployment; promote `OVERPASS_URL` to a strict config var at that point.
 - ~~Optional: stream the Overpass response / write GeoJSON incrementally to push the

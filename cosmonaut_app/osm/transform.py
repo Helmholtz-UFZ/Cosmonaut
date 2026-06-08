@@ -1,7 +1,7 @@
 """Transform raw OSM ways into the routing GeoJSON sensor-routing consumes.
 
-This replaces the osmnx graph build/unbuild round-trip in
-``cosmonaut_app.osm_downloader``. The output schema is the one documented in
+This replaces the osmnx graph build/unbuild round-trip of the former
+osmnx-based downloader. The output schema is the one documented in
 docs/skills/local_sensor_routing.md (File 3): one LineString feature per OSM way
 with a single integer ``osmid``, the ordered OSM ``nodes`` sequence (which alone
 encodes routing connectivity), a normalized ``oneway``, and the highway tags.

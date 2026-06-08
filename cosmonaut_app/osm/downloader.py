@@ -1,8 +1,7 @@
 """Overpass-based OSM road-network downloader (streaming).
 
-Drop-in replacement for ``cosmonaut_app.osm_downloader.OsmDownloader``: same
-constructor signature, same ``run_osm_query`` entry point, same three output
-files —
+Replaces the former osmnx-based ``OsmDownloader`` (removed): same constructor
+signature, same ``run_osm_query`` entry point, same three output files —
 
   - ``osm_data_download.geojson``    (EPSG:4326)
   - ``osm_data_edited.geojson``      (EPSG:4326, copy)
