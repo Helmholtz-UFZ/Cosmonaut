@@ -73,7 +73,10 @@ def process_upload_task(self, job_id, epsg_input):
         self.retry(exc=e, countdown=countdown, max_retries=3)
 
     except requests.exceptions.HTTPError as e:
-        if e.response and e.response.status_code in (429, 502, 503, 504):
+        # NB: `if e.response` is wrong — requests.Response.__bool__ returns
+        # `response.ok`, which is False for every status >= 400 (i.e. exactly the
+        # transient codes below), so it would never retry. Test identity instead.
+        if e.response is not None and e.response.status_code in (429, 502, 503, 504):
             countdown = 2 ** self.request.retries * 5
             log.warning(
                 f"Overpass API transient error (HTTP {e.response.status_code}) "

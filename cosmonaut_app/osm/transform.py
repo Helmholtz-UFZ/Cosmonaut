@@ -112,6 +112,34 @@ def _build_properties(way_id, nodes, tags):
     return properties
 
 
+def way_to_feature(way, polygon):
+    """Transform one raw OSM way into a routing GeoJSON feature (EPSG:4326), or
+    None if it fragments at the polygon boundary.
+
+    Accepts ints/floats (stdlib json) or Decimals (streamed via ijson) and
+    normalizes node ids to int and coordinates to float, so the output schema is
+    identical regardless of the source/parser.
+
+    The caller must have run ``shapely.prepare(polygon)`` once beforehand for fast
+    point-in-polygon truncation.
+    """
+    coords = [(float(point["lon"]), float(point["lat"])) for point in way["geometry"]]
+    nodes = [int(node) for node in way["nodes"]]
+    nodes, coords = _truncate_by_edge(nodes, coords, polygon)
+    if nodes is None:
+        return None
+    way_id = int(way["id"])
+    return {
+        "type": "Feature",
+        "id": way_id,
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [[lon, lat] for lon, lat in coords],
+        },
+        "properties": _build_properties(way_id, nodes, way["tags"]),
+    }
+
+
 def ways_to_features(ways, polygon):
     """Build routing GeoJSON features (EPSG:4326) from raw Overpass ways.
 
@@ -122,26 +150,10 @@ def ways_to_features(ways, polygon):
     Returns:
         list[dict]: GeoJSON LineString features ready for projection/export.
     """
-    # Build a prepared spatial index on the polygon once, so the per-way
-    # contains_xy calls below are fast point-in-polygon lookups.
+    # Prepare the polygon's spatial index once; way_to_feature relies on it.
     shapely.prepare(polygon)
 
-    features = []
-    for way in ways:
-        coords = [(point["lon"], point["lat"]) for point in way["geometry"]]
-        nodes, coords = _truncate_by_edge(way["nodes"], coords, polygon)
-        if nodes is None:
-            continue
-        features.append(
-            {
-                "type": "Feature",
-                "id": way["id"],
-                "geometry": {
-                    "type": "LineString",
-                    "coordinates": [[lon, lat] for lon, lat in coords],
-                },
-                "properties": _build_properties(way["id"], nodes, way["tags"]),
-            }
-        )
+    features = [way_to_feature(way, polygon) for way in ways]
+    features = [feature for feature in features if feature is not None]
     log.info("Built %d road features from %d ways", len(features), len(ways))
     return features

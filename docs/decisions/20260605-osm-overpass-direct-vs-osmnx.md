@@ -52,9 +52,11 @@ against the **same** Overpass endpoint (osmnx cache disabled):
 - **Route-equivalent on the test AOI:** 0 roads only-in-old, 0 node-set mismatches,
   0 routing-tag mismatches, **max geometry delta 0 m**, sensor-routing connectivity map
   byte-identical on shared roads.
-- **Saxony RAM:** Overpass-direct = **3.2 GB peak / 77 s / 375,293 features / 357 MB**,
-  vs osmnx **12.5 GB** — ~3.9× reduction, comfortably under the 7 GB cluster limit. The
-  357 MB output matches the byte-faithful Saxony network delivered to Can.
+- **Saxony RAM:** osmnx **12.5 GB** → Overpass-direct (geopandas) **3.2 GB** →
+  **streaming 152 MB** (54 s, 375,293 features). The streaming path parses the response
+  incrementally (ijson) and writes features one at a time, so the peak is ~one way, not
+  the whole dataset. Streaming output is bit-identical to the geopandas path (0.0 m
+  projection delta) and the ijson parse is byte-identical to the json parse.
 - **Track-impact measured:** the one differing way (track 771997790) is *routing-
   redundant* — it covers 2 survey points, both already covered by roads present in both
   backends; total reachable coverage identical (483 = 483). Including it cannot reduce
@@ -106,5 +108,10 @@ against the **same** Overpass endpoint (osmnx cache disabled):
   `cosmonaut_app.osm` (one import); then remove the old module.
 - Decide the production Overpass source (self-hosted wiktorn vs `.pbf` reader) and add it
   to the deployment; promote `OVERPASS_URL` to a strict config var at that point.
-- Optional: stream the Overpass response / write GeoJSON incrementally to push the 3.2 GB
-  peak lower (not needed under the current 7 GB limit).
+- ~~Optional: stream the Overpass response / write GeoJSON incrementally to push the
+  3.2 GB peak lower.~~ **Done** — `OverpassSource.stream_ways` (ijson) +
+  `StreamingGeoJsonWriter` + per-way pyproj projection bring Saxony to 152 MB. Also
+  vectorized truncate-by-edge (`shapely.contains_xy` on a prepared polygon, 3.1× faster,
+  no RAM cost).
+- Migrate `street_selector.py` off the old `osm_downloader.project_and_save` (geopandas)
+  to the new package's projection, so edit-time re-projection matches the download path.

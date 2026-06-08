@@ -1,4 +1,4 @@
-"""Overpass-based OSM road-network downloader.
+"""Overpass-based OSM road-network downloader (streaming).
 
 Drop-in replacement for ``cosmonaut_app.osm_downloader.OsmDownloader``: same
 constructor signature, same ``run_osm_query`` entry point, same three output
@@ -8,18 +8,19 @@ files —
   - ``osm_data_edited.geojson``      (EPSG:4326, copy)
   - ``osm_data_transformed.geojson`` (EPSG:``epsg_output``) -> read by sensor-routing
 
-— but it fetches ways directly from Overpass instead of building (and then
-immediately un-building) an osmnx graph. RAM scales with the size of the road
-data, not with an in-memory networkx graph over the whole hull.
+— but it streams ways from the source and writes features incrementally, so peak
+RAM stays bounded: one way is parsed, transformed, projected and written at a
+time, and the full response is never materialized. See the decision record
+docs/decisions/20260605-osm-overpass-direct-vs-osmnx.md.
 """
 
-import json
 import logging
 import os
 import shutil
 
-import geopandas as gpd
 import numpy as np
+import pyproj
+import shapely
 from sensor_routing.constants import OSM_FILENAME
 from shapely.geometry import Polygon
 
@@ -27,8 +28,9 @@ from cosmonaut_app.constants.general import (
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
 )
+from cosmonaut_app.osm.geojson_writer import StreamingGeoJsonWriter
 from cosmonaut_app.osm.source import OverpassSource
-from cosmonaut_app.osm.transform import ways_to_features
+from cosmonaut_app.osm.transform import way_to_feature
 
 log = logging.getLogger(__name__)
 
@@ -43,13 +45,6 @@ HIGHWAY_TYPES = [
     "living_street",
     "track",
 ]
-
-
-def project_and_save(features, dst_path, src_epsg, dst_epsg):
-    """Project GeoJSON features to the target CRS and save with a CRS header."""
-    gdf = gpd.GeoDataFrame.from_features(features, crs=f"EPSG:{src_epsg}")
-    gdf = gdf.to_crs(epsg=dst_epsg)
-    gdf.to_file(dst_path, driver="GeoJSON")
 
 
 class OsmDownloader:
@@ -79,36 +74,56 @@ class OsmDownloader:
         hull = Polygon(points).convex_hull
         return hull.buffer(0.005, cap_style="square", join_style=2)
 
-    def _get_roads(self, download_folder):
-        """Fetch ways, build features, and write the two 4326 files.
+    @staticmethod
+    def _project_feature(feature, transformer):
+        """Reproject a 4326 feature to the output CRS.
 
-        Returns:
-            list: GeoJSON features in EPSG:4326.
+        Drops the top-level ``id`` to match the transformed file sensor-routing
+        reads (it keys on ``properties.osmid``). pyproj is exactly what geopandas
+        uses underneath, so coordinates match the previous geopandas output.
         """
-        ways = self.source.fetch_ways(self.polygon, self.highway_types)
-        features = ways_to_features(ways, self.polygon)
-
-        feature_collection = {"type": "FeatureCollection", "features": features}
-
-        download_path = os.path.join(download_folder, OSM_DATA_DOWNLOAD_FILE)
-        with open(download_path, "w", encoding="utf-8") as f:
-            json.dump(feature_collection, f, ensure_ascii=False)
-
-        edit_path = os.path.join(download_folder, OSM_DATA_EDITED_FILE)
-        shutil.copy2(download_path, edit_path)
-
-        return features
-
-    def _osm_transform(self, features, download_folder):
-        """Project features to the output CRS and save as the transformed file."""
-        log.info("Transforming road data to EPSG:%s ...", self.epsg_output)
-        project_and_save(
-            features,
-            os.path.join(download_folder, OSM_FILENAME),
-            self.epsg_input,
-            self.epsg_output,
+        coordinates = feature["geometry"]["coordinates"]
+        eastings, northings = transformer.transform(
+            [lon for lon, lat in coordinates],
+            [lat for lon, lat in coordinates],
         )
+        return {
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [float(easting), float(northing)]
+                    for easting, northing in zip(eastings, northings)
+                ],
+            },
+            "properties": feature["properties"],
+        }
 
     def run_osm_query(self, download_folder):
-        features = self._get_roads(download_folder)
-        self._osm_transform(features, download_folder)
+        """Stream ways from the source and write the three output files incrementally."""
+        shapely.prepare(self.polygon)
+        transformer = pyproj.Transformer.from_crs(
+            self.epsg_input, self.epsg_output, always_xy=True
+        )
+
+        download_path = os.path.join(download_folder, OSM_DATA_DOWNLOAD_FILE)
+        transformed_path = os.path.join(download_folder, OSM_FILENAME)
+
+        count = 0
+        with (
+            StreamingGeoJsonWriter(download_path) as download_writer,
+            StreamingGeoJsonWriter(
+                transformed_path, crs_epsg=self.epsg_output
+            ) as transformed_writer,
+        ):
+            for way in self.source.stream_ways(self.polygon, self.highway_types):
+                feature = way_to_feature(way, self.polygon)
+                if feature is None:
+                    continue
+                download_writer.write(feature)
+                transformed_writer.write(self._project_feature(feature, transformer))
+                count += 1
+
+        # The editable copy starts identical to the download (EPSG:4326).
+        shutil.copy2(download_path, os.path.join(download_folder, OSM_DATA_EDITED_FILE))
+        log.info("Streamed %d road features to %s", count, download_folder)

@@ -12,12 +12,19 @@ schema changes.
 
 import json
 import os
+import tempfile
+from decimal import Decimal
 
+import pandas as pd
+import shapely
 from shapely.geometry import box
 
+from cosmonaut_app.osm.downloader import OsmDownloader
+from cosmonaut_app.osm.geojson_writer import StreamingGeoJsonWriter
 from cosmonaut_app.osm.transform import (
     PROPERTY_ORDER,
     _truncate_by_edge,
+    way_to_feature,
     ways_to_features,
 )
 from sensor_routing.point_mapping import build_node_to_roads_map
@@ -117,3 +124,123 @@ def test_truncate_by_edge_drops_fragmented_way():
     out_nodes, out_coords = _truncate_by_edge(nodes, coords, poly)
     assert out_nodes is None
     assert out_coords is None
+
+
+def test_way_to_feature_normalizes_decimal_input():
+    """ijson yields numbers as Decimal; way_to_feature must normalize node ids to
+    int and coordinates to float so the schema is identical to the json path."""
+    poly = box(0, 0, 10, 10)
+    shapely.prepare(poly)
+    way = {
+        "id": Decimal("42"),
+        "nodes": [Decimal("100"), Decimal("101"), Decimal("102")],
+        "geometry": [
+            {"lon": Decimal("1.0"), "lat": Decimal("1.0")},
+            {"lon": Decimal("2.0"), "lat": Decimal("2.0")},
+            {"lon": Decimal("3.0"), "lat": Decimal("3.0")},
+        ],
+        "tags": {"highway": "track"},
+    }
+    feature = way_to_feature(way, poly)
+
+    assert isinstance(feature["properties"]["osmid"], int)
+    assert all(isinstance(node, int) for node in feature["properties"]["nodes"])
+    assert all(
+        isinstance(value, float)
+        for coord in feature["geometry"]["coordinates"]
+        for value in coord
+    )
+    # A leftover Decimal would make this raise — proves the output is JSON-clean.
+    json.dumps(feature)
+
+
+def test_streaming_writer_roundtrip():
+    """The incremental writer yields a valid FeatureCollection with a CRS header
+    and preserves nodes as a JSON int list."""
+    _, features = _load_features()
+    path = os.path.join(tempfile.mkdtemp(), "out.geojson")
+    with StreamingGeoJsonWriter(path, crs_epsg=25832) as writer:
+        for feature in features:
+            writer.write(feature)
+
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    assert data["type"] == "FeatureCollection"
+    assert data["crs"]["properties"]["name"] == "urn:ogc:def:crs:EPSG::25832"
+    assert len(data["features"]) == len(features)
+    nodes = data["features"][0]["properties"]["nodes"]
+    assert isinstance(nodes, list) and isinstance(nodes[0], int)
+
+
+def test_streaming_writer_empty_is_valid():
+    """Zero features still produces a valid (empty) FeatureCollection."""
+    path = os.path.join(tempfile.mkdtemp(), "empty.geojson")
+    with StreamingGeoJsonWriter(path):
+        pass
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    assert data == {"type": "FeatureCollection", "features": []}
+
+
+def test_streaming_writer_atomic_discard_on_error():
+    """A failure inside the writer context leaves neither a final nor a temp file,
+    so a mid-stream download error never leaves a half-written GeoJSON behind."""
+    path = os.path.join(tempfile.mkdtemp(), "partial.geojson")
+    try:
+        with StreamingGeoJsonWriter(path) as writer:
+            writer.write({"type": "Feature", "properties": {}, "geometry": None})
+            raise RuntimeError("simulated stream failure")
+    except RuntimeError:
+        pass
+    assert not os.path.exists(path)
+    assert not os.path.exists(path + ".tmp")
+
+
+class _FakeSource:
+    """OsmSource stub yielding pre-built ways (no network)."""
+
+    def __init__(self, ways):
+        self._ways = ways
+
+    def stream_ways(self, polygon, highway_types):
+        yield from self._ways
+
+
+def test_downloader_streams_three_files(tmp_path):
+    """run_osm_query streams to the three output files, projects the transformed
+    one, and leaves no temp files."""
+    data = pd.DataFrame(
+        {"Longitude": [10.0, 10.1, 10.05], "Latitude": [50.0, 50.1, 50.05]}
+    )
+    way = {
+        "id": 1,
+        "nodes": [10, 11, 12],
+        "geometry": [
+            {"lon": 10.02, "lat": 50.02},
+            {"lon": 10.04, "lat": 50.04},
+            {"lon": 10.06, "lat": 50.06},
+        ],
+        "tags": {"highway": "track", "oneway": "yes"},
+    }
+    OsmDownloader(data, epsg_output=25832, source=_FakeSource([way])).run_osm_query(
+        str(tmp_path)
+    )
+
+    with open(os.path.join(tmp_path, "osm_data_download.geojson"), encoding="utf-8") as f:
+        download = json.load(f)
+    with open(os.path.join(tmp_path, "osm_data_edited.geojson"), encoding="utf-8") as f:
+        edited = json.load(f)
+    with open(
+        os.path.join(tmp_path, "osm_data_transformed.geojson"), encoding="utf-8"
+    ) as f:
+        transformed = json.load(f)
+
+    assert len(download["features"]) == 1
+    assert download == edited  # editable copy starts identical to the download
+    props = download["features"][0]["properties"]
+    assert props["osmid"] == 1 and props["nodes"] == [10, 11, 12] and props["oneway"] == "yes"
+    # transformed file: CRS header + reprojected (no longer lon/lat) coordinates
+    assert transformed["crs"]["properties"]["name"] == "urn:ogc:def:crs:EPSG::25832"
+    assert transformed["features"][0]["geometry"]["coordinates"][0][0] > 100000
+    # atomic write left no temp files
+    assert not any(name.endswith(".tmp") for name in os.listdir(tmp_path))
