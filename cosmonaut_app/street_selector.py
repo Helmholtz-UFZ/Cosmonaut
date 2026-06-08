@@ -29,7 +29,7 @@ from cosmonaut_app.constants.general import (
     OSM_TAGS_MAPPING,
     STREET_EDITS_FILE,
 )
-from cosmonaut_app.osm_downloader import project_and_save
+from cosmonaut_app.osm.projection import project_features_to_file
 from cosmonaut_app.road_network_utils import (
     build_graph,
     get_largest_subnetwork,
@@ -157,7 +157,7 @@ class StreetSelector:
         3. Optionally keep only the largest connected component
 
         When *defer_projection* is True the expensive reprojection step
-        (``project_and_save``) is skipped.  The caller must invoke
+        (``project_features_to_file``) is skipped.  The caller must invoke
         :meth:`ensure_projected` before the transformed file is needed
         (i.e. before routing).
 
@@ -177,7 +177,7 @@ class StreetSelector:
         self._save_edit_file(fc)
         if not defer_projection:
             if features:
-                project_and_save(
+                project_features_to_file(
                     features,
                     self.transformed_path,
                     src_epsg=4326,
@@ -218,7 +218,7 @@ class StreetSelector:
             return
         features = self._load_edit_features()
         if features:
-            project_and_save(
+            project_features_to_file(
                 features,
                 self.transformed_path,
                 src_epsg=4326,

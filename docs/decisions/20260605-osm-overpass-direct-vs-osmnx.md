@@ -113,5 +113,8 @@ against the **same** Overpass endpoint (osmnx cache disabled):
   `StreamingGeoJsonWriter` + per-way pyproj projection bring Saxony to 152 MB. Also
   vectorized truncate-by-edge (`shapely.contains_xy` on a prepared polygon, 3.1× faster,
   no RAM cost).
-- Migrate `street_selector.py` off the old `osm_downloader.project_and_save` (geopandas)
-  to the new package's projection, so edit-time re-projection matches the download path.
+- ~~Migrate `street_selector.py` off the old `osm_downloader.project_and_save` (geopandas)
+  to the new package's projection.~~ **Done** — `osm/projection.py` (`project_feature` +
+  `project_features_to_file`) is now shared by the download and edit paths (output
+  byte-identical, 0 m delta). The old `osm_downloader.py` has no production importers
+  left; it stays only as the osmnx baseline in `compare_osm_backends.py`.

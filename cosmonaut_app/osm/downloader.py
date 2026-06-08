@@ -29,6 +29,7 @@ from cosmonaut_app.constants.general import (
     OSM_DATA_EDITED_FILE,
 )
 from cosmonaut_app.osm.geojson_writer import StreamingGeoJsonWriter
+from cosmonaut_app.osm.projection import project_feature
 from cosmonaut_app.osm.source import OverpassSource
 from cosmonaut_app.osm.transform import way_to_feature
 
@@ -74,31 +75,6 @@ class OsmDownloader:
         hull = Polygon(points).convex_hull
         return hull.buffer(0.005, cap_style="square", join_style=2)
 
-    @staticmethod
-    def _project_feature(feature, transformer):
-        """Reproject a 4326 feature to the output CRS.
-
-        Drops the top-level ``id`` to match the transformed file sensor-routing
-        reads (it keys on ``properties.osmid``). pyproj is exactly what geopandas
-        uses underneath, so coordinates match the previous geopandas output.
-        """
-        coordinates = feature["geometry"]["coordinates"]
-        eastings, northings = transformer.transform(
-            [lon for lon, lat in coordinates],
-            [lat for lon, lat in coordinates],
-        )
-        return {
-            "type": "Feature",
-            "geometry": {
-                "type": "LineString",
-                "coordinates": [
-                    [float(easting), float(northing)]
-                    for easting, northing in zip(eastings, northings)
-                ],
-            },
-            "properties": feature["properties"],
-        }
-
     def run_osm_query(self, download_folder):
         """Stream ways from the source and write the three output files incrementally."""
         shapely.prepare(self.polygon)
@@ -121,7 +97,7 @@ class OsmDownloader:
                 if feature is None:
                     continue
                 download_writer.write(feature)
-                transformed_writer.write(self._project_feature(feature, transformer))
+                transformed_writer.write(project_feature(feature, transformer))
                 count += 1
 
         # The editable copy starts identical to the download (EPSG:4326).
