@@ -10,6 +10,7 @@ conventions, skills, and project context.
 docs/
 ├── conventions/     — Coding conventions and patterns (one file per topic)
 ├── decisions/       — Architecture and pattern decision records
+├── knowledge/       — Durable concept/system explanations (index.md is the map)
 ├── plan/            — Implementation plans (local only, gitignored)
 ├── skills/          — Reusable skill guides for common tasks
 ├── architecture.md  — Package structure and pipeline overview
@@ -64,3 +65,7 @@ decisions, code — are pushed to the repo. The plan file itself stays local.
 - **New skill:** Create a file in `skills/`. Add a link in the CLAUDE.md "Skills" section.
 - **New decision:** Create a numbered file in `decisions/` following the format in
   `decisions/README.md`.
+- **New knowledge page:** Create a file under the right `knowledge/` subfolder
+  (`concepts/ systems/ datasets/ runbooks/ raw/`), add it to `knowledge/index.md`, and log it in
+  `knowledge/log.md`. Knowledge = durable explanations, *not* binding rules (those are conventions)
+  or one-off choices (those are decisions).
