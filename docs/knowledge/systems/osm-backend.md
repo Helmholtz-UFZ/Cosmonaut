@@ -79,6 +79,12 @@ at a self-hosted wiktorn instance or a UFZ endpoint for large areas. The `OsmSou
 door open for a future `.osm.pbf` reader without touching the transform. **`TODO:` promote `OVERPASS_URL`
 to a strict config var once the deployment Overpass source is chosen (project-state issue #36).**
 
+Set the **full** interpreter URL (`http://host:12345/api/interpreter`) — the client POSTs
+`OVERPASS_URL` verbatim and does **not** append `/interpreter`. Standing up a local instance and
+pointing COSMONAUT at it (incl. a merged multi-Bundesland snapshot on the mirrored image) is the
+[local-overpass-testing runbook](../runbooks/local-overpass-testing.md), validated route-equivalent
+to public on 2026-06-24.
+
 ## Gotchas
 
 - The public endpoint answers **HTTP 406** to the default `python-requests` User-Agent — a descriptive
@@ -86,6 +92,13 @@ to a strict config var once the deployment Overpass source is chosen (project-st
 - `upload_tasks.py` retries 429/502/503/504 via `e.response is not None and …` — **not** `if e.response`,
   because `requests.Response.__bool__` returns `response.ok` (False for every status ≥ 400), which would
   silently never retry.
+- **`OVERPASS_URL` is POSTed verbatim** — set the **full** `…/api/interpreter` URL, not the base `…/api`.
+  The `compare_osm_backends.py` spike has the *opposite* convention (takes the base `…/api`, appends
+  `/interpreter`) — don't copy its value into the env var.
+- **Self-hosting (cross-repo):** an *empty* `OVERPASS_DIFF_URL` only disables wiktorn auto-updates if
+  osm-services' compose uses `${VAR-default}` (no colon). The old `${VAR:-default}` substituted the
+  germany-updates default for empty too, silently mutating a "snapshot" DB. See the
+  [local-overpass-testing runbook](../runbooks/local-overpass-testing.md).
 
 ## Related links
 

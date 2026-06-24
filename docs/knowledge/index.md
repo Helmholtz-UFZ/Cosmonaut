@@ -33,7 +33,11 @@ Input/reference data and schemas. _(none yet — see [datasets/](datasets/))_
 
 ## Runbooks
 
-Operational guides for recurring tasks. _(none yet — see [runbooks/](runbooks/))_
+Operational guides for recurring tasks.
+
+- [local-overpass-testing](runbooks/local-overpass-testing.md) — Point COSMONAUT at a local
+  self-hosted Overpass (mirrored wiktorn image) to fetch large/multi-region AOIs that public
+  Overpass rate-limits: env wiring, test commands, and the bring-up gotchas.
 
 ## Raw
 

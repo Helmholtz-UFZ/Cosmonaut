@@ -41,3 +41,6 @@ REDIS_PORT=6379
 REDIS_HOST="localhost"
 REDIS_DB=0
 REDIS_PASSWORD=
+
+### Overpass ###
+OVERPASS_URL="http://localhost:12345/api/interpreter"
