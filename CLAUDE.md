@@ -87,6 +87,9 @@ then.
 
 ## Skills
 
+Use the semantic-anchor-translator skill from:
+https://github.com/LLM-Coding/Semantic-Anchors/tree/main/skill/semantic-anchor-translator
+
 When the user asks to perform one of these tasks, read the corresponding skill
 document first for the step-by-step guide. This is espacially important for tasks the
 user asks later. Keep this skill list in Mind:
