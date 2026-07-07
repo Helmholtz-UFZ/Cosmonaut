@@ -47,9 +47,9 @@ sensor-routing package and displayed in the UI tooltip on the upload button.
 
 After a successful membership upload, a Celery task (process_upload_task) is
 submitted to the ``upload`` queue via background_job_manager.submit_upload_job().
-The task uses osmnx to download a road graph from OpenStreetMap, reconstructs
-per-way geometries, and projects them to the user's EPSG. This runs in a worker
-to keep the memory-intensive osmnx graph construction off the web process.
+The task streams the road network from Overpass (``cosmonaut_app/osm/``) and
+projects it to the user's EPSG. This runs in a worker to keep the download and
+projection work off the web process.
 
 membership_upload["street_processing"] state machine:
 - ``"PENDING"``  — default, no task submitted yet

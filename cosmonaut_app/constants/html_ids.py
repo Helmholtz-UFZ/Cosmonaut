@@ -41,9 +41,13 @@ from dash.dash import _ID_LOCATION
 # ============================================================================
 
 # --- Buttons ---
+MAP_LEGEND_TOGGLE_BUTTON_SHARED_ID = "map-legend-toggle-button-shared-id"
 RESET_BUTTON_SHARED_ID = "reset-button-shared-id"
 RESET_MODAL_CANCEL_BUTTON_SHARED_ID = "reset-modal-cancel-button-shared-id"
 RESET_MODAL_CONFIRM_BUTTON_SHARED_ID = "reset-modal-confirm-button-shared-id"
+
+# --- Collapses ---
+MAP_LEGEND_COLLAPSE_SHARED_ID = "map-legend-collapse-shared-id"
 
 # --- Intervals ---
 MAP_INIT_INTERVAL_SHARED_ID = (
@@ -53,9 +57,13 @@ MAP_INIT_INTERVAL_SHARED_ID = (
 # --- Layers ---
 MEMBERSHIP_TILE_LAYER_MAP_ID = "membership-tile-layer-map-id"
 OSM_GEOJSON_LAYER_MAP_SHARED_ID = "osm-geojson-layer-map-shared-id"
+ROUTE_CASING_LAYER_MAP_ID = "route-casing-layer-map-id"
+ROUTE_DIRECTION_DECORATOR_MAP_ID = "route-direction-decorator-map-id"
+ROUTE_ENDPOINTS_GROUP_MAP_ID = "route-endpoints-group-map-id"
 ROUTE_POLYLINE_LAYER_MAP_ID = "route-polyline-layer-map-id"
 
 # --- Links ---
+NEW_JOB_LINK_NAV_SHARED_ID = "new-job-link-nav-shared-id"
 # Dash's internal routing location — page_container listens to this ID.
 # Outputting to it triggers layout() and navigates without a full reload.
 URL_SHARED_ID = _ID_LOCATION
@@ -220,6 +228,9 @@ DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID = (
     "download-url-code-route-download-id"  # nocheck testing only
 )
 
+# --- Switches ---
+REVERSE_ROUTE_SWITCH_ROUTE_DOWNLOAD_ID = "reverse-route-switch-route-download-id"
+
 
 # ============================================================================
 # ROUTING_PARAMS
@@ -261,6 +272,16 @@ TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID = (
 )
 TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID = (
     "tags-select-none-button-street-selection-id"
+)
+
+# --- Checklists ---
+TRACK_GRADES_CHECKLIST_STREET_SELECTION_ID = (
+    "track-grades-checklist-street-selection-id"
+)
+
+# --- Collapses ---
+TRACK_GRADES_COLLAPSE_STREET_SELECTION_ID = (
+    "track-grades-collapse-street-selection-id"
 )
 
 # --- Divs ---

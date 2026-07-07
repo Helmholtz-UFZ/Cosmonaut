@@ -24,16 +24,20 @@ from shapely.geometry import box, mapping, shape
 from sensor_routing.constants import OSM_FILENAME
 
 from cosmonaut_app.constants.general import (
+    DEFAULT_TRACK_GRADES,
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
     OSM_TAGS_MAPPING,
     STREET_EDITS_FILE,
+    TRACK_GRADES,
+    UNGRADED_TRACK_GRADE,
 )
 from cosmonaut_app.osm.projection import project_features_to_file
 from cosmonaut_app.road_network_utils import (
     build_graph,
     get_largest_subnetwork,
     remove_disconnected_roads,
+    track_grade_allowed,
 )
 
 if TYPE_CHECKING:
@@ -73,10 +77,12 @@ def _zoom_to_tolerance(zoom: float) -> float:
 class StreetSelector:
     """Encapsulates street selection state and operations for a job.
 
-    All edit state is persisted in ``street_edits.json`` with three keys:
+    All edit state is persisted in ``street_edits.json`` with four keys:
 
     - ``removed_roads`` – list of feature IDs explicitly deleted by the user.
     - ``selected_road_tags`` – list of road-type labels currently enabled.
+    - ``selected_track_grades`` – allowed ``tracktype`` grades for
+      highway=track features (plus the ungraded bucket).
     - ``keep_largest`` – whether the keep-largest-component filter is active.
 
     Every mutating method calls :meth:`apply_edits` which re-derives
@@ -94,6 +100,7 @@ class StreetSelector:
         edits = self._load_edits()
         self.removed_roads: list[int] = edits["removed_roads"]
         self.selected_road_tags: list[str] = edits["selected_road_tags"]
+        self.selected_track_grades: list[str] = edits["selected_track_grades"]
         self.keep_largest_applied: bool = edits["keep_largest"]
 
     # -- public mutating methods ------------------------------------------
@@ -127,7 +134,19 @@ class StreetSelector:
 
     def update_tags(self, tags: list[str]) -> None:
         """Set the active road-type tags and re-derive the edited network."""
+        # No-op when unchanged: reset_edits / select-all redeliver the same
+        # checklist value, retriggering this path with identical state.
+        if tags == self.selected_road_tags:
+            return
         self.selected_road_tags = tags
+        self.keep_largest_applied = False
+        self.apply_edits(defer_projection=True)
+
+    def update_track_grades(self, grades: list[str]) -> None:
+        """Set the allowed track grades and re-derive the edited network."""
+        if grades == self.selected_track_grades:
+            return
+        self.selected_track_grades = grades
         self.keep_largest_applied = False
         self.apply_edits(defer_projection=True)
 
@@ -143,6 +162,7 @@ class StreetSelector:
         """Restore all edit state to defaults and re-derive."""
         self.removed_roads = []
         self.selected_road_tags = list(_DEFAULT_TAGS)
+        self.selected_track_grades = list(DEFAULT_TRACK_GRADES)
         self.keep_largest_applied = False
         self.apply_edits(defer_projection=True)
 
@@ -153,8 +173,9 @@ class StreetSelector:
 
         Applies operations in order:
         1. Filter by ``selected_road_tags``
-        2. Remove features in ``removed_roads``
-        3. Optionally keep only the largest connected component
+        2. Filter tracks by ``selected_track_grades``
+        3. Remove features in ``removed_roads``
+        4. Optionally keep only the largest connected component
 
         When *defer_projection* is True the expensive reprojection step
         (``project_features_to_file``) is skipped.  The caller must invoke
@@ -165,6 +186,11 @@ class StreetSelector:
         """
         features = self._load_download_features()
         features = self._filter_by_tags(features, self.selected_road_tags)
+        features = [
+            f
+            for f in features
+            if track_grade_allowed(f["properties"], self.selected_track_grades)
+        ]
         removed_set = set(self.removed_roads)
         features = [f for f in features if f["id"] not in removed_set]
 
@@ -193,9 +219,11 @@ class StreetSelector:
         self.job.save(sync_files=False)
 
         log.info(
-            "Applied edits: %d features, tags=%d, removed=%d, keep_largest=%s, deferred=%s",
+            "Applied edits: %d features, tags=%d, track_grades=%d, removed=%d, "
+            "keep_largest=%s, deferred=%s",
             len(features),
             len(self.selected_road_tags),
+            len(self.selected_track_grades),
             len(self.removed_roads),
             self.keep_largest_applied,
             defer_projection,
@@ -329,11 +357,20 @@ class StreetSelector:
         defaults = {
             "removed_roads": [],
             "selected_road_tags": list(_DEFAULT_TAGS),
+            "selected_track_grades": list(DEFAULT_TRACK_GRADES),
             "keep_largest": False,
         }
         if os.path.exists(self.edits_path):
             with open(self.edits_path, "rb") as f:
-                return orjson.loads(f.read())
+                edits = orjson.loads(f.read())
+            # Migration: edit files written before the track-grade filter
+            # existed lack this key. Those networks were downloaded without
+            # the default grade filter, so "all grades" preserves the job's
+            # existing behaviour (unlike DEFAULT_TRACK_GRADES, which would
+            # silently drop grade4/5 tracks from an in-flight job).
+            if "selected_track_grades" not in edits:
+                edits["selected_track_grades"] = TRACK_GRADES + [UNGRADED_TRACK_GRADE]
+            return edits
         # Create the file so it exists for future reads
         with open(self.edits_path, "wb") as f:
             f.write(orjson.dumps(defaults))
@@ -344,6 +381,7 @@ class StreetSelector:
         data = {
             "removed_roads": self.removed_roads,
             "selected_road_tags": self.selected_road_tags,
+            "selected_track_grades": self.selected_track_grades,
             "keep_largest": self.keep_largest_applied,
         }
         with open(self.edits_path, "wb") as f:

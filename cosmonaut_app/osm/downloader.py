@@ -3,8 +3,8 @@
 Replaces the former osmnx-based ``OsmDownloader`` (removed): same constructor
 signature, same ``run_osm_query`` entry point, same three output files —
 
-  - ``osm_data_download.geojson``    (EPSG:4326)
-  - ``osm_data_edited.geojson``      (EPSG:4326, copy)
+  - ``osm_data_download.geojson``    (EPSG:4326, unfiltered baseline)
+  - ``osm_data_edited.geojson``      (EPSG:4326, minus default track-grade filter)
   - ``osm_data_transformed.geojson`` (EPSG:``epsg_output``) -> read by sensor-routing
 
 — but it streams ways from the source and writes features incrementally, so peak
@@ -15,7 +15,6 @@ docs/decisions/20260605-osm-overpass-direct-vs-osmnx.md.
 
 import logging
 import os
-import shutil
 
 import numpy as np
 import pyproj
@@ -24,6 +23,7 @@ from sensor_routing.constants import OSM_FILENAME
 from shapely.geometry import Polygon
 
 from cosmonaut_app.constants.general import (
+    DEFAULT_TRACK_GRADES,
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
 )
@@ -31,12 +31,17 @@ from cosmonaut_app.osm.geojson_writer import StreamingGeoJsonWriter
 from cosmonaut_app.osm.projection import project_feature
 from cosmonaut_app.osm.source import OverpassSource
 from cosmonaut_app.osm.transform import way_to_feature
+from cosmonaut_app.road_network_utils import track_grade_allowed
 
 log = logging.getLogger(__name__)
 
-# Highway tag values to fetch — identical to the old osmnx custom_filter.
+# Highway tag values to fetch. Matches the old osmnx custom_filter plus
+# "trunk" (added 2026-07-06): expressways sit between motorway and primary in
+# the OSM hierarchy — fetching motorways but not trunks left silent holes in
+# the network. The unanchored regex also matches the *_link variants.
 HIGHWAY_TYPES = [
     "motorway",
+    "trunk",
     "primary",
     "secondary",
     "tertiary",
@@ -82,11 +87,14 @@ class OsmDownloader:
         )
 
         download_path = os.path.join(download_folder, OSM_DATA_DOWNLOAD_FILE)
+        edited_path = os.path.join(download_folder, OSM_DATA_EDITED_FILE)
         transformed_path = os.path.join(download_folder, OSM_FILENAME)
 
         count = 0
+        edited_count = 0
         with (
             StreamingGeoJsonWriter(download_path) as download_writer,
+            StreamingGeoJsonWriter(edited_path) as edited_writer,
             StreamingGeoJsonWriter(
                 transformed_path, crs_epsg=self.epsg_output
             ) as transformed_writer,
@@ -96,9 +104,21 @@ class OsmDownloader:
                 if feature is None:
                     continue
                 download_writer.write(feature)
-                transformed_writer.write(project_feature(feature, transformer))
                 count += 1
+                # The edited/transformed files start as the download minus the
+                # default track-grade filter, matching StreetSelector's initial
+                # edit state so the Street Selection UI and the network agree.
+                # The download file stays unfiltered — re-enabling grades on
+                # the Street Selection page restores those tracks from it.
+                if not track_grade_allowed(feature["properties"], DEFAULT_TRACK_GRADES):
+                    continue
+                edited_writer.write(feature)
+                transformed_writer.write(project_feature(feature, transformer))
+                edited_count += 1
 
-        # The editable copy starts identical to the download (EPSG:4326).
-        shutil.copy2(download_path, os.path.join(download_folder, OSM_DATA_EDITED_FILE))
-        log.info("Streamed %d road features to %s", count, download_folder)
+        log.info(
+            "Streamed %d road features (%d after default track-grade filter) to %s",
+            count,
+            edited_count,
+            download_folder,
+        )

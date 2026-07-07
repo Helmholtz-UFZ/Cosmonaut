@@ -1,5 +1,36 @@
 import networkx as nx
 
+from cosmonaut_app.constants.general import TRACK_GRADES, UNGRADED_TRACK_GRADE
+
+
+def track_grade_allowed(properties, allowed_grades):
+    """Return True if a feature passes the track-grade filter.
+
+    Only ``highway=track`` features are graded; every other feature always
+    passes. Tracks whose ``tracktype`` is missing or not a standard
+    grade1..grade5 value fall into the ``UNGRADED_TRACK_GRADE`` bucket, which
+    is selectable in the UI ("No grade tag") like any grade.
+
+    Lives here (not in street_selector) so both users import it without a
+    cycle: street_selector -> osm.projection -> osm/__init__ -> downloader.
+
+    Parameters:
+    properties (dict): GeoJSON feature properties with highway and tracktype.
+    allowed_grades (list): Allowed tracktype values incl. the ungraded bucket.
+
+    Returns:
+    bool: Whether the feature stays in the network.
+    """
+    if properties["highway"] != "track":
+        return True
+    # .get(): legacy (osmnx-era) download files omit the key entirely when no
+    # way in the AOI carried a tracktype tag; same handling as the None the
+    # current transform writes — the ungraded bucket.
+    grade = properties.get("tracktype")
+    if grade not in TRACK_GRADES:
+        grade = UNGRADED_TRACK_GRADE
+    return grade in allowed_grades
+
 
 def build_graph(all_roads):
     """

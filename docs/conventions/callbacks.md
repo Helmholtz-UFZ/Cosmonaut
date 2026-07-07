@@ -141,6 +141,46 @@ dash.clientside_callback(
 (e.g. a submit callback re-fires after a refresh, triggering a second refresh cycle).
 Use overlay wait timeouts of at least 20s in Playwright tests to accommodate this.
 
+### Interval Polling — Interval as the Only Input
+
+Poll callbacks for page- or state-scoped components (e.g. a `dcc.Interval`
+that only exists in a waiting layout) must use the interval as their **only
+`Input`**. Context like the job id or URL comes in via `State`.
+
+**Why:** An `Input` is a trigger. If a poll callback also takes
+`Input(URL_SHARED_ID, "pathname")`, every navigation on *any* page triggers
+it — but the interval component only exists in one specific layout, so the
+renderer cannot fill its value and raises the devtools error
+*"A nonexistent object was used in an `Input` of a Dash callback"* on every
+page switch. With the interval as the only Input, the callback can only fire
+while the interval actually exists.
+
+Trade-off: the first poll happens after the first interval tick (e.g. 3 s)
+instead of immediately on navigation. That is fine — the page `layout()`
+renders the current status anyway.
+
+```python
+# CORRECT — interval triggers, context via State
+@callback(
+    Output(STREET_PROCESSING_ALERT_STREET_SELECTION_ID, "children"),
+    ...
+    Input(STREET_PROCESSING_POLL_STREET_SELECTION_ID, "n_intervals"),
+    State(URL_SHARED_ID, "pathname"),
+    prevent_initial_call=True,
+)
+
+# WRONG — URL Input fires on every navigation, interval may not exist
+@callback(
+    ...
+    Input(STREET_PROCESSING_POLL_STREET_SELECTION_ID, "n_intervals"),
+    Input(URL_SHARED_ID, "pathname"),
+    prevent_initial_call=True,
+)
+```
+
+Reference implementations: `pages/data_upload.py::poll_street_processing`,
+`pages/street_selection.py::poll_street_processing_status`.
+
 ### Dict-Style Callbacks for Many Outputs
 
 When a callback has **5+ outputs**, use dict-style `output={}`, `inputs={}`, `state={}`

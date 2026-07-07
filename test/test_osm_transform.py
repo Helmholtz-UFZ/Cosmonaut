@@ -207,11 +207,13 @@ class _FakeSource:
 
 
 def test_downloader_streams_three_files(tmp_path):
-    """run_osm_query streams to the three output files, projects the transformed
-    one, and leaves no temp files."""
+    """run_osm_query streams to the three output files, applies the default
+    track-grade filter to edited/transformed, projects the transformed one,
+    and leaves no temp files."""
     data = pd.DataFrame(
         {"Longitude": [10.0, 10.1, 10.05], "Latitude": [50.0, 50.1, 50.05]}
     )
+    # grade2 track: kept by the default track-grade filter
     way = {
         "id": 1,
         "nodes": [10, 11, 12],
@@ -220,11 +222,32 @@ def test_downloader_streams_three_files(tmp_path):
             {"lon": 10.04, "lat": 50.04},
             {"lon": 10.06, "lat": 50.06},
         ],
-        "tags": {"highway": "track", "oneway": "yes"},
+        "tags": {"highway": "track", "tracktype": "grade2", "oneway": "yes"},
     }
-    OsmDownloader(data, epsg_output=25832, source=_FakeSource([way])).run_osm_query(
-        str(tmp_path)
-    )
+    # grade5 track: excluded from edited/transformed by default, kept in download
+    grade5_way = {
+        "id": 2,
+        "nodes": [20, 21],
+        "geometry": [
+            {"lon": 10.03, "lat": 50.03},
+            {"lon": 10.05, "lat": 50.05},
+        ],
+        "tags": {"highway": "track", "tracktype": "grade5"},
+    }
+    # untagged track: unknown condition -> also excluded by default
+    # (coordinates on the collinear test hull like the other ways)
+    ungraded_way = {
+        "id": 3,
+        "nodes": [30, 31],
+        "geometry": [
+            {"lon": 10.01, "lat": 50.01},
+            {"lon": 10.03, "lat": 50.03},
+        ],
+        "tags": {"highway": "track"},
+    }
+    OsmDownloader(
+        data, epsg_output=25832, source=_FakeSource([way, grade5_way, ungraded_way])
+    ).run_osm_query(str(tmp_path))
 
     with open(os.path.join(tmp_path, "osm_data_download.geojson"), encoding="utf-8") as f:
         download = json.load(f)
@@ -235,8 +258,11 @@ def test_downloader_streams_three_files(tmp_path):
     ) as f:
         transformed = json.load(f)
 
-    assert len(download["features"]) == 1
-    assert download == edited  # editable copy starts identical to the download
+    # download keeps everything; edited/transformed drop grade5 + untagged
+    assert [f["properties"]["osmid"] for f in download["features"]] == [1, 2, 3]
+    assert [f["properties"]["osmid"] for f in edited["features"]] == [1]
+    assert [f["properties"]["osmid"] for f in transformed["features"]] == [1]
+    assert download["features"][0] == edited["features"][0]
     props = download["features"][0]["properties"]
     assert props["osmid"] == 1 and props["nodes"] == [10, 11, 12] and props["oneway"] == "yes"
     # transformed file: CRS header + reprojected (no longer lon/lat) coordinates

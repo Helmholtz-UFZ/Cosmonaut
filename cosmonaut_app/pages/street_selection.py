@@ -23,6 +23,16 @@ preserved exactly as you left them.
 
   Use "Select All" / "Select None" buttons for quick bulk operations.
 
+- **Track Grades**: While the Track type is enabled, an additional filter
+  selects which OSM ``tracktype`` grades are included. The scale describes
+  surface firmness from grade 1 (solid — paved or heavily compacted) to
+  grade 5 (soft — uncompacted, subtle on the landscape) and makes track
+  selection much more reliable — but many tracks in OSM are unfortunately
+  untagged. Grades 4 and 5 are rarely traversable by survey vehicles;
+  they and untagged tracks (unknown condition) are excluded by default, so
+  only grades 1-3 are active initially. Enable "No grade tag" to include
+  untagged tracks as well.
+
 - **Interactive Clicking**: Click individual road segments on the map to mark
   them for removal. Marked roads are highlighted in a distinct color for
   visual feedback. Press "Remove selected" to permanently delete them.
@@ -52,8 +62,8 @@ parameters for the final route calculation.
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
 Street selection state is persisted to ``street_edits.json`` in the job's
-work directory. The file records removed road IDs, selected tag filters, and
-a boolean flag for keep-largest. Every edit re-derives
+work directory. The file records removed road IDs, selected tag filters,
+allowed track grades, and a boolean flag for keep-largest. Every edit re-derives
 ``osm_data_edited.geojson`` and ``osm_data_transformed.geojson`` from the
 immutable ``osm_data_download.geojson`` via :meth:`StreetSelector.apply_edits`.
 
@@ -84,6 +94,8 @@ from dash.exceptions import PreventUpdate
 from cosmonaut_app.constants.general import (
     JOB_STATUS_PENDING,
     OSM_TAGS_MAPPING,
+    TRACK_GRADES,
+    UNGRADED_TRACK_GRADE,
 )
 from cosmonaut_app.constants.html_ids import (
     CANCEL_RESET_BUTTON_STREET_SELECTION_ID,
@@ -105,6 +117,8 @@ from cosmonaut_app.constants.html_ids import (
     TAGS_DROPDOWN_STREET_SELECTION_ID,
     TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID,
     TAGS_SELECT_NONE_BUTTON_STREET_SELECTION_ID,
+    TRACK_GRADES_CHECKLIST_STREET_SELECTION_ID,
+    TRACK_GRADES_COLLAPSE_STREET_SELECTION_ID,
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -122,6 +136,9 @@ log = logging.getLogger(__name__)
 
 # Height for ~5 list items before scrolling
 _REMOVED_LIST_MAX_HEIGHT = "12rem"
+
+# OSM_TAGS_MAPPING label whose selection shows the track-grade sub-filter
+_TRACK_TAG_LABEL = "Track"
 
 
 def _extract_job_id(pathname: str) -> Optional[str]:
@@ -284,6 +301,41 @@ def layout(job_id: str):
                 if is_active
                 else "form-check-input disabled",
                 className="" if is_active else "pe-none opacity-50",
+            ),
+            # Track-grade sub-filter — only meaningful while Track is enabled
+            dbc.Collapse(
+                [
+                    dbc.Label("Track grades", className="fw-semibold mb-0 mt-2"),
+                    dbc.FormText(
+                        "The OSM tracktype tag grades track surface firmness "
+                        "from grade 1 (solid, compacted) to grade 5 (soft, "
+                        "uncompacted) and makes track selection much more "
+                        "reliable — but many tracks are unfortunately untagged. "
+                        "Grades 4-5 are rarely traversable by survey vehicles; "
+                        "they and untagged tracks (unknown condition) are "
+                        "excluded by default. Enable 'No grade tag' to include "
+                        "untagged tracks.",
+                        className="d-block mb-2",
+                    ),
+                    dbc.Checklist(
+                        id=TRACK_GRADES_CHECKLIST_STREET_SELECTION_ID,
+                        options=[
+                            {"label": f"Grade {grade[-1]}", "value": grade}
+                            for grade in TRACK_GRADES
+                        ]
+                        + [{"label": "No grade tag", "value": UNGRADED_TRACK_GRADE}],
+                        value=sel.selected_track_grades,
+                        switch=True,
+                        inline=True,
+                        input_class_name="form-check-input"
+                        if is_active
+                        else "form-check-input disabled",
+                        className="" if is_active else "pe-none opacity-50",
+                    ),
+                ],
+                id=TRACK_GRADES_COLLAPSE_STREET_SELECTION_ID,
+                is_open=_TRACK_TAG_LABEL in sel.selected_road_tags,
+                className="ms-4",
             ),
             html.Hr(className="my-3"),
             html.Div(
@@ -528,7 +580,11 @@ def _street_processing_failed_layout(job_id, completed_steps):
     Output(STREET_PROCESSING_POLL_STREET_SELECTION_ID, "disabled"),
     Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
     Input(STREET_PROCESSING_POLL_STREET_SELECTION_ID, "n_intervals"),
-    Input(URL_SHARED_ID, "pathname"),
+    # State, not Input: the interval only exists in the wait layout, but the
+    # URL exists on every page — as an Input it would trigger this callback on
+    # every navigation and raise "nonexistent object used in an Input" in the
+    # Dash devtools (see docs/conventions/callbacks.md, Interval Polling).
+    State(URL_SHARED_ID, "pathname"),
     prevent_initial_call=True,
 )
 def poll_street_processing_status(n_intervals, pathname):
@@ -645,19 +701,35 @@ def keep_largest_subnetwork(
     return (version or 0) + 1, hint, "mt-3"
 
 
+# Dict-style: 6 outputs (see docs/conventions/callbacks.md, 5+ threshold)
 @callback(
-    Output(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data", allow_duplicate=True),
-    Output(TAGS_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True),
-    Output(
-        REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID, "children", allow_duplicate=True
-    ),
-    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
-    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
-    [Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks")],
-    [
-        State(URL_SHARED_ID, "pathname"),
-        State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
-    ],
+    output={
+        "refresh_version": Output(
+            STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data", allow_duplicate=True
+        ),
+        "tags_value": Output(
+            TAGS_DROPDOWN_STREET_SELECTION_ID, "value", allow_duplicate=True
+        ),
+        "track_grades_value": Output(
+            TRACK_GRADES_CHECKLIST_STREET_SELECTION_ID, "value", allow_duplicate=True
+        ),
+        "removed_panel": Output(
+            REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID,
+            "children",
+            allow_duplicate=True,
+        ),
+        "hint_children": Output(
+            KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True
+        ),
+        "hint_class": Output(
+            KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True
+        ),
+    },
+    inputs={"n": Input(CONFIRM_RESET_BUTTON_STREET_SELECTION_ID, "n_clicks")},
+    state={
+        "pathname": State(URL_SHARED_ID, "pathname"),
+        "version": State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
+    },
     prevent_initial_call=True,
 )
 def reset_edits(
@@ -679,7 +751,14 @@ def reset_edits(
         _build_keep_largest_hint(False),
         className="text-warning",
     )
-    return (version or 0) + 1, sel.selected_road_tags, panel, hint, "mt-3"
+    return {
+        "refresh_version": (version or 0) + 1,
+        "tags_value": sel.selected_road_tags,
+        "track_grades_value": sel.selected_track_grades,
+        "removed_panel": panel,
+        "hint_children": hint,
+        "hint_class": "mt-3",
+    }
 
 
 @callback(
@@ -771,14 +850,67 @@ def update_tags_dropdown(
     if not job_id:
         raise PreventUpdate
 
+    job = CosmonautJob(job_id=job_id, sync_files=False)
+    if job.get_status() != JOB_STATUS_PENDING:
+        # The checklist is only soft-disabled via CSS (pe-none) for non-active
+        # jobs — keyboard toggling still fires this callback, so guard here.
+        raise PreventUpdate
+
     log.info(f"Job {job_id} road tags updated: {tags}")
-    sel = StreetSelector(CosmonautJob(job_id=job_id, sync_files=False))
+    sel = StreetSelector(job)
     sel.update_tags(tags)
     hint = html.Small(
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",
     )
     return (version or 0) + 1, hint, "mt-3"
+
+
+@callback(
+    Output(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "children", allow_duplicate=True),
+    Output(KEEP_LARGEST_HINT_STREET_SELECTION_ID, "className", allow_duplicate=True),
+    Input(TRACK_GRADES_CHECKLIST_STREET_SELECTION_ID, "value"),
+    State(URL_SHARED_ID, "pathname"),
+    State(STREETS_REFRESH_TRIGGER_STORE_SHARED_ID, "data"),
+    prevent_initial_call=True,
+)
+def update_track_grades(
+    grades: Optional[List[str]], pathname: Optional[str], version: Optional[int]
+):
+    """Persist the allowed track grades and refresh the map to match."""
+    if grades is None:
+        raise PreventUpdate
+
+    job_id = _extract_job_id(pathname)
+    if not job_id:
+        raise PreventUpdate
+
+    job = CosmonautJob(job_id=job_id, sync_files=False)
+    if job.get_status() != JOB_STATUS_PENDING:
+        # Same CSS-only soft-disable as the road-type checklist — guard here.
+        raise PreventUpdate
+
+    log.info(f"Job {job_id} track grades updated: {grades}")
+    sel = StreetSelector(job)
+    sel.update_track_grades(grades)
+    hint = html.Small(
+        _build_keep_largest_hint(sel.keep_largest_applied),
+        className="text-success" if sel.keep_largest_applied else "text-warning",
+    )
+    return (version or 0) + 1, hint, "mt-3"
+
+
+# Show the track-grade sub-filter only while the "Track" road type is enabled.
+dash.clientside_callback(
+    """
+    function(tags) { return (tags || []).includes('"""
+    + _TRACK_TAG_LABEL
+    + """'); }
+    """,
+    Output(TRACK_GRADES_COLLAPSE_STREET_SELECTION_ID, "is_open"),
+    Input(TAGS_DROPDOWN_STREET_SELECTION_ID, "value"),
+)
 
 
 @callback(

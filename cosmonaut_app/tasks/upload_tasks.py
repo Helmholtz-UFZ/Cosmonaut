@@ -37,7 +37,7 @@ def process_upload_task(self, job_id, epsg_input):
     """Celery task to process membership upload post-processing.
 
     Downloads OSM road data and saves the result. This offloads the
-    memory-intensive osmnx graph construction from the web server process.
+    memory-intensive OSM download from the web server process.
 
     Args:
         job_id: ID of the job to process.
