@@ -7,9 +7,9 @@ based on cosmic ray neutron sensor measurement locations. This page allows you t
 begin a new routing job by clicking the "Create new job" button.
 
 Each job is assigned a unique identifier that tracks your data, route selections,
-and final navigation output through the entire workflow. You can also load existing
-jobs using the search bar in the navigation header to continue work on a previous
-routing project.
+and final navigation output through the entire workflow. You can also continue
+work on a previous routing project by opening it from the Job manager in the
+navigation header.
 
 From here, you'll proceed through the workflow to provide job information, upload
 membership data, select streets from OpenStreetMap, configure routing parameters,
@@ -63,7 +63,7 @@ card_body = [
         color="primary",
     ),
     html.Div(
-        "Or load an existing job using the search bar in the navbar.",
+        "Or reopen an existing job via the Job manager in the navbar.",
         className="text-muted small mt-2",
     ),
 ]

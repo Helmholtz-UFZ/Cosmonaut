@@ -70,3 +70,9 @@ div:has(> #_pages_content) {
     width: fit-content;
     margin-left: 12px;
 }
+
+/* Map color legend overlay — must sit above the Leaflet panes/controls
+   (Leaflet controls use z-index 1000) */
+.map-legend {
+    z-index: 1001;
+}

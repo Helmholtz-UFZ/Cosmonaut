@@ -19,15 +19,21 @@ from cosmonaut_app.constants.html_ids import (
     JOB_ID_KICKER_CODE_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
+    MAP_LEGEND_COLLAPSE_SHARED_ID,
+    MAP_LEGEND_TOGGLE_BUTTON_SHARED_ID,
     MAP_INIT_INTERVAL_SHARED_ID,
     MEMBERSHIP_TILE_LAYER_MAP_ID,
     NAVBAR_COLLAPSE_NAV_SHARED_ID,
     NAVBAR_TOGGLER_NAV_SHARED_ID,
+    NEW_JOB_LINK_NAV_SHARED_ID,
     OSM_GEOJSON_LAYER_MAP_SHARED_ID,
     RESET_BUTTON_SHARED_ID,
     RESET_MODAL_CANCEL_BUTTON_SHARED_ID,
     RESET_MODAL_CONFIRM_BUTTON_SHARED_ID,
     RESET_MODAL_SHARED_ID,
+    ROUTE_CASING_LAYER_MAP_ID,
+    ROUTE_DIRECTION_DECORATOR_MAP_ID,
+    ROUTE_ENDPOINTS_GROUP_MAP_ID,
     ROUTE_POLYLINE_LAYER_MAP_ID,
     STREETS_REFRESH_TRIGGER_STORE_SHARED_ID,
     URL_SHARED_ID,
@@ -50,34 +56,73 @@ _default_name_space.dump = lambda assets_folder=_assets_folder: _original_dump(
     assets_folder
 )
 
-# Define a JavaScript function for styling the GeoJSON features
+# Map layer colors — single source of truth for the clientside style handlers,
+# the route layer styles and the map legend below.
+STREET_COLOR = "#d32f2f"  # in-network roads
+STREET_SELECTED_COLOR = "#f9a825"  # roads marked by click (pending removal)
+STREET_HOVER_COLOR = "#ff6666"
+STREET_SELECTED_HOVER_COLOR = "#ffb300"
+# Deep violet over a white casing: nothing else on the base maps (incl.
+# satellite) or in the network uses violet, it stays distinguishable from the
+# red network under red-, green- AND blue-deficient color vision (magenta-
+# leaning hues collapse toward red under tritanopia), and it is calmer than
+# the magenta tried first (user feedback: too garish). 8:1 contrast on the
+# white casing.
+ROUTE_COLOR = "#5e35b1"
+ROUTE_CASING_COLOR = "#ffffff"
+
+# Define a JavaScript function for styling the GeoJSON features.
+# f-string: the color constants above are baked into the JS source (doubled
+# braces are literal braces in the emitted JS).
+# Weights are constants: an earlier zoom-adaptive formula read hideout.zoom,
+# but that value was never updated after map creation (always 10), so it
+# always evaluated to these numbers. On non-editing pages (dimmed) the network
+# is fainter so the route stays dominant, but keeps the full weight —
+# weight 2 / opacity 0.3 proved too faint over the membership overlay.
+# Marked roads get a dash pattern on top of the amber color: red vs amber
+# hue separation collapses under red-/green-deficient vision, so the dash is
+# the color-independent second cue.
 style_handle = assign(
-    """
-function(feature, context){
-    const {selected, zoom, dimmed} = context.hideout;
-    // Increase base weight to make lines easier to click. Keep adaptive thinning on zoom in.
-    const lineWeight = zoom ? Math.max(3, 18 / zoom) : 4; // at zoom=10 -> ~3
-    const color = selected.includes(feature.id) ? 'yellow' : 'red';
-    const opacity = dimmed ? 0.4 : 0.85;
-    return {color: color, weight: lineWeight, opacity: opacity};
-}
+    f"""
+function(feature, context){{
+    const {{selected, dimmed}} = context.hideout;
+    const isMarked = selected.includes(feature.id);
+    const color = isMarked ? '{STREET_SELECTED_COLOR}' : '{STREET_COLOR}';
+    const opacity = dimmed ? 0.6 : 0.85;
+    return {{color: color, weight: 3, opacity: opacity,
+             dashArray: isMarked ? '6, 4' : null}};
+}}
 """
 )
 
-# Separate hover style with slight highlight and thicker stroke for better affordance
+# Hover: thicker stroke as the primary (color-independent) affordance — but
+# only on the street-selection page. On dimmed pages streets are not
+# interactive (click_handler guards on dimmed), so hover shows no change.
 hover_style_handle = assign(
-    """
-function(feature, context){
-    const {selected, zoom, dimmed} = context.hideout;
-    const lineWeight = zoom ? Math.max(4, 22 / zoom) : 5;
-    const color = selected.includes(feature.id) ? 'orange' : '#ff6666';
-    const opacity = dimmed ? 0.5 : 1.0;
-    return {color: color, weight: lineWeight, opacity: opacity};
-}
+    f"""
+function(feature, context){{
+    const {{selected, dimmed}} = context.hideout;
+    const isMarked = selected.includes(feature.id);
+    if (dimmed) {{
+        const color = isMarked ? '{STREET_SELECTED_COLOR}' : '{STREET_COLOR}';
+        return {{color: color, weight: 3, opacity: 0.6,
+                 dashArray: isMarked ? '6, 4' : null}};
+    }}
+    const color = isMarked ? '{STREET_SELECTED_HOVER_COLOR}' : '{STREET_HOVER_COLOR}';
+    return {{color: color, weight: 4, opacity: 1.0,
+             dashArray: isMarked ? '6, 4' : null}};
+}}
 """
 )
 
 click_handler = assign("""function(e, ctx) {
+    // Streets are only clickable on the street-selection page. Without this
+    // guard, clicks on any other page would silently mark roads that
+    // "Remove clicked roads" later deletes. Guard on the URL, NOT on
+    // ctx.hideout.dimmed: event handlers keep a snapshot of hideout from
+    // binding time and never see server-side hideout updates (verified —
+    // the style functions DO read hideout dynamically, events don't).
+    if (!window.location.pathname.includes('street-selection')) { return; }
     const id = e.layer.feature.id;
     const selected = [...(ctx.hideout.selected || [])];
     const idx = selected.indexOf(id);
@@ -94,11 +139,45 @@ click_handler = assign("""function(e, ctx) {
 # Layout Components
 # ============================================================================
 
-osm_layer = dl.TileLayer(
-    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution="© OpenStreetMap contributors",
-)
-default_map_layers = [osm_layer, dl.FullScreenControl(title="Toggle full screen")]
+# Selectable base maps (radio buttons in the LayersControl). All three are
+# free, keyless tile services; attribution per provider terms.
+def _base_layers():
+    return [
+        dl.BaseLayer(
+            dl.TileLayer(
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                attribution="© OpenStreetMap contributors",
+            ),
+            name="OpenStreetMap",
+            checked=True,
+        ),
+        dl.BaseLayer(
+            dl.TileLayer(
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/"
+                "World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                attribution=(
+                    "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, "
+                    "and the GIS User Community"
+                ),
+                maxZoom=19,
+            ),
+            name="Satellite",
+            checked=False,
+        ),
+        dl.BaseLayer(
+            dl.TileLayer(
+                url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+                attribution=(
+                    "© OpenStreetMap contributors, SRTM | "
+                    "Style: © OpenTopoMap (CC-BY-SA)"
+                ),
+                # OpenTopoMap serves tiles up to z17 only
+                maxZoom=17,
+            ),
+            name="Terrain",
+            checked=False,
+        ),
+    ]
 steps_jobs = {
     "user_info": ["Information", "Provide user information"],
     "data_upload": ["Upload", "Upload classification data"],
@@ -240,16 +319,32 @@ def create_navbar():
                             width="30",
                             height="30",
                             className="d-inline-block align-text-top",
-                            alt="Cosmopolitan Icon",
+                            alt="COSMONAUT Icon",
                         ),
                         " COSMONAUT",
                     ],
                 ),
                 dbc.NavbarToggler(id=NAVBAR_TOGGLER_NAV_SHARED_ID, n_clicks=0),
                 dbc.Collapse(
+                    # Item order mirrors COSMOPOLITAN's navbar (New Job,
+                    # Documentation, Job, Worker, Logs) for cross-app consistency.
                     dbc.Nav(
                         className="navbar-nav me-auto mb-2 mb-lg-0",
                         children=[
+                            dbc.NavItem(
+                                dbc.NavLink(
+                                    [
+                                        html.I(className="bi bi-plus-circle me-1"),
+                                        "New job",
+                                    ],
+                                    id=NEW_JOB_LINK_NAV_SHARED_ID,
+                                    n_clicks=0,
+                                    # cursor: no Bootstrap utility class in v5.2;
+                                    # this NavLink has no href — it creates the
+                                    # job via callback like the home-page button.
+                                    style={"cursor": "pointer"},
+                                )
+                            ),
                             dbc.NavItem(
                                 dbc.NavLink(
                                     [
@@ -264,10 +359,10 @@ def create_navbar():
                             dbc.NavItem(
                                 dbc.NavLink(
                                     [
-                                        html.I(className="bi bi-journal-text me-1"),
-                                        "Logs",
+                                        html.I(className="bi bi-list-task me-1"),
+                                        "Job manager",
                                     ],
-                                    href=dash.page_registry["pages.logs"][
+                                    href=dash.page_registry["pages.job_manager"][
                                         "relative_path"
                                     ],
                                 )
@@ -286,10 +381,10 @@ def create_navbar():
                             dbc.NavItem(
                                 dbc.NavLink(
                                     [
-                                        html.I(className="bi bi-list-task me-1"),
-                                        "Job manager",
+                                        html.I(className="bi bi-journal-text me-1"),
+                                        "Logs",
                                     ],
-                                    href=dash.page_registry["pages.job_manager"][
+                                    href=dash.page_registry["pages.logs"][
                                         "relative_path"
                                     ],
                                 )
@@ -305,6 +400,89 @@ def create_navbar():
     )
 
 
+def route_endpoint_markers(positions):
+    """Start/end CircleMarkers for the route ([] when there is no route).
+
+    Start: violet fill / white ring. End: white fill / violet ring. Shared by
+    ``update_map_layers`` and the reverse-direction toggle on Route Download.
+    """
+    if not positions:
+        return []
+    return [
+        dl.CircleMarker(
+            center=positions[0],
+            radius=7,
+            pathOptions=dict(
+                color=ROUTE_CASING_COLOR,
+                weight=2,
+                fillColor=ROUTE_COLOR,
+                fillOpacity=1.0,
+                interactive=False,
+            ),
+            children=dl.Tooltip("Route start"),
+        ),
+        dl.CircleMarker(
+            center=positions[-1],
+            radius=7,
+            pathOptions=dict(
+                color=ROUTE_COLOR,
+                weight=3,
+                fillColor=ROUTE_CASING_COLOR,
+                fillOpacity=1.0,
+                interactive=False,
+            ),
+            children=dl.Tooltip("Route end"),
+        ),
+    ]
+
+
+def _map_legend():
+    """Static color legend overlaid on the map (bottom-left)."""
+
+    def row(color, label, casing=None):
+        # inline style: swatch colors come from the map color constants —
+        # there is no Bootstrap utility for arbitrary hex values.
+        swatch_style = {
+            "backgroundColor": color,
+            "width": "1.4rem",
+            "height": "0.35rem",
+        }
+        if casing:
+            swatch_style["boxShadow"] = f"0 0 0 2px {casing}"
+        return html.Div(
+            [
+                html.Span(style=swatch_style, className="d-inline-block rounded me-2"),
+                html.Small(label),
+            ],
+            className="d-flex align-items-center",
+        )
+
+    return html.Div(
+        [
+            dbc.Collapse(
+                html.Div(
+                    [
+                        row(ROUTE_COLOR, "Route", casing=ROUTE_CASING_COLOR),
+                        row(STREET_COLOR, "Road network"),
+                        row(STREET_SELECTED_COLOR, "Marked for removal"),
+                    ],
+                    className="px-2 py-1 bg-white bg-opacity-75 rounded shadow-sm mb-1",
+                ),
+                id=MAP_LEGEND_COLLAPSE_SHARED_ID,
+                is_open=True,
+            ),
+            dbc.Button(
+                [html.I(className="bi bi-map me-1"), "Legend"],
+                id=MAP_LEGEND_TOGGLE_BUTTON_SHARED_ID,
+                size="sm",
+                color="light",
+                className="border shadow-sm py-0",
+            ),
+        ],
+        className="position-absolute bottom-0 start-0 m-3 map-legend",
+    )
+
+
 def build_global_map():
     """Build the global persistent map with empty layer slots.
 
@@ -314,6 +492,7 @@ def build_global_map():
     """
     layers_control = dl.LayersControl(
         [
+            *_base_layers(),
             dl.Overlay(
                 dl.TileLayer(id=MEMBERSHIP_TILE_LAYER_MAP_ID, url="", opacity=0.7),
                 name="Membership",
@@ -326,18 +505,73 @@ def build_global_map():
                     options={"style": style_handle},
                     hoverStyle=hover_style_handle,
                     eventHandlers=dict(click=click_handler),
-                    hideout=dict(selected=[], zoom=10, dimmed=True),
+                    hideout=dict(selected=[], dimmed=True),
                 ),
                 name="Streets",
                 checked=True,
             ),
             dl.Overlay(
-                dl.GeoJSON(
-                    id=ROUTE_POLYLINE_LAYER_MAP_ID,
-                    data={"type": "FeatureCollection", "features": []},
-                    options={
-                        "style": {"color": "#1a73e8", "weight": 4, "opacity": 0.8}
-                    },
+                # LayerGroup so the "Route" toggle hides casing + line together.
+                dl.LayerGroup(
+                    [
+                        # White casing under the route line keeps it readable on
+                        # top of the base map and the red road network.
+                        dl.GeoJSON(
+                            id=ROUTE_CASING_LAYER_MAP_ID,
+                            data={"type": "FeatureCollection", "features": []},
+                            options={
+                                "style": {
+                                    "color": ROUTE_CASING_COLOR,
+                                    "weight": 9,
+                                    "opacity": 0.9,
+                                },
+                                # The route must not swallow clicks meant for
+                                # the street layer underneath.
+                                "interactive": False,
+                            },
+                        ),
+                        dl.GeoJSON(
+                            id=ROUTE_POLYLINE_LAYER_MAP_ID,
+                            data={"type": "FeatureCollection", "features": []},
+                            options={
+                                "style": {
+                                    "color": ROUTE_COLOR,
+                                    "weight": 5,
+                                    "opacity": 1.0,
+                                },
+                                "interactive": False,
+                            },
+                        ),
+                        # Driving-direction arrowheads: violet fill + thin
+                        # white keyline, so they read both on the white
+                        # casing and on the violet line itself.
+                        dl.PolylineDecorator(
+                            id=ROUTE_DIRECTION_DECORATOR_MAP_ID,
+                            positions=[],
+                            patterns=[
+                                dict(
+                                    offset="5%",
+                                    repeat="120px",
+                                    arrowHead=dict(
+                                        pixelSize=13,
+                                        polygon=True,
+                                        pathOptions=dict(
+                                            color=ROUTE_CASING_COLOR,
+                                            weight=1.5,
+                                            fill=True,
+                                            fillColor=ROUTE_COLOR,
+                                            fillOpacity=1.0,
+                                            opacity=1.0,
+                                            interactive=False,
+                                        ),
+                                    ),
+                                )
+                            ],
+                        ),
+                        # Start/end markers — populated by update_map_layers
+                        # and the reverse-direction toggle.
+                        dl.LayerGroup(id=ROUTE_ENDPOINTS_GROUP_MAP_ID),
+                    ]
                 ),
                 name="Route",
                 checked=True,
@@ -346,7 +580,7 @@ def build_global_map():
         position="topright",
     )
     return dl.Map(
-        [osm_layer, dl.FullScreenControl(title="Toggle full screen"), layers_control],
+        [dl.FullScreenControl(title="Toggle full screen"), layers_control],
         id=MAIN_MAP_COMPONENT_MAP_SHARED_ID,
         center=[51.70, 11.20],
         zoom=10,
@@ -371,7 +605,10 @@ def app_layout():
             html.Div(
                 className="d-flex flex-grow-1 app-panels overflow-hidden",
                 children=[
-                    html.Div(build_global_map(), className="map-panel col-7 p-0"),
+                    html.Div(
+                        [build_global_map(), _map_legend()],
+                        className="map-panel col-7 p-0 position-relative",
+                    ),
                     html.Div(
                         dash.page_container,
                         className="content-panel col-5 p-0 d-flex flex-column",
@@ -588,6 +825,24 @@ def register_navbar_callbacks(app):
             return not is_open
         return is_open
 
+    @app.callback(
+        Output(URL_SHARED_ID, "pathname", allow_duplicate=True),
+        Input(NEW_JOB_LINK_NAV_SHARED_ID, "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def start_job_from_navbar(n_clicks):
+        """Create a new job and jump to its first wizard step.
+
+        Same flow as the home page's "Create new job" button.
+        """
+        if not n_clicks:
+            raise PreventUpdate
+
+        log.info("Initializing new CosmonautJob from navbar")
+        job = CosmonautJob()
+
+        return build_url_step("user_info", job.model.job_id)
+
 
 def register_reset_callbacks(app):
     """Register callbacks for job reset functionality."""
@@ -660,29 +915,52 @@ def register_map_callbacks(app):
     - the active job changes.
     """
 
+    # Dict-style: 5 outputs (see docs/conventions/callbacks.md, 5+ threshold)
     @app.callback(
-        Output(MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True),
-        Output(MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True),
-        Output(ROUTE_POLYLINE_LAYER_MAP_ID, "data"),
-        Output(CURRENT_JOB_ID_MAP_STORE_ID, "data"),
-        Input(URL_SHARED_ID, "pathname"),
-        State(CURRENT_JOB_ID_MAP_STORE_ID, "data"),
+        output={
+            "viewport": Output(
+                MAIN_MAP_COMPONENT_MAP_SHARED_ID, "viewport", allow_duplicate=True
+            ),
+            "tile_url": Output(
+                MEMBERSHIP_TILE_LAYER_MAP_ID, "url", allow_duplicate=True
+            ),
+            "route_data": Output(ROUTE_POLYLINE_LAYER_MAP_ID, "data"),
+            "route_casing_data": Output(ROUTE_CASING_LAYER_MAP_ID, "data"),
+            "route_direction_positions": Output(
+                ROUTE_DIRECTION_DECORATOR_MAP_ID, "positions"
+            ),
+            "route_endpoints_children": Output(
+                ROUTE_ENDPOINTS_GROUP_MAP_ID, "children"
+            ),
+            "job_id": Output(CURRENT_JOB_ID_MAP_STORE_ID, "data"),
+        },
+        inputs={"pathname": Input(URL_SHARED_ID, "pathname")},
+        state={"prev_job_id": State(CURRENT_JOB_ID_MAP_STORE_ID, "data")},
         prevent_initial_call=True,
     )
     def update_map_layers(pathname, prev_job_id):
         log.info(f"Map update triggered by {ctx.triggered_id}: {pathname}")
         empty_fc = {"type": "FeatureCollection", "features": []}
+        empty_result = {
+            "viewport": no_update,
+            "tile_url": "",
+            "route_data": empty_fc,
+            "route_casing_data": empty_fc,
+            "route_direction_positions": [],
+            "route_endpoints_children": [],
+            "job_id": None,
+        }
         parts = pathname.split("/")
         if len(parts) < 3 or parts[1] != "job":
             log.info("Not a job page, returning empty")
-            return no_update, "", empty_fc, None
+            return empty_result
 
         job_id = parts[2]
         try:
             job = CosmonautJob(job_id=job_id, sync_files=False)
         except JobNotFound:
             log.info(f"Job {job_id} not found, returning empty")
-            return no_update, "", empty_fc, None
+            return empty_result
 
         # Only recentre the map when the job changes
         if job_id != prev_job_id:
@@ -709,7 +987,18 @@ def register_map_callbacks(app):
                 }
             ]
         log.info(f"Returning tile_url={tile_url!r}, route_pts={len(raw_positions)}")
-        return viewport, tile_url, route_fc, job_id
+        return {
+            "viewport": viewport,
+            "tile_url": tile_url,
+            "route_data": route_fc,
+            # Casing gets the same geometry — it renders as the white halo
+            # under the route line.
+            "route_casing_data": route_fc,
+            # Decorator takes Leaflet [lat, lon] positions directly.
+            "route_direction_positions": [list(pos) for pos in raw_positions],
+            "route_endpoints_children": route_endpoint_markers(raw_positions),
+            "job_id": job_id,
+        }
 
     @app.callback(
         Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "data", allow_duplicate=True),
@@ -736,7 +1025,10 @@ def register_map_callbacks(app):
         Output(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout", allow_duplicate=True),
         Input(URL_SHARED_ID, "pathname"),
         State(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
-        prevent_initial_call=True,
+        # "initial_duplicate": guarantee the dim styling is computed on a
+        # HARD page load too (browser refresh), independent of whether the
+        # pages hydration happens to fire pathname callbacks initially.
+        prevent_initial_call="initial_duplicate",
     )
     def toggle_map_dim_on_page(pathname, current_hideout):
         """Dim the map on all pages except street_selection."""
@@ -746,7 +1038,20 @@ def register_map_callbacks(app):
             # context.hideout.dimmed
             raise PreventUpdate
         dimmed = not pathname.endswith("/street-selection")
+        log.info(f"Map dim toggle: {pathname} -> dimmed={dimmed}")
         return {**current_hideout, "dimmed": dimmed}
+
+    @app.callback(
+        Output(MAP_LEGEND_COLLAPSE_SHARED_ID, "is_open"),
+        Input(MAP_LEGEND_TOGGLE_BUTTON_SHARED_ID, "n_clicks"),
+        State(MAP_LEGEND_COLLAPSE_SHARED_ID, "is_open"),
+        prevent_initial_call=True,
+    )
+    def toggle_map_legend(n_clicks, is_open):
+        """Collapse/expand the map color legend."""
+        if n_clicks:
+            return not is_open
+        return is_open
 
 
 # Copy job ID to clipboard on click, flash background to confirm.
