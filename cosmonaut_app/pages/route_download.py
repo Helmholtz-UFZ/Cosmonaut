@@ -22,6 +22,12 @@ or navigation applications.
   (GPS Exchange Format) file compatible with most GPS devices, smartphone
   navigation apps, and mapping software.
 
+- **Reverse Direction**: A switch flips the start and end of the route. The
+  GPX file, the QR code and the on-map direction arrows update together.
+  Only the order of the track points is reversed — the route itself does not
+  change, and one-way restrictions are not re-validated for the opposite
+  direction, so double-check the reversed route is legal to drive.
+
 - **Route Visualization**: View the calculated route overlaid on the interactive
   map with all waypoints, turn-by-turn segments, and your original measurement
   locations. This allows you to preview the route before using it in the field.
@@ -58,12 +64,16 @@ GPX files are stored in MinIO object storage and retrieved via Flask routes.
 import logging
 
 import dash_bootstrap_components as dbc
-from dash import dcc, html, register_page
+from dash import Input, Output, State, callback, dcc, html, register_page
+from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.config import get_download_url
 from cosmonaut_app.constants.html_ids import (
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
     JOB_ID_STORE_SHARED_ID,
+    REVERSE_ROUTE_SWITCH_ROUTE_DOWNLOAD_ID,
+    ROUTE_DIRECTION_DECORATOR_MAP_ID,
+    ROUTE_ENDPOINTS_GROUP_MAP_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
@@ -71,6 +81,7 @@ from cosmonaut_app.layout import (
     create_card_input,
     page_container_fullscreen_layout,
     progress_footer,
+    route_endpoint_markers,
 )
 
 log = logging.getLogger(__name__)
@@ -100,6 +111,18 @@ def layout(job_id):
         html.P(
             "Download the GPX file of the route, or scan the QR code to transfer it to a phone.",
             className="mb-3",
+        ),
+        dbc.Switch(
+            id=REVERSE_ROUTE_SWITCH_ROUTE_DOWNLOAD_ID,
+            label="Reverse direction of travel",
+            value=job.is_route_reversed(),
+            className="mb-0",
+        ),
+        dbc.FormText(
+            "Flips the start and end of the route. Updates the map, the GPX "
+            "file, and the QR code together. Order only — one-way "
+            "restrictions are not re-checked for the opposite direction.",
+            className="d-block mb-3",
         ),
         html.A(
             [
@@ -158,3 +181,35 @@ def layout(job_id):
         completed_steps=job.get_completed_steps(),
     )
     return page_container_fullscreen_layout(input_container)
+
+
+# ============================================================================
+# Callbacks
+# ============================================================================
+
+
+@callback(
+    Output(ROUTE_DIRECTION_DECORATOR_MAP_ID, "positions", allow_duplicate=True),
+    Output(ROUTE_ENDPOINTS_GROUP_MAP_ID, "children", allow_duplicate=True),
+    Input(REVERSE_ROUTE_SWITCH_ROUTE_DOWNLOAD_ID, "value"),
+    State(JOB_ID_STORE_SHARED_ID, "data"),
+    prevent_initial_call=True,
+)
+def toggle_route_direction(reversed_value, job_id):
+    """Persist the chosen route direction and flip the on-map direction cues.
+
+    Regenerates route.gpx + QR code and syncs to MinIO (the QR's presigned
+    URL and the download route serve the MinIO copy). The route line itself
+    is direction-agnostic — only arrowheads and start/end markers move.
+    """
+    if reversed_value is None or not job_id:
+        raise PreventUpdate
+
+    job = CosmonautJob(job_id=job_id, sync_files=False)
+    # No-op when unchanged: page re-renders redeliver the current value.
+    if job.is_route_reversed() == reversed_value:
+        raise PreventUpdate
+
+    job.set_route_reversed(reversed_value)
+    positions = job.get_route_polyline() or []
+    return [list(pos) for pos in positions], route_endpoint_markers(positions)

@@ -3,6 +3,7 @@
 import logging
 import smtplib
 from email.mime.text import MIMEText
+from email.utils import formataddr
 
 from cosmonaut_app.config import (
     EMAIL_PASSWORD,
@@ -35,7 +36,11 @@ def send_mail(recipients, subject, body):
 
     msg = MIMEText(body)
     msg["Subject"] = subject
-    msg["From"] = EMAIL_SENDER
+    # Explicit display name: EMAIL_SENDER is currently the sister project's
+    # mailbox (no cosmonaut@ufz.de exists yet) — the display name is what
+    # identifies the sending app to recipients. If a COSMONAUT alias is ever
+    # set up, only the env files need to change.
+    msg["From"] = formataddr(("COSMONAUT", EMAIL_SENDER))
     msg["To"] = ", ".join(recipients)
 
     try:

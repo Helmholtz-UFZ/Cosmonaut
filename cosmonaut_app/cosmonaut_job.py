@@ -37,6 +37,7 @@ from cosmonaut_app.constants.general import (
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
     QR_CODE_FILE,
+    ROUTE_OPTIONS_FILE,
     STREET_EDITS_FILE,
 )
 from cosmonaut_app.background_job_manager import background_job_manager
@@ -518,12 +519,47 @@ class CosmonautJob:
             job_id=self.model.job_id,
             source_epsg=self.model.epsg,
         )
-        qr_code_url = route_creator.create_gpx()
+        # Honor the persisted direction — a GPX regenerated after a MinIO
+        # round-trip must match what the user chose on Route Download.
+        qr_code_url = route_creator.create_gpx(reverse=self.is_route_reversed())
         self.save()
         return qr_code_url
 
+    def is_route_reversed(self) -> bool:
+        """Return the persisted route direction (False when never toggled)."""
+        options_path = os.path.join(self.working_dir, ROUTE_OPTIONS_FILE)
+        if not os.path.exists(options_path):
+            return False
+        with open(options_path) as f:
+            return json.load(f)["reversed"]
+
+    def set_route_reversed(self, reversed_flag: bool):
+        """Persist the route direction and regenerate GPX + QR code to match.
+
+        Syncs to object storage (via create_qr_code_routing -> save): the QR
+        code's presigned URL points at the MinIO copy of route.gpx, and the
+        download route re-pulls the working dir from MinIO.
+        """
+        log.info(
+            f"Setting route direction for job {self.model.job_id}: "
+            f"reversed={reversed_flag}"
+        )
+        options_path = os.path.join(self.working_dir, ROUTE_OPTIONS_FILE)
+        with open(options_path, "w") as f:
+            json.dump({"reversed": reversed_flag}, f)
+
+        # Force regeneration — create_gpx skips existing files.
+        gpx_path = os.path.join(self.working_dir, GPX_FILE)
+        if os.path.exists(gpx_path):
+            os.remove(gpx_path)
+        self.create_qr_code_routing()
+
     def get_route_polyline(self):
-        """Return the route as WGS84 [[lat, lon], ...] positions, or None if unavailable."""
+        """Return the route as WGS84 [[lat, lon], ...] positions, or None if unavailable.
+
+        The order follows the persisted route direction, so direction-derived
+        map layers (arrowheads, start/end markers) always match the GPX.
+        """
         route_path = os.path.join(self.working_dir, ROUTE_FILENAME)
         if not os.path.exists(route_path):
             return None
@@ -534,6 +570,8 @@ class CosmonautJob:
         for x, y in solution["Path"]:
             lon, lat = transformer.transform(x, y)
             positions.append([lat, lon])
+        if self.is_route_reversed():
+            positions.reverse()
         return positions
 
     def submit(self):

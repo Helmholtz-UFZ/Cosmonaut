@@ -32,23 +32,33 @@ class RouteCreator:
         )
         log.debug("RouteCreator initialized.")
 
-    def create_gpx(self):
-        """Creates a GPX file and QR code from the routing solution."""
+    def create_gpx(self, reverse=False):
+        """Creates a GPX file and QR code from the routing solution.
+
+        Args:
+            reverse: Write the track points in reverse order. Order only —
+                one-way restrictions are not re-validated.
+        """
         log.info("Starting GPX creation process.")
         if not os.path.exists(self.gpx_path):
-            log.debug("Creating GPX file.")
+            log.debug("Creating GPX file (reverse=%s).", reverse)
             with open(self.solution_path, encoding="utf-8") as f:
                 solution = json.load(f)
 
             gpx = gpxpy.gpx.GPX()
-            gpx.name = f"Route ({solution['Optimization Objective']})"
+            gpx.name = f"Route ({solution['Optimization Objective']})" + (
+                " — reversed" if reverse else ""
+            )
             gpx.description = f"Distance: {solution['Distance']:.2f} km"
 
             gpx_track = gpxpy.gpx.GPXTrack()
             segment = gpxpy.gpx.GPXTrackSegment()
 
+            path = solution["Path"]
+            if reverse:
+                path = list(reversed(path))
             transformer = Transformer.from_crs(self.source_epsg, 4326, always_xy=True)
-            for x, y in solution["Path"]:
+            for x, y in path:
                 lon, lat = transformer.transform(x, y)
                 segment.points.append(gpxpy.gpx.GPXTrackPoint(lat, lon))
 
