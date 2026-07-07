@@ -2,7 +2,7 @@
 
 ### COSmic ray based soil MOisture Prediction NAvigation and UTility Tool
 
-*Last updated: 2026-05-22 15:02:32*
+*Last updated: 2026-07-07 22:37:55*
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -60,9 +60,9 @@ based on cosmic ray neutron sensor measurement locations. This page allows you t
 begin a new routing job by clicking the "Create new job" button.
 
 Each job is assigned a unique identifier that tracks your data, route selections,
-and final navigation output through the entire workflow. You can also load existing
-jobs using the search bar in the navigation header to continue work on a previous
-routing project.
+and final navigation output through the entire workflow. You can also continue
+work on a previous routing project by opening it from the Job manager in the
+navigation header.
 
 From here, you'll proceed through the workflow to provide job information, upload
 membership data, select streets from OpenStreetMap, configure routing parameters,
@@ -165,6 +165,16 @@ preserved exactly as you left them.
   - Unclassified, Residential, Living street, Track
 
   Use "Select All" / "Select None" buttons for quick bulk operations.
+
+- **Track Grades**: While the Track type is enabled, an additional filter
+  selects which OSM ``tracktype`` grades are included. The scale describes
+  surface firmness from grade 1 (solid — paved or heavily compacted) to
+  grade 5 (soft — uncompacted, subtle on the landscape) and makes track
+  selection much more reliable — but many tracks in OSM are unfortunately
+  untagged. Grades 4 and 5 are rarely traversable by survey vehicles;
+  they and untagged tracks (unknown condition) are excluded by default, so
+  only grades 1-3 are active initially. Enable "No grade tag" to include
+  untagged tracks as well.
 
 - **Interactive Clicking**: Click individual road segments on the map to mark
   them for removal. Marked roads are highlighted in a distinct color for
@@ -327,6 +337,12 @@ or navigation applications.
 - **GPX Download**: Download the complete navigation route as a standard GPX
   (GPS Exchange Format) file compatible with most GPS devices, smartphone
   navigation apps, and mapping software.
+
+- **Reverse Direction**: A switch flips the start and end of the route. The
+  GPX file, the QR code and the on-map direction arrows update together.
+  Only the order of the track points is reversed — the route itself does not
+  change, and one-way restrictions are not re-validated for the opposite
+  direction, so double-check the reversed route is legal to drive.
 
 - **Route Visualization**: View the calculated route overlaid on the interactive
   map with all waypoints, turn-by-turn segments, and your original measurement

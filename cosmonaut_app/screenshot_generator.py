@@ -255,6 +255,15 @@ class ScreenshotGenerator:
             # Wait for Dash callbacks and content
             self.wait_for_page_ready(timeout=15)
 
+            # Hide the Dash debug-mode dev-tools UI (menu, error alerts) so
+            # documentation can be generated from a DEBUG=1 dev server without
+            # it appearing in the screenshots. Prefix selector: the class
+            # names changed between Dash versions.
+            self.page.add_style_tag(
+                content='[class^="dash-debug"], [class*=" dash-debug"] '
+                "{ display: none !important; }"
+            )
+
             # Capture screenshot
             self.page.screenshot(path=str(output_path), full_page=False)
 

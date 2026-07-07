@@ -243,10 +243,17 @@ log = logging.getLogger(__name__)
 After the page works:
 
 ```bash
-python -m cosmonaut_app.doc_generator <job_id>
+# Requires the dev app running on localhost:8080 and TWO prepared jobs:
+# <job_id_new>: advanced up to routing-params (upload done, route NOT started)
+# <job_id_finished>: fully completed (route computed)
+python -m cosmonaut_app.doc_generator <job_id_new> <job_id_finished>
 ```
 
-This captures a screenshot and extracts the module docstring into web documentation. Ensure your `# User documentation` section in the docstring is complete.
+This captures all page screenshots and extracts the module docstrings into the
+static web documentation (`assets/docs/`). Ensure your `# User documentation`
+section in the docstring is complete. Also add the new page to
+`cosmonaut_app/doc_pages_config.py` — the generator only documents pages
+listed there (it is not derived from the navbar).
 
 ### Step 11: Navbar (if applicable)
 
