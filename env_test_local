@@ -9,7 +9,7 @@ COSMONAUT_TESTING="true"
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
 FLASK_PORT=8080
 WEB_OUTSIDE_URL="http://localhost"
-MAINTAINER_EMAIL="john-eric.anders@ufz.de,louis-ferdinand.trinkle@ufz.de"
+MAINTAINER_EMAIL="louis-ferdinand.trinkle@ufz.de"
 
 ### Tile Server ###
 TILESERVER_URL="http://127.0.0.1:8001"
