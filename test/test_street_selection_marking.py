@@ -20,7 +20,6 @@ import pytest
 from PIL import Image
 from playwright.sync_api import expect
 
-from test.help_functions_tests import check_all_errors
 from cosmonaut_app.config import FLASK_PORT
 from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
@@ -33,6 +32,7 @@ from cosmonaut_app.constants.html_ids import (
     START_JOB_BUTTON_HOME_ID,
 )
 from cosmonaut_app.db_manager import DataBaseManager
+from test.help_functions_tests import check_all_errors
 
 log = logging.getLogger(__name__)
 

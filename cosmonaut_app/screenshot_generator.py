@@ -3,12 +3,11 @@
 import logging
 import time
 from pathlib import Path
-from typing import Tuple
 
-from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
+from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
 # Import page lists from doc_pages_config (single source of truth)
-from cosmonaut_app.doc_pages_config import USER_WORKFLOW_PAGES, ADMIN_PAGES
+from cosmonaut_app.doc_pages_config import ADMIN_PAGES, USER_WORKFLOW_PAGES
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +30,7 @@ PAGE_CONFIG = {
 }
 
 
-def build_pages_to_screenshot() -> list[Tuple[int, str, str, str]]:
+def build_pages_to_screenshot() -> list[tuple[int, str, str, str]]:
     """Build screenshot list from doc_generator page lists.
 
     This ensures page lists stay in sync - if a page is added to documentation,
@@ -88,7 +87,7 @@ class ScreenshotGenerator:
         job_id_finished: str,
         job_id_new: str,
         headless: bool = True,
-        viewport_size: Tuple[int, int] = (1920, 1080),
+        viewport_size: tuple[int, int] = (1920, 1080),
         base_url: str = "http://localhost:8080",
     ):
         """Initialize the screenshot generator.

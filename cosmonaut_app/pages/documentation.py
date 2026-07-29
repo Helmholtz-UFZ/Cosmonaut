@@ -54,12 +54,13 @@ message with instructions for generating them.
 """
 
 from pathlib import Path
-from dash import register_page, dcc
+
 import dash_bootstrap_components as dbc
+from dash import dcc, register_page
 
 from cosmonaut_app.layout import (
-    page_container_column_layout,
     create_header,
+    page_container_column_layout,
 )
 
 register_page(

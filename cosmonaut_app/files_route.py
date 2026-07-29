@@ -6,7 +6,7 @@ import os
 import zipfile
 
 import dash_bootstrap_components as dbc
-from flask import send_from_directory, send_file, abort
+from flask import abort, send_file, send_from_directory
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.error_handling import JobNotFound

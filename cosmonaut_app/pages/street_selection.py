@@ -73,7 +73,7 @@ processing.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import dash
 import dash_bootstrap_components as dbc
@@ -141,7 +141,7 @@ _REMOVED_LIST_MAX_HEIGHT = "12rem"
 _TRACK_TAG_LABEL = "Track"
 
 
-def _extract_job_id(pathname: str) -> Optional[str]:
+def _extract_job_id(pathname: str) -> str | None:
     """Extract job_id from URL pathname. Returns None if invalid format."""
     if not pathname:
         return None
@@ -637,10 +637,10 @@ def poll_street_processing_status(n_intervals, pathname):
     prevent_initial_call=True,
 )
 def remove_selected(
-    n: Optional[int],
-    hideout: Optional[Dict[str, Any]],
-    pathname: Optional[str],
-    version: Optional[int],
+    n: int | None,
+    hideout: dict[str, Any] | None,
+    pathname: str | None,
+    version: int | None,
 ):
     """Remove the currently selected roads and update the edited GeoJSON."""
     job_id = _extract_job_id(pathname)
@@ -677,9 +677,9 @@ def remove_selected(
     prevent_initial_call=True,
 )
 def keep_largest_subnetwork(
-    n: Optional[int],
-    pathname: Optional[str],
-    version: Optional[int],
+    n: int | None,
+    pathname: str | None,
+    version: int | None,
 ):
     """Keep the largest connected subnetwork of the current road network."""
     job_id = _extract_job_id(pathname)
@@ -733,9 +733,9 @@ def keep_largest_subnetwork(
     prevent_initial_call=True,
 )
 def reset_edits(
-    n: Optional[int],
-    pathname: Optional[str],
-    version: Optional[int],
+    n: int | None,
+    pathname: str | None,
+    version: int | None,
 ):
     """Reset edits by restoring all state to defaults."""
     job_id = _extract_job_id(pathname)
@@ -768,9 +768,9 @@ def reset_edits(
     prevent_initial_call=True,
 )
 def tags_select_all_none(
-    n_all: Optional[int],
-    n_none: Optional[int],
-) -> List[str]:
+    n_all: int | None,
+    n_none: int | None,
+) -> list[str]:
     """Set checklist to all or none. The value change triggers update_tags_dropdown."""
     trig = ctx.triggered_id
     if trig == TAGS_SELECT_ALL_BUTTON_STREET_SELECTION_ID:
@@ -789,10 +789,10 @@ def tags_select_all_none(
     prevent_initial_call=True,
 )
 def toggle_reset_modal(
-    n_open: Optional[int],
-    n_cancel: Optional[int],
-    n_confirm: Optional[int],
-    is_open: Optional[bool],
+    n_open: int | None,
+    n_cancel: int | None,
+    n_confirm: int | None,
+    is_open: bool | None,
 ) -> bool:
     """Open/close the reset confirmation modal based on the triggering control."""
     if ctx.triggered_id in (
@@ -817,11 +817,11 @@ def toggle_reset_modal(
     prevent_initial_call=True,
 )
 def clear_selections(
-    n_remove: Optional[int],
-    n_largest: Optional[int],
-    n_reset_confirm: Optional[int],
-    hideout: Optional[Dict[str, Any]],
-) -> Dict[str, Any]:
+    n_remove: int | None,
+    n_largest: int | None,
+    n_reset_confirm: int | None,
+    hideout: dict[str, Any] | None,
+) -> dict[str, Any]:
     """Clear current selections after destructive operations for a clean state."""
     if not any([n_remove, n_largest, n_reset_confirm]):
         raise PreventUpdate
@@ -840,7 +840,7 @@ def clear_selections(
     prevent_initial_call=True,
 )
 def update_tags_dropdown(
-    tags: Optional[List[str]], pathname: Optional[str], version: Optional[int]
+    tags: list[str] | None, pathname: str | None, version: int | None
 ):
     """Persist selected tag values and refresh the map to match the filter."""
     if tags is None:
@@ -876,7 +876,7 @@ def update_tags_dropdown(
     prevent_initial_call=True,
 )
 def update_track_grades(
-    grades: Optional[List[str]], pathname: Optional[str], version: Optional[int]
+    grades: list[str] | None, pathname: str | None, version: int | None
 ):
     """Persist the allowed track grades and refresh the map to match."""
     if grades is None:

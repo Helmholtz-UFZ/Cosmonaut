@@ -72,6 +72,7 @@ For specific implementation details, see:
 - [Form Partition](docs/conventions/form_partition.md) - Essential vs advanced Pydantic form tiers
 - [Bootstrap Styling](docs/conventions/bootstrap_styling.md) - Bootstrap classes only
 - [Logging](docs/conventions/logging.md) - Log levels, proper logger usage
+- [Linting](docs/conventions/linting.md) - Ruff version pinning, explicit rule set, noqa
 - [Callbacks](docs/conventions/callbacks.md) - Callback organization patterns
 - [Dash Leaflet](docs/conventions/dash_leaflet.md) - Map component gotchas
 - [Deployment](docs/conventions/deployment.md) - Kubernetes/production gotchas (Gunicorn, HAProxy, resource limits)

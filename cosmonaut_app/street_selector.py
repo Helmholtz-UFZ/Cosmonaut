@@ -15,13 +15,12 @@ from __future__ import annotations
 
 import logging
 import os
-
-import orjson
 from typing import TYPE_CHECKING
 
+import orjson
+from sensor_routing.constants import OSM_FILENAME
 from shapely import STRtree
 from shapely.geometry import box, mapping, shape
-from sensor_routing.constants import OSM_FILENAME
 
 from cosmonaut_app.constants.general import (
     DEFAULT_TRACK_GRADES,

@@ -22,6 +22,7 @@ from sensor_routing.full_pipeline_cli import (
     validate_predictor_membership_consistency,
 )
 
+from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.config import (
     DAYS_DELETE_NOT_SUBMITTED,
     DAYS_DELETE_SUBMITTED,
@@ -40,7 +41,6 @@ from cosmonaut_app.constants.general import (
     ROUTE_OPTIONS_FILE,
     STREET_EDITS_FILE,
 )
-from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
 from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.navigation_routing import RouteCreator
@@ -71,7 +71,7 @@ def _transform_csv(input_file, epsg_input, epsg_output):
         log.error("Input file must be a CSV or TXT file.")
         raise ValueError("Input file must be a CSV file.")
 
-    with open(input_file, "r") as csvfile:
+    with open(input_file) as csvfile:
         sample = csvfile.read(4096)
         dialect = csv.Sniffer().sniff(sample)
         has_header = csv.Sniffer().has_header(sample)
@@ -679,7 +679,7 @@ class CosmonautJob:
         log.info(f"Retrieving logs for job {self.model.job_id}")
         log_file_path = os.path.join(self.working_dir, LOG_FILE_NAME)
         if os.path.exists(log_file_path):
-            with open(log_file_path, "r") as f:
+            with open(log_file_path) as f:
                 log_content = f.read()
             if not log_content.strip():
                 log_content = "Logs empty."

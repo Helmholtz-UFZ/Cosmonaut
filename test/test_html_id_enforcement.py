@@ -26,7 +26,6 @@ If you find a # nocheck that doesn't fit these cases:
 import ast
 import re
 from pathlib import Path
-from typing import List, Set, Tuple, Dict
 
 
 def get_cosmonaut_app_path() -> Path:
@@ -39,7 +38,7 @@ def get_html_ids_path() -> Path:
     return get_cosmonaut_app_path() / "constants" / "html_ids.py"
 
 
-def load_html_ids_constants() -> Dict[str, bool]:
+def load_html_ids_constants() -> dict[str, bool]:
     """Load all ID constants from html_ids.py.
 
     Returns:
@@ -48,7 +47,7 @@ def load_html_ids_constants() -> Dict[str, bool]:
     html_ids_file = get_html_ids_path()
     constants = {}
 
-    with open(html_ids_file, "r") as f:
+    with open(html_ids_file) as f:
         for line in f:
             # Match pattern: CONSTANT_NAME = "value"
             match = re.match(r'^([A-Z_]+_ID)\s*=\s*"[^"]*"(.*)$', line)
@@ -61,7 +60,7 @@ def load_html_ids_constants() -> Dict[str, bool]:
     return constants
 
 
-def find_python_files(directory: Path) -> List[Path]:
+def find_python_files(directory: Path) -> list[Path]:
     """Find all Python files in directory recursively."""
     return list(directory.rglob("*.py"))
 
@@ -76,7 +75,7 @@ def is_comment_or_docstring(line: str) -> bool:
     )
 
 
-def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
+def find_id_usages_in_file(file_path: Path) -> list[tuple[int, str, str]]:
     """Find all id= usages in Dash components.
 
     Returns:
@@ -84,7 +83,7 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
     """
     violations = []
 
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         lines = f.readlines()
 
     # Common Dash component prefixes and callback patterns
@@ -153,7 +152,7 @@ def find_id_usages_in_file(file_path: Path) -> List[Tuple[int, str, str]]:
     return violations
 
 
-def find_non_constant_callback_ids(file_path: Path) -> List[Tuple[int, str, str]]:
+def find_non_constant_callback_ids(file_path: Path) -> list[tuple[int, str, str]]:
     """Find Input/Output/State calls where the first arg is not an uppercase constant.
 
     Uses AST to detect string literals, function calls (e.g. hidden_id(...)),
@@ -164,7 +163,7 @@ def find_non_constant_callback_ids(file_path: Path) -> List[Tuple[int, str, str]
     """
     violations = []
 
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         source = f.read()
     lines = source.splitlines()
 
@@ -217,7 +216,7 @@ def find_non_constant_callback_ids(file_path: Path) -> List[Tuple[int, str, str]
 
 
 def check_if_constant_from_html_ids(
-    id_value: str, html_ids_constants: Set[str]
+    id_value: str, html_ids_constants: set[str]
 ) -> bool:
     """Check if an ID value is a constant from html_ids.py."""
     # Constant names are uppercase with underscores
@@ -243,7 +242,7 @@ def _is_callback_call(node: ast.Call) -> bool:
     return False
 
 
-def _extract_callback_constants(call_node: ast.Call) -> Set[str]:
+def _extract_callback_constants(call_node: ast.Call) -> set[str]:
     """Extract ID constants from a callback call's arguments."""
     constants = set()
     for arg in call_node.args:
@@ -253,7 +252,7 @@ def _extract_callback_constants(call_node: ast.Call) -> Set[str]:
     return constants
 
 
-def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
+def find_callback_id_usages_in_file(file_path: Path) -> set[str]:
     """Find all ID constants used in callbacks.
 
     Detects three patterns:
@@ -267,7 +266,7 @@ def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
     used_constants = set()
 
     try:
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             content = f.read()
 
         tree = ast.parse(content, filename=str(file_path))
@@ -294,7 +293,7 @@ def find_callback_id_usages_in_file(file_path: Path) -> Set[str]:
     return used_constants
 
 
-def extract_constants_from_ast(node: ast.AST) -> Set[str]:
+def extract_constants_from_ast(node: ast.AST) -> set[str]:
     """Extract constant names from an AST node.
 
     Recursively searches for Name nodes that look like ID constants.

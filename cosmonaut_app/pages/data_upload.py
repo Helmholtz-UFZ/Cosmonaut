@@ -85,7 +85,6 @@ from sensor_routing.full_pipeline_cli import (
 
 from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.classification_plot import ClassificationPlot
-from cosmonaut_app.object_storage_manager import save_files
 from cosmonaut_app.constants.general import (
     DEFAULT_MAP_CENTER,
     DEFAULT_MAP_ZOOM,
@@ -126,6 +125,7 @@ from cosmonaut_app.layout import (
     progress_footer,
 )
 from cosmonaut_app.map_utils import get_tile_url
+from cosmonaut_app.object_storage_manager import save_files
 from cosmonaut_app.pydantic_models import check_epsg
 
 log = logging.getLogger(__name__)

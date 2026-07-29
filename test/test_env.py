@@ -3,7 +3,6 @@
 import logging
 import os
 import shutil
-from typing import List
 
 from dotenv import load_dotenv
 
@@ -12,7 +11,7 @@ from cosmonaut_app.config import env_vars, getenv
 log = logging.getLogger(__name__)
 
 
-def _test_single_env_file(env_filename: str, logger, additional_lines: List[str]):
+def _test_single_env_file(env_filename: str, logger, additional_lines: list[str]):
     """Test a single .env file.
 
     Args:

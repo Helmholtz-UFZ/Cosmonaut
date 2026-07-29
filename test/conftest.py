@@ -15,7 +15,8 @@ import urllib.request
 
 import pytest
 import redis
-from playwright.sync_api import ConsoleMessage, Error as PlaywrightError, Page
+from playwright.sync_api import ConsoleMessage, Page
+from playwright.sync_api import Error as PlaywrightError
 from slugify import slugify
 from sqlalchemy.exc import OperationalError
 from werkzeug.serving import make_server
@@ -29,7 +30,7 @@ from cosmonaut_app.config import (
 )
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.error_handling import ObjectStorageError
-from cosmonaut_app.object_storage_manager import setup_remote, create_bucket
+from cosmonaut_app.object_storage_manager import create_bucket, setup_remote
 
 
 def create_logger():

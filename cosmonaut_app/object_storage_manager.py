@@ -9,7 +9,6 @@ from datetime import timedelta
 from minio import Minio
 from minio.error import S3Error
 
-from cosmonaut_app.error_handling import ObjectStorageError
 from cosmonaut_app.config import (
     JOB_WORK_DIR_TEMPLATE,
     OBJECT_STORAGE_ACCESS_KEY,
@@ -18,6 +17,7 @@ from cosmonaut_app.config import (
     OBJECT_STORAGE_REMOTE_NAME,
     OBJECT_STORAGE_SECRET_KEY,
 )
+from cosmonaut_app.error_handling import ObjectStorageError
 
 log = logging.getLogger(__name__)
 

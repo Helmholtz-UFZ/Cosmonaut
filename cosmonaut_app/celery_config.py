@@ -2,7 +2,7 @@
 
 from celery.schedules import crontab
 
-from cosmonaut_app.config import REDIS_HOST, REDIS_DB, REDIS_PASSWORD, REDIS_PORT
+from cosmonaut_app.config import REDIS_DB, REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
 
 
 def _get_redis_port():

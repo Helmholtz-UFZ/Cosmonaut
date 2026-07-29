@@ -43,21 +43,22 @@ model and used during background route calculation.
 """
 
 import logging
+
+import dash_bootstrap_components as dbc
 from dash import (
-    register_page,
-    dcc,
-    html,
-    callback,
+    Input,
     Output,
     State,
-    Input,
+    callback,
     callback_context,
+    dcc,
+    html,
     no_update,
+    register_page,
 )
 from dash.exceptions import PreventUpdate
-import dash_bootstrap_components as dbc
+from dash_form_factory import FormFactory, InputField
 
-from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
     ADVANCED_COLLAPSE_ROUTING_PARAMS_ID,
@@ -66,16 +67,15 @@ from cosmonaut_app.constants.html_ids import (
     NEXT_BUTTON_ROUTING_PARAMS_ID,
     URL_SHARED_ID,
 )
-
+from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (
-    page_container_fullscreen_layout,
-    create_card_input,
-    progress_footer,
     build_url_step,
+    create_card_input,
     create_reset_banner,
     create_reset_modal,
+    page_container_fullscreen_layout,
+    progress_footer,
 )
-from dash_form_factory import FormFactory, InputField
 from cosmonaut_app.pydantic_models import FullPipelineConfig
 
 log = logging.getLogger(__name__)

@@ -84,8 +84,12 @@ linting:
   # so linting it again adds nothing. Skip on the schedule.
   rules:
     - if: "$CI_PIPELINE_SOURCE != 'schedule'"
+  # Version pinned deliberately: an unpinned `pip install ruff` installs whatever
+  # is current, so a new ruff release breaks the pipeline on unchanged code. This
+  # happened with 0.16.0, which expanded the default rule set from 59 to 413
+  # rules. Keep in sync with pyproject.toml and .pre-commit-config.yaml.
   script:
-    - "pip install --quiet ruff"
+    - "pip install --quiet ruff==0.16.0"
     - "ruff check ."
 
 # Unit tests: no external services needed.

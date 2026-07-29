@@ -14,7 +14,6 @@ from celery import Task
 from sensor_routing.full_pipeline_cli import sensor_routing_pipeline
 
 from cosmonaut_app.config import FLASK_PORT, WEB_OUTSIDE_URL
-from cosmonaut_app.object_storage_manager import get_presigned_download_url
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
@@ -22,8 +21,9 @@ from cosmonaut_app.constants.general import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.email_service import send_mail
-from cosmonaut_app.street_selector import StreetSelector
 from cosmonaut_app.logger import get_logger_config_computation, get_logger_config_worker
+from cosmonaut_app.object_storage_manager import get_presigned_download_url
+from cosmonaut_app.street_selector import StreetSelector
 
 log = logging.getLogger(__name__)
 

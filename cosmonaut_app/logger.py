@@ -8,11 +8,11 @@ import psycopg2
 from psycopg2 import pool
 
 from cosmonaut_app.config import (
-    POSTGRES_NAME,
     POSTGRES_HOST_NAME,
+    POSTGRES_NAME,
+    POSTGRES_PASSWORD,
     POSTGRES_PORT,
     POSTGRES_USER,
-    POSTGRES_PASSWORD,
 )
 
 format_string = (

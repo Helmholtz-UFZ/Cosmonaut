@@ -41,7 +41,9 @@ dev = [
     "pytest-mock>=3.15.1",
     "pytest-playwright>=0.6.2",
     "python-slugify>=8.0.0",
-    "ruff>=0.7.4",
+    # Upper bound on the minor: ruff changes rule behaviour in minor releases.
+    # Keep in sync with .gitlab-ci.yml and .pre-commit-config.yaml.
+    "ruff>=0.16.0,<0.17",
 ]
 docs = [
     "mkdocs>=1.6.1",
@@ -58,6 +60,20 @@ packages = ["cosmonaut_app"]
 default-groups = [
     "dev"
 ]
+
+[tool.ruff.lint]
+# Explicit rule set instead of ruff's built-in defaults. Those defaults are not a
+# stable contract: 0.16.0 grew them from 59 to 413 rules and simultaneously
+# dropped 18 long-standing ones (E402, E711, E712, E731, E741, F403, …). Listing
+# the set here decouples us from that in both directions — a ruff upgrade can no
+# longer silently add or remove checks.
+#   E4/E7/E9 + F : the pre-0.16 default set
+#   I            : import sorting — ruff-format does not do this, nothing else did
+#   UP           : pyupgrade, safe and auto-fixable on requires-python >= 3.13
+# Deliberately not enabled yet: BLE, DTZ, SIM, S, RUF012. Each needs a per-site
+# judgement call (is this `except Exception` justified? does this naive datetime
+# matter?), so they belong in their own review, not in a lint-config change.
+select = ["E4", "E7", "E9", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 pythonpath = "."

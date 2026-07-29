@@ -13,7 +13,7 @@ Classes:
 import logging
 import time
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -26,8 +26,8 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.dialects.postgresql import JSON
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from cosmonaut_app.config import (
     POSTGRES_HOST_NAME,
@@ -287,7 +287,7 @@ class DataBaseManager:
             return job_info
 
     @classmethod
-    def query_distinct_modules(cls) -> List[str]:
+    def query_distinct_modules(cls) -> list[str]:
         """Return all distinct module names from the logs table.
 
         Returns
@@ -312,10 +312,10 @@ class DataBaseManager:
         start_minute: int,
         end_hour: int,
         end_minute: int,
-        levels: List[str],
-        pid: Optional[int] = None,
-        excluded_modules: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        levels: list[str],
+        pid: int | None = None,
+        excluded_modules: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Query logs from the database with specified filters.
 
         Parameters

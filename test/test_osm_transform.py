@@ -17,6 +17,7 @@ from decimal import Decimal
 
 import pandas as pd
 import shapely
+from sensor_routing.point_mapping import build_node_to_roads_map
 from shapely.geometry import box
 
 from cosmonaut_app.osm.downloader import OsmDownloader
@@ -27,7 +28,6 @@ from cosmonaut_app.osm.transform import (
     way_to_feature,
     ways_to_features,
 )
-from sensor_routing.point_mapping import build_node_to_roads_map
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "overpass_test_aoi.json")
 # Bounding box the fixture was queried with (lon/lat), used for truncation.

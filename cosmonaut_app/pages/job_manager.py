@@ -24,8 +24,8 @@ import logging
 import re
 
 import dash
-import dash_bootstrap_components as dbc
 import dash_ag_grid as dag
+import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, html
 
 from cosmonaut_app.constants.general import (
@@ -43,7 +43,11 @@ from cosmonaut_app.constants.html_ids import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
-from cosmonaut_app.layout import create_header, page_container_column_layout, build_url_step
+from cosmonaut_app.layout import (
+    build_url_step,
+    create_header,
+    page_container_column_layout,
+)
 from cosmonaut_app.tasks.maintenance_tasks import clean_up_jobs
 
 log = logging.getLogger(__name__)

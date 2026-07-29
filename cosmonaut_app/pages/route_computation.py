@@ -70,38 +70,38 @@ import logging
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import html, register_page, callback, Input, Output, State, dcc, no_update
+from dash import Input, Output, State, callback, dcc, html, no_update, register_page
 from dash.exceptions import PreventUpdate
 
-from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.background_job_manager import background_job_manager
-from cosmonaut_app.files_route import create_download_button
 from cosmonaut_app.constants.general import (
-    JOB_STATUS_PENDING,
-    JOB_STATUS_RUNNING,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
+    JOB_STATUS_PENDING,
+    JOB_STATUS_RUNNING,
 )
 from cosmonaut_app.constants.html_ids import (
+    CANCEL_BUTTON_ROUTE_COMPUTATION_ID,
     JOB_ID_STORE_SHARED_ID,
     LOADING_OVERLAY_SHARED_ID,
-    START_BUTTON_ROUTE_COMPUTATION_ID,
-    CANCEL_BUTTON_ROUTE_COMPUTATION_ID,
-    RESTART_BUTTON_ROUTE_COMPUTATION_ID,
+    LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
+    RESTART_BUTTON_ROUTE_COMPUTATION_ID,
+    START_BUTTON_ROUTE_COMPUTATION_ID,
     STATUS_BADGE_ROUTE_COMPUTATION_ID,
+    STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID,
     TASK_STATUS_SPAN_ROUTE_COMPUTATION_ID,
+    UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID,
     WORKER_NAME_SPAN_ROUTE_COMPUTATION_ID,
     WORKER_STATUS_SPAN_ROUTE_COMPUTATION_ID,
-    LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID,
-    STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID,
-    UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID,
 )
+from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.files_route import create_download_button
 from cosmonaut_app.layout import (
-    page_container_fullscreen_layout,
-    create_card_input,
-    progress_footer,
     build_url_step,
+    create_card_input,
+    page_container_fullscreen_layout,
+    progress_footer,
 )
 
 log = logging.getLogger(__name__)

@@ -21,23 +21,23 @@ import zipfile
 import pytest
 from playwright.sync_api import expect
 
-from test.help_functions_tests import check_all_errors
 from cosmonaut_app.config import FLASK_PORT
 from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
+    EMAIL_INPUT_USER_INFO_ID,
     LOADING_OVERLAY_SHARED_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTING_PARAMS_ID,
     NEXT_BUTTON_STREET_SELECTION_ID,
+    NEXT_BUTTON_USER_INFO_ID,
     PREDICTOR_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     START_BUTTON_ROUTE_COMPUTATION_ID,
     START_JOB_BUTTON_HOME_ID,
-    EMAIL_INPUT_USER_INFO_ID,
-    NEXT_BUTTON_USER_INFO_ID,
 )
 from cosmonaut_app.db_manager import DataBaseManager
+from test.help_functions_tests import check_all_errors
 
 log = logging.getLogger(__name__)
 

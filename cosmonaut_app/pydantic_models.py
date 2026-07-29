@@ -1,13 +1,13 @@
 import logging
 import re
 from datetime import date
-from pyproj.exceptions import CRSError
-from pyproj import CRS
+from typing import Annotated, Any
 
 from email_validator import EmailNotValidError, validate_email
 from pydantic import AfterValidator, Field
+from pyproj import CRS
+from pyproj.exceptions import CRSError
 from sensor_routing.full_pipeline_cli import FullPipelineConfig
-from typing import Annotated, Any, Dict
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class UserModel(FullPipelineConfig):
         AfterValidator(validate_job_id),
     ]
     membership_upload: Annotated[
-        Dict[str, Any],
+        dict[str, Any],
         Field(
             {
                 "file_name": "No file uploaded",
@@ -108,7 +108,7 @@ class UserModel(FullPipelineConfig):
         ),
     ]
     predictor_upload: Annotated[
-        Dict[str, Any],
+        dict[str, Any],
         Field(
             {"file_name": "No file uploaded", "len": 0},
             description="Upload a file with the predictor data",

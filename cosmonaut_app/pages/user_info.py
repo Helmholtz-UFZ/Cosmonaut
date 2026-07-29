@@ -31,12 +31,12 @@ from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.constants.general import JOB_STATUS_PENDING
 from cosmonaut_app.constants.html_ids import (
-    JOB_ID_STORE_SHARED_ID,
-    URL_SHARED_ID,
     EMAIL_HELPER_TEXT_USER_INFO_ID,
     EMAIL_INPUT_USER_INFO_ID,
     EMAIL_VISIBILITY_NOTICE_COLLAPSE_USER_INFO_ID,
+    JOB_ID_STORE_SHARED_ID,
     NEXT_BUTTON_USER_INFO_ID,
+    URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.layout import (

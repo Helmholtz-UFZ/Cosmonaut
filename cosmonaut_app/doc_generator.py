@@ -14,9 +14,9 @@ from datetime import datetime
 from pathlib import Path
 
 from cosmonaut_app.doc_pages_config import (
-    USER_WORKFLOW_PAGES,
     ADMIN_PAGES,
     EXCLUDED_PAGES,
+    USER_WORKFLOW_PAGES,
 )
 from cosmonaut_app.screenshot_generator import ScreenshotGenerator
 
@@ -125,7 +125,7 @@ class DocumentationGenerator:
         module_file = pages_dir / f"{module_name}.py"
 
         # Read and parse the file to extract docstring
-        with open(module_file, "r", encoding="utf-8") as f:
+        with open(module_file, encoding="utf-8") as f:
             tree = ast.parse(f.read())
 
         # Get module docstring
