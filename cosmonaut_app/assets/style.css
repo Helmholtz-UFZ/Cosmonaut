@@ -44,8 +44,15 @@ div:has(> #_pages_content) {
     min-width: 0;
 }
 
+/* Admin pages are marked either by cosmonaut's own .no-map-page wrapper or, for
+   pages served by the framework, by #main-content-container — the id
+   cosmo_suite.layouts.page_container_column_layout gives its column. The framework
+   container has no wrapper to hang a class on, and without this the Logs and
+   Worker Management pages render squeezed beside a map they do not use.
+   Framework-side fix (a className parameter on that helper) is on the MR list. */
+
 /* Map pages only: lock root to viewport so .content-panel scrolls, not the document */
-.app-root:not(:has(.no-map-page)) {
+.app-root:not(:has(.no-map-page, #main-content-container)) {
     height: 100vh;
     overflow: hidden;
 }
@@ -56,10 +63,10 @@ div:has(> #_pages_content) {
 }
 
 /* Admin pages: hide map, full-width content */
-.app-panels:has(.no-map-page) .map-panel {
+.app-panels:has(.no-map-page, #main-content-container) .map-panel {
     display: none;
 }
-.app-panels:has(.no-map-page) .content-panel {
+.app-panels:has(.no-map-page, #main-content-container) .content-panel {
     flex: 1;
     max-width: 100%;
 }

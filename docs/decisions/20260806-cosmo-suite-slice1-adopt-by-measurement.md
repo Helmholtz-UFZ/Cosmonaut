@@ -84,9 +84,20 @@ Concretely, per module:
   `WEB_WORK_DIR`, and moving `cosmo_suite.layouts`' navbar and reset-modal
   callbacks behind an opt-in registration function instead of registering them at
   import time.
-- **Known cost of the two page shims:** importing a framework page pulls in
-  `cosmo_suite.layouts`, which registers three callbacks at import time (one navbar
-  collapse, two reset-modal) whose components cosmonaut's `app_layout()` does not
-  mount. They are inert — nothing writes to the store that triggers them — but Dash
-  dev tools reports them as "nonexistent object was used in an Output" in debug
-  mode. That is the last framework MR item above.
+- **Known cost of the two page shims**, measured on a running app in debug mode:
+  - Importing a framework page pulls in `cosmo_suite.layouts`, which registers three
+    callbacks at import time (one navbar collapse, two reset-modal) whose components
+    cosmonaut's `app_layout()` does not mount. Confirmed present in
+    `/_dash-dependencies`. They are **inert and silent**: nothing writes to the store
+    that triggers them, so they never fire, and Dash reports *no*
+    "nonexistent object was used in an Output" — 0 such console messages and 0
+    devtools error cards across `/`, `/logs` and `/worker-management`. The cost is
+    three dead entries in the callback graph, not user-visible noise. Cleaning it up
+    is still the right framework fix (last MR item above), just not urgent.
+  - `cosmo_suite.layouts.page_container_column_layout` has no wrapper to carry
+    cosmonaut's `.no-map-page` marker class, so both adopted pages first rendered
+    squeezed into the content panel beside a map they do not use, with the ag-grid
+    column headers truncated to two characters. Fixed app-side in `style.css` by
+    also keying the admin-page rules on `#main-content-container`, the id the
+    framework helper gives its column. A `className` parameter on that helper is the
+    framework-side fix and is on the MR list.
