@@ -6,9 +6,8 @@ from datetime import timedelta
 
 import gpxpy
 import qrcode
+from cosmo_suite.object_storage_manager import get_presigned_download_url
 from pyproj import Transformer
-
-from cosmonaut_app.object_storage_manager import get_presigned_download_url
 
 log = logging.getLogger(__name__)
 

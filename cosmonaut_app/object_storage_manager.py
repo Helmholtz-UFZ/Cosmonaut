@@ -1,13 +1,34 @@
-"""This module provides a class to manage object storage using rclone."""
+"""Manage object storage using rclone.
+
+Partially adopted from ``cosmo_suite.object_storage_manager``: ``check_result``
+(and with it the credential masking) is imported from there, ``ObjectStorageError``
+is re-exported through ``error_handling``, and ``get_presigned_download_url`` is
+gone from here entirely — its callers import the framework function directly.
+
+The rclone wrappers below deliberately stay local. They are not drift — they carry
+three deviations the framework version does not have, all of them load-bearing on
+Kubernetes (introduced in ff62119, "Kubernet friendly sync"):
+
+1. Every subprocess call has a ``timeout``. The framework's have none, so a hung
+   rclone against an unreachable MinIO blocks a worker forever.
+2. ``check_connection`` runs a 3s-contimeout ``rclone lsd`` pre-flight, so an
+   unreachable store fails in seconds instead of after three long retries.
+3. ``get_files(overwrite=...)`` — the framework always downloads with
+   ``--checksum``, i.e. always overwrites. This app defaults to
+   ``--ignore-existing`` so a stale remote copy cannot clobber street-selection
+   edits that have not been synced yet; only worker pods pass ``overwrite=True``.
+
+Converging these means a cosmo-suite MR (parameters for timeout / connection check
+/ overwrite) and a new tag, not a local edit. Until then the duplication is the
+lesser evil: adopting the framework version as-is would be a silent regression.
+"""
 
 import logging
 import subprocess
 import sys
 import time
-from datetime import timedelta
 
-from minio import Minio
-from minio.error import S3Error
+from cosmo_suite.object_storage_manager import check_result
 
 from cosmonaut_app.config import (
     JOB_WORK_DIR_TEMPLATE,
@@ -20,66 +41,6 @@ from cosmonaut_app.config import (
 from cosmonaut_app.error_handling import ObjectStorageError
 
 log = logging.getLogger(__name__)
-
-
-def check_result(params: list, result: subprocess.CompletedProcess) -> None:
-    """Check the result of a subprocess command and raise an error if it failed.
-
-    Args:
-        result: The result of the subprocess command
-
-    Raises:
-        ObjectStorageError: If the command failed
-    """
-    error_msg = result.stderr.replace(OBJECT_STORAGE_SECRET_KEY, "****")
-    error_msg = error_msg.replace(OBJECT_STORAGE_ACCESS_KEY, "****")
-    output = result.stdout.replace(OBJECT_STORAGE_SECRET_KEY, "****")
-    output = output.replace(OBJECT_STORAGE_ACCESS_KEY, "****")
-    call = " ".join(params)
-    call = call.replace(OBJECT_STORAGE_SECRET_KEY, "****")
-    call = call.replace(OBJECT_STORAGE_ACCESS_KEY, "****")
-    if result.returncode != 0:
-        if "QuotaExceeded" in error_msg:
-            log.error(
-                f"Object storage quota exceeded for command: {call}\n{error_msg}\n{output}"  # noqa
-            )
-        else:
-            log.error(f"Command failed: {call}\n{error_msg}\n{output}")
-        raise ObjectStorageError
-
-
-def get_presigned_download_url(object_key: str, expiry: timedelta) -> str:
-    """Generate a presigned GET URL for an object in S3-compatible storage.
-
-    Args:
-        object_key: Key of the object (e.g. "{job_id}/route.gpx")
-        expiry: Duration for which the URL is valid
-
-    Returns:
-        str: Presigned URL that can be downloaded without credentials
-
-    Raises:
-        ObjectStorageError: If S3 operation fails
-    """
-    secure = OBJECT_STORAGE_HOST.startswith("https://")
-    endpoint = OBJECT_STORAGE_HOST.replace("https://", "").replace("http://", "")
-    client = Minio(
-        endpoint=endpoint,
-        access_key=OBJECT_STORAGE_ACCESS_KEY,
-        secret_key=OBJECT_STORAGE_SECRET_KEY,
-        secure=secure,
-    )
-    try:
-        url = client.presigned_get_object(
-            OBJECT_STORAGE_BUCKET,
-            object_key,
-            expires=expiry,
-        )
-        log.debug(f"Generated presigned URL for {object_key}")
-        return url
-    except S3Error as e:
-        log.error(f"S3 error generating presigned URL for {object_key}: {e}")
-        raise ObjectStorageError(f"Presigning failed for {object_key}") from e
 
 
 def run_rclone_with_retry(

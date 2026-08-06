@@ -1,160 +1,24 @@
-"""Logging configuration for COSMONAUT App."""
+"""Logging configuration for COSMONAUT App.
 
-import datetime
+``PostgreSQLHandler``, ``postgres_params`` and ``format_string`` come from
+``cosmo_suite.logger``.
+
+The filter and the three ``get_logger_config_*`` builders stay local, because
+``cosmo_suite.logger.ExcludeSubmodulesFilter`` hard-codes its excluded-package list
+(``watchdog``, ``selenium``) with no way to extend it, and cosmonaut has to silence
+four more (matplotlib, PIL, pyogrio, rasterio) or every raster/plot operation floods
+the Postgres log table. The framework's ``_build_stream_config`` references its own
+filter class, so the builders have to be local too. The seam to push into the
+framework is an excluded-packages parameter; until then this is duplication with a
+reason, not drift.
+
+Also deliberate: ``get_logger_config_web()`` takes no argument here. The framework's
+signature takes ``debug`` and ignores it.
+"""
+
 import logging
-import time
 
-import psycopg2
-from psycopg2 import pool
-
-from cosmonaut_app.config import (
-    POSTGRES_HOST_NAME,
-    POSTGRES_NAME,
-    POSTGRES_PASSWORD,
-    POSTGRES_PORT,
-    POSTGRES_USER,
-)
-
-format_string = (
-    "[%(asctime)s] [PID:%(process)d] %(levelname)s in %(module)s: %(message)s"
-)
-postgres_params = {
-    "dbname": POSTGRES_NAME,
-    "user": POSTGRES_USER,
-    "password": POSTGRES_PASSWORD,
-    "host": POSTGRES_HOST_NAME,
-    "port": POSTGRES_PORT,
-}
-
-
-class PostgreSQLHandler(logging.Handler):
-    """A log handler that writes log records to a PostgreSQL database.
-
-    This handler writes all log records to the database with connection pooling
-    for better performance and reliability.
-    """
-
-    def __init__(self, connection_params):
-        """Initialize the handler with PostgreSQL connection parameters.
-
-        Args:
-            connection_params (dict): Connection parameters for PostgreSQL
-                                     (dbname, user, password, host, port)
-        """
-        super().__init__()
-        self.connection_params = connection_params
-        # Create a connection pool for better performance
-        # Add keepalive settings to prevent connections from going stale
-        pool_params = {
-            **connection_params,
-            "keepalives": 1,
-            "keepalives_idle": 30,  # Start keepalive after 30s idle
-            "keepalives_interval": 10,  # Send keepalive every 10s
-            "keepalives_count": 5,  # 5 failed keepalives = dead connection
-        }
-        max_retries = 5
-        retry_delay_seconds = 2
-        for attempt in range(1, max_retries + 1):
-            try:
-                self.connection_pool = pool.SimpleConnectionPool(
-                    1,
-                    10,  # min and max connections
-                    **pool_params,
-                )
-                break
-            except psycopg2.OperationalError:
-                if attempt == max_retries:
-                    raise
-                print(
-                    f"PostgreSQL not ready, retrying in {retry_delay_seconds}s "
-                    f"(attempt {attempt}/{max_retries})"
-                )
-                time.sleep(retry_delay_seconds)
-
-    def emit(self, record):
-        """Write the log record to the database.
-
-        Args:
-            record: The log record to write.
-        """
-        # Get a connection from the pool
-        connection = self.connection_pool.getconn()
-        connection_is_bad = False
-
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO logs
-                    (timestamp, pid, level, module, message)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (
-                        datetime.datetime.fromtimestamp(record.created),
-                        record.process,
-                        record.levelname,
-                        record.module,
-                        self.format(record),
-                    ),
-                )
-                connection.commit()
-        except psycopg2.OperationalError as e:
-            # Connection is bad (timeout, network issue, etc.)
-            # Mark it as bad so it's not returned to the pool
-            connection_is_bad = True
-            print(f"Database connection error (will retry with new connection): {e}")
-
-            # Try once more with a fresh connection
-            try:
-                new_connection = self.connection_pool.getconn()
-                try:
-                    with new_connection.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            INSERT INTO logs
-                            (timestamp, pid, level, module, message)
-                            VALUES (%s, %s, %s, %s, %s)
-                            """,
-                            (
-                                datetime.datetime.fromtimestamp(record.created),
-                                record.process,
-                                record.levelname,
-                                record.module,
-                                self.format(record),
-                            ),
-                        )
-                        new_connection.commit()
-                finally:
-                    self.connection_pool.putconn(new_connection)
-            except Exception as retry_error:  # noqa — intentional broad catch: any DB error after retry is fatal
-                print(
-                    f"FATAL: Database logging failed after retry. "
-                    f"Worker cannot continue without logging capability: {retry_error}"
-                )
-                # Re-raise to fail the worker - logging is critical
-                raise
-        except Exception as e:  # noqa — intentional broad catch: any non-OperationalError DB error is fatal
-            # Any other database error is also fatal
-            print(f"FATAL: Error writing to PostgreSQL: {e}")
-            # Re-raise to fail the worker
-            raise
-        finally:
-            # Return the connection to the pool, or close it if it's bad
-            if connection_is_bad:
-                try:
-                    connection.close()
-                except Exception:  # noqa
-                    pass
-                # putconn with close=True tells the pool this connection is bad
-                self.connection_pool.putconn(connection, close=True)
-            else:
-                self.connection_pool.putconn(connection)
-
-    def close(self):
-        """Close all database connections when the handler is closed."""
-        if hasattr(self, "connection_pool") and self.connection_pool:
-            self.connection_pool.closeall()
-        super().close()
+from cosmo_suite.logger import format_string, postgres_params
 
 
 class ExcludeSubmodulesFilter(logging.Filter):
@@ -249,7 +113,7 @@ def _build_stream_config(stream, disable_existing_loggers):
                 "level": "DEBUG",
             },
             "postgres": {
-                "class": __name__ + ".PostgreSQLHandler",
+                "class": "cosmo_suite.logger.PostgreSQLHandler",
                 "level": "DEBUG",
                 "formatter": "message_only",
                 "filters": ["exclude_submodules"],
