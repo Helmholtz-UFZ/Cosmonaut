@@ -399,8 +399,8 @@ wheels = [
 
 [[package]]
 name = "cosmo-suite"
-version = "0.3.0"
-source = { git = "https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite?rev=v0.3.0#0681cd193ef35f95a88eb13fd2dd5167da5fa263" }
+version = "0.4.0"
+source = { git = "https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite?rev=v0.4.0#2968f9ed4ab945de64df3f1e82df02e22c5df4c6" }
 dependencies = [
     { name = "celery", extra = ["redis"] },
     { name = "coolname" },
@@ -466,7 +466,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "celery", extras = ["redis"], specifier = ">=5.4.0,<6" },
-    { name = "cosmo-suite", git = "https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite?rev=v0.3.0" },
+    { name = "cosmo-suite", git = "https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite?rev=v0.4.0" },
     { name = "dash", specifier = ">=3.2.0,<4" },
     { name = "dash-ag-grid", specifier = ">=32.0.0,<33" },
     { name = "dash-bootstrap-components", specifier = ">=2.0.3,<3" },
