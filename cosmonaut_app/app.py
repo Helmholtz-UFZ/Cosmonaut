@@ -3,10 +3,13 @@ import logging.config
 from pathlib import Path
 from threading import Thread
 
+from cosmo_suite.logger import get_logger_config_web
+from cosmo_suite.object_storage_manager import create_bucket, setup_remote
 from dash import Dash
 
 from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.config import DEBUG, PORT
+from cosmonaut_app.constants.general import EXCLUDED_LOG_PACKAGES
 from cosmonaut_app.error_handling import handle_error
 from cosmonaut_app.files_route import serve_files
 from cosmonaut_app.layout import (
@@ -15,11 +18,9 @@ from cosmonaut_app.layout import (
     register_navbar_callbacks,
     register_reset_callbacks,
 )
-from cosmonaut_app.logger import get_logger_config_web
-from cosmonaut_app.object_storage_manager import create_bucket, setup_remote
 
 # Configure application-wide logging
-logging.config.dictConfig(get_logger_config_web())
+logging.config.dictConfig(get_logger_config_web(DEBUG, EXCLUDED_LOG_PACKAGES))
 logger = logging.getLogger(__name__)
 logger.info("COSMONAUT application starting")
 

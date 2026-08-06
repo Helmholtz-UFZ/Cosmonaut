@@ -11,18 +11,22 @@ from datetime import timedelta
 from logging.config import dictConfig
 
 from celery import Task
+from cosmo_suite.logger import (
+    get_logger_config_computation,
+    get_logger_config_worker,
+)
 from cosmo_suite.object_storage_manager import get_presigned_download_url
 from sensor_routing.full_pipeline_cli import sensor_routing_pipeline
 
 from cosmonaut_app.config import PORT, WEB_OUTSIDE_URL
 from cosmonaut_app.constants.general import (
+    EXCLUDED_LOG_PACKAGES,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
     LOG_FILE_NAME,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.email_service import send_mail
-from cosmonaut_app.logger import get_logger_config_computation, get_logger_config_worker
 from cosmonaut_app.street_selector import StreetSelector
 
 log = logging.getLogger(__name__)
@@ -72,7 +76,9 @@ def process_routing_job(self, job_id):
 
     # Switch logging to file in work directory
     dictConfig(
-        get_logger_config_computation(os.path.join(job.working_dir, LOG_FILE_NAME))
+        get_logger_config_computation(
+            os.path.join(job.working_dir, LOG_FILE_NAME), EXCLUDED_LOG_PACKAGES
+        )
     )
 
     try:
@@ -92,7 +98,7 @@ def process_routing_job(self, job_id):
         flush_all_handlers()
 
         # Switch logging back to worker config
-        dictConfig(get_logger_config_worker())
+        dictConfig(get_logger_config_worker(EXCLUDED_LOG_PACKAGES))
 
         log.info(f"Routing job {job_id} finished")
 
@@ -106,7 +112,7 @@ def process_routing_job(self, job_id):
 
         # Flush handlers and switch back even on error
         flush_all_handlers()
-        dictConfig(get_logger_config_worker())
+        dictConfig(get_logger_config_worker(EXCLUDED_LOG_PACKAGES))
 
         job.model.status = JOB_STATUS_FAILED
         job.save()

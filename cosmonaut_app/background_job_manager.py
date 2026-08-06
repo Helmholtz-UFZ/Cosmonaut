@@ -20,9 +20,10 @@ from cosmo_suite.background_job_manager import (
 from cosmo_suite.background_job_manager import (
     configure_worker_logging as framework_configure_worker_logging,
 )
+from cosmo_suite.logger import get_logger_config_worker
 
 from cosmonaut_app.celery_config import CeleryConfig
-from cosmonaut_app.logger import get_logger_config_worker
+from cosmonaut_app.constants.general import EXCLUDED_LOG_PACKAGES
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ worker_process_init.disconnect(framework_configure_worker_logging)
 @worker_process_init.connect
 def configure_worker_logging(sender=None, conf=None, **kwargs):
     """Configure database logging for Celery worker processes."""
-    dictConfig(get_logger_config_worker())
+    dictConfig(get_logger_config_worker(EXCLUDED_LOG_PACKAGES))
 
 
 NAME_ROUTING_TASK = "cosmonaut_app.tasks.routing_tasks.process_routing"
