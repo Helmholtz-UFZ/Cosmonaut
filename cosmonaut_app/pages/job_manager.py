@@ -38,7 +38,7 @@ from cosmonaut_app.constants.html_ids import (
     CLEAN_UP_BUTTON_JOB_MANAGER_ID,
     DELETE_BUTTON_JOB_MANAGER_ID,
     JOBS_TABLE_JOB_MANAGER_ID,
-    LOADING_OVERLAY_SHARED_ID,
+    LOADING_OVERLAY_MODAL_SHARED_ID,
     REFRESH_BUTTON_JOB_MANAGER_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -274,7 +274,7 @@ def layout():
 @callback(
     Output(JOBS_TABLE_JOB_MANAGER_ID, "rowData"),
     Output(JOBS_TABLE_JOB_MANAGER_ID, "selectedRows"),
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(LOADING_OVERLAY_MODAL_SHARED_ID, "is_open", allow_duplicate=True),
     Input(REFRESH_BUTTON_JOB_MANAGER_ID, "n_clicks"),
     Input(DELETE_BUTTON_JOB_MANAGER_ID, "n_clicks"),
     Input(CLEAN_UP_BUTTON_JOB_MANAGER_ID, "n_clicks"),

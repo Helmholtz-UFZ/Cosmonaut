@@ -76,7 +76,7 @@ MAIN_MAP_COMPONENT_MAP_SHARED_ID = "main-map-component-map-shared-id"
 ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"  # nocheck
 ERROR_MODAL_SHARED_ID = "error-modal"  # nocheck
 ERROR_MODAL_TITLE_SHARED_ID = "error-title"  # nocheck
-LOADING_OVERLAY_SHARED_ID = "loading-overlay-shared-id"
+LOADING_OVERLAY_MODAL_SHARED_ID = "loading-overlay-modal-shared-id"
 RESET_MODAL_SHARED_ID = "reset-modal-shared-id"
 
 # --- Codes ---
@@ -118,8 +118,12 @@ STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID = (
 )
 
 # --- Icons ---
-MEMBERSHIP_HELP_ICON_ID = "membership-help-icon-data-upload-id"  # nocheck dbc.Tooltip target only
-PREDICTOR_HELP_ICON_ID = "predictor-help-icon-data-upload-id"  # nocheck dbc.Tooltip target only
+MEMBERSHIP_HELP_ICON_ID = (
+    "membership-help-icon-data-upload-id"  # nocheck dbc.Tooltip target only
+)
+PREDICTOR_HELP_ICON_ID = (
+    "predictor-help-icon-data-upload-id"  # nocheck dbc.Tooltip target only
+)
 
 # --- Inputs ---
 DATA_UPLOAD_EPSG_INPUT_DATA_UPLOAD_ID = "data-upload-epsg-input-data-upload-id"
@@ -157,41 +161,6 @@ REFRESH_BUTTON_JOB_MANAGER_ID = "refresh-button-job-manager-id"
 
 # --- Tables ---
 JOBS_TABLE_JOB_MANAGER_ID = "jobs-table-job-manager-id"
-
-
-# ============================================================================
-# LOGS
-# ============================================================================
-
-# --- Buttons ---
-REFRESH_BUTTON_LOGS_ID = "refresh-button-logs-id"
-
-# --- Checklists ---
-LIVE_MODE_CHECKLIST_LOGS_ID = "live-mode-checklist-logs-id"
-PID_CHECKLIST_LOGS_ID = "pid-checklist-logs-id"
-
-# --- DatePickers ---
-LOG_DATE_PICKER_LOGS_ID = "log-date-picker-logs-id"
-
-# --- Divs ---
-LOG_OUTPUT_DIV_LOGS_ID = "log-output-div-logs-id"
-TIME_ERROR_DIV_LOGS_ID = "time-error-div-logs-id"
-TIME_INPUT_GROUP_LOGS_ID = "time-input-group-logs-id"
-
-# --- Dropdowns ---
-LOG_LEVELS_DROPDOWN_LOGS_ID = "log-levels-dropdown-logs-id"
-MODULE_EXCLUDE_DROPDOWN_LOGS_ID = "module-exclude-dropdown-logs-id"
-
-# --- Inputs ---
-END_HOUR_INPUT_LOGS_ID = "end-hour-input-logs-id"
-END_MINUTE_INPUT_LOGS_ID = "end-minute-input-logs-id"
-LOG_PID_INPUT_LOGS_ID = "log-pid-input-logs-id"
-START_HOUR_INPUT_LOGS_ID = "start-hour-input-logs-id"
-START_MINUTE_INPUT_LOGS_ID = "start-minute-input-logs-id"
-
-# --- Intervals ---
-AUTO_POLL_INTERVAL_LOGS_ID = "auto-poll-interval-logs-id"
-
 
 # ============================================================================
 # ROUTE_COMPUTATION
@@ -280,9 +249,7 @@ TRACK_GRADES_CHECKLIST_STREET_SELECTION_ID = (
 )
 
 # --- Collapses ---
-TRACK_GRADES_COLLAPSE_STREET_SELECTION_ID = (
-    "track-grades-collapse-street-selection-id"
-)
+TRACK_GRADES_COLLAPSE_STREET_SELECTION_ID = "track-grades-collapse-street-selection-id"
 
 # --- Divs ---
 REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID = (
@@ -318,55 +285,3 @@ EMAIL_HELPER_TEXT_USER_INFO_ID = "email-helper-text-user-info-id"
 
 # --- Inputs ---
 EMAIL_INPUT_USER_INFO_ID = "email-input-user-info-id"
-
-
-# ============================================================================
-# WORKER_MANAGEMENT
-# ============================================================================
-
-# --- Buttons ---
-CANCEL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID = (
-    "cancel-modal-cancel-button-worker-management-id"
-)
-CANCEL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID = (
-    "cancel-modal-confirm-button-worker-management-id"
-)
-KILL_MODAL_CANCEL_BUTTON_WORKER_MANAGEMENT_ID = (
-    "kill-modal-cancel-button-worker-management-id"
-)
-KILL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID = (
-    "kill-modal-confirm-button-worker-management-id"
-)
-TEST_TASK_BUTTON_WORKER_MANAGEMENT_ID = "test-task-button-worker-management-id"
-WORKER_CANCEL_BTN_WORKER_MANAGEMENT_ID = "worker-cancel-btn-worker-management-id"
-WORKER_KILL_BTN_WORKER_MANAGEMENT_ID = "worker-kill-btn-worker-management-id"
-WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID = "worker-refresh-btn-worker-management-id"
-
-# --- Divs ---
-CANCEL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID = (
-    "cancel-modal-task-info-div-worker-management-id"
-)
-KILL_MODAL_TASK_INFO_DIV_WORKER_MANAGEMENT_ID = (
-    "kill-modal-task-info-div-worker-management-id"
-)
-WORKER_LAST_REFRESH_DIV_WORKER_MANAGEMENT_ID = (
-    "worker-last-refresh-div-worker-management-id"
-)
-WORKER_MANAGEMENT_DUMMY_COMPONENT_WORKER_MANAGEMENT_ID = (
-    "worker-management-dummy-component-worker-management-id"
-)
-WORKER_STATS_CARD_DIV_WORKER_MANAGEMENT_ID = (
-    "worker-stats-card-div-worker-management-id"
-)
-
-# --- Modals ---
-CANCEL_MODAL_WORKER_MANAGEMENT_ID = "cancel-modal-worker-management-id"
-KILL_MODAL_WORKER_MANAGEMENT_ID = "kill-modal-worker-management-id"
-
-# --- Tables ---
-ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID = "active-tasks-table-worker-management-id"
-RESERVED_TASKS_TABLE_WORKER_MANAGEMENT_ID = "reserved-tasks-table-worker-management-id"
-REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID = "revoked-tasks-table-worker-management-id"
-SCHEDULED_TASKS_TABLE_WORKER_MANAGEMENT_ID = (
-    "scheduled-tasks-table-worker-management-id"
-)

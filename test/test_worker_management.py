@@ -9,19 +9,19 @@ This test validates:
 
 import logging
 
-from playwright.sync_api import expect
-
-from cosmonaut_app.config import FLASK_PORT
-from cosmonaut_app.constants.html_ids import (
+from cosmo_suite.constants import (
     ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID,
     KILL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID,
     KILL_MODAL_WORKER_MANAGEMENT_ID,
-    LOADING_OVERLAY_SHARED_ID,
+    LOADING_OVERLAY_MODAL_SHARED_ID,
     REVOKED_TASKS_TABLE_WORKER_MANAGEMENT_ID,
     TEST_TASK_BUTTON_WORKER_MANAGEMENT_ID,
     WORKER_KILL_BTN_WORKER_MANAGEMENT_ID,
     WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID,
 )
+from playwright.sync_api import expect
+
+from cosmonaut_app.config import PORT
 from test.help_functions_tests import check_all_errors
 
 log = logging.getLogger(__name__)
@@ -30,21 +30,21 @@ log = logging.getLogger(__name__)
 def click_refresh_and_wait(page):
     """Click refresh button and wait for the loading overlay to close."""
     page.locator(f"#{WORKER_REFRESH_BTN_WORKER_MANAGEMENT_ID}").click()
-    expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
+    expect(page.locator(f"#{LOADING_OVERLAY_MODAL_SHARED_ID}")).not_to_be_visible(
         timeout=20000
     )
 
 
 def wait_for_overlay_close(page):
     """Wait for the loading overlay to close."""
-    expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
+    expect(page.locator(f"#{LOADING_OVERLAY_MODAL_SHARED_ID}")).not_to_be_visible(
         timeout=20000
     )
 
 
 def test_submit_and_kill_task(page, dash_app, celery_worker):
     """Test submitting a test task, killing it via modal, and verifying it appears in revoked tasks."""
-    page.goto(f"http://localhost:{FLASK_PORT}/worker-management")
+    page.goto(f"http://localhost:{PORT}/worker-management")
     wait_for_overlay_close(page)
 
     # Submit test task

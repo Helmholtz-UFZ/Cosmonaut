@@ -17,7 +17,7 @@ from cosmonaut_app.constants.general import (
 from cosmonaut_app.constants.html_ids import (
     CURRENT_JOB_ID_MAP_STORE_ID,
     JOB_ID_KICKER_CODE_SHARED_ID,
-    LOADING_OVERLAY_SHARED_ID,
+    LOADING_OVERLAY_MODAL_SHARED_ID,
     MAIN_MAP_COMPONENT_MAP_SHARED_ID,
     MAP_INIT_INTERVAL_SHARED_ID,
     MAP_LEGEND_COLLAPSE_SHARED_ID,
@@ -193,7 +193,7 @@ loading_overlay = dbc.Modal(
         [dbc.Spinner(size="lg"), html.H4("Loading...", className="text-center mt-3")],
         className="text-center",
     ),
-    id=LOADING_OVERLAY_SHARED_ID,
+    id=LOADING_OVERLAY_MODAL_SHARED_ID,
     is_open=False,
     backdrop="static",  # Prevents closing by clicking outside
     keyboard=False,  # Prevents closing with escape key
