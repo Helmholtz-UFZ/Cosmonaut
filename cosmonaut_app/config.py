@@ -9,6 +9,7 @@ framework does not know about are read here.
 import os
 
 from cosmo_suite.config import DEBUG as DEBUG
+from cosmo_suite.config import JOB_WORK_DIR_TEMPLATE as JOB_WORK_DIR_TEMPLATE
 from cosmo_suite.config import OBJECT_STORAGE_ACCESS_KEY as OBJECT_STORAGE_ACCESS_KEY
 from cosmo_suite.config import OBJECT_STORAGE_BUCKET as OBJECT_STORAGE_BUCKET
 from cosmo_suite.config import OBJECT_STORAGE_HOST as OBJECT_STORAGE_HOST
@@ -25,6 +26,7 @@ from cosmo_suite.config import REDIS_HOST as REDIS_HOST
 from cosmo_suite.config import REDIS_PASSWORD as REDIS_PASSWORD
 from cosmo_suite.config import REDIS_PORT as REDIS_PORT
 from cosmo_suite.config import WEB_OUTSIDE_URL as WEB_OUTSIDE_URL
+from cosmo_suite.config import WEB_WORK_DIR as WEB_WORK_DIR
 from cosmo_suite.config import env_vars as framework_env_vars
 from cosmo_suite.config import getenv
 from cosmo_suite.constants.general import (
@@ -59,14 +61,6 @@ DOCKER_GID = getenv("DOCKER_GID")
 GUNICORN = getenv("GUNICORN")
 
 # Web Application Configuration
-# Deviation from the framework, on purpose: cosmo_suite.config leaves WEB_WORK_DIR as
-# read from the environment, i.e. relative ("./cosmonaut_app/work_dir"). Flask's
-# send_from_directory resolves a relative directory against app.root_path
-# (= cosmonaut_app/), not the process CWD, so serving job pictures would 404. Resolve
-# it once at import instead. Belongs in the framework — until then cosmo_suite.job and
-# cosmo_suite.tasks.maintenance_tasks still see the relative form.
-WEB_WORK_DIR = os.path.abspath(getenv("WEB_WORK_DIR"))
-JOB_WORK_DIR_TEMPLATE = os.path.join(WEB_WORK_DIR, "{job_id}")
 MAINTAINER_EMAIL = [e.strip() for e in getenv("MAINTAINER_EMAIL").split(",")]
 
 # Tile Server URL
