@@ -46,10 +46,16 @@ div:has(> #_pages_content) {
 
 /* Admin pages are marked either by cosmonaut's own .no-map-page wrapper or, for
    pages served by the framework, by #main-content-container — the id
-   cosmo_suite.layouts.page_container_column_layout gives its column. The framework
-   container has no wrapper to hang a class on, and without this the Logs and
-   Worker Management pages render squeezed beside a map they do not use.
-   Framework-side fix (a className parameter on that helper) is on the MR list. */
+   cosmo_suite.layouts.page_container_column_layout gives its column. Without this
+   the Logs and Worker Management pages render squeezed beside a map they do not
+   use, with the grid headers truncated.
+
+   cosmo-suite v0.4.0 added a `wrapper_class` parameter to that helper for exactly
+   this, but it does not reach us: cosmo_suite.pages.logs and
+   .pages.worker_management call the helper themselves and pass no wrapper_class,
+   and their layout is already bound into register_page by the time we import them.
+   So this keying stays until the framework pages accept the class too (queued MR).
+   Verified against v0.4.0, not assumed. */
 
 /* Map pages only: lock root to viewport so .content-panel scrolls, not the document */
 .app-root:not(:has(.no-map-page, #main-content-container)) {
