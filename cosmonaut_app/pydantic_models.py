@@ -1,24 +1,25 @@
 """Pydantic models for user input and persisted job state.
 
-``validate_job_id`` comes from ``cosmo_suite.pydantic_models``. ``UserModel``
-deliberately does **not** subclass the framework's ``BaseJobConfig``: that contract
-carries an ``upload_file_name`` field for the framework ``Job``'s single-upload
-model, and cosmonaut has two uploads, each with its own JSON column
-(``membership_upload`` / ``predictor_upload``). Measured consequence of inheriting
-it: ``model_dump()`` gains an ``upload_file_name`` key that ``JobTable`` has no
-column for, so ``CosmonautJob.save()`` breaks — the fix would be a permanently NULL
-production column for a field the domain has no use for. Revisit when the framework
-``Job`` is actually adopted (that is what ``BaseJobConfig`` is a contract for);
-``cosmonaut_job.py`` is not part of slice 1.
+``UserModel`` subclasses ``cosmo_suite.pydantic_models.BaseJobConfig``, the minimal
+contract: a ``job_id`` validated by ``validate_job_id`` plus
+``validate_assignment=True``, so no model can be assigned an invalid job id after
+construction either.
+
+It does **not** subclass ``UploadJobConfig``. That layer adds ``upload_file_name``
+for the framework ``Job``'s single-upload pattern; cosmonaut has two uploads, each
+with its own JSON column (``membership_upload`` / ``predictor_upload``), and
+``JobTable`` has no ``upload_file_name`` column — inheriting it would make
+``model_dump()`` produce a key ``CosmonautJob.save()`` cannot write. Revisit only
+if the framework ``Job`` is adopted.
 """
 
 import logging
 from datetime import date
 from typing import Annotated, Any
 
-from cosmo_suite.pydantic_models import validate_job_id
+from cosmo_suite.pydantic_models import BaseJobConfig
 from email_validator import EmailNotValidError, validate_email
-from pydantic import AfterValidator, ConfigDict, Field
+from pydantic import AfterValidator, Field
 from pyproj import CRS
 from pyproj.exceptions import CRSError
 from sensor_routing.full_pipeline_cli import FullPipelineConfig
@@ -58,14 +59,11 @@ def check_email(email: str) -> str:
         raise ValueError(f"Invalid email: {e}")
 
 
-class UserModel(FullPipelineConfig):
-    """Pydantic model for user input."""
+class UserModel(BaseJobConfig, FullPipelineConfig):
+    """Pydantic model for user input.
 
-    # Taken from the framework's BaseJobConfig even though the base class itself is
-    # not inherited (see the module docstring): without it, `job.model.job_id = x`
-    # bypasses validate_job_id entirely, so an invalid id can reach the database and
-    # the work-dir path. Validation on construction alone is not enough.
-    model_config = ConfigDict(validate_assignment=True)
+    ``job_id`` and ``validate_assignment=True`` come from ``BaseJobConfig``.
+    """
 
     # Input fields
     email: Annotated[
@@ -77,16 +75,6 @@ class UserModel(FullPipelineConfig):
             json_schema_extra={"type": "email"},
         ),
         AfterValidator(check_email),
-    ]
-    job_id: Annotated[
-        str,
-        Field(
-            "poised_python_of_wonder",
-            description='Identifier for your submission. Only letters, numbers and "_".',  # noqa
-            title="Job ID",
-            json_schema_extra={"type": "text"},
-        ),
-        AfterValidator(validate_job_id),
     ]
     membership_upload: Annotated[
         dict[str, Any],

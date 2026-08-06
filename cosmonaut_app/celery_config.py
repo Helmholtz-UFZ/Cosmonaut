@@ -27,11 +27,14 @@ class CeleryConfig(BaseCeleryConfig):
         "cosmo_suite.tasks.test_tasks.*": {"queue": "test"},
     }
 
-    # Deliberately switched off, unlike BaseCeleryConfig (1 h soft / 65 min hard):
-    # a routing job's runtime scales with the area — sensor-routing is O(n²) over
-    # the measurement points and has no tiling — so a wall-clock ceiling would kill
-    # exactly the large surveys the app exists for. Reinstate only together with a
-    # measured upper bound.
+    # No wall-clock ceiling on tasks. Redundant since cosmo-suite v0.4.0, which
+    # made None the framework default after this app hit the former 65-minute
+    # hard limit — kept explicit on purpose, so a future framework default cannot
+    # silently reinstate one. The reason is domain-specific and only visible here:
+    # a routing job's runtime scales with the survey area, sensor-routing is O(n²)
+    # over the measurement points and is not tileable, so any blanket limit kills
+    # exactly the large surveys the app exists for. Set a number only together
+    # with a measured upper bound.
     task_soft_time_limit = None
     task_time_limit = None
 
