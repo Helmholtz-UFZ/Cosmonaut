@@ -2,9 +2,9 @@
 
 # User documentation (This section is for user documentation and will appear in the user documentation.)
 
-This page is where you upload your cosmic ray neutron sensor measurement locations
-or sampling points that will be used to plan the navigation route. The workflow
-on this page involves three key steps:
+This page is where you upload your measurement locations or sampling points that
+will be used to plan the navigation route. The workflow on this page involves
+three key steps:
 
 1. **Specify EPSG Code**: Enter the coordinate reference system (CRS) of your data.
    The application validates the EPSG code.

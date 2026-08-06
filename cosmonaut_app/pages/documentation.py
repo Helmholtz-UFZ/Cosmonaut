@@ -40,17 +40,18 @@ stay synchronized.
 Documentation is regenerated manually via CLI when page content changes:
 
 ```bash
-python -m cosmonaut_app.doc_generator <job_id> [--no-headless]
+python -m cosmonaut_app.doc_generator <job_id_new> <job_id_finished> [--no-headless]
 ```
 
 Requirements:
 - Development server running at http://localhost:8080
-- A completed job_id with data through all workflow steps
+- An unfinished job_id (screenshots of the early workflow pages) and a
+  completed job_id with data through all workflow steps
 - Playwright browser automation dependencies installed
 
 NOTE: Documentation is generated as a pre-deployment step, not at runtime.
-If the documentation files don't exist, this page will display an error
-message with instructions for generating them.
+The markdown is read at import time, so a missing file raises immediately
+and the application does not start — it is not reported in the page.
 """
 
 from pathlib import Path

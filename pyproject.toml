@@ -1,7 +1,7 @@
 [project]
 name = "cosmonaut"
 version = "0.3.2"
-description = "Navigation route optimization for cosmic ray neutron sensor surveys"
+description = "Navigation route optimization for field survey campaigns, developed for cosmic ray neutron sensor (CRNS) surveys"
 requires-python = ">=3.13"
 dependencies = [
     "celery[redis]>=5.4.0,<6",

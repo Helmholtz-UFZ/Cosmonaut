@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 INTRO_TEMPLATE = """# COSMONAUT Documentation
 
-### COSmic ray based soil MOisture Prediction NAvigation and UTility Tool
+### COSmic ray based soil MOisture NAvigation and UTility Tool
 
 *Last updated: {timestamp}*
 
@@ -37,15 +37,31 @@ INTRO_TEMPLATE = """# COSMONAUT Documentation
 
 <h2 id="introduction">Introduction</h2>
 
-COSMONAUT is a web application for creating optimized navigation routes based on
-regional classification for remote sensing measurements specifically designed for cosmic
-ray neutron sensor (CRNS). The service helps researchers plan efficient field sampling
-routes by:
+COSMONAUT is a web application for information-driven survey planning. From a
+probabilistic map describing the spatial heterogeneity of a survey area, it computes an
+optimized sampling route over an accessible road network. The service helps researchers
+plan efficient field sampling campaigns by:
 
 - Uploading membership data (sample locations)
 - Selecting relevant street networks from OpenStreetMap
 - Configuring routing parameters
 - Generating downloadable GPX navigation files
+
+### Where COSMONAUT Fits
+
+COSMONAUT is the survey-planning stage of a **sparse-to-spatial workflow** — the sequence
+that turns sparse field observations into spatially continuous maps:
+
+1. **Survey planning** (COSMONAUT): compute an information-driven sampling route.
+2. **Data acquisition and conditioning**: application-specific, outside this workflow.
+3. **Spatial regionalization** (COSMOPOLITAN): uncertainty-aware prediction of continuous
+   maps from the sparse observations.
+
+COSMONAUT was developed for, and is used operationally in, mobile **cosmic ray neutron
+sensing (CRNS)** surveys for regional soil moisture mapping — that is the use case the
+defaults are tuned for. The routing workflow itself makes no assumption about the
+instrument: any measurement locations with a probabilistic representation of the survey
+area will do, and the method applies to network-constrained mobile sensing in general.
 
 ### How It Works
 
@@ -328,8 +344,8 @@ def generate_documentation(
 
         return 0
 
-    except Exception as e:
-        log.error(f"Documentation generation failed: {e}")
+    except Exception:
+        log.exception("Documentation generation failed")
         return 1
 
 
