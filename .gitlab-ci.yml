@@ -6,15 +6,14 @@ stages:
   - "deploy"
 
 variables:
-  # Postgres (service configuration)
+  # Postgres. POSTGRES_DB/USER/PASSWORD configure the service image; the app reads
+  # the same names (they were POSTGRES_NAME/… before the cosmo_suite integration —
+  # the framework's name won, which collapsed the former duplicate pair into one).
   POSTGRES_DB: cosmonaut_db
   POSTGRES_USER: cosmonaut
   POSTGRES_PASSWORD: password
-  # Postgres (app connection)
   POSTGRES_HOST_NAME: postgres
-  POSTGRES_NAME: cosmonaut_db
   POSTGRES_PORT: "5432"
-  POSTGRES_PASSWORD: password
   # MinIO
   OBJECT_STORAGE_ACCESS_KEY: minioadmin
   OBJECT_STORAGE_SECRET_KEY: minioadmin
@@ -26,7 +25,7 @@ variables:
   DOCKER_UID: "1000"
   DOCKER_GID: "1000"
   GUNICORN: "0"
-  DEBUG: "0"
+  FLASK_DEBUG: "0"
   # Enable BuildKit for better Docker layer caching
   DOCKER_BUILDKIT: "1"
 

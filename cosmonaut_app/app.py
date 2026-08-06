@@ -6,7 +6,7 @@ from threading import Thread
 from dash import Dash
 
 from cosmonaut_app.background_job_manager import background_job_manager
-from cosmonaut_app.config import DEBUG, FLASK_PORT
+from cosmonaut_app.config import DEBUG, PORT
 from cosmonaut_app.error_handling import handle_error
 from cosmonaut_app.files_route import serve_files
 from cosmonaut_app.layout import (
@@ -64,4 +64,4 @@ if __name__ == "__main__":
     # Watch local sensor-routing source for auto-reload (mounted via --local-sr)
     local_sr = Path("/python_docker/sensor-routing/sensor_routing")
     extra = list(local_sr.rglob("*.py")) if local_sr.is_dir() else []
-    app.run(host="0.0.0.0", debug=DEBUG, port=FLASK_PORT, extra_files=extra)
+    app.run(host="0.0.0.0", debug=DEBUG, port=PORT, extra_files=extra)

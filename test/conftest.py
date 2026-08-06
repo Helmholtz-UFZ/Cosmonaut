@@ -22,7 +22,7 @@ from sqlalchemy.exc import OperationalError
 from werkzeug.serving import make_server
 
 from cosmonaut_app.config import (
-    FLASK_PORT,
+    PORT,
     REDIS_DB,
     REDIS_HOST,
     REDIS_PASSWORD,
@@ -240,7 +240,7 @@ def dash_app(request):
     # Inline import: app.py boots Dash, MinIO, Beat scheduler — must stay deferred
     from cosmonaut_app.app import app
 
-    port = int(FLASK_PORT)
+    port = int(PORT)
     srv = make_server("localhost", port, app.server)
     thread = threading.Thread(target=srv.serve_forever)
     thread.start()

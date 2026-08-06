@@ -21,12 +21,12 @@ import zipfile
 import pytest
 from playwright.sync_api import expect
 
-from cosmonaut_app.config import FLASK_PORT
+from cosmonaut_app.config import PORT
 from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
     EMAIL_INPUT_USER_INFO_ID,
-    LOADING_OVERLAY_SHARED_ID,
+    LOADING_OVERLAY_MODAL_SHARED_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTING_PARAMS_ID,
@@ -53,7 +53,7 @@ def test_complete_routing_workflow(
 ) -> None:
     """Test the complete routing workflow from job creation to route download."""
     # === Home Page ===
-    page.goto(f"http://localhost:{FLASK_PORT}/")
+    page.goto(f"http://localhost:{PORT}/")
     page.locator(f"#{START_JOB_BUTTON_HOME_ID}").click()
     check_all_errors(page)
 
@@ -79,7 +79,7 @@ def test_complete_routing_workflow(
     expect(page.locator(f"#{NEXT_BUTTON_DATA_UPLOAD_ID}")).to_be_enabled(timeout=120000)
     # Wait for loading overlay to close — the predictor callback enables the button
     # but the overlay may still be visible (backdrop="static" intercepts clicks)
-    expect(page.locator(f"#{LOADING_OVERLAY_SHARED_ID}")).not_to_be_visible(
+    expect(page.locator(f"#{LOADING_OVERLAY_MODAL_SHARED_ID}")).not_to_be_visible(
         timeout=10000
     )
     page.locator(f"#{NEXT_BUTTON_DATA_UPLOAD_ID}").click()

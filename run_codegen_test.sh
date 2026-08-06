@@ -29,8 +29,8 @@ fi
 
 cp env_test .env
 
-# Assure DEBUG=0 no reload of code during test generation
-sed -i 's/^DEBUG=.*/DEBUG=0/' .env
+# Assure FLASK_DEBUG=0 no reload of code during test generation
+sed -i 's/^FLASK_DEBUG=.*/FLASK_DEBUG=0/' .env
 source .env
 # Stop and remove any existing containers
 docker compose down 2>/dev/null || true

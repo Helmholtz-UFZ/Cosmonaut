@@ -1,8 +1,19 @@
 # Environment Variables
 
-All environment variables are centralized in `cosmonaut_app/config.py`. They are
+All environment variables are reachable from `cosmonaut_app/config.py`. They are
 loaded via `python-dotenv` and validated at startup with a strict `getenv()`
 wrapper that raises `ValueError` on any missing variable.
+
+The service-level half (Postgres, Redis, object storage, Flask) is read and
+validated by **`cosmo_suite.config`** and re-exported from `cosmonaut_app.config`,
+so consumers keep a single import site. Only cosmonaut's own variables (email,
+tileserver, Docker UID/GID, the MinIO console ports) are read here.
+
+**Consequence: the framework owns those names.** `cosmo_suite.config` uses
+`POSTGRES_DB` and `FLASK_DEBUG`; cosmonaut used `POSTGRES_NAME` and `DEBUG` before
+the integration. The python-level name `DEBUG` is unchanged — the framework
+derives it (`DEBUG = getenv("FLASK_DEBUG") == "1"`). The python-level name for the
+port is now `PORT`, not `FLASK_PORT` (the env var is still `FLASK_PORT`).
 
 ---
 
@@ -23,8 +34,8 @@ wrapper that raises `ValueError` on any missing variable.
 
 Grouped by service. The full list lives in `config.env_vars`.
 
-- **Web / App**: `WEB_WORK_DIR`, `FLASK_PORT`, `DEBUG`, `GUNICORN`, `WEB_OUTSIDE_URL`
-- **PostgreSQL**: `POSTGRES_NAME`, `POSTGRES_HOST_NAME`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+- **Web / App**: `WEB_WORK_DIR`, `FLASK_PORT`, `FLASK_DEBUG`, `GUNICORN`, `WEB_OUTSIDE_URL`
+- **PostgreSQL**: `POSTGRES_DB`, `POSTGRES_HOST_NAME`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
 - **Redis / Celery**: `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD`
 - **Object Storage (S3/MinIO)**: `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_HOST`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_REMOTE_NAME`, `OBJECT_STORAGE_PORT`, `OBJECT_STORAGE_CONSOLE_PORT`
 - **Tileserver**: `TILESERVER_URL`
@@ -35,13 +46,23 @@ Grouped by service. The full list lives in `config.env_vars`.
 
 ## How Config Loading Works
 
-1. `config.py` calls `load_dotenv()` at import time.
+1. `cosmo_suite.config` calls `load_dotenv(find_dotenv(usecwd=True))` at import
+   time. **It searches upward from the process CWD, not from next to `config.py`**
+   (the framework lives in site-packages). Every entry point — `dev_up.sh`,
+   `run_pytest.sh`, gunicorn, the celery worker, the deployment manifests — must
+   therefore start from the repo root, or the `.env` is not found.
 2. The custom `getenv()` wrapper calls `os.getenv()` and raises `ValueError` if
    the variable is missing.
 3. All values are stored as **module-level constants** — import them from
-   `cosmonaut_app.config`.
-4. The `config.env_vars` list enumerates every required variable. Tests use this
-   list to validate completeness across all env files.
+   `cosmonaut_app.config`, whether the framework or cosmonaut reads them.
+4. `config.env_vars` is `cosmo_suite.config.env_vars + cosmonaut's own` and
+   enumerates every required variable. Tests use this list to validate
+   completeness across all env files.
+5. `WEB_WORK_DIR` is the one value cosmonaut deliberately does **not** take
+   verbatim from the framework: it is `os.path.abspath`-resolved here, because
+   Flask's `send_from_directory` resolves a relative directory against
+   `app.root_path` (= `cosmonaut_app/`) rather than the CWD, which would 404 every
+   job picture. The comment in `config.py` records this.
 
 ---
 

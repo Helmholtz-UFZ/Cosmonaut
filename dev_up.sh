@@ -22,7 +22,7 @@ while [[ $# -gt 0 ]]; do
     *)
         echo "Unknown option: $1"
         echo "Usage: $0 [-d|--debug] [--local-sr] <mock|prod|stage>"
-        echo "  -d, --debug: Enable debug mode (DEBUG=1)"
+        echo "  -d, --debug: Enable debug mode (FLASK_DEBUG=1)"
         echo "  --local-sr:  Use local ../sensor-routing instead of PyPI version"
         echo "  mock:  Use mock environment (env_dev_mock)"
         echo "  prod:  Use production environment (env_dev_prod_priv)"
@@ -34,7 +34,7 @@ done
 
 if [ -z "$MODE" ]; then
     echo "Usage: $0 [-d|--debug] [--local-sr] <mock|prod|stage>"
-    echo "  -d, --debug: Enable debug mode (DEBUG=1)"
+    echo "  -d, --debug: Enable debug mode (FLASK_DEBUG=1)"
     echo "  --local-sr:  Use local ../sensor-routing instead of PyPI version"
     echo "  mock:  Use mock environment (env_dev_mock)"
     echo "  prod:  Use production environment (env_dev_prod_priv)"
@@ -62,7 +62,7 @@ fi
 cp "$env_file" .env
 
 if [ "$DEBUG_MODE" = true ]; then
-    sed -i 's/^DEBUG=.*/DEBUG=1/' .env
+    sed -i 's/^FLASK_DEBUG=.*/FLASK_DEBUG=1/' .env
 fi
 
 # Build compose command (optionally layer local sensor-routing override)
