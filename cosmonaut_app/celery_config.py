@@ -1,92 +1,47 @@
-"""Celery configuration for COSMONAUT App."""
+"""Celery configuration for COSMONAUT App.
+
+Everything generic (broker/result URL, Redis socket timeouts, serialization,
+worker recycling, beat file location) comes from
+``cosmo_suite.celery_config.BaseCeleryConfig``. Only the domain routing, the beat
+schedule and the two overrides below are set here.
+"""
 
 from celery.schedules import crontab
-
-from cosmonaut_app.config import REDIS_DB, REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
-
-
-def _get_redis_port():
-    """Get Redis port, handling GitLab CI service link format."""
-    port = REDIS_PORT
-    # GitLab CI may set REDIS_PORT as 'tcp://redis:6379' format
-    if port and port.startswith("tcp://"):
-        # Extract port from URL format
-        port = port.split(":")[-1]
-    return port
+from cosmo_suite.celery_config import BaseCeleryConfig
 
 
-class CeleryConfig:
+class CeleryConfig(BaseCeleryConfig):
     """Celery configuration class.
 
     This configuration uses Redis as both the message broker and result backend.
     Tasks are routed to different queues based on their type.
     """
 
-    # Build Redis URL with optional password
-    _redis_auth = f":{REDIS_PASSWORD}@" if REDIS_PASSWORD else ""
-    _redis_port = _get_redis_port()
-    _redis_url = f"redis://{_redis_auth}{REDIS_HOST}:{_redis_port}/{REDIS_DB}"
-
-    # Broker and result backend
-    broker_url = _redis_url
-    result_backend = _redis_url
-    broker_connection_retry_on_startup = True
-    broker_connection_timeout = 5
-
-    # Socket timeouts for Redis operations — broker_connection_timeout only covers
-    # TCP connect. These cover actual Redis commands (PUBLISH, SET, SUBSCRIBE, …).
-    # Without them, a frozen Redis pod blocks all Celery calls forever.
-    broker_transport_options = {"socket_timeout": 5, "socket_connect_timeout": 5}
-    result_backend_transport_options = {
-        "socket_timeout": 5,
-        "socket_connect_timeout": 5,
-    }
-
-    # Serialization
-    task_serializer = "json"
-    result_serializer = "json"
-    accept_content = ["json"]
-
-    # Timezone
-    timezone = "UTC"
-    enable_utc = True
-
-    # Task routing - different queues for different task types
+    # Task routing - different queues for different task types.
+    # The framework's maintenance route is kept: the worker registers the
+    # framework test task, and cosmonaut's own cleanup task is routed below.
     task_routes = {
         "cosmonaut_app.tasks.routing_tasks.*": {"queue": "routing"},
         "cosmonaut_app.tasks.upload_tasks.*": {"queue": "upload"},
+        "cosmonaut_app.tasks.maintenance_tasks.*": {"queue": "default"},
+        "cosmo_suite.tasks.test_tasks.*": {"queue": "test"},
     }
 
-    # Task state tracking
-    task_send_sent_event = True  # Send task sent events
-    task_track_started = True  # Track when tasks start
+    # Deliberately switched off, unlike BaseCeleryConfig (1 h soft / 65 min hard):
+    # a routing job's runtime scales with the area — sensor-routing is O(n²) over
+    # the measurement points and has no tiling — so a wall-clock ceiling would kill
+    # exactly the large surveys the app exists for. Reinstate only together with a
+    # measured upper bound.
+    task_soft_time_limit = None
+    task_time_limit = None
 
-    # Result backend settings
-    result_expires = 3600  # 1 hour
-    result_persistent = True
-
-    # Logging - prevent Celery from hijacking the root logger and removing
-    # our PostgreSQL handler (which is configured in app.py / logger.py)
-    worker_hijack_root_logger = False
-    worker_redirect_stdouts = False  # Don't redirect stdout/stderr
-    worker_log_color = False  # Disable color for database logging
-
-    # Worker settings for better performance and reliability
-    worker_prefetch_multiplier = 1  # Fair distribution of tasks
-    task_acks_late = True  # Acknowledge task after completion, not before
-    # Restart worker after 50 tasks (memory cleanup)
-    worker_max_tasks_per_child = 50
-    worker_max_memory_per_child = 512000  # 512MB per worker process
-
-    # Beat scheduler settings
-    beat_schedule_filename = (
-        "/tmp/celerybeat-schedule"  # Use tmp directory to avoid permission issues
-    )
-
-    # Celery Beat schedule - periodic tasks
+    # Celery Beat schedule - periodic tasks. Cosmonaut's cleanup, not the
+    # framework's: the framework task cleans up through cosmo_suite.db_manager,
+    # which this app does not use (db_manager.py is not part of slice 1).
     beat_schedule = {
         "daily-cleanup": {
             "task": "cosmonaut_app.tasks.maintenance_tasks.cleanup",
             "schedule": crontab(hour=3, minute=0),
+            "options": {"queue": "default"},
         },
     }
