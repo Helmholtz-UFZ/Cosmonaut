@@ -1,10 +1,24 @@
+"""Pydantic models for user input and persisted job state.
+
+``validate_job_id`` comes from ``cosmo_suite.pydantic_models``. ``UserModel``
+deliberately does **not** subclass the framework's ``BaseJobConfig``: that contract
+carries an ``upload_file_name`` field for the framework ``Job``'s single-upload
+model, and cosmonaut has two uploads, each with its own JSON column
+(``membership_upload`` / ``predictor_upload``). Measured consequence of inheriting
+it: ``model_dump()`` gains an ``upload_file_name`` key that ``JobTable`` has no
+column for, so ``CosmonautJob.save()`` breaks — the fix would be a permanently NULL
+production column for a field the domain has no use for. Revisit when the framework
+``Job`` is actually adopted (that is what ``BaseJobConfig`` is a contract for);
+``cosmonaut_job.py`` is not part of slice 1.
+"""
+
 import logging
-import re
 from datetime import date
 from typing import Annotated, Any
 
+from cosmo_suite.pydantic_models import validate_job_id
 from email_validator import EmailNotValidError, validate_email
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, ConfigDict, Field
 from pyproj import CRS
 from pyproj.exceptions import CRSError
 from sensor_routing.full_pipeline_cli import FullPipelineConfig
@@ -44,31 +58,14 @@ def check_email(email: str) -> str:
         raise ValueError(f"Invalid email: {e}")
 
 
-def validate_job_id(job_id: str) -> str:
-    """Validate job id.
-
-    The function further creates input dir for the job. If the job id was
-    changed the function and moves all previously uploaded files into the
-    new input dir.
-    """
-    log.debug(f"Check job id {job_id}")
-
-    job_id_regex = r"^\w+$"
-    if not re.match(job_id_regex, job_id):
-        raise ValueError("Job id must contain only letters numbers or underscore")
-
-    min_job_id_length = 8
-    max_job_id_length = 50
-
-    if len(job_id) < min_job_id_length or len(job_id) > max_job_id_length:
-        raise ValueError(
-            f"Job id must be between {min_job_id_length} and {max_job_id_length} characters"  # noqa
-        )
-    return job_id
-
-
 class UserModel(FullPipelineConfig):
     """Pydantic model for user input."""
+
+    # Taken from the framework's BaseJobConfig even though the base class itself is
+    # not inherited (see the module docstring): without it, `job.model.job_id = x`
+    # bypasses validate_job_id entirely, so an invalid id can reach the database and
+    # the work-dir path. Validation on construction alone is not enough.
+    model_config = ConfigDict(validate_assignment=True)
 
     # Input fields
     email: Annotated[
