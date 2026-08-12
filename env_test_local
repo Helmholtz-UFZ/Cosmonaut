@@ -7,12 +7,18 @@ COSMONAUT_TESTING="true"
 
 ### Webserver ###
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
-FLASK_PORT=8080
+FLASK_PORT=8081
 WEB_OUTSIDE_URL="http://localhost"
 MAINTAINER_EMAIL="louis-ferdinand.trinkle@ufz.de"
 
 ### Tile Server ###
-TILESERVER_URL="http://127.0.0.1:8001"
+# Host port for the tileserver container (docker-compose reads this directly;
+# the app only ever sees TILESERVER_URL). Local allocation across the three
+# suites lives in ../cosmo-suite/docs/plan/local-port-allocation.md — cosmonaut
+# owns 8081 / 5433 / 6380 / 9010 / 9011 / 8011 so its stack can run next to
+# cosmopolitan's and csv_profiler's.
+TILESERVER_HOST_PORT=8011
+TILESERVER_URL="http://127.0.0.1:8011"
 
 ### Email ###
 EMAIL_SERVER="test"

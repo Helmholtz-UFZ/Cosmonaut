@@ -6,12 +6,18 @@ FLASK_DEBUG=0
 
 ### Webserver ###
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
-FLASK_PORT=8080
+FLASK_PORT=8081
 WEB_OUTSIDE_URL="http://localhost"
 MAINTAINER_EMAIL="louis-ferdinand.trinkle@ufz.de"
 
 ### Tile Server ###
-TILESERVER_URL="http://127.0.0.1:8001"
+# Host port for the tileserver container (docker-compose reads this directly;
+# the app only ever sees TILESERVER_URL). Local allocation across the three
+# suites lives in ../cosmo-suite/docs/plan/local-port-allocation.md — cosmonaut
+# owns 8081 / 5433 / 6380 / 9010 / 9011 / 8011 so its stack can run next to
+# cosmopolitan's and csv_profiler's.
+TILESERVER_HOST_PORT=8011
+TILESERVER_URL="http://127.0.0.1:8011"
 
 ### Email ###
 EMAIL_SERVER="test"
@@ -23,21 +29,21 @@ EMAIL_PASSWORD="test"
 ### Object Storage (S3-compatible via rclone) ###
 OBJECT_STORAGE_ACCESS_KEY="minioadmin"
 OBJECT_STORAGE_SECRET_KEY="minioadmin"
-OBJECT_STORAGE_HOST="http://localhost:9000"
-OBJECT_STORAGE_PORT=9000
-OBJECT_STORAGE_CONSOLE_PORT=9001
+OBJECT_STORAGE_HOST="http://localhost:9010"
+OBJECT_STORAGE_PORT=9010
+OBJECT_STORAGE_CONSOLE_PORT=9011
 OBJECT_STORAGE_BUCKET="cosmic-routing"
 OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
 
 ### Postgres DB ###
 POSTGRES_DB="cosmonaut_db"
-POSTGRES_PORT="5432"
+POSTGRES_PORT="5433"
 POSTGRES_USER="cosmonaut"
 POSTGRES_PASSWORD="password"
 POSTGRES_HOST_NAME="localhost"
 
 ### Redis ###
-REDIS_PORT=6379
+REDIS_PORT=6380
 REDIS_HOST="localhost"
 REDIS_DB=0
 REDIS_PASSWORD=

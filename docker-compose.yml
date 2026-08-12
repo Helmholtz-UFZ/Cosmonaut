@@ -75,7 +75,12 @@ services:
     container_name: cosmonaut-tileserver
     platform: linux/amd64
     ports:
-      - "8001:80"
+      # The only host-published port that was a fixed literal. Postgres, Redis and
+      # MinIO already publish through a variable (host side variable, container side
+      # fixed — the shape that actually works). With the variable unset the default
+      # is the old value, so prod/CI/k8s see no change at all.
+      # Local allocation across the three suites: ../cosmo-suite/docs/plan/local-port-allocation.md
+      - "${TILESERVER_HOST_PORT:-8001}:80"
     volumes:
       - "./cosmonaut_app/work_dir:/data:ro"
     environment:

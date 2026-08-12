@@ -93,6 +93,47 @@ since `v0.4.0`; before that the app did it locally.
 
 ---
 
+## Local port allocation
+
+The three stacks — cosmopolitan, cosmonaut, `cosmo-suite/examples/csv_profiler` —
+used to publish the same host ports, so **no two suites could run at once, in any
+combination**. Each repo now owns a disjoint block:
+
+| | Flask | Postgres | Redis | MinIO | Console | Tileserver |
+|---|---|---|---|---|---|---|
+| cosmopolitan | 8080 | 5432 | 6379 | 9000 | 9001 | 8001 |
+| **cosmonaut** | **8081** | **5433** | **6380** | **9010** | **9011** | **8011** |
+| csv_profiler | 8082 | 5434 | 6381 | 9020 | 9021 | — |
+
+**Canonical source:** `../cosmo-suite/docs/plan/local-port-allocation.md`. Do not
+invent an allocation here — a second table is how the collision comes back, harder
+to find. Extend that one.
+
+Only `env_dev_mock` and `env_test_local` carry these values. `env_prod`,
+`env_dev_prod*`, `env_test` and the k8s manifests are untouched and must stay that
+way: in CI every stack has its own containers, in production its own pod. The one
+host-published literal in `docker-compose.yml` is parametrised as
+`${TILESERVER_HOST_PORT:-8001}` — **with the variable unset the resolved
+`docker compose config` is byte-identical to before**, which is what keeps prod out
+of it. Postgres, Redis and MinIO already published through a variable with the
+container side fixed (`${POSTGRES_PORT}:5432`), which is the shape that works;
+`FLASK_PORT` needs no host variable because the app and worker run with
+`network_mode: host`.
+
+### A port collision does not look like a failure
+
+It looks like **setup ERRORs** ("Address already in use" from
+`werkzeug.serving`) or like e2e tests running against no server — i.e. like a bug
+somewhere else entirely. Two runs were lost to this before the allocation existed.
+
+The inverse also happens: three setup ERRORs that look exactly like a collision but
+are a missing Playwright browser build after a version bump
+(`BrowserType.launch: Executable doesn't exist at …/chromium_headless_shell-<n>`).
+Fix with `uv run playwright install chromium`. **Read the error before blaming the
+ports.**
+
+---
+
 ## Who owns what
 
 - **Env-var names**: the framework owns the service-level half. It reads
