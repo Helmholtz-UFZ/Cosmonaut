@@ -1,10 +1,14 @@
 [project]
 name = "cosmonaut"
 version = "0.3.2"
-description = "Navigation route optimization for cosmic ray neutron sensor surveys"
+description = "Navigation route optimization for field survey campaigns, developed for cosmic ray neutron sensor (CRNS) surveys"
 requires-python = ">=3.13"
 dependencies = [
     "celery[redis]>=5.4.0,<6",
+    # Shared Dash + Celery + PostgreSQL + MinIO framework, pinned to a frozen tag.
+    # COSMOPOLITAN pins the same tag; a framework change is an MR + new tag there,
+    # then both apps re-pin. Never edit the framework from an app repo.
+    "cosmo-suite @ git+https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite@v0.4.0",
     "dash>=3.2.0,<4",
     "dash-ag-grid>=32.0.0,<33",
     "dash-bootstrap-components>=2.0.3,<3",
@@ -52,6 +56,10 @@ docs = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+# Required because cosmo-suite is a direct git reference, not a PyPI package.
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["cosmonaut_app"]

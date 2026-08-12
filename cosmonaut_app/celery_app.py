@@ -9,6 +9,8 @@ Separated from background_job_manager to break a circular import:
     tasks/*.py → cosmonaut_job → background_job_manager → tasks/*.py
 """
 
+from cosmo_suite.tasks.test_tasks import long_running_test_task
+
 from cosmonaut_app.background_job_manager import (
     NAME_MAINTENANCE_CLEANUP_TASK,
     NAME_ROUTING_TASK,
@@ -18,13 +20,16 @@ from cosmonaut_app.background_job_manager import (
 )
 from cosmonaut_app.tasks.maintenance_tasks import MaintenanceTask, cleanup_task
 from cosmonaut_app.tasks.routing_tasks import RoutingTask, process_routing_job
-from cosmonaut_app.tasks.test_tasks import TestTask, test_sleep_task
 from cosmonaut_app.tasks.upload_tasks import UploadTask, process_upload_task
 
 app = background_job_manager.app
 
 app.task(bind=True, base=RoutingTask, name=NAME_ROUTING_TASK)(process_routing_job)
-app.task(bind=True, base=TestTask, name=NAME_TEST_TASK)(test_sleep_task)
+# The test task comes from the framework. NAME_TEST_TASK is the framework's name,
+# and the framework worker-management page submits exactly that name — registering
+# a local task under a local name would leave the page's button enqueueing into a
+# queue nobody consumes.
+app.task(bind=True, name=NAME_TEST_TASK)(long_running_test_task)
 app.task(bind=True, base=MaintenanceTask, name=NAME_MAINTENANCE_CLEANUP_TASK)(
     cleanup_task
 )

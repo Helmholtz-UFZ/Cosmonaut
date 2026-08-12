@@ -7,6 +7,7 @@ import traceback
 import dash
 import dash_bootstrap_components as dbc
 import psycopg2
+from cosmo_suite.object_storage_manager import ObjectStorageError as ObjectStorageError
 from dash import set_props
 from sqlalchemy.exc import DatabaseError, OperationalError
 from werkzeug.exceptions import NotFound
@@ -16,7 +17,7 @@ from cosmonaut_app.constants.html_ids import (
     ERROR_MODAL_MESSAGE_SHARED_ID,
     ERROR_MODAL_SHARED_ID,
     ERROR_MODAL_TITLE_SHARED_ID,
-    LOADING_OVERLAY_SHARED_ID,
+    LOADING_OVERLAY_MODAL_SHARED_ID,
 )
 from cosmonaut_app.email_service import send_mail
 
@@ -41,13 +42,14 @@ class WrongCeleryTaskId(Exception):
         super().__init__(f"Invalid Celery task ID format: '{task_id}'")
 
 
-class ObjectStorageError(Exception):
-    """Exception raised for errors in the ObjectStorageManager class."""
-
-    def __init__(self, message="An error occurred while managing object storage."):
-        """Initialize the ObjectStorageError with a message."""
-        self.message = message
-        super().__init__(message)
+# Convention deviation (CLAUDE.md: custom exceptions live in error_handling.py):
+# ObjectStorageError is imported, not defined. The framework's object storage
+# functions raise cosmo_suite.object_storage_manager.ObjectStorageError; a local
+# class of the same name would be a *different* class, so every
+# `except ObjectStorageError` here would silently stop catching — no import error,
+# no failing test, the exception just falls through to the generic handler.
+# Re-exporting keeps all call sites and the error_responds_dict entry unchanged.
+# No cycle: cosmo_suite.object_storage_manager imports only config and logging.
 
 
 class FileValidationError(Exception):
@@ -188,7 +190,7 @@ def handle_error(error):
 
     log.error(f"{error_title}: {error_message}")
     log.error(f"Error details: {traceback.format_exc()}")
-    set_props(LOADING_OVERLAY_SHARED_ID, {"is_open": False})
+    set_props(LOADING_OVERLAY_MODAL_SHARED_ID, {"is_open": False})
     set_props(ERROR_MODAL_SHARED_ID, {"is_open": True})
     set_props(ERROR_MODAL_TITLE_SHARED_ID, {"children": error_title})
     set_props(ERROR_MODAL_MESSAGE_SHARED_ID, {"children": error_message})

@@ -64,6 +64,7 @@ When you spot bad practices, convention violations, symmetric bugs, or fragile p
 
 For specific implementation details, see:
 
+- [Framework Integration](docs/conventions/framework_integration.md) - Working with the `cosmo-suite` dependency: freeze rule, CWD rule, adoption rule, two silent traps
 - [HTML IDs](docs/conventions/html_ids.md) - ID naming and restricted usage
 - [Testing](docs/conventions/testing.md) - Test execution and CI pipeline
 - [Error Handling](docs/conventions/error_handling.md) - Custom exceptions, error modal

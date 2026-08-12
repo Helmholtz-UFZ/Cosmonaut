@@ -2,7 +2,7 @@
 DOCKER_UID=1000
 DOCKER_GID=1000
 GUNICORN=0
-DEBUG=0
+FLASK_DEBUG=0
 
 ### Webserver ###
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
@@ -28,7 +28,7 @@ OBJECT_STORAGE_PORT=9000
 OBJECT_STORAGE_CONSOLE_PORT=9001
 
 ### Postgres DB ###
-POSTGRES_NAME="cosmonaut_stage"
+POSTGRES_DB="cosmonaut_stage"
 POSTGRES_PORT="5432"
 POSTGRES_USER="cosmonaut_stage_rw"
 POSTGRES_HOST_NAME="postgres-dev.intranet.ufz.de"

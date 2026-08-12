@@ -1,8 +1,23 @@
+"""Pydantic models for user input and persisted job state.
+
+``UserModel`` subclasses ``cosmo_suite.pydantic_models.BaseJobConfig``, the minimal
+contract: a ``job_id`` validated by ``validate_job_id`` plus
+``validate_assignment=True``, so no model can be assigned an invalid job id after
+construction either.
+
+It does **not** subclass ``UploadJobConfig``. That layer adds ``upload_file_name``
+for the framework ``Job``'s single-upload pattern; cosmonaut has two uploads, each
+with its own JSON column (``membership_upload`` / ``predictor_upload``), and
+``JobTable`` has no ``upload_file_name`` column — inheriting it would make
+``model_dump()`` produce a key ``CosmonautJob.save()`` cannot write. Revisit only
+if the framework ``Job`` is adopted.
+"""
+
 import logging
-import re
 from datetime import date
 from typing import Annotated, Any
 
+from cosmo_suite.pydantic_models import BaseJobConfig
 from email_validator import EmailNotValidError, validate_email
 from pydantic import AfterValidator, Field
 from pyproj import CRS
@@ -44,31 +59,11 @@ def check_email(email: str) -> str:
         raise ValueError(f"Invalid email: {e}")
 
 
-def validate_job_id(job_id: str) -> str:
-    """Validate job id.
+class UserModel(BaseJobConfig, FullPipelineConfig):
+    """Pydantic model for user input.
 
-    The function further creates input dir for the job. If the job id was
-    changed the function and moves all previously uploaded files into the
-    new input dir.
+    ``job_id`` and ``validate_assignment=True`` come from ``BaseJobConfig``.
     """
-    log.debug(f"Check job id {job_id}")
-
-    job_id_regex = r"^\w+$"
-    if not re.match(job_id_regex, job_id):
-        raise ValueError("Job id must contain only letters numbers or underscore")
-
-    min_job_id_length = 8
-    max_job_id_length = 50
-
-    if len(job_id) < min_job_id_length or len(job_id) > max_job_id_length:
-        raise ValueError(
-            f"Job id must be between {min_job_id_length} and {max_job_id_length} characters"  # noqa
-        )
-    return job_id
-
-
-class UserModel(FullPipelineConfig):
-    """Pydantic model for user input."""
 
     # Input fields
     email: Annotated[
@@ -80,16 +75,6 @@ class UserModel(FullPipelineConfig):
             json_schema_extra={"type": "email"},
         ),
         AfterValidator(check_email),
-    ]
-    job_id: Annotated[
-        str,
-        Field(
-            "poised_python_of_wonder",
-            description='Identifier for your submission. Only letters, numbers and "_".',  # noqa
-            title="Job ID",
-            json_schema_extra={"type": "text"},
-        ),
-        AfterValidator(validate_job_id),
     ]
     membership_upload: Annotated[
         dict[str, Any],

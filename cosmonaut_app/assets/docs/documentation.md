@@ -1,8 +1,8 @@
 # COSMONAUT Documentation
 
-### COSmic ray based soil MOisture Prediction NAvigation and UTility Tool
+### COSmic ray based soil MOisture NAvigation and UTility Tool
 
-*Last updated: 2026-07-07 22:37:55*
+*Last updated: 2026-08-05 11:31:01*
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -13,15 +13,31 @@
 
 <h2 id="introduction">Introduction</h2>
 
-COSMONAUT is a web application for creating optimized navigation routes based on
-regional classification for remote sensing measurements specifically designed for cosmic
-ray neutron sensor (CRNS). The service helps researchers plan efficient field sampling
-routes by:
+COSMONAUT is a web application for information-driven survey planning. From a
+probabilistic map describing the spatial heterogeneity of a survey area, it computes an
+optimized sampling route over an accessible road network. The service helps researchers
+plan efficient field sampling campaigns by:
 
 - Uploading membership data (sample locations)
 - Selecting relevant street networks from OpenStreetMap
 - Configuring routing parameters
 - Generating downloadable GPX navigation files
+
+### Where COSMONAUT Fits
+
+COSMONAUT is the survey-planning stage of a **sparse-to-spatial workflow**. The sequence
+that turns sparse field observations into spatially continuous maps:
+
+1. **Survey planning** (COSMONAUT): compute an information-driven sampling route.
+2. **Data acquisition and conditioning**: application-specific, outside this workflow.
+3. **Spatial regionalization** (COSMOPOLITAN): uncertainty-aware prediction of continuous
+   maps from the sparse observations.
+
+COSMONAUT was developed for, and is used operationally in, mobile **cosmic ray neutron
+sensing (CRNS)** surveys for regional soil moisture mapping. That is the use case the
+defaults are tuned for. The routing workflow itself makes no assumption about the
+instrument: any measurement locations with a probabilistic representation of the survey
+area will do, and the method applies to network-constrained mobile sensing in general.
 
 ### How It Works
 
@@ -56,8 +72,8 @@ Landing page for creating new routing jobs.
 
 
 Welcome to COSMONAUT - the starting point for creating optimized navigation routes
-based on cosmic ray neutron sensor measurement locations. This page allows you to
-begin a new routing job by clicking the "Create new job" button.
+based on your measurement locations. This page allows you to begin a new routing
+job by clicking the "Create new job" button.
 
 Each job is assigned a unique identifier that tracks your data, route selections,
 and final navigation output through the entire workflow. You can also continue
@@ -103,9 +119,9 @@ Upload membership and predictor data and configure coordinate reference system.
 
 
 
-This page is where you upload your cosmic ray neutron sensor measurement locations
-or sampling points that will be used to plan the navigation route. The workflow
-on this page involves three key steps:
+This page is where you upload your measurement locations or sampling points that
+will be used to plan the navigation route. The workflow on this page involves
+three key steps:
 
 1. **Specify EPSG Code**: Enter the coordinate reference system (CRS) of your data.
    The application validates the EPSG code.
@@ -231,7 +247,7 @@ field includes its data type, default value, and valid ranges where applicable.
 **Using This Page:**
 
 Most users can proceed with the default values, which are optimized for typical
-CRNS field sampling scenarios. The defaults provide a good balance between route
+field sampling scenarios. The defaults provide a good balance between route
 efficiency, coverage of measurement points, and practical navigability.
 
 Advanced users can customize parameters for specific use cases:

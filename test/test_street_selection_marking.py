@@ -20,7 +20,7 @@ import pytest
 from PIL import Image
 from playwright.sync_api import expect
 
-from cosmonaut_app.config import FLASK_PORT
+from cosmonaut_app.config import PORT
 from cosmonaut_app.constants.html_ids import (
     DATA_UPLOAD_UPLOAD_COMPONENT_DATA_UPLOAD_ID,
     EMAIL_INPUT_USER_INFO_ID,
@@ -74,7 +74,7 @@ def _upload_membership_and_wait(page, membership_file_path):
     Returns the job_id. Stops after the OSM download completes — the
     predictor upload is not needed for street selection.
     """
-    page.goto(f"http://localhost:{FLASK_PORT}/")
+    page.goto(f"http://localhost:{PORT}/")
     page.locator(f"#{START_JOB_BUTTON_HOME_ID}").click()
     check_all_errors(page)
 
@@ -114,7 +114,7 @@ def test_street_click_marks_road_after_hard_load(
     job_id = _upload_membership_and_wait(page, membership_file_path)
 
     # Hard load (browser refresh path) — not SPA navigation.
-    page.goto(f"http://localhost:{FLASK_PORT}/job/{job_id}/street-selection")
+    page.goto(f"http://localhost:{PORT}/job/{job_id}/street-selection")
     check_all_errors(page)
 
     pixel = _wait_for_street_pixel(page)

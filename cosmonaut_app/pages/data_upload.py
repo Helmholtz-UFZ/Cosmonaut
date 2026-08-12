@@ -2,9 +2,9 @@
 
 # User documentation (This section is for user documentation and will appear in the user documentation.)
 
-This page is where you upload your cosmic ray neutron sensor measurement locations
-or sampling points that will be used to plan the navigation route. The workflow
-on this page involves three key steps:
+This page is where you upload your measurement locations or sampling points that
+will be used to plan the navigation route. The workflow on this page involves
+three key steps:
 
 1. **Specify EPSG Code**: Enter the coordinate reference system (CRS) of your data.
    The application validates the EPSG code.
@@ -66,6 +66,7 @@ import logging
 
 import dash
 import dash_bootstrap_components as dbc
+from cosmo_suite.object_storage_manager import save_files
 from dash import (
     Input,
     Output,
@@ -125,7 +126,6 @@ from cosmonaut_app.layout import (
     progress_footer,
 )
 from cosmonaut_app.map_utils import get_tile_url
-from cosmonaut_app.object_storage_manager import save_files
 from cosmonaut_app.pydantic_models import check_epsg
 
 log = logging.getLogger(__name__)

@@ -3,8 +3,8 @@
 # User documentation (This section is for user documentation and will appear in the user documentation.)
 
 Welcome to COSMONAUT - the starting point for creating optimized navigation routes
-based on cosmic ray neutron sensor measurement locations. This page allows you to
-begin a new routing job by clicking the "Create new job" button.
+based on your measurement locations. This page allows you to begin a new routing
+job by clicking the "Create new job" button.
 
 Each job is assigned a unique identifier that tracks your data, route selections,
 and final navigation output through the entire workflow. You can also continue

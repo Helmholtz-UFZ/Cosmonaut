@@ -30,8 +30,8 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from cosmonaut_app.config import (
+    POSTGRES_DB,
     POSTGRES_HOST_NAME,
-    POSTGRES_NAME,
     POSTGRES_PASSWORD,
     POSTGRES_PORT,
     POSTGRES_USER,
@@ -123,7 +123,7 @@ class DataBaseManager:
         if cls._Session is None:
             database_url = (
                 f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
-                f"@{POSTGRES_HOST_NAME}:{POSTGRES_PORT}/{POSTGRES_NAME}"
+                f"@{POSTGRES_HOST_NAME}:{POSTGRES_PORT}/{POSTGRES_DB}"
             )
             cls._engine = create_engine(
                 database_url,

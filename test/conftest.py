@@ -15,6 +15,7 @@ import urllib.request
 
 import pytest
 import redis
+from cosmo_suite.object_storage_manager import create_bucket, setup_remote
 from playwright.sync_api import ConsoleMessage, Page
 from playwright.sync_api import Error as PlaywrightError
 from slugify import slugify
@@ -22,7 +23,7 @@ from sqlalchemy.exc import OperationalError
 from werkzeug.serving import make_server
 
 from cosmonaut_app.config import (
-    FLASK_PORT,
+    PORT,
     REDIS_DB,
     REDIS_HOST,
     REDIS_PASSWORD,
@@ -30,7 +31,6 @@ from cosmonaut_app.config import (
 )
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.error_handling import ObjectStorageError
-from cosmonaut_app.object_storage_manager import create_bucket, setup_remote
 
 
 def create_logger():
@@ -240,7 +240,7 @@ def dash_app(request):
     # Inline import: app.py boots Dash, MinIO, Beat scheduler — must stay deferred
     from cosmonaut_app.app import app
 
-    port = int(FLASK_PORT)
+    port = int(PORT)
     srv = make_server("localhost", port, app.server)
     thread = threading.Thread(target=srv.serve_forever)
     thread.start()

@@ -2,7 +2,7 @@
 DOCKER_UID=1000
 DOCKER_GID=1000
 GUNICORN=0
-DEBUG=0
+FLASK_DEBUG=0
 
 ### Webserver ###
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
@@ -30,7 +30,7 @@ OBJECT_STORAGE_BUCKET="cosmic-routing"
 OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
 
 ### Postgres DB ###
-POSTGRES_NAME="cosmonaut_db"
+POSTGRES_DB="cosmonaut_db"
 POSTGRES_PORT="5432"
 POSTGRES_USER="cosmonaut"
 POSTGRES_PASSWORD="password"

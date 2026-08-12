@@ -19,6 +19,12 @@ JOB_STATUS_FAILED = "FAILED"
 # Maintenance constants
 LOG_RETENTION_DAYS = 30  # Days to retain logs in PostgreSQL database
 
+# Third-party packages whose DEBUG output would otherwise fill the logs table.
+# Passed to every cosmo_suite.logger builder; the framework adds its own
+# (watchdog, selenium) on top, so those are not repeated here. All four run
+# inside worker processes, which is where the volume comes from.
+EXCLUDED_LOG_PACKAGES = ("matplotlib", "PIL", "pyogrio", "rasterio")
+
 # OSM data file names
 OSM_DATA_DOWNLOAD_FILE = "osm_data_download.geojson"
 OSM_DATA_EDITED_FILE = "osm_data_edited.geojson"

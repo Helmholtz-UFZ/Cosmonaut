@@ -21,7 +21,7 @@ field includes its data type, default value, and valid ranges where applicable.
 **Using This Page:**
 
 Most users can proceed with the default values, which are optimized for typical
-CRNS field sampling scenarios. The defaults provide a good balance between route
+field sampling scenarios. The defaults provide a good balance between route
 efficiency, coverage of measurement points, and practical navigability.
 
 Advanced users can customize parameters for specific use cases:

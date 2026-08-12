@@ -83,7 +83,7 @@ from cosmonaut_app.constants.general import (
 from cosmonaut_app.constants.html_ids import (
     CANCEL_BUTTON_ROUTE_COMPUTATION_ID,
     JOB_ID_STORE_SHARED_ID,
-    LOADING_OVERLAY_SHARED_ID,
+    LOADING_OVERLAY_MODAL_SHARED_ID,
     LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     RESTART_BUTTON_ROUTE_COMPUTATION_ID,
@@ -481,7 +481,7 @@ dash.clientside_callback(
         return false;
     }
     """,
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(LOADING_OVERLAY_MODAL_SHARED_ID, "is_open", allow_duplicate=True),
     Input(START_BUTTON_ROUTE_COMPUTATION_ID, "n_clicks"),
     Input(CANCEL_BUTTON_ROUTE_COMPUTATION_ID, "n_clicks"),
     Input(RESTART_BUTTON_ROUTE_COMPUTATION_ID, "n_clicks"),
@@ -490,7 +490,7 @@ dash.clientside_callback(
 
 
 @callback(
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(LOADING_OVERLAY_MODAL_SHARED_ID, "is_open", allow_duplicate=True),
     Output(STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID, "disabled", allow_duplicate=True),
     Output(UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, "data", allow_duplicate=True),
     Input(START_BUTTON_ROUTE_COMPUTATION_ID, "n_clicks"),
@@ -527,7 +527,7 @@ def start_computation(n_clicks, job_id):
 
 
 @callback(
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(LOADING_OVERLAY_MODAL_SHARED_ID, "is_open", allow_duplicate=True),
     Output(UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, "data", allow_duplicate=True),
     Input(CANCEL_BUTTON_ROUTE_COMPUTATION_ID, "n_clicks"),
     State(JOB_ID_STORE_SHARED_ID, "data"),
@@ -564,7 +564,7 @@ def cancel_computation(n_clicks, job_id):
 
 
 @callback(
-    Output(LOADING_OVERLAY_SHARED_ID, "is_open", allow_duplicate=True),
+    Output(LOADING_OVERLAY_MODAL_SHARED_ID, "is_open", allow_duplicate=True),
     Output(STATUS_POLL_INTERVAL_ROUTE_COMPUTATION_ID, "disabled", allow_duplicate=True),
     Output(UPDATE_TRIGGER_STORE_ROUTE_COMPUTATION_ID, "data", allow_duplicate=True),
     Input(RESTART_BUTTON_ROUTE_COMPUTATION_ID, "n_clicks"),

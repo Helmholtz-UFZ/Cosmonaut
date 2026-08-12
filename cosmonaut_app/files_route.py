@@ -1,4 +1,22 @@
-"""Serve files from a directory."""
+"""Serve files from a directory.
+
+Deliberately NOT replaced by ``cosmo_suite.files_route`` in slice 1. The framework
+version is not a drifted copy of this one — it is a different route set:
+
+- It has no ``/download/<job_id>/route.gpx`` route at all. That is the path the
+  QR code and the notification mail point at.
+- Its ``Job(job_id)`` has no equivalent of ``overwrite=True``, which is what makes
+  every one of these routes re-pull the job's files from MinIO first. On
+  Kubernetes the pod serving the request is usually not the pod that produced the
+  file.
+- Its picture route calls ``send_from_directory(f"work_dir/{job_id}", ...)``,
+  a path relative to Flask's ``app.root_path`` (= ``cosmonaut_app/``), whereas this
+  one passes the job's absolute working dir.
+
+Above all it imports ``cosmo_suite.job.Job``, and the framework ``Job`` is still a
+concrete job bound to ``cosmo_suite.db_manager``, not a contract — both are out of
+slice 1. Revisit together with ``cosmonaut_job.py``.
+"""
 
 import io
 import logging

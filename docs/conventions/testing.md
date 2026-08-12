@@ -101,7 +101,7 @@ pipeline run.
 
 The image lives at:
 ```
-codebase.helmholtz.cloud:5050/ufz/tb5-smm/met/wg7/ufz-cosmonaut/ci:latest
+codebase.helmholtz.cloud:5050/ufz/tb5-smm/met/wg7/cosmonaut/ci:latest
 ```
 
 **When it is rebuilt:** `build-ci-image` runs only when `docker/ci.Dockerfile`,
