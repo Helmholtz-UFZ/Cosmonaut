@@ -14,16 +14,16 @@ MAINTAINER_EMAIL="louis-ferdinand.trinkle@ufz.de"
 TILESERVER_URL="http://127.0.0.1:8001"
 
 ### Email ###
-EMAIL_SERVER="smtp.ufz.de"
+EMAIL_SERVER="fill and copy to env_dev_prod_priv"
 EMAIL_PORT="587"
-EMAIL_USERNAME="soncosmo"
+EMAIL_USERNAME="fill and copy to env_dev_prod_priv"
 EMAIL_SENDER="cosmopolitan@ufz.de"
 EMAIL_PASSWORD="fill and copy to env_dev_prod_priv"
 
 ### Object Storage (S3-compatible via rclone) ###
-OBJECT_STORAGE_ACCESS_KEY="AKIATCJ4AYK7SU9P73Q1K"
+OBJECT_STORAGE_ACCESS_KEY="fill and copy to env_dev_prod_priv"
 OBJECT_STORAGE_SECRET_KEY="fill and copy to env_dev_prod_priv"
-OBJECT_STORAGE_HOST="https://vip.s3.ufz.de"
+OBJECT_STORAGE_HOST="fill and copy to env_dev_prod_priv"
 OBJECT_STORAGE_BUCKET="cosmic-routing"
 OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
 OBJECT_STORAGE_PORT=9000
@@ -32,9 +32,9 @@ OBJECT_STORAGE_CONSOLE_PORT=9001
 ### Postgres DB ###
 POSTGRES_DB="cosmonaut_stage"
 POSTGRES_PORT="5432"
-POSTGRES_USER="cosmonaut_stage_rw"
+POSTGRES_USER="fill and copy to env_dev_prod_priv"
 POSTGRES_PASSWORD="fill and copy to env_dev_prod_priv"
-POSTGRES_HOST_NAME="postgres-dev.intranet.ufz.de"
+POSTGRES_HOST_NAME="fill and copy to env_dev_prod_priv"
 
 ### Redis ###
 REDIS_PORT=6379
