@@ -1,5 +1,9 @@
 # runbooks/
 
 Operational guides for recurring tasks (release flow, onboarding, debugging a recurring issue).
-_Empty for now._ Step-by-step task guides currently live in [skills/](../../skills/); use runbooks for
+Step-by-step task guides currently live in [skills/](../../skills/); use runbooks for
 operational procedures (deploy, recover, rotate) rather than coding tasks.
+
+- [local-overpass-testing.md](local-overpass-testing.md) — self-hosted wiktorn Overpass for large-AOI work
+- [registry-path-migration.md](registry-path-migration.md) — renaming the GitLab project + registry path.
+  **Currently paused mid-procedure with ArgoCD auto-sync and both pipeline schedules disabled.**
