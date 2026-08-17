@@ -173,4 +173,55 @@ sed -i 's|met/wg7/ufz-cosmonaut/frontend|met/wg7/cosmonaut/frontend|
         s|met/wg7/ufz-cosmonaut/worker|met/wg7/cosmonaut/worker|' \
   deployment/ufz/prod/values.yaml
 git diff -- deployment/ufz/prod/values.yaml   # exactly two lines
+
+# commit path-limited — never `git commit -am` here, it would sweep up whatever
+# else the branch switch carried into the working tree
+git commit -m "Point the prod images at the renamed registry path" \
+  -- deployment/ufz/prod/values.yaml
+git push
 ```
+
+### Abort path — only before the rename
+
+`docker tag` in step 1 *adds* a tag, so the local daemon still holds the images
+under the **old** path as well. As long as the rename has **not** happened, the
+status quo is therefore restorable:
+
+```bash
+OLD="registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut"
+for img in frontend worker; do
+  for t in 0.3.3-2026.08.16 0.3.3 0.3.2-2026.08.12 0.3.2; do
+    docker push "${OLD}/${img}:${t}"
+  done
+done
+docker push "${OLD}/ci:latest"
+```
+
+This is what makes it defensible to enter the window without knowing whether a
+registry cleanup job has to run first — worst case the nine tags go back where
+they were and prod is pullable again.
+
+**Once the rename is through, this escape hatch is gone**: the old registry path
+no longer exists, so nothing can be pushed back to it. From that point the only
+way is forward.
+
+## `write_registry` — verify the token BEFORE deleting anything
+
+The push failed on the first attempt with `denied: requested access to the
+resource is denied` for all nine images, with the registry already emptied and
+the project already renamed — i.e. at the one moment where there is no way back.
+Cause: the stored `docker login` credential was a Personal Access Token with
+`read_registry` but **not** `write_registry`. Pulls had therefore always worked
+and nothing signalled the gap. Project role is irrelevant here (Owner,
+`access_level: 50`), and GitLab cannot add a scope to an existing token — a new
+one has to be created.
+
+Check this in step 1, not in step 6:
+
+```bash
+glab api personal_access_tokens/self | python3 -c \
+  "import json,sys; print(json.load(sys.stdin)['scopes'])"
+```
+
+`write_registry` must be in that list, and the token that `docker login` uses must
+be the one carrying it (`~/.docker/config.json`, `auths['registry.hzdr.de']`).
