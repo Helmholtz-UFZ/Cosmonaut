@@ -6,7 +6,7 @@ persistence:
 frontend:
   enabled: true
   image:
-    repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut/frontend
+    repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/cosmonaut/frontend
     tag: "0.3.3-2026.08.16"
   imagePullSecrets:
     - name: wombat-docker-registry-codebase
@@ -72,7 +72,7 @@ frontend:
 worker:
   enabled: true
   image:
-    repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut/worker
+    repository: registry.hzdr.de/ufz/tb5-smm/met/wg7/cosmonaut/worker
     pullPolicy: Always
     tag: "0.3.3-2026.08.16"
   imagePullSecrets:

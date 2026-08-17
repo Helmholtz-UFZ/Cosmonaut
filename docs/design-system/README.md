@@ -23,8 +23,8 @@ mocks and prototypes feel native to the real product.
 
 ## Sources
 
-- **Codebase**  — `uploads/ufz-cosmonaut-main/` (provided as a zipped upload of
-  the `ufz-cosmonaut` repo).  Key files referenced while building this system:
+- **Codebase**  — `uploads/cosmonaut-main/` (provided as a zipped upload of
+  the `cosmonaut` repo).  Key files referenced while building this system:
   - `cosmonaut_app/layout.py` — navbar, page shells, cards, footers
   - `cosmonaut_app/assets/flatly_bootstrap.css` — base theme (Bootswatch Flatly)
   - `cosmonaut_app/assets/style.css` — six COSMONAUT-specific overrides
