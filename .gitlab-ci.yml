@@ -279,6 +279,11 @@ build-latest-tag:
     paths:
       - "deployment/ufz/prod/values.yaml"
   rules:
+    # A release pipeline (VERSION set) owns the version files and the tag it
+    # pushes; this job must not also fire, or it would build a stray image and
+    # overwrite values.yaml from the previous tag.
+    - if: "$VERSION"
+      when: "never"
     - if: "$NIGHTLY_BUILD == '1'"
     - if: "$CI_PIPELINE_SOURCE == 'web'"
     - when: "never"
@@ -310,7 +315,53 @@ bump_version_for_cluster:
     - "git pull origin ${BRANCH} --strategy-option=ours"
     - "git push origin HEAD:$BRANCH -o ci.skip"
   rules:
+    # A release pipeline (VERSION set) owns the version files and the tag it
+    # pushes; this job must not also fire, or it would build a stray image and
+    # overwrite values.yaml from the previous tag.
+    - if: "$VERSION"
+      when: "never"
     - if: '$CI_COMMIT_TAG =~ /^\d+.\d+.\d+/'
     - if: "$NIGHTLY_BUILD == '1'"
     - if: "$CI_PIPELINE_SOURCE == 'web'"
+    - when: "never"
+
+# ─── Release ──────────────────────────────────────────────────────────────────
+# Cut a release in one action: write the version into every file that must carry
+# it, commit, tag THAT commit, push both.
+#
+# How to run: Build → Pipelines → Run pipeline, on main, with variable
+#   VERSION = 0.3.6
+#
+# Why the version is written BEFORE the tag and not after: Zenodo archives the
+# tagged snapshot, so a job that writes CITATION.cff after the tag mints the
+# PREVIOUS version into the DOI record. Measured, not theoretical — the
+# framework's v0.4.0 carries no CITATION.cff at all for exactly this reason.
+#
+# Pushing the tag is what triggers build-release and bump_version_for_cluster,
+# which own the image build and deployment/values.yaml. This job deliberately
+# does not touch values.yaml.
+release:
+  stage: "deploy"
+  image: "python:3.13"
+  variables:
+    BRANCH: "main"
+  script:
+    - *prepare
+    - 'echo "$VERSION" | grep -qE "^[0-9]+\\.[0-9]+\\.[0-9]+$" || { echo "VERSION must be X.Y.Z, got: $VERSION"; exit 1; }'
+    - "git fetch --tags origin"
+    - 'if git rev-parse -q --verify "refs/tags/$VERSION" > /dev/null; then echo "Tag $VERSION already exists — choose another version"; exit 1; fi'
+    # detached HEAD in CI: create the local branch from the remote in one step
+    - "git checkout -B $BRANCH origin/$BRANCH"
+    - 'sed -i "s/^version = .*/version = \"${VERSION}\"/" pyproject.toml'
+    - 'sed -i "s/^version: .*/version: \"${VERSION}\"/; s/^date-released: .*/date-released: \"$(date -I)\"/" CITATION.cff'
+    - 'git diff --quiet && { echo "Nothing changed — is VERSION already the current one?"; exit 1; } || true'
+    - "git add pyproject.toml CITATION.cff"
+    - 'git commit -m "Release ${VERSION}"'
+    - 'git tag -a "$VERSION" -m "Release ${VERSION}"'
+    # Branch first, with ci.skip: the release commit itself needs no pipeline.
+    - "git push origin HEAD:$BRANCH -o ci.skip"
+    # The tag push is the trigger for build-release + bump_version_for_cluster.
+    - 'git push origin "$VERSION"'
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $VERSION'
     - when: "never"
