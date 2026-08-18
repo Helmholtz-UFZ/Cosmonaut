@@ -24,7 +24,7 @@ The migration is **done**. Nothing is left in a non-default state.
 | Git tag `0.3.4` | carries the new path, which defuses the nightly revert below |
 | ArgoCD | repointed, auto-sync on, green (Robin Zinke, RDM) |
 | Schedules 546 / 536 | re-enabled |
-| Git remote | moved to HTTPS — SSH broke mid-migration, see below |
+| Git remote | back on SSH |
 
 **The open question is answered:** deleting all 224 tags went through in one pass
 and the rename was accepted immediately afterwards. No registry cleanup job had to
