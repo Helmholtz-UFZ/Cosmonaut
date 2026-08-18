@@ -1,6 +1,7 @@
 # Container Registry & Project Rename
 
-Images live in the GitLab registry at `registry.hzdr.de/ufz/tb5-smm/met/wg7/ufz-cosmonaut/{frontend,worker,ci}`.
+Images live in the GitLab registry at
+`registry.hzdr.de/ufz/tb5-smm/met/wg7/cosmonaut/{frontend,worker,ci}`.
 ArgoCD watches `deployment/ufz/prod/values.yaml`.
 
 ## The registry path appears in exactly one place
@@ -11,31 +12,36 @@ occurrences are the two `repository:` lines in `deployment/ufz/prod/values.yaml`
 (frontend + worker). A project rename therefore needs no CI changes, only those
 two lines.
 
-## Renaming the project is blocked by the registry
+## Renaming the project: the registry blocks it, and how that was resolved
 
-Attempting the rename (Settings → General → Advanced → Change path) fails with:
+The path was `ufz-cosmonaut` until 2026-08-17. Changing it fails with:
 
 ```
 Cannot rename project, the container registry path rename validation failed: Rename Not Supported
 ```
 
-The registry refuses to move the repository path, even though its GitLab API is
-reachable (`https://registry.hzdr.de/gitlab/v1/` answers 401, not 404). This is
-instance-side and owned by the Wombat/RDM team — not fixable from this repo.
+`registry.hzdr.de` refuses to move a repository path, even though its GitLab API is
+reachable (`/gitlab/v1/` answers 401, not 404). HIFIS confirmed there is no
+server-side move; the documented route is pull → delete → rename → push, which is
+what was done. The full procedure, the two traps that cost time, and the end state
+are in [knowledge/runbooks/registry-path-migration.md](../knowledge/runbooks/registry-path-migration.md).
 
-Known facts, so this doesn't get re-investigated:
+Facts worth keeping, so none of this gets re-investigated:
 
 - GitLab's *Name* (display) can be changed freely — only the *Path* triggers the
   registry validation.
-- Deleting all container images in the project skips the validation, but costs the
-  full tag history (~200 tags) and opens a window where prod cannot pull. The
-  worker uses `pullPolicy: Always`, so a pod restart in that window means
-  `ImagePullBackOff`. Image deletion is also asynchronous — the rename stays
-  blocked until GitLab's cleanup job has run.
-- Argo watches the old path. Any path move requires the RDM team to disable
-  auto-sync first, and to re-point + re-enable it afterwards.
-
-Recorded 2026-08-12 after the attempt failed.
+- Deleting every container image in the project skips the validation. It costs the
+  tag history and opens a window in which prod cannot pull; the worker uses
+  `pullPolicy: Always`, so a pod restart in that window means `ImagePullBackOff`.
+- **The rename is accepted as soon as the tags are gone via the API** — no cleanup
+  job has to run in between. Measured on 2026-08-17: 224 tags deleted in one pass,
+  rename accepted immediately. (An earlier note here assumed a cleanup wait; that
+  was wrong.)
+- The `docker login` credential needs **`write_registry`**, not just
+  `read_registry`. Pulls work without it, so the gap only surfaces on the push —
+  i.e. after the registry is already empty. Check the scope first.
+- Argo watches the path. Any move needs the RDM team to disable auto-sync first and
+  to re-point + re-enable it afterwards.
 
 ## Never touch values.yaml while a release pipeline runs
 

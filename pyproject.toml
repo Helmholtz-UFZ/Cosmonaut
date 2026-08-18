@@ -1,6 +1,6 @@
 [project]
 name = "cosmonaut"
-version = "0.3.3"
+version = "0.3.4"
 description = "Navigation route optimization for field survey campaigns, developed for cosmic ray neutron sensor (CRNS) surveys"
 readme = "README.md"
 license = { text = "EUPL-1.2" }

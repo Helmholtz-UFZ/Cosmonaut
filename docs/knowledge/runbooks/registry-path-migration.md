@@ -12,28 +12,28 @@ route is [pull → delete → rename → push](https://docs.gitlab.com/user/pack
 Background and the reason the path is hardcoded in exactly one place:
 [conventions/registry_and_rename.md](../../conventions/registry_and_rename.md).
 
-## State — update this section as the migration proceeds
+## State — completed 2026-08-17
 
-**Paused since 2026-08-17, before the destructive step.**
+The migration is **done**. Nothing is left in a non-default state.
 
-| | Zustand | muss zurückgesetzt werden |
-|---|---|---|
-| ArgoCD Auto-Sync | **aus** (Robin Zinke, RDM) | ja — auf den neuen Pfad zeigen, dann einschalten |
-| Schedule 546 `renew latest release image` | **deaktiviert** | **ja** |
-| Schedule 536 `Daily OSM Overpass live check` | **deaktiviert** | **ja** |
-| GitLab `path` | unverändert `ufz-cosmonaut` | — |
-| GitLab `name` | schon `Cosmonaut` | — |
-| Registry-Tags | unverändert (17 / 103 / 103 / 1) | — |
-| Prod läuft auf | `0.3.3-2026.08.16` | — |
+| | Endzustand |
+|---|---|
+| GitLab `path` | `cosmonaut` (`name` was already `Cosmonaut`) |
+| Registry | new path — 6 tags frontend, 6 worker, 1 ci |
+| `values.yaml` | new `repository:` lines, `tag: "0.3.4"` |
+| Git tag `0.3.4` | carries the new path, which defuses the nightly revert below |
+| ArgoCD | repointed, auto-sync on, green (Robin Zinke, RDM) |
+| Schedules 546 / 536 | re-enabled |
+| Git remote | back on SSH |
 
-Nothing destructive has happened yet. Both schedules being off is the only thing
-that silently degrades over time: no nightly rebuild means no base-image security
-patches. **If this migration is abandoned, re-enable them anyway:**
+**The open question is answered:** deleting all 224 tags went through in one pass
+and the rename was accepted immediately afterwards. No registry cleanup job had to
+run first — the validation passes as soon as the tags are gone via the API. Plan
+the window around the pushes, not around a cleanup wait.
 
-```bash
-glab api -X PUT projects/11247/pipeline_schedules/546 -f active=true
-glab api -X PUT projects/11247/pipeline_schedules/536 -f active=true
-```
+Prod moved from `0.3.3-2026.08.16` to `0.3.4`, which was code-identical: the diff
+between git tag `0.3.3` and main was empty, so `0.3.4` exists purely to make the
+nightly check out a `values.yaml` that has the new path.
 
 ## What gets preserved, what is lost
 
@@ -90,9 +90,9 @@ so any restart in this window fails to pull.
 3. Robin: ArgoCD auto-sync off.
 4. Delete all tags in all four registry repositories. Wait until `tags_count`
    reports 0 everywhere — GitLab cleans up asynchronously and the rename stays
-   blocked until then. **Open question for HIFIS: does the rename validation pass
-   as soon as the tags are gone via API, or does a cleanup job have to run first?**
-   That answer determines the window length.
+   blocked until then. In the 2026-08-17 run this was instant: all 224 tags were
+   gone after one pass and the rename was accepted straight away, with no cleanup
+   job in between.
 5. Rename `path` → `cosmonaut` (Settings → General → Advanced → Change path).
    No HIFIS involvement needed once the tags are gone.
 6. Push the nine images to the new path, repoint the git remote, fix the two
