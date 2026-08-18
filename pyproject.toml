@@ -2,7 +2,12 @@
 name = "cosmonaut"
 version = "0.3.4"
 description = "Navigation route optimization for field survey campaigns, developed for cosmic ray neutron sensor (CRNS) surveys"
-readme = "README.md"
+# No `readme` field on purpose. All four Dockerfiles copy only pyproject.toml and
+# uv.lock before running `uv export | uv pip install`, and that export carries `-e .`
+# — so hatchling validates the metadata in a context that has no README.md and the
+# image build dies with "Readme file does not exist". Adding one means adding
+# README.md to four COPY lines; the field buys nothing for an application that is
+# never published to an index.
 license = { text = "EUPL-1.2" }
 requires-python = ">=3.13"
 dependencies = [
