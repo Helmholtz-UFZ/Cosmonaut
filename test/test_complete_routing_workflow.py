@@ -138,7 +138,18 @@ def test_complete_routing_workflow(
     check_all_errors(page)
 
     # === Verify email notification was sent ===
+    # Poll rather than read once: the UI gate above is `status == COMPLETED`,
+    # written by the worker's first job.save(). notified_end is written by a
+    # *second* save inside _notify_user, which runs after it. Reading the row
+    # immediately can land between the two — it passes on a fast machine and
+    # fails on CI, which is what happened.
     job_row = DataBaseManager.get_job_columns(job_id)
+    for _ in range(30):
+        if job_row["notified_end"] is True:
+            break
+        time.sleep(1)
+        job_row = DataBaseManager.get_job_columns(job_id)
+
     assert (
         job_row["email"] == "test@ufz.de"
     ), f"Expected email 'test@ufz.de' in DB, got '{job_row['email']}'"
