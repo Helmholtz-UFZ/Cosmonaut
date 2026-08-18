@@ -78,6 +78,7 @@ For specific implementation details, see:
 - [Dash Leaflet](docs/conventions/dash_leaflet.md) - Map component gotchas
 - [Deployment](docs/conventions/deployment.md) - Kubernetes/production gotchas (Gunicorn, HAProxy, resource limits)
 - [Environment Variables](docs/conventions/environment_variables.md) - Env files, config loading, secrets
+- [Registry & Project Rename](docs/conventions/registry_and_rename.md) - Where the registry path is hardcoded, and the rename procedure
 
 **Important** read the convention before you make any codebase exploration or answering.
 Never sacrfice speed for accuracy.
