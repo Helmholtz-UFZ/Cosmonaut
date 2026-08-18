@@ -77,7 +77,6 @@ For specific implementation details, see:
 - [Callbacks](docs/conventions/callbacks.md) - Callback organization patterns
 - [Dash Leaflet](docs/conventions/dash_leaflet.md) - Map component gotchas
 - [Deployment](docs/conventions/deployment.md) - Kubernetes/production gotchas (Gunicorn, HAProxy, resource limits)
-- [Registry & Project Rename](docs/conventions/registry_and_rename.md) - Where the registry path is hardcoded, why the project rename is blocked
 - [Environment Variables](docs/conventions/environment_variables.md) - Env files, config loading, secrets
 - [Registry & Project Rename](docs/conventions/registry_and_rename.md) - Where the registry path is hardcoded, and the rename procedure
 
