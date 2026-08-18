@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "COSMONAUT"
+abstract: >-
+  A browser-based application for information-driven survey planning. From a probabilistic
+  map describing the spatial heterogeneity of a survey area, it computes an optimized
+  sampling route over an accessible road network and exports it as an enriched GPX file
+  that also marks road segments of high expected information gain. Developed for, and used
+  operationally in, mobile cosmic-ray neutron sensing surveys, while the routing workflow
+  itself makes no assumption about the instrument. Part of the COSMO Suite and built on
+  its reusable framework.
+type: software
+authors:
+  - family-names: Trinkle
+    given-names: Louis
+    email: louis-ferdinand.trinkle@ufz.de
+    affiliation: "Helmholtz Centre for Environmental Research – UFZ"
+    orcid: "https://orcid.org/0009-0003-0434-939X"
+  - family-names: Anders
+    given-names: John
+    email: john-eric.anders@ufz.de
+    affiliation: "Helmholtz Centre for Environmental Research – UFZ"
+    orcid: "https://orcid.org/0000-0002-3582-2157"
+  - family-names: Bohring
+    given-names: Hannes
+    email: hannes.bohring@ufz.de
+    affiliation: "Helmholtz Centre for Environmental Research – UFZ"
+    orcid: "https://orcid.org/0009-0007-5103-5886"
+  - family-names: Topaclioglu
+    given-names: Can
+    email: can.topaclioglu@ufz.de
+    affiliation: "Helmholtz Centre for Environmental Research – UFZ"
+    orcid: "https://orcid.org/0000-0003-1383-4779"
+  - family-names: Schrön
+    given-names: Martin
+    email: martin.schroen@ufz.de
+    affiliation: "Helmholtz Centre for Environmental Research – UFZ"
+    orcid: "https://orcid.org/0000-0002-0220-0677"
+  - family-names: Paasche
+    given-names: Hendrik
+    email: hendrik.paasche@ufz.de
+    affiliation: "Helmholtz Centre for Environmental Research – UFZ"
+version: "0.3.4"
+date-released: "2026-08-17"
+license: EUPL-1.2
+repository-code: "https://github.com/Helmholtz-UFZ/Cosmonaut"
+keywords:
+  - "survey planning"
+  - "route optimization"
+  - "informative path planning"
+  - "cosmic-ray neutron sensing"
+  - "OpenStreetMap"

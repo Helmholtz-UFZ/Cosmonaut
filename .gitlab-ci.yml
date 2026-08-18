@@ -191,6 +191,13 @@ test-integration-live-osm:
     - name: "redis:latest"
       alias: "redis"
   variables:
+    # Disables BOTH test seams: the in-process osm_cache_patch and the
+    # overpass_stub that otherwise points the Celery worker at a committed
+    # fixture. Without it this job would be served that fixture and would prove
+    # nothing about the live contract.
+    # To test a specific endpoint (e.g. the UFZ Overpass instead of the public
+    # one), set OVERPASS_URL as a CI variable — the worker inherits it and
+    # conftest leaves it alone. The job log names the endpoint it used.
     SKIP_OSM_CACHE: "1"
   before_script:
     # Wait for PostgreSQL to be ready

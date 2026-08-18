@@ -287,7 +287,22 @@ def overpass_stub():
     ``out geom`` response for the committed test AOI — and hands back its URL so
     ``celery_worker`` can point the worker at it. No production code knows it
     exists, and the real streaming parse and transform still run.
+
+    Disabled by ``SKIP_OSM_CACHE=1`` — the same switch ``osm_cache_patch`` honours,
+    set by the nightly ``test-integration-live-osm`` job. Then no stub starts and
+    no ``OVERPASS_URL`` is injected, so the worker queries whatever the environment
+    says: the built-in public default, or a UFZ endpoint supplied as a CI variable.
+    That job exists to exercise the real Overpass contract, so it must not be
+    silently served a fixture.
     """
+    if os.getenv("SKIP_OSM_CACHE") == "1":
+        endpoint = os.getenv("OVERPASS_URL", "the built-in default (public Overpass)")
+        log.info(
+            f"Overpass stub disabled (SKIP_OSM_CACHE=1) — worker will query {endpoint}"
+        )
+        yield None
+        return
+
     payload = (
         pathlib.Path(__file__).parent / "fixtures" / "overpass_test_aoi.json"
     ).read_bytes()
@@ -353,12 +368,12 @@ def celery_worker(request, overpass_stub):
     # Both stdout and stderr go to the log file: Celery's own logging uses stderr,
     # but the routing task switches logging to stdout via dictConfig.
     # OVERPASS_URL is the only seam that reaches the worker subprocess — see the
-    # overpass_stub fixture for why a monkeypatch cannot.
-    worker_env = {
-        **os.environ,
-        "PYTHONUNBUFFERED": "1",
-        "OVERPASS_URL": overpass_stub,
-    }
+    # overpass_stub fixture for why a monkeypatch cannot. None means the stub stood
+    # down (SKIP_OSM_CACHE=1): leave the variable alone so the nightly live-Overpass
+    # job really reaches Overpass.
+    worker_env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    if overpass_stub is not None:
+        worker_env["OVERPASS_URL"] = overpass_stub
     worker_process = subprocess.Popen(
         [
             "uv",
