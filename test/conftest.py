@@ -1,6 +1,7 @@
 """Setup tests with conditional fixture loading."""
 
 import hashlib
+import http.server
 import importlib.resources
 import logging
 import os
@@ -269,7 +270,59 @@ def dash_app(request):
 
 
 @pytest.fixture(scope="session")
-def celery_worker(request):
+def overpass_stub():
+    """Serve the committed Overpass response instead of querying the live API.
+
+    The OSM download runs inside ``process_upload_task``, i.e. in the **Celery
+    worker subprocess** that ``celery_worker`` starts with ``subprocess.Popen``.
+    A ``monkeypatch`` lives in the pytest process and cannot cross that boundary,
+    which is why ``osm_cache_patch`` never protected this path: every integration
+    run so far went to the public Overpass API and inherited its flakiness (a
+    timeout leaves the street-selection "Next" button disabled and the test burns
+    its full timeout — it does not look like a network problem).
+
+    The seam that *does* cross the boundary is the production environment
+    variable ``OVERPASS_URL``, read in ``cosmonaut_app.osm.source`` at import
+    time. This fixture serves ``test/fixtures/overpass_test_aoi.json`` — a real
+    ``out geom`` response for the committed test AOI — and hands back its URL so
+    ``celery_worker`` can point the worker at it. No production code knows it
+    exists, and the real streaming parse and transform still run.
+    """
+    payload = (
+        pathlib.Path(__file__).parent / "fixtures" / "overpass_test_aoi.json"
+    ).read_bytes()
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802 — BaseHTTPRequestHandler's naming
+            """Answer any query with the fixture; the AOI is fixed anyway."""
+            length = int(self.headers.get("Content-Length", 0))
+            self.rfile.read(length)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, *args):
+            """Silence per-request stderr noise."""
+
+    # Port 0: the OS picks a free one, so the stub cannot collide with the other
+    # suites (see docs/conventions/framework_integration.md, port allocation).
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    url = f"http://127.0.0.1:{server.server_port}/api/interpreter"
+    log.info(f"Overpass stub serving {len(payload)} bytes at {url}")
+
+    yield url
+
+    server.shutdown()
+    server.server_close()
+    thread.join(timeout=5)
+
+
+@pytest.fixture(scope="session")
+def celery_worker(request, overpass_stub):
     """Start a Celery worker for testing background job processing.
 
     This fixture spawns a Celery worker subprocess that:
@@ -299,7 +352,13 @@ def celery_worker(request):
     # Command adapted from cosmopolitan reference but using uv instead of poetry
     # Both stdout and stderr go to the log file: Celery's own logging uses stderr,
     # but the routing task switches logging to stdout via dictConfig.
-    worker_env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    # OVERPASS_URL is the only seam that reaches the worker subprocess — see the
+    # overpass_stub fixture for why a monkeypatch cannot.
+    worker_env = {
+        **os.environ,
+        "PYTHONUNBUFFERED": "1",
+        "OVERPASS_URL": overpass_stub,
+    }
     worker_process = subprocess.Popen(
         [
             "uv",
@@ -375,13 +434,19 @@ def worker_log_path(celery_worker):
 def osm_cache_patch(monkeypatch):
     """Monkeypatch OsmDownloader.run_osm_query to use cached test fixtures.
 
-    Instead of querying the live Overpass API (slow, flaky on CI), the integration
-    test uses precomputed OSM data cached in test/fixtures/osm_cache/. The cache
+    Instead of querying the live Overpass API (slow, flaky on CI), an in-process
+    caller gets precomputed OSM data cached in test/fixtures/osm_cache/. The cache
     contains the three outputs for the fixed test AOI (test/memberships.csv, EPSG:25832).
+    It is regenerated only when the test AOI changes (via
+    test/fixtures/regenerate_osm_cache.py).
 
-    This fixture is used in test_complete_routing_workflow to avoid Overpass
-    rate limits and network timeouts during CI runs. The cache is regenerated
-    only when the test AOI changes (via test/fixtures/regenerate_osm_cache.py).
+    **This covers in-process callers only.** The download the integration tests
+    actually trigger runs in ``process_upload_task``, inside the Celery worker
+    *subprocess*, which a monkeypatch cannot reach — so this fixture never
+    protected that path, and every integration run went to the public Overpass
+    API. The worker is covered by the ``overpass_stub`` fixture instead, via the
+    ``OVERPASS_URL`` environment variable. Keep both: they guard different
+    processes.
 
     In production (real users), the live Overpass query runs and may retry on
     transient errors (Tier 2 of the fix plan).
