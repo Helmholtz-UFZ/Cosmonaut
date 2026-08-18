@@ -355,7 +355,12 @@ release:
     - 'sed -i "s/^version = .*/version = \"${VERSION}\"/" pyproject.toml'
     - 'sed -i "s/^version: .*/version: \"${VERSION}\"/; s/^date-released: .*/date-released: \"$(date -I)\"/" CITATION.cff'
     - 'git diff --quiet && { echo "Nothing changed — is VERSION already the current one?"; exit 1; } || true'
-    - "git add pyproject.toml CITATION.cff"
+    # Fourth place the version lives. cosmopolitan asserts it against
+    # pyproject.toml in test_documentation_version, so leaving it behind breaks
+    # the release commit's own suite; cosmonaut has no such test and would
+    # instead ship documentation quietly claiming the previous version.
+    - 'echo "${VERSION}" > cosmonaut_app/assets/docs/doc_version.txt'
+    - "git add pyproject.toml CITATION.cff cosmonaut_app/assets/docs/doc_version.txt"
     - 'git commit -m "Release ${VERSION}"'
     - 'git tag -a "$VERSION" -m "Release ${VERSION}"'
     # Branch first, with ci.skip: the release commit itself needs no pipeline.
