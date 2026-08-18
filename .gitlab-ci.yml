@@ -301,7 +301,11 @@ bump_version_for_cluster:
     BRANCH: "main"
   script:
     - *prepare
-    - "git add deployment/ufz/prod/values.yaml"
+    # Version lives in three places; the tag is the source, so write the other two here.
+    # Guarded: on a non-tag run CI_COMMIT_TAG is empty and an unguarded sed would blank them.
+    - 'if [ -n "${CI_COMMIT_TAG}" ]; then sed -i "s/^version = .*/version = \"${CI_COMMIT_TAG}\"/" pyproject.toml; fi'
+    - 'if [ -n "${CI_COMMIT_TAG}" ]; then sed -i "s/^version: .*/version: \"${CI_COMMIT_TAG}\"/; s/^date-released: .*/date-released: \"$(date -I)\"/" CITATION.cff; fi'
+    - "git add deployment/ufz/prod/values.yaml pyproject.toml CITATION.cff"
     - "git commit -m 'automatically increased tag-version for cluster-deployment'"
     - "git pull origin ${BRANCH} --strategy-option=ours"
     - "git push origin HEAD:$BRANCH -o ci.skip"
