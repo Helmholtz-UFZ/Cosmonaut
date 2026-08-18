@@ -40,8 +40,8 @@ authors:
     given-names: Hendrik
     email: hendrik.paasche@ufz.de
     affiliation: "Helmholtz Centre for Environmental Research – UFZ"
-version: "0.3.4"
-date-released: "2026-08-17"
+version: "0.3.5"
+date-released: "2026-08-18"
 license: EUPL-1.2
 repository-code: "https://github.com/Helmholtz-UFZ/Cosmonaut"
 keywords:
