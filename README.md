@@ -9,10 +9,9 @@
 </div>
 
 > **This is a read-only mirror.** Development happens at
-> [codebase.helmholtz.cloud/…/cosmonaut](https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmonaut) — issues and merge
-> requests belong there. This copy exists so the software has a citable public
-> home (Zenodo DOI, SoftwareX metadata); anything pushed here is overwritten by
-> the next mirror sync.
+> [codebase.helmholtz.cloud/…/cosmonaut](https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmonaut). Issues and merge requests
+> belong there. This copy exists so the software has a citable public home,
+> anything pushed here is overwritten by the next mirror sync.
 
 COSMONAUT is a Python-based web application designed to optimize navigation routes for mobile Cosmic Ray Neutron Sensor (CRNS) rover surveys.
 
@@ -110,4 +109,4 @@ These are skill documents and configuration files designed for AI-assisted devel
 
 ## Design
 
-- [Design System](docs/design-system/README.md) — Tokens, brand voice, UI kit, iconography.
+- [Design System](docs/design-system/README.md): Tokens, brand voice, UI kit, iconography.
