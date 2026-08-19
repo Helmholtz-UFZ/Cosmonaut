@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/1338233918.svg)](https://doi.org/10.5281/zenodo.22011172)
+
 <div>
 <h1 align="center">COSMONAUT</h1>
 <h2 align="center"><strong>COS</strong><small>mic ray based soil </small><strong>MO</strong><small>isture </small><strong>P</strong><small>rediction </small><strong>NA</strong><small>vigation and </small><strong>UT</strong><small>ility </small><strong>T</strong><small>ool</small></h2>
