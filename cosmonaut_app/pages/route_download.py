@@ -64,6 +64,7 @@ GPX files are stored in MinIO object storage and retrieved via Flask routes.
 import logging
 
 import dash_bootstrap_components as dbc
+from cosmo_suite.files_route import _download_href
 from dash import Input, Output, State, callback, dcc, html, register_page
 from dash.exceptions import PreventUpdate
 
@@ -144,7 +145,7 @@ def layout(job_id):
             "Download work_dir",
             color="secondary",
             outline=True,
-            href=f"/download/{job_id}/work_dir.zip",
+            href=_download_href(job_id),
             external_link=True,
             className="mt-2",
         ),
