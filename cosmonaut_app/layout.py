@@ -4,6 +4,7 @@ import os
 import dash
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
+from cosmo_suite.layouts import create_header as create_header
 from dash import ctx, dcc, html, no_update
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
@@ -696,29 +697,6 @@ def create_card_input(
 def build_url_step(step, job_id):
     base_path = dash.page_registry[f"pages.{step}"]["path_template"]
     return base_path.replace("<job_id>", job_id)
-
-
-def create_header(title, subtitle, bg_color="bg-info", id="", rounded=True):
-    """Create a header layout."""
-    className = f"{bg_color} rounded-top py-2" if rounded else f"{bg_color} py-2"
-    layout = html.Div(
-        className=className,
-        children=[
-            html.H2(title, className="text-center", id=f"{id}-title"),  # nocheck
-            (
-                html.H3(
-                    subtitle,
-                    className="text-center",
-                    id=f"{id}-subtitle",  # nocheck
-                )
-                if subtitle != ""
-                else None
-            ),
-        ],
-        id=id,
-    )
-
-    return layout
 
 
 def progress_footer(

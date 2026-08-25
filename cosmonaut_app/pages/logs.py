@@ -31,4 +31,14 @@ manual refresh button, and the live-mode switch. Its HTML ids come from
 `cosmo_suite.constants`.
 """
 
-import cosmo_suite.pages.logs  # noqa: F401
+import cosmo_suite.layouts
+
+# Set BEFORE importing the page: page_container_column_layout reads this at
+# layout-build time, and pages/job_management.py builds its layout as a
+# module-level statement, so a value assigned afterwards would silently miss.
+# Assign the module attribute — `from … import default_wrapper_class` would bind
+# a copy of the value and configure nothing.
+# See cosmo-suite docs/conventions/framework_page_imports.md.
+cosmo_suite.layouts.default_wrapper_class = "no-map-page"
+
+import cosmo_suite.pages.logs  # noqa: E402,F401
