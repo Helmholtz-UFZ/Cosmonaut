@@ -34,9 +34,15 @@ RUN chown -R 1000:1000 /python_docker/cosmonaut
 
 USER appuser
 
-# Setup object storage and start Celery worker
-CMD echo "Starting Celery worker..."; \
-    python3 -c "from cosmonaut_app.object_storage_manager import setup_remote; setup_remote()"; \
+# Setup object storage and start Celery worker.
+# The web container configures its own rclone remote in app.py; this container has
+# a separate filesystem, so it must configure its own or every storage call fails
+# with "didn't find section in config file".
+# `set -e`-style chaining with && on purpose: with `;` a failing setup_remote let
+# the worker start anyway, unconfigured, and the first upload failed much later
+# with a message that pointed at the road network instead of at rclone.
+CMD echo "Starting Celery worker..." && \
+    python3 -c "from cosmo_suite.object_storage_manager import setup_remote; setup_remote()" && \
     exec celery -A cosmonaut_app.celery_app.celery worker \
         --loglevel=info \
         --concurrency=4 \
