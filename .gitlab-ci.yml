@@ -229,6 +229,26 @@ build-latest:
     - "docker build -t ${CI_REGISTRY_IMAGE}/frontend:latest -f docker/prod.Dockerfile ."
     - "docker push --all-tags ${CI_REGISTRY_IMAGE}/frontend"
     - "docker build -t ${CI_REGISTRY_IMAGE}/worker:latest -f docker/worker.Dockerfile ."
+    # Worker-image smoke test, run against the image just built, before it is
+    # pushed. It runs the CMD's setup_remote() step only, derived from the image's
+    # own CMD rather than copied — a copy would stay green even after the CMD
+    # bends, which is exactly the failure this guards against. See
+    # docs/conventions/worker_image.md (cosmo-suite) for the full rationale: this
+    # is the test that would have caught the two-week rclone outage.
+    # env_test, not a dedicated env_ci: it already carries dummy credentials for
+    # every var config.py reads, and is already used by the test jobs above.
+    # `docker run --env-file`, unlike compose, keeps the quotes around a value —
+    # strip them so config.py reads ./cosmonaut_app/work_dir and not
+    # "./cosmonaut_app/work_dir".
+    - tr -d '"' < env_test > /tmp/smoke.env
+    - |
+      CMD_STR=$(docker inspect --format '{{index .Config.Cmd 2}}' "${CI_REGISTRY_IMAGE}/worker:latest")
+      case "$CMD_STR" in
+        *"exec celery"*) ;;
+        *) echo "CMD has no 'exec celery' marker — this job cannot find the setup step."; exit 1 ;;
+      esac
+      docker run --rm --env-file /tmp/smoke.env --entrypoint sh "${CI_REGISTRY_IMAGE}/worker:latest" \
+        -c "${CMD_STR%%exec celery*} true"
     - "docker push --all-tags ${CI_REGISTRY_IMAGE}/worker"
   rules:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'schedule'"

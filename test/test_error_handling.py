@@ -14,6 +14,7 @@ from cosmo_suite.error_handling import error_responds_dict
 from cosmo_suite.object_storage_manager import ObjectStorageError as FrameworkError
 
 from cosmonaut_app.error_handling import (
+    ERROR_RESPONSES,
     FileValidationError,
     ObjectStorageError,
     WrongCeleryTaskId,
@@ -72,14 +73,16 @@ def test_file_validation_error_stays_local_and_carries_its_message():
     assert str(err) == "column 'x' is missing"
 
     # The app's class needs its own response entry — the framework keys its entry
-    # on its own class, which this app never raises.
-    assert FileValidationError in error_responds_dict
+    # on its own class, which this app never raises. Laid over error_responds_dict
+    # via handle_error's error_responses parameter, not mutated into it.
+    assert FileValidationError in ERROR_RESPONSES
 
 
 def test_domain_exceptions_have_response_entries():
-    """Extending the framework table must not drop the domain entries."""
-    for exc in (WrongCeleryTaskId, FileValidationError, ObjectStorageError):
-        assert exc in error_responds_dict, f"{exc.__name__} has no response entry"
+    """The app's own exceptions carry a response entry the modal can use."""
+    for exc in (WrongCeleryTaskId, FileValidationError):
+        assert exc in ERROR_RESPONSES, f"{exc.__name__} has no response entry"
+    assert ObjectStorageError in error_responds_dict
 
 
 def test_on_unhandled_is_called_for_unexpected_errors():

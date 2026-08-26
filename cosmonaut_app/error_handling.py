@@ -25,7 +25,6 @@ from functools import partial
 import psycopg2
 from cosmo_suite.error_handling import JobNotFound as JobNotFound
 from cosmo_suite.error_handling import error_modal as error_modal
-from cosmo_suite.error_handling import error_responds_dict
 from cosmo_suite.error_handling import handle_error as handle_error
 from cosmo_suite.object_storage_manager import ObjectStorageError as ObjectStorageError
 
@@ -67,26 +66,20 @@ class FileValidationError(Exception):
         super().__init__(message)
 
 
-# Extend the framework's table rather than replace it: the framework keys its own
-# entry on *its* FileValidationError, which this app never raises, so the local
-# class needs an entry of its own or a validation error would fall through to the
-# generic "Internal Error".
-error_responds_dict.update(
-    {
-        psycopg2.DatabaseError: (
-            "Database Connection Error",
-            "Unfortunately, it is not possible to connect to the job database. Please try again later.",  # noqa
-        ),
-        WrongCeleryTaskId: (
-            "Invalid Task ID",
-            "The task ID '{task_id}' is not a valid Celery task ID format. Task IDs must be UUIDs.",  # noqa
-        ),
-        FileValidationError: (
-            "File Validation Error",
-            "The uploaded file could not be validated. Please check the file format and try again.",  # noqa
-        ),
-    }
-)
+ERROR_RESPONSES = {
+    psycopg2.DatabaseError: (
+        "Database Connection Error",
+        "Unfortunately, it is not possible to connect to the job database. Please try again later.",  # noqa
+    ),
+    WrongCeleryTaskId: (
+        "Invalid Task ID",
+        "The task ID '{task_id}' is not a valid Celery task ID format. Task IDs must be UUIDs.",  # noqa
+    ),
+    FileValidationError: (
+        "File Validation Error",
+        "The uploaded file could not be validated. Please check the file format and try again.",  # noqa
+    ),
+}
 
 
 def notify_maintainer(error):
@@ -105,4 +98,6 @@ def notify_maintainer(error):
 
 # Ready-made for `Dash(on_error=...)`, so the hook cannot be forgotten at the
 # call site by writing `on_error=handle_error`.
-handle_error_with_notification = partial(handle_error, on_unhandled=notify_maintainer)
+handle_error_with_notification = partial(
+    handle_error, on_unhandled=notify_maintainer, error_responses=ERROR_RESPONSES
+)
