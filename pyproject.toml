@@ -1,6 +1,6 @@
 [project]
 name = "cosmonaut"
-version = "0.3.6"
+version = "0.3.7"
 description = "Navigation route optimization for field survey campaigns, developed for cosmic ray neutron sensor (CRNS) surveys"
 # No `readme` field on purpose. All four Dockerfiles copy only pyproject.toml and
 # uv.lock before running `uv export | uv pip install`, and that export carries `-e .`
