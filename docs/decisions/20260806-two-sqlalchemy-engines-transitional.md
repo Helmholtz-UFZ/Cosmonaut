@@ -1,7 +1,7 @@
 # Decision: Two SQLAlchemy Engines Are a Deliberate Transitional State
 
 **Date:** 2026-08-06
-**Status:** Accepted (transitional — resolved by slice 2)
+**Status:** Resolved 2026-08-21 by slice 2 — kept for the reasoning
 **Context:** Adopting `cosmo_suite.pages.logs` pulled `cosmo_suite.db_manager` into the
 process, while `cosmonaut_app/db_manager.py` stayed (it is slice-2 work). The app now
 runs **two SQLAlchemy engines against the same Postgres**, with **two separate
@@ -49,3 +49,30 @@ Verified, not assumed:
   `jobs` through a second identity map is where this stops being harmless.
 - Slice 2 acceptance: one `Base`, one engine, `cosmonaut_app/db_manager.py` gone or
   reduced to the domain queries.
+
+---
+
+## Resolved (2026-08-21)
+
+Slice 2 unwound it, on `cosmo-suite@v0.6.1`. Two framework defects measured here
+had to be fixed first, both shipped in that tag:
+
+- `JobTable` claimed to map the intersection across the apps, but mapped
+  `input_data` and `logs`, which this app's `jobs` table does not have. By the
+  framework's own asymmetry rule a missing column fails at the first query, so
+  the class was unusable here. It is now a `JobColumns` mixin carrying the true
+  six-column intersection, with COSMONAUT named in its docstring as the reason.
+- `Base` and a concrete `JobTable` lived in one module, so importing the shared
+  `Base` also claimed the `jobs` table name — declaring this app's own raised
+  `InvalidRequestError: Table 'jobs' is already defined`. The concrete class is
+  gone; `DbManager.job_table` is the seam.
+
+`cosmonaut_app/db_manager.py` now declares `JobTable(JobColumns, Base)` on the
+framework `Base` with its seven extra columns, and assigns
+`DbManager.job_table`. One registry, one engine, one connection pool. The
+batch's acceptance criterion holds: after importing each of the twelve framework
+modules, `Base.metadata.tables` contains only `logs` — `jobs` appears only once
+this app declares it.
+
+The load-bearing fact from above still holds and still matters: nothing calls
+`create_all` or `drop_all`, so `docker/init.sql` remains the authoritative DDL.

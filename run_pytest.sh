@@ -160,7 +160,15 @@ if [ "$START_SERVICES" -eq 1 ]; then
     docker compose up postgres minio redis -d --quiet-pull
 
     # Wait for services with retry logic
-    check_service "docker exec postgres_cosmonaut pg_isready -q 2>/dev/null" "PostgreSQL"
+    # -h 127.0.0.1 forces the TCP check. Without it pg_isready probes the Unix
+    # socket, which already answers during initdb's temporary server phase —
+    # that server sets listen_addresses='' and serves no TCP at all. The check
+    # then reports "ready" while the endpoint the tests actually use (localhost
+    # :POSTGRES_PORT) is still down, and the first query dies with "server closed
+    # the connection unexpectedly". Measured window ~1s, wider on a loaded
+    # machine. .gitlab-ci.yml already checks over TCP, which is why CI never saw
+    # this.
+    check_service "docker exec postgres_cosmonaut pg_isready -q -h 127.0.0.1 2>/dev/null" "PostgreSQL"
     check_service "docker exec minio_cosmonaut curl -sf http://localhost:9000/minio/health/ready >/dev/null 2>&1" "MinIO"
     check_service "docker exec redis_cosmonaut redis-cli ping 2>/dev/null | grep -q PONG" "Redis"
 else

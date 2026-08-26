@@ -10,7 +10,7 @@ from dash import Dash
 from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.config import DEBUG, PORT
 from cosmonaut_app.constants.general import EXCLUDED_LOG_PACKAGES
-from cosmonaut_app.error_handling import handle_error
+from cosmonaut_app.error_handling import handle_error_with_notification
 from cosmonaut_app.files_route import serve_files
 from cosmonaut_app.layout import (
     app_layout,
@@ -32,7 +32,7 @@ app = Dash(
     prevent_initial_callbacks=True,
     assets_url_path="/assets",
     title="COSMONAUT",
-    on_error=handle_error,
+    on_error=handle_error_with_notification,
 )
 
 app.layout = app_layout()

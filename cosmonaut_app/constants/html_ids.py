@@ -73,9 +73,6 @@ MAIN_MAP_COMPONENT_MAP_SHARED_ID = "main-map-component-map-shared-id"
 
 # --- Modals ---
 # used not in normal callbacks, but in error handling callbacks (set_props())
-ERROR_MODAL_MESSAGE_SHARED_ID = "error-message"  # nocheck
-ERROR_MODAL_SHARED_ID = "error-modal"  # nocheck
-ERROR_MODAL_TITLE_SHARED_ID = "error-title"  # nocheck
 LOADING_OVERLAY_MODAL_SHARED_ID = "loading-overlay-modal-shared-id"
 RESET_MODAL_SHARED_ID = "reset-modal-shared-id"
 

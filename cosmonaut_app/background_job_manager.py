@@ -1,9 +1,15 @@
 """Background job manager for COSMONAUT App.
 
 Extends ``cosmo_suite.background_job_manager.BackgroundJobManager``: the generic
-plumbing (``submit_named_job``, ``get_job_status``, ``get_task_result_info``,
-``get_all_tasks_overview``, ``revoke_job``, ``submit_test_task``) comes from the
-framework; only the two domain submissions are added here.
+plumbing (``submit_job``, ``submit_named_job``, ``get_job_status``,
+``get_task_result_info``, ``get_all_tasks_overview``, ``revoke_job``,
+``submit_test_task``) comes from the framework; only the domain submissions are
+added here.
+
+``track_task_name`` defaults to True in both submit helpers, which is what keeps a
+revoked task from showing up as "Unknown" on the worker-management page — this app
+relied on that Redis write before the framework had the seam, so nothing needs to
+pass it explicitly.
 
 Task registration lives in celery_app.py (the worker entry point) to avoid a
 circular import: tasks/*.py -> cosmonaut_job -> this module -> tasks/*.py.
@@ -66,11 +72,7 @@ class BackgroundJobManager(BaseBackgroundJobManager):
             tuple: (celery_task_id, failed_boolean)
                    celery_task_id is None if submission failed
         """
-        return self.submit_named_job(
-            NAME_ROUTING_TASK,
-            args=[job.model.job_id],
-            queue="routing",
-        )
+        return self.submit_job(NAME_ROUTING_TASK, job.model.job_id, "routing")
 
     def submit_upload_job(self, job, epsg_input: int) -> tuple[str | None, bool]:
         """Submit an upload post-processing job to the Celery queue.
@@ -83,6 +85,9 @@ class BackgroundJobManager(BaseBackgroundJobManager):
             tuple: (celery_task_id, failed_boolean)
                    celery_task_id is None if submission failed
         """
+        # submit_named_job, not submit_job: the framework's submit_job passes the
+        # job id as the task's *only* positional arg, and this task takes a second
+        # one. Same retry policy and the same task-name tracking underneath.
         return self.submit_named_job(
             NAME_UPLOAD_TASK,
             args=[job.model.job_id, epsg_input],

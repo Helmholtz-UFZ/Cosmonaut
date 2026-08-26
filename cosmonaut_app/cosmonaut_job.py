@@ -9,6 +9,7 @@ import uuid
 from datetime import date, timedelta
 
 import pandas as pd
+from cosmo_suite.base_job import BaseJob
 from cosmo_suite.object_storage_manager import (
     delete_directory_from_storage,
     get_files,
@@ -138,7 +139,7 @@ def _get_bounds(classification_df):
     return [[min_lat, min_lon], [max_lat, max_lon]]
 
 
-class CosmonautJob:
+class CosmonautJob(BaseJob):
     """
     This class represents a job submission by the user.
 
@@ -148,7 +149,25 @@ class CosmonautJob:
 
     All business data is stored in self.model (JobModel instance).
     Filesystem paths are stored as direct instance attributes.
+
+    Implements ``cosmo_suite.base_job.BaseJob``: ``job_id``, ``save``,
+    ``delete``, ``submit`` and ``time_to_live`` are what framework code may call
+    on a job it did not build. Everything else here is domain. ``working_dir`` is
+    not in the contract but is required by ``files_route.serve_files``, which
+    says so in its own docstring.
     """
+
+    @property
+    def job_id(self) -> str:
+        """Return the job's unique id.
+
+        The contract member. This app stores the id inside the Pydantic model,
+        so the property is what lets generic framework code take an id without
+        knowing that. Read-only on purpose: assigning through the model keeps
+        validate_assignment in play, which is what stops an invalid id from
+        reaching the database and the work-dir path.
+        """
+        return self.model.job_id
 
     def __init__(
         self, job_id=None, *, sync_files: bool = True, overwrite: bool = False
