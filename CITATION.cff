@@ -43,6 +43,10 @@ authors:
 version: "0.3.8"
 date-released: "2026-08-26"
 license: EUPL-1.2
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.22011172
+    description: "Concept DOI, resolves to the latest version"
 repository-code: "https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmonaut"
 url: "https://github.com/Helmholtz-UFZ/Cosmonaut"
 keywords:
