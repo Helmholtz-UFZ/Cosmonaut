@@ -139,7 +139,9 @@ test-integration:
         POSTGRES_DB: cosmonaut_db
         POSTGRES_USER: cosmonaut
         POSTGRES_PASSWORD: password
-    - name: "minio/minio:latest"
+    # minio/minio is gone from Docker Hub. MinIO stopped publishing images, so
+    # quay's :latest is frozen at this release anyway — pin it explicitly.
+    - name: "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
       alias: "minio"
       command: ["server", "/data", "--console-address", ":9001"]
       variables:
@@ -183,7 +185,9 @@ test-integration-live-osm:
         POSTGRES_DB: cosmonaut_db
         POSTGRES_USER: cosmonaut
         POSTGRES_PASSWORD: password
-    - name: "minio/minio:latest"
+    # minio/minio is gone from Docker Hub. MinIO stopped publishing images, so
+    # quay's :latest is frozen at this release anyway — pin it explicitly.
+    - name: "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
       alias: "minio"
       command: ["server", "/data", "--console-address", ":9001"]
       variables:

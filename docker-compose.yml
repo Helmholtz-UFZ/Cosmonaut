@@ -55,7 +55,7 @@ services:
     command: redis-server --appendonly yes
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: minio_cosmonaut
     ports:
       - "${OBJECT_STORAGE_PORT}:9000"
