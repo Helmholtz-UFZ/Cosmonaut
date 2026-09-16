@@ -40,8 +40,8 @@ authors:
     given-names: Hendrik
     email: hendrik.paasche@ufz.de
     affiliation: "Helmholtz Centre for Environmental Research – UFZ"
-version: "0.3.8"
-date-released: "2026-08-26"
+version: "0.3.9"
+date-released: "2026-09-16"
 license: EUPL-1.2
 identifiers:
   - type: doi
