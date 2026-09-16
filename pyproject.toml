@@ -12,10 +12,10 @@ license = { text = "EUPL-1.2" }
 requires-python = ">=3.13"
 dependencies = [
     "celery[redis]>=5.4.0,<6",
-    # Shared Dash + Celery + PostgreSQL + MinIO framework, pinned to a frozen tag.
+    # Shared Dash + Celery + PostgreSQL + S3 framework, pinned to a frozen tag.
     # COSMOPOLITAN pins the same tag; a framework change is an MR + new tag there,
     # then both apps re-pin. Never edit the framework from an app repo.
-    "cosmo-suite @ git+https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite@v0.7.0",
+    "cosmo-suite @ git+https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite@v0.8.0",
     "dash>=3.2.0,<4",
     "dash-ag-grid>=32.0.0,<33",
     "dash-bootstrap-components>=2.0.3,<3",
@@ -29,7 +29,6 @@ dependencies = [
     "gunicorn>=22.0.0,<24",
     "ijson>=3.5.0,<4",
     "matplotlib>=3.10.0,<4",
-    "minio>=7.2.0,<8",
     "networkx>=3.4.0,<4",
     "orjson>=3.10.0,<4",
     "psycopg2>=2.9.10,<3",

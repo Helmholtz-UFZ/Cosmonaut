@@ -18,7 +18,7 @@ COSMONAUT is a Python-based web application designed to optimize navigation rout
 COSMONAUT implements a seven-step guided workflow that transforms membership classification data into field-ready navigation routes. Each step is presented as a separate page within the web interface, preserving state in a PostgreSQL database to enable researchers to pause and resume work at any time.
 
 The service is primarily built using Plotly Dash and uses Celery for background and
-resource intensive tasks. Three databases are used: PostgreSQL as main storage, MinIO for
+resource intensive tasks. Three databases are used: PostgreSQL as main storage, S3 for
 object storage, and Redis as the broker between the Dash server and workers.
 
 ## Quick Start
@@ -47,15 +47,15 @@ COSMONAUT's architecture balances scientific workflow requirements with software
 
 **Message Queue**: Redis 7 with Celery 5.x implements the distributed task queue for route computation. Celery workers run in separate Docker containers (cosmonaut-worker) with identical Python environment but isolated process space. The architecture supports task prioritization (routing queue for user jobs, maintenance queue for cleanup tasks), task cancellation, and health monitoring.
 
-**Object Storage**: MinIO (S3-compatible) provides durable file storage independent of container lifecycles. Each job's working directory uploads to MinIO bucket `cosmonaut-jobs/{job_id}/` via rclone synchronization. This enables stateless web container design (containers can restart without data loss).
+**Object Storage**: S3 (UFZ S3 in production, RustFS locally and in CI) provides durable file storage independent of container lifecycles. Each job's working directory uploads to the bucket `cosmonaut-jobs/{job_id}/` via rclone synchronization. This enables stateless web container design (containers can restart without data loss).
 
-**Containerization**: Docker Compose orchestrates five services (cosmonaut web, cosmonaut-worker, postgres, redis, minio) with health checks and dependency ordering.
+**Containerization**: Docker Compose orchestrates five services (cosmonaut web, cosmonaut-worker, postgres, redis, object-storage) with health checks and dependency ordering.
 
-**Local Deployment**: The simplest deployment method is to clone the repository and execute `docker compose up` or better `./dev_up.sh mock` which copies the required env file in the project root. This single command provisions a complete local instance with all required services (Dash web application, Celery workers, PostgreSQL, Redis, MinIO) pre-configured with networking and health checks. A fully functional route planning environment is available within minutes, suitable for local development, evaluation, and institutional pilot deployments.
+**Local Deployment**: The simplest deployment method is to clone the repository and execute `docker compose up` or better `./dev_up.sh mock` which copies the required env file in the project root. This single command provisions a complete local instance with all required services (Dash web application, Celery workers, PostgreSQL, Redis, S3 object storage) pre-configured with networking and health checks. A fully functional route planning environment is available within minutes, suitable for local development, evaluation, and institutional pilot deployments.
 
 **Production Deployment**: In production the service is deployed on a Kubernetes
 cluster. Here only the services cosmonaut-web, cosmonaut-worker, Redis, and the
-tileserver are used, as the permanent storages PostgreSQL and MinIO are managed by the
+tileserver are used, as the permanent storages PostgreSQL and S3 are managed by the
 infrastructure of the institute.
 
 ## sensor-routing

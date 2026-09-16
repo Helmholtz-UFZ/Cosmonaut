@@ -13,7 +13,7 @@ should link to at least one related page.
 Durable ideas used across the codebase.
 
 - [cosmonaut-job](concepts/cosmonaut-job.md) — The `CosmonautJob` state object: the two-tier
-  persistence model (Postgres JSONB + MinIO), `stage`/`status`/`street_processing` semantics,
+  persistence model (Postgres JSONB + object storage), `stage`/`status`/`street_processing` semantics,
   and the `sync_files`/`overwrite` web-pod-vs-worker-pod rules.
 
 ## Systems
@@ -25,7 +25,7 @@ Major subsystems and how they interact.
 - [sensor-routing-integration](systems/sensor-routing-integration.md) — How COSMONAUT drives the
   external `sensor-routing` engine, the file contract, and the O(n²) / globally-coupled constraint.
 - [background-tasks](systems/background-tasks.md) — The Celery queue architecture and the
-  web→MinIO→worker→status-sync flow.
+  web→object storage→worker→status-sync flow.
 
 ## Datasets
 

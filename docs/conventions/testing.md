@@ -37,7 +37,7 @@ to preserve them across runs).
 
 - Use Playwright via `pytest-playwright` (`page` fixture)
 - App served by `dash_app` fixture (werkzeug make_server in background thread)
-- Require all services: Postgres, Redis, MinIO, Celery worker
+- Require all services: Postgres, Redis, object storage, Celery worker
 - Test full user workflows through the browser
 - Reusable helpers in `test/help_functions_tests.py`
 
@@ -127,7 +127,7 @@ the sync entirely; the pre-built venv is used as-is.
 | Job | Command | Services | Runs on |
 |-----|---------|----------|---------|
 | `test-unit` | `pytest --no-services` on 3 files | none | every push |
-| `test-integration` | `pytest` (all tests) | Postgres, MinIO, Redis | main + MRs only |
+| `test-integration` | `pytest` (all tests) | Postgres, object storage, Redis | main + MRs only |
 
 `test-unit` and `test-integration` run in parallel when both are active.
 The no-service files are: `test_env.py`, `test_html_id_enforcement.py`,

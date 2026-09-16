@@ -12,8 +12,8 @@ cleaning_up() {
     fi
 
     # Stop and remove containers
-    docker stop postgres_cosmonaut minio_cosmonaut redis_cosmonaut >/dev/null 2>&1 || true
-    docker rm postgres_cosmonaut minio_cosmonaut redis_cosmonaut >/dev/null 2>&1 || true
+    docker stop postgres_cosmonaut object_storage_cosmonaut redis_cosmonaut >/dev/null 2>&1 || true
+    docker rm postgres_cosmonaut object_storage_cosmonaut redis_cosmonaut >/dev/null 2>&1 || true
     docker compose down >/dev/null 2>&1 || true
 }
 
@@ -156,8 +156,8 @@ if [ "$START_SERVICES" -eq 1 ]; then
     docker compose down 2>/dev/null || true
 
     # Start services (quiet output)
-    echo "Starting services: postgres, minio, redis"
-    docker compose up postgres minio redis -d --quiet-pull
+    echo "Starting services: postgres, object-storage, redis"
+    docker compose up postgres object-storage redis -d --quiet-pull
 
     # Wait for services with retry logic
     # -h 127.0.0.1 forces the TCP check. Without it pg_isready probes the Unix
@@ -169,7 +169,8 @@ if [ "$START_SERVICES" -eq 1 ]; then
     # machine. .gitlab-ci.yml already checks over TCP, which is why CI never saw
     # this.
     check_service "docker exec postgres_cosmonaut pg_isready -q -h 127.0.0.1 2>/dev/null" "PostgreSQL"
-    check_service "docker exec minio_cosmonaut curl -sf http://localhost:9000/minio/health/ready >/dev/null 2>&1" "MinIO"
+    # The compose healthcheck owns the server-specific probe; this only reads its verdict.
+    check_service "docker inspect -f '{{.State.Health.Status}}' object_storage_cosmonaut 2>/dev/null | grep -qx healthy" "Object storage"
     check_service "docker exec redis_cosmonaut redis-cli ping 2>/dev/null | grep -q PONG" "Redis"
 else
     echo "Skipping service management (assuming services already running)"

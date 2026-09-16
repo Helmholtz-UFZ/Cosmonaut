@@ -13,9 +13,12 @@ services:
     user: "${DOCKER_UID}:${DOCKER_GID}"
     network_mode: host
     depends_on:
-      - postgres
-      - minio
-      - redis
+      postgres:
+        condition: service_started
+      object-storage:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   worker:
     image: cosmonaut-worker
@@ -31,9 +34,12 @@ services:
     user: "${DOCKER_UID}:${DOCKER_GID}"
     network_mode: host
     depends_on:
-      - postgres
-      - minio
-      - redis
+      postgres:
+        condition: service_started
+      object-storage:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   postgres:
     image: postgis/postgis:latest
@@ -54,21 +60,23 @@ services:
       - "${REDIS_PORT}:6379"
     command: redis-server --appendonly yes
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: minio_cosmonaut
+  # S3 server for local runs, copied from cosmo-suite's
+  # docs/conventions/object_storage.md (CI takes the same image from the
+  # framework's ci/object-storage.gitlab-ci.yml).
+  object-storage:
+    image: rustfs/rustfs:1.0.0
+    container_name: object_storage_cosmonaut
     ports:
-      - "${OBJECT_STORAGE_PORT}:9000"
-      - "${OBJECT_STORAGE_CONSOLE_PORT}:9001" # Web-based admin console
+      - "${OBJECT_STORAGE_HOST_PORT:-9000}:9000"
+      - "${OBJECT_STORAGE_CONSOLE_HOST_PORT:-9001}:9001" # Web console at /rustfs/console/
     environment:
-      MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${OBJECT_STORAGE_SECRET_KEY}
-    command: server /data --console-address ":9001"
+      RUSTFS_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
-      interval: 5s
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/health/ready"]
+      interval: 2s
       timeout: 3s
-      retries: 10
+      retries: 15
 
   tileserver:
     image: ghcr.io/developmentseed/titiler:latest
@@ -76,7 +84,7 @@ services:
     platform: linux/amd64
     ports:
       # The only host-published port that was a fixed literal. Postgres, Redis and
-      # MinIO already publish through a variable (host side variable, container side
+      # object storage already publish through a variable (host side variable, container side
       # fixed — the shape that actually works). With the variable unset the default
       # is the old value, so prod/CI/k8s see no change at all.
       # Local allocation across the three suites: ../cosmo-suite/docs/plan/local-port-allocation.md

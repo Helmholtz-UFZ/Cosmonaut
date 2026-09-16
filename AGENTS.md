@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Cross-tool entry point for AI coding agents working on **COSMONAUT** (Dash + Celery +
-PostgreSQL/MinIO/Redis route-optimization app).
+PostgreSQL/S3/Redis route-optimization app).
 
 The canonical instructions live in **[CLAUDE.md](CLAUDE.md)** and the shared docs layer
 under **[docs/](docs/README.md)**. To avoid drift, this file does not duplicate them —

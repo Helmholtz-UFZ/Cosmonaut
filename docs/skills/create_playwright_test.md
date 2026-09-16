@@ -95,7 +95,7 @@ the full artifact reference.
 
 - Test must run headless (no `--headed` dependency)
 - Test must not depend on local file paths outside `test/test_files/`
-- Services (PostgreSQL, MinIO, Redis) are available in CI — no mocking
+- Services (PostgreSQL, object storage, Redis) are available in CI — no mocking
 - `env_test` is used as `.env` in CI (not `env_test_local`)
 - Run the full suite to check for regressions:
 

@@ -40,8 +40,6 @@ env_vars = framework_env_vars + [
     "DOCKER_UID",
     "DOCKER_GID",
     "GUNICORN",
-    "OBJECT_STORAGE_PORT",
-    "OBJECT_STORAGE_CONSOLE_PORT",
     "TILESERVER_URL",
     "MAINTAINER_EMAIL",
     "EMAIL_SERVER",
@@ -72,10 +70,6 @@ EMAIL_PORT = getenv("EMAIL_PORT")
 EMAIL_USERNAME = getenv("EMAIL_USERNAME")
 EMAIL_PASSWORD = getenv("EMAIL_PASSWORD")
 EMAIL_SENDER = getenv("EMAIL_SENDER")
-
-# Object Storage — not needed for the service, kept for testing
-OBJECT_STORAGE_PORT = getenv("OBJECT_STORAGE_PORT")
-OBJECT_STORAGE_CONSOLE_PORT = getenv("OBJECT_STORAGE_CONSOLE_PORT")
 
 
 def get_download_url(job_id, filename="route.gpx"):

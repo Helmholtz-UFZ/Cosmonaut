@@ -9,7 +9,7 @@ Step-by-step checklist for adding an integration test for a core module (databas
 Ask the user before starting:
 
 1. **Target module** — Which module or class should be tested? (e.g., `db_manager`, `cosmonaut_job`, `object_storage_manager`)
-2. **Services needed** — Does the test require running services (PostgreSQL, MinIO, Redis)?
+2. **Services needed** — Does the test require running services (PostgreSQL, object storage, Redis)?
 3. **Scope** — What operations should be tested? (e.g., CRUD, save/load, connectivity)
 
 ---
@@ -48,7 +48,7 @@ Create `test/test_<module>.py` following the reference template (see Section 3).
 
 ### Step 4: Verify CI compatibility
 
-- Services (PostgreSQL, MinIO, Redis) are available in CI — no mocking
+- Services (PostgreSQL, object storage, Redis) are available in CI — no mocking
 - `env_test` is used as `.env` in CI (not `env_test_local`)
 - Run the full suite to check for regressions:
 

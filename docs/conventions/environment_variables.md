@@ -7,7 +7,7 @@ wrapper that raises `ValueError` on any missing variable.
 The service-level half (Postgres, Redis, object storage, Flask) is read and
 validated by **`cosmo_suite.config`** and re-exported from `cosmonaut_app.config`,
 so consumers keep a single import site. Only cosmonaut's own variables (email,
-tileserver, Docker UID/GID, the MinIO console ports) are read here.
+tileserver, Docker UID/GID) are read here.
 
 **Consequence: the framework owns those names.** `cosmo_suite.config` uses
 `POSTGRES_DB` and `FLASK_DEBUG`; cosmonaut used `POSTGRES_NAME` and `DEBUG` before
@@ -22,7 +22,7 @@ port is now `PORT`, not `FLASK_PORT` (the env var is still `FLASK_PORT`).
 | File | Purpose |
 |------|---------|
 | `.env` | Active file read by the app (symlinked or copied from a variant below) |
-| `env_dev_mock` | Local dev with mocked services (MinIO, localhost) |
+| `env_dev_mock` | Local dev with mocked services (local object storage, localhost) |
 | `env_test` / `env_test_local` | Test environments (containerized vs localhost) |
 | `env_dev_prod` | Dev against real staging services (needs secrets from `env_dev_prod_priv`) |
 | `env_prod` | Production reference (secrets injected at deployment time) |
@@ -37,7 +37,8 @@ Grouped by service. The full list lives in `config.env_vars`.
 - **Web / App**: `WEB_WORK_DIR`, `FLASK_PORT`, `FLASK_DEBUG`, `GUNICORN`, `WEB_OUTSIDE_URL`
 - **PostgreSQL**: `POSTGRES_DB`, `POSTGRES_HOST_NAME`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
 - **Redis / Celery**: `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD`
-- **Object Storage (S3/MinIO)**: `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_HOST`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_REMOTE_NAME`, `OBJECT_STORAGE_PORT`, `OBJECT_STORAGE_CONSOLE_PORT`
+- **Object Storage (S3)**: `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_HOST`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_REMOTE_NAME`
+- **Compose only, not read by `config.py`**: `OBJECT_STORAGE_HOST_PORT`, `OBJECT_STORAGE_CONSOLE_HOST_PORT`, `TILESERVER_HOST_PORT` (defaults in `docker-compose.yml`)
 - **Tileserver**: `TILESERVER_URL`
 - **Email**: `MAINTAINER_EMAIL`, `EMAIL_SERVER`, `EMAIL_PORT`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_SENDER`
 - **Docker**: `DOCKER_UID`, `DOCKER_GID`
@@ -72,9 +73,9 @@ How env vars reach containers (see `docker-compose.yml`):
 
 - **App and worker containers**: `env_file: .env` passes all variables from the
   active `.env` file.
-- **Postgres and MinIO**: `environment:` block with `${VAR}` interpolation maps
+- **Postgres and object storage**: `environment:` block with `${VAR}` interpolation maps
   project variables to the service's expected names (e.g.
-  `MINIO_ROOT_USER: ${OBJECT_STORAGE_ACCESS_KEY}`).
+  `RUSTFS_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY}`).
 - **Production Dockerfiles** (`docker/prod.Dockerfile`, `docker/worker.Dockerfile`):
   `COPY env_prod .env` bakes non-secret vars into the image; the CMD sources
   `.env` before starting the process.

@@ -58,7 +58,7 @@ for immediate field use.
 
 Route calculation is triggered via background_job_manager using Celery tasks.
 The QR code is generated using the qrcode library with an embedded download URL.
-GPX files are stored in MinIO object storage and retrieved via Flask routes.
+GPX files are stored in S3 object storage and retrieved via Flask routes.
 """
 
 import logging
@@ -199,8 +199,8 @@ def layout(job_id):
 def toggle_route_direction(reversed_value, job_id):
     """Persist the chosen route direction and flip the on-map direction cues.
 
-    Regenerates route.gpx + QR code and syncs to MinIO (the QR's presigned
-    URL and the download route serve the MinIO copy). The route line itself
+    Regenerates route.gpx + QR code and syncs to object storage (the QR's
+    presigned URL and the download route serve that copy). The route line itself
     is direction-agnostic — only arrowheads and start/end markers move.
     """
     if reversed_value is None or not job_id:

@@ -541,7 +541,7 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         return result
 
     # Single sync to object storage before plot generation — the worker pulls
-    # files via get_files() so the membership CSV must be in MinIO before the
+    # files via get_files() so the membership CSV must be in object storage before the
     # task starts.  Syncing here (before plots) keeps the payload small and fast.
     # Previous intermediate saves used sync_files=False to avoid redundant rclone
     # calls that blocked this synchronous callback for minutes on large uploads.

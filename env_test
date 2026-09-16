@@ -22,13 +22,11 @@ EMAIL_SENDER="cosmopolitan@ufz.de"
 EMAIL_PASSWORD="test"
 
 ### Object Storage (S3-compatible via rclone) ###
-OBJECT_STORAGE_ACCESS_KEY="minioadmin"
-OBJECT_STORAGE_SECRET_KEY="minioadmin"
-OBJECT_STORAGE_HOST="http://minio:9000"
+OBJECT_STORAGE_ACCESS_KEY="accesskey"
+OBJECT_STORAGE_SECRET_KEY="secretkey"
+OBJECT_STORAGE_HOST="http://object-storage:9000"
 OBJECT_STORAGE_BUCKET="cosmic-routing"
 OBJECT_STORAGE_REMOTE_NAME="cosmonaut-s3"
-OBJECT_STORAGE_PORT=9000
-OBJECT_STORAGE_CONSOLE_PORT=9001
 
 ### Postgres DB ###
 POSTGRES_DB="cosmonaut_db"

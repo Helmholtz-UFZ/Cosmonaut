@@ -1,8 +1,15 @@
 # Decision: Use S3 Presigned URLs for QR Code and Email Downloads
 
 **Date:** 2026-04-23  
-**Status:** Accepted  
+**Status:** Accepted — signing SDK superseded 2026-09-16  
 **Context:** QR codes on the route-download page and download links in completion emails encode intranet-only Flask URLs (`WEB_OUTSIDE_URL`), making them inaccessible to field surveyors on mobile data or guest networks.
+
+> **2026-09-16:** Presigned URLs stay. The signing moved from the `minio` SDK to
+> boto3 inside `cosmo_suite.object_storage_manager` (v0.8.0), and the local/CI
+> server from MinIO to RustFS: MinIO Community Edition is archived and its SDK
+> unreleased since 7.2.20. The "why not the AWS SDK" point below no longer holds;
+> the size cost (~30 MB) was accepted. Rationale: cosmo-suite
+> `docs/conventions/object_storage.md`.
 
 ## Decision
 

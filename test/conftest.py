@@ -107,14 +107,14 @@ def pytest_configure(config):
             log.error(f"Redis connection failed: {e}")
             pytest.exit(f"Redis not available: {e}")
 
-        # Check rclone can connect to MinIO via S3 protocol
+        # Check rclone can connect to the object storage via S3 protocol
         try:
             setup_remote()
             create_bucket()
-            log.info("rclone MinIO connectivity check passed")
+            log.info("rclone object storage connectivity check passed")
         except ObjectStorageError as e:
-            log.error(f"rclone MinIO connectivity check failed: {e}")
-            pytest.exit(f"MinIO S3 connectivity check failed: {e}")
+            log.error(f"rclone object storage connectivity check failed: {e}")
+            pytest.exit(f"Object storage (S3) connectivity check failed: {e}")
     else:
         log.info("Skipping service health checks (--no-services flag set)")
 
@@ -238,7 +238,7 @@ def dash_app(request):
     if skip_services:
         pytest.skip("Skipping dash_app fixture (--no-services flag set)")
 
-    # Inline import: app.py boots Dash, MinIO, Beat scheduler — must stay deferred
+    # Inline import: app.py boots Dash, object storage, Beat scheduler — must stay deferred
     from cosmonaut_app.app import app
 
     port = int(PORT)

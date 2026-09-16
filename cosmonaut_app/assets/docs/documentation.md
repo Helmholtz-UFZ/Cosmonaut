@@ -52,7 +52,7 @@ The application uses a distributed architecture to handle routing jobs efficient
   operations and spatial analysis.
 
 - **Object Storage**: Large route files, GPX outputs, and intermediate results are stored
-  in MinIO object storage for efficient retrieval and long-term archival.
+  in S3 object storage for efficient retrieval and long-term archival.
 
 - **Web Interface**: Built with the Dash framework for interactive data visualization,
   providing real-time map updates, responsive controls, and seamless navigation through

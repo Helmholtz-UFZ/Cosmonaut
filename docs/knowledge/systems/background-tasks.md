@@ -2,7 +2,7 @@
 
 Resource-intensive work — OSM download and route computation — runs off the web process in Celery
 workers, brokered by Redis. The web pod stays responsive and stateless; the worker does the heavy
-lifting and persists results to Postgres + MinIO. This page covers how jobs get onto a queue and how
+lifting and persists results to Postgres + object storage. This page covers how jobs get onto a queue and how
 their status flows back to the UI.
 
 ## Queues
@@ -37,7 +37,7 @@ Task **registration** lives in `celery_app.py` (the worker entry point), kept se
 with a retry policy, and stash `task_name:<id>` in Redis (24 h TTL) so a later revoked-task lookup can
 recover the name. They return `(task_id, failed)`; the caller stores `task_id` on the job. The worker
 **re-loads the job by id with `overwrite=True`** — it never receives the job object over the wire, only
-the id, and pulls a clean copy from MinIO (see [cosmonaut-job](../concepts/cosmonaut-job.md)).
+the id, and pulls a clean copy from object storage (see [cosmonaut-job](../concepts/cosmonaut-job.md)).
 
 The canonical submit path is `CosmonautJob.submit()`: set `status=RUNNING`, `save()` (so the worker
 sees current files + `parameters.json`), enqueue, then store `celery_task_id` with `sync_files=False`.
@@ -68,7 +68,7 @@ sync is the fallback for the window before the task's own write lands or when a 
 ## Do / Don't
 
 - **Do** pass only the `job_id` to a task and re-load with `overwrite=True` inside it.
-- **Do** `save()` before enqueuing so the worker's MinIO pull is current.
+- **Do** `save()` before enqueuing so the worker's object storage pull is current.
 - **Don't** expect the worker to update the UI directly — the web side syncs status lazily via the job.
 - **Don't** pass user input into task args that become object-storage keys; derive keys server-side from
   the validated `job_id`.

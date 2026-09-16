@@ -3,13 +3,13 @@
 This is the repository of COSMONAUT, a Python-based web application designed to optimize navigation routes surveys.
 
 The service is primarily built using Plotly Dash and uses Celery for background and
-resource intensive tasks. Three databases are used: PostgreSQL as main storage, MinIO for
+resource intensive tasks. Three databases are used: PostgreSQL as main storage, S3 for
 object storage, and Redis as the broker between the Dash server and workers.
 
 ## Sister Project: COSMOPOLITAN
 
 COSMONAUT has a sister project **COSMOPOLITAN** (`../cosmopolitan`). Both share the same
-architecture (Dash + Celery + PostgreSQL + MinIO), the same conventions, and the same
+architecture (Dash + Celery + PostgreSQL + S3), the same conventions, and the same
 anti-patterns/coding rules. Key differences:
 
 - **COSMOPOLITAN** analyzes cosmic ray neutron sensor (CRNS) data to predict soil

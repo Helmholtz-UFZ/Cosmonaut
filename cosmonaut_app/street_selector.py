@@ -214,7 +214,7 @@ class StreetSelector:
         # Database must be current but skip rclone sync — interactive edits
         # (tag changes, road removals, keep-largest) happen frequently and the
         # rclone round-trip blocks the callback for seconds/minutes.  Files are
-        # saved locally; MinIO is synced when the routing job is submitted.
+        # saved locally; object storage is synced when the routing job is submitted.
         self.job.save(sync_files=False)
 
         log.info(

@@ -144,7 +144,7 @@ class CosmonautJob(BaseJob):
     This class represents a job submission by the user.
 
     It submits jobs to the PostgreSQL database,
-    uploads the file to the MinIO object storage
+    uploads the file to the object storage
     and can retrieve the job again.
 
     All business data is stored in self.model (JobModel instance).
@@ -185,7 +185,7 @@ class CosmonautJob(BaseJob):
                 exist locally (``--checksum``).  When False (default), only
                 download files missing locally (``--ignore-existing``),
                 preserving local edits.  Use True on worker pods that need
-                a clean copy from MinIO.
+                a clean copy from object storage.
         """
         if job_id is not None:
             log.info(f"Load job with id {job_id}")
@@ -538,7 +538,7 @@ class CosmonautJob(BaseJob):
             job_id=self.model.job_id,
             source_epsg=self.model.epsg,
         )
-        # Honor the persisted direction — a GPX regenerated after a MinIO
+        # Honor the persisted direction — a GPX regenerated after an object storage
         # round-trip must match what the user chose on Route Download.
         qr_code_url = route_creator.create_gpx(reverse=self.is_route_reversed())
         self.save()
@@ -556,8 +556,8 @@ class CosmonautJob(BaseJob):
         """Persist the route direction and regenerate GPX + QR code to match.
 
         Syncs to object storage (via create_qr_code_routing -> save): the QR
-        code's presigned URL points at the MinIO copy of route.gpx, and the
-        download route re-pulls the working dir from MinIO.
+        code's presigned URL points at the object storage copy of route.gpx, and
+        the download route re-pulls the working dir from object storage.
         """
         log.info(
             f"Setting route direction for job {self.model.job_id}: "
@@ -601,7 +601,7 @@ class CosmonautJob(BaseJob):
             self.model.submitted = True
             self.model.status = JOB_STATUS_RUNNING
             self.model.stage = max(self.model.stage, 4)
-            # Sync files — the worker pulls from MinIO via get_files().
+            # Sync files — the worker pulls from object storage via get_files().
             # Also writes parameters.json via dump_routing_params().
             self.save()
 

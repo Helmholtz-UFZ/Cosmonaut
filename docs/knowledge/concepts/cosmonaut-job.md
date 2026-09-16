@@ -19,9 +19,9 @@ coherent:
    ordinary columns. `load()` reverses this — it pops `config` and merges it back so `self.model`
    is whole again. The split is driven dynamically by `FullPipelineConfig.model_fields`, so adding a
    routing parameter on the sensor-routing side needs no schema change here.
-2. **Files → MinIO.** Each job has a `working_dir` at `WEB_WORK_DIR/<job_id>` holding the uploaded
+2. **Files → object storage.** Each job has a `working_dir` at `WEB_WORK_DIR/<job_id>` holding the uploaded
    CSVs, the OSM GeoJSON files, `parameters.json`, logs, the route solution, GPX and QR code. `save()`
-   syncs this directory to MinIO via rclone (`save_files`); `load()` pulls it back (`get_files`).
+   syncs this directory to object storage via rclone (`save_files`); `load()` pulls it back (`get_files`).
 
 ## `sync_files` and `overwrite` — the web-vs-worker footgun
 
@@ -29,9 +29,9 @@ Both `__init__`/`load` and `save` take keyword-only flags that control the (slow
 Getting these wrong either loses recent edits or wastes seconds per callback:
 
 - **`sync_files=False` on load** (Dash callbacks, web pod): local files are already current, so skip
-  the download. Pulling from MinIO here would be slow *and* could overwrite recent local edits with
+  the download. Pulling from object storage here would be slow *and* could overwrite recent local edits with
   stale remote files.
-- **`overwrite=True` on load** (worker pods): force a clean copy from MinIO (`rclone --checksum`).
+- **`overwrite=True` on load** (worker pods): force a clean copy from object storage (`rclone --checksum`).
   The worker starts cold and must get exactly what the web pod last saved — e.g.
   `CosmonautJob(job_id=job_id, overwrite=True)` in both [routing_tasks.py](../../../cosmonaut_app/tasks/routing_tasks.py)
   and [upload_tasks.py](../../../cosmonaut_app/tasks/upload_tasks.py).
@@ -69,7 +69,7 @@ files and plots, and resets `membership_upload`. `time_to_live()` computes days-
 - **Don't** assume `street_processing` is a status string — it may be a Celery task ID.
 - **Don't** add a field to `JobModel` expecting it in the `config` JSONB (or vice-versa): the split
   is by membership in `FullPipelineConfig.model_fields`, not by where you declare it.
-- **Don't** write to `working_dir` and forget to `save()` — unsynced files never reach MinIO and are
+- **Don't** write to `working_dir` and forget to `save()` — unsynced files never reach object storage and are
   lost when the stateless web pod restarts.
 
 ## Related links

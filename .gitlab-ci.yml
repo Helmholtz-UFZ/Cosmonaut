@@ -5,6 +5,12 @@ stages:
   - "build"
   - "deploy"
 
+include:
+  # The S3 server for the integration jobs. Keep ref on the tag pyproject.toml pins.
+  - project: "ufz/tb5-smm/met/wg7/cosmo-suite"
+    ref: "v0.8.0"
+    file: "/ci/object-storage.gitlab-ci.yml"
+
 variables:
   # Postgres. POSTGRES_DB/USER/PASSWORD configure the service image; the app reads
   # the same names (they were POSTGRES_NAME/… before the cosmo_suite integration —
@@ -14,9 +20,9 @@ variables:
   POSTGRES_PASSWORD: password
   POSTGRES_HOST_NAME: postgres
   POSTGRES_PORT: "5432"
-  # MinIO
-  OBJECT_STORAGE_ACCESS_KEY: minioadmin
-  OBJECT_STORAGE_SECRET_KEY: minioadmin
+  # Object storage (ci/object-storage.gitlab-ci.yml in cosmo-suite)
+  OBJECT_STORAGE_ACCESS_KEY: accesskey
+  OBJECT_STORAGE_SECRET_KEY: secretkey
   # App config
   WEB_WORK_DIR: "./cosmonaut_app/work_dir"
   FLASK_PORT: "8080"
@@ -92,7 +98,7 @@ linting:
     - "ruff check ."
 
 # Unit tests: no external services needed.
-# Only files confirmed to work without DB/Redis/MinIO are listed here.
+# Only files confirmed to work without DB/Redis/object storage are listed here.
 # Add new service-free test files to this list as they are created.
 test-unit:
   stage: "test"
@@ -139,14 +145,7 @@ test-integration:
         POSTGRES_DB: cosmonaut_db
         POSTGRES_USER: cosmonaut
         POSTGRES_PASSWORD: password
-    # minio/minio is gone from Docker Hub. MinIO stopped publishing images, so
-    # quay's :latest is frozen at this release anyway — pin it explicitly.
-    - name: "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
-      alias: "minio"
-      command: ["server", "/data", "--console-address", ":9001"]
-      variables:
-        MINIO_ROOT_USER: "${OBJECT_STORAGE_ACCESS_KEY}"
-        MINIO_ROOT_PASSWORD: "${OBJECT_STORAGE_SECRET_KEY}"
+    - !reference [.cosmo-suite-object-storage, services]
     - name: "redis:latest"
       alias: "redis"
   before_script:
@@ -154,12 +153,9 @@ test-integration:
     - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
     # Initialize database schema
     - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
-    # Wait for MinIO to be ready
-    - "until curl -sf http://minio:9000/minio/health/ready; do echo 'Waiting for MinIO...'; sleep 2; done"
+    - !reference [.cosmo-suite-object-storage, before_script]
     - "cp env_test .env"
-    # Create MinIO bucket
-    - "source .env && rclone config create minio s3 provider=Minio access_key_id=${OBJECT_STORAGE_ACCESS_KEY} secret_access_key=${OBJECT_STORAGE_SECRET_KEY} endpoint=${OBJECT_STORAGE_HOST}"
-    - "source .env && rclone mkdir minio:${OBJECT_STORAGE_BUCKET}"
+    # No rclone setup here: conftest runs setup_remote() and create_bucket().
     - "mkdir -p test/artifacts"
   script:
     - "python -m pytest -v --screenshot only-on-failure --tracing retain-on-failure --output test/artifacts"
@@ -185,14 +181,7 @@ test-integration-live-osm:
         POSTGRES_DB: cosmonaut_db
         POSTGRES_USER: cosmonaut
         POSTGRES_PASSWORD: password
-    # minio/minio is gone from Docker Hub. MinIO stopped publishing images, so
-    # quay's :latest is frozen at this release anyway — pin it explicitly.
-    - name: "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
-      alias: "minio"
-      command: ["server", "/data", "--console-address", ":9001"]
-      variables:
-        MINIO_ROOT_USER: "${OBJECT_STORAGE_ACCESS_KEY}"
-        MINIO_ROOT_PASSWORD: "${OBJECT_STORAGE_SECRET_KEY}"
+    - !reference [.cosmo-suite-object-storage, services]
     - name: "redis:latest"
       alias: "redis"
   variables:
@@ -209,12 +198,9 @@ test-integration-live-osm:
     - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
     # Initialize database schema
     - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
-    # Wait for MinIO to be ready
-    - "until curl -sf http://minio:9000/minio/health/ready; do echo 'Waiting for MinIO...'; sleep 2; done"
+    - !reference [.cosmo-suite-object-storage, before_script]
     - "cp env_test .env"
-    # Create MinIO bucket
-    - "source .env && rclone config create minio s3 provider=Minio access_key_id=${OBJECT_STORAGE_ACCESS_KEY} secret_access_key=${OBJECT_STORAGE_SECRET_KEY} endpoint=${OBJECT_STORAGE_HOST}"
-    - "source .env && rclone mkdir minio:${OBJECT_STORAGE_BUCKET}"
+    # No rclone setup here: conftest runs setup_remote() and create_bucket().
     - "mkdir -p test/artifacts"
   script:
     - "python -m pytest -v --screenshot only-on-failure --tracing retain-on-failure --output test/artifacts"

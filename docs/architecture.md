@@ -20,12 +20,12 @@ A Dash web app backed by Celery workers and three datastores:
 | **cosmonaut-worker** (Celery 5.x) | Background, resource-intensive jobs (OSM download, route computation) |
 | **PostgreSQL 15** | Main storage — `jobs` table (metadata, status enum, EPSG, JSONB `config`) + all service logs |
 | **Redis 7** | Celery broker + result backend |
-| **MinIO** (S3-compatible) | Durable per-job working dirs (`cosmonaut-jobs/{job_id}/`), keeps web containers stateless |
+| **Object storage** (S3; RustFS locally) | Durable per-job working dirs (`cosmonaut-jobs/{job_id}/`), keeps web containers stateless |
 | **tileserver** | Map tiles (production) |
 
-The web container is stateless: each job's `work_dir` syncs to MinIO via rclone, so
+The web container is stateless: each job's `work_dir` syncs to object storage via rclone, so
 containers can restart without data loss. Local dev brings everything up with
-`./dev_up.sh mock`; production runs on Kubernetes with managed Postgres/MinIO.
+`./dev_up.sh mock`; production runs on Kubernetes with managed Postgres and UFZ S3.
 
 ## The workflow (pages)
 
@@ -77,7 +77,7 @@ shortest paths + Ant Colony Optimization over global matrices — O(n²), global
 | `pydantic_models.py` | Routing config models (serialized to the `jobs.config` JSONB) |
 | `cosmonaut_job.py` | `CosmonautJob` — job state object |
 | `db_manager.py` | PostgreSQL access (jobs + logs) |
-| `object_storage_manager.py` | MinIO sync of per-job working dirs |
+| `object_storage_manager.py` | S3 sync of per-job working dirs |
 | `error_handling.py` | Custom exceptions + error modal (see [conventions/error_handling.md](conventions/error_handling.md)) |
 | `logger.py`, `logs_table.py` | DB-backed logging (see [conventions/logging.md](conventions/logging.md)) |
 | `navigation_routing.py`, `road_network_utils.py`, `street_selector.py` | Road-network handling + street editing |
@@ -88,7 +88,7 @@ shortest paths + Ant Colony Optimization over global matrices — O(n²), global
 ## Key external dependencies
 
 Dash 3.x + dash-bootstrap-components + dash-leaflet + dash-extensions (UI/maps);
-Celery[redis] (queue); SQLAlchemy + psycopg2 (Postgres); minio (object storage);
+Celery[redis] (queue); SQLAlchemy + psycopg2 (Postgres); rclone + boto3 via cosmo-suite (object storage);
 pydantic v2 (config models); geopandas / shapely / pyproj / rasterio / GDAL (geospatial);
 ijson + requests (streaming Overpass); **sensor-routing** (the routing engine).
 

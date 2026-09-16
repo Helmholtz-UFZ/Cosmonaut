@@ -1,6 +1,6 @@
 # Framework Integration (`cosmo-suite`)
 
-COSMONAUT shares its infrastructure — Dash shell, Celery, Postgres, MinIO — with
+COSMONAUT shares its infrastructure — Dash shell, Celery, Postgres, object storage — with
 COSMOPOLITAN through the **`cosmo-suite`** package. This file is about working with
 that dependency. What each adopted module does is documented in its own docstring;
 what was decided and why is in `docs/decisions/`.
@@ -11,11 +11,15 @@ what was decided and why is in `docs/decisions/`.
 
 ### 1. Freeze rule — work against a tag, never patch the installed package
 
-`pyproject.toml` pins an exact framework tag:
+`pyproject.toml` pins an exact framework tag (`vX.Y.Z` stands for it — the current
+one is whatever `pyproject.toml` says, so this line cannot go stale):
 
 ```toml
-"cosmo-suite @ git+https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite@v0.4.0",
+"cosmo-suite @ git+https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite@vX.Y.Z",
 ```
+
+`.gitlab-ci.yml` includes the framework's `ci/object-storage.gitlab-ci.yml` at the
+same tag. A re-pin moves both, plus `uv.lock`.
 
 If the framework needs to change, the change is an **MR in the framework repo plus a
 new tag**, then both apps re-pin. Never edit `site-packages`, never carry a local
@@ -99,7 +103,7 @@ The three stacks — cosmopolitan, cosmonaut, `cosmo-suite/examples/csv_profiler
 used to publish the same host ports, so **no two suites could run at once, in any
 combination**. Each repo now owns a disjoint block:
 
-| | Flask | Postgres | Redis | MinIO | Console | Tileserver |
+| | Flask | Postgres | Redis | Object storage | Console | Tileserver |
 |---|---|---|---|---|---|---|
 | cosmopolitan | 8080 | 5432 | 6379 | 9000 | 9001 | 8001 |
 | **cosmonaut** | **8081** | **5433** | **6380** | **9010** | **9011** | **8011** |
@@ -115,7 +119,7 @@ way: in CI every stack has its own containers, in production its own pod. The on
 host-published literal in `docker-compose.yml` is parametrised as
 `${TILESERVER_HOST_PORT:-8001}` — **with the variable unset the resolved
 `docker compose config` is byte-identical to before**, which is what keeps prod out
-of it. Postgres, Redis and MinIO already published through a variable with the
+of it. Postgres, Redis and object storage already published through a variable with the
 container side fixed (`${POSTGRES_PORT}:5432`), which is the shape that works;
 `FLASK_PORT` needs no host variable because the app and worker run with
 `network_mode: host`.
