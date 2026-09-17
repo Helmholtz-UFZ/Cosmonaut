@@ -38,7 +38,7 @@ Grouped by service. The full list lives in `config.env_vars`.
 - **PostgreSQL**: `POSTGRES_DB`, `POSTGRES_HOST_NAME`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
 - **Redis / Celery**: `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `REDIS_PASSWORD`
 - **Object Storage (S3)**: `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_HOST`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_REMOTE_NAME`
-- **Compose only, not read by `config.py`**: `OBJECT_STORAGE_HOST_PORT`, `OBJECT_STORAGE_CONSOLE_HOST_PORT`, `TILESERVER_HOST_PORT` (defaults in `docker-compose.yml`)
+- **Compose only, not read by `config.py`**: `POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`, `OBJECT_STORAGE_HOST_PORT`, `OBJECT_STORAGE_CONSOLE_HOST_PORT`, `TILESERVER_HOST_PORT` (defaults in `docker-compose.yml`)
 - **Tileserver**: `TILESERVER_URL`
 - **Email**: `MAINTAINER_EMAIL`, `EMAIL_SERVER`, `EMAIL_PORT`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_SENDER`
 - **Docker**: `DOCKER_UID`, `DOCKER_GID`

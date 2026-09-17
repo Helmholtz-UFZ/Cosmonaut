@@ -44,7 +44,7 @@ services:
   postgres:
     image: postgis/postgis:latest
     ports:
-      - ${POSTGRES_PORT}:5432
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -57,7 +57,7 @@ services:
     image: redis:7-alpine
     container_name: redis_cosmonaut
     ports:
-      - "${REDIS_PORT}:6379"
+      - "${REDIS_HOST_PORT:-6379}:6379"
     command: redis-server --appendonly yes
 
   # S3 server for local runs, copied from cosmo-suite's
@@ -83,10 +83,9 @@ services:
     container_name: cosmonaut-tileserver
     platform: linux/amd64
     ports:
-      # The only host-published port that was a fixed literal. Postgres, Redis and
-      # object storage already publish through a variable (host side variable, container side
-      # fixed — the shape that actually works). With the variable unset the default
-      # is the old value, so prod/CI/k8s see no change at all.
+      # Every host-published port reads ${<SERVICE>_HOST_PORT:-<default>}: host side
+      # variable, container side fixed. With the variable unset the default applies,
+      # so prod/CI/k8s see no change at all.
       # Local allocation across the three suites: ../cosmo-suite/docs/plan/local-port-allocation.md
       - "${TILESERVER_HOST_PORT:-8001}:80"
     volumes:

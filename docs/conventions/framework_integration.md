@@ -115,14 +115,14 @@ to find. Extend that one.
 
 Only `env_dev_mock` and `env_test_local` carry these values. `env_prod`,
 `env_dev_prod*`, `env_test` and the k8s manifests are untouched and must stay that
-way: in CI every stack has its own containers, in production its own pod. The one
-host-published literal in `docker-compose.yml` is parametrised as
-`${TILESERVER_HOST_PORT:-8001}` — **with the variable unset the resolved
-`docker compose config` is byte-identical to before**, which is what keeps prod out
-of it. Postgres, Redis and object storage already published through a variable with the
-container side fixed (`${POSTGRES_PORT}:5432`), which is the shape that works;
-`FLASK_PORT` needs no host variable because the app and worker run with
-`network_mode: host`.
+way: in CI every stack has its own containers, in production its own pod. Every
+host-published port in `docker-compose.yml` reads `${<SERVICE>_HOST_PORT:-<default>}`
+with the container side fixed (`${POSTGRES_HOST_PORT:-5432}:5432`) — **with the
+variables unset the resolved `docker compose config` is identical to before**, which
+is what keeps prod out of it. `FLASK_PORT` needs no host variable because the app and
+worker run with `network_mode: host` — which is also why `POSTGRES_HOST_PORT` /
+`REDIS_HOST_PORT` must equal `POSTGRES_PORT` / `REDIS_PORT` here: the app connects to
+the published port.
 
 ### A port collision does not look like a failure
 
