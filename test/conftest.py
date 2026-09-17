@@ -238,7 +238,7 @@ def dash_app(request):
     if skip_services:
         pytest.skip("Skipping dash_app fixture (--no-services flag set)")
 
-    # Inline import: app.py boots Dash, object storage, Beat scheduler — must stay deferred
+    # Inline import: app.py boots Dash and object storage — must stay deferred
     from cosmonaut_app.app import app
 
     port = int(PORT)

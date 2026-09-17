@@ -17,6 +17,13 @@ gotchas that don't surface in local docker-compose development.
 CMD ... gunicorn --preload -w 2 -b 0.0.0.0:$FLASK_PORT --timeout 300 cosmonaut_app.app:server
 ```
 
+- **Nothing may start a thread in `app.py`, and Celery Beat runs in the worker**
+  (`--beat`, exactly one worker pod). With `--preload`, a thread running at fork time
+  deadlocked the forked workers on their first task submission — the "road network
+  never loads" outage of 2026-09. Details and evidence:
+  `docs/conventions/celery_beat.md` in cosmo-suite; guarded by
+  `test/test_no_threads_in_app.py`.
+
 ## HAProxy Ingress
 
 Two annotations are required in `deployment/ufz/prod/values.yaml`:

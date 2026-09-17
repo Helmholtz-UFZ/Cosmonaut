@@ -97,7 +97,7 @@ artifact reference.
 
 ## Celery and the Root Logger
 
-The web process runs a Celery Beat thread (`app.py`). By default Celery hijacks the
+The worker runs Celery Beat embedded (`--beat`, `docker/worker.Dockerfile`). By default Celery hijacks the
 root logger on startup, replacing all handlers with its own stdout-only handler. This
 silently drops the PostgreSQL handler.
 

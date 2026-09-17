@@ -119,6 +119,7 @@ test-unit:
       test/test_sensor_routing_descriptions.py
       test/test_osm_transform.py
       test/test_error_handling.py
+      test/test_no_threads_in_app.py
       --no-services -v
   artifacts:
     when: on_failure

@@ -41,12 +41,16 @@ USER appuser
 # `set -e`-style chaining with && on purpose: with `;` a failing setup_remote let
 # the worker start anyway, unconfigured, and the first upload failed much later
 # with a message that pointed at the road network instead of at rclone.
+# --beat embeds the Celery Beat scheduler. It belongs here and not in the web
+# process (see app.py), and it relies on there being exactly one worker pod: a
+# second replica would run every scheduled task twice.
 CMD echo "Starting Celery worker..." && \
     python3 -c "from cosmo_suite.object_storage_manager import setup_remote; setup_remote()" && \
     exec celery -A cosmonaut_app.celery_app.celery worker \
         --loglevel=info \
         --concurrency=4 \
         --queues=default,routing,test,upload \
+        --beat \
         --hostname=worker@%h \
         --without-gossip \
         --without-mingle;

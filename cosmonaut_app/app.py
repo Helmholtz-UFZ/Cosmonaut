@@ -1,13 +1,11 @@
 import logging
 import logging.config
 from pathlib import Path
-from threading import Thread
 
 from cosmo_suite.logger import get_logger_config_web
 from cosmo_suite.object_storage_manager import create_bucket, setup_remote
 from dash import Dash
 
-from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.config import DEBUG, PORT
 from cosmonaut_app.constants.general import EXCLUDED_LOG_PACKAGES
 from cosmonaut_app.error_handling import handle_error_with_notification
@@ -49,17 +47,12 @@ register_map_callbacks(app)
 
 server = app.server  # Expose Flask server for WSGI
 
-
-def start_beat_scheduler():
-    """Start Celery Beat scheduler with thread-specific logging."""
-    beat = background_job_manager.app.Beat(loglevel="DEBUG")
-    beat.run()
-
-
-# Start Beat scheduler as daemon thread
-beat_thread = Thread(target=start_beat_scheduler, daemon=True)
-beat_thread.start()
-logger.info("Celery Beat scheduler started in background thread")
+# No Celery Beat here: it runs embedded in the worker (docker/worker.Dockerfile).
+# Gunicorn with --preload imports this module once and then forks its workers; a
+# thread started at import can hold one of Celery's internal locks at that moment,
+# and the forked worker then blocks forever on its first task submission. Without
+# --preload every worker would start its own Beat instead, and every scheduled task
+# would run once per worker. See docs/conventions/celery_beat.md in cosmo-suite.
 
 if __name__ == "__main__":
     # Watch local sensor-routing source for auto-reload (mounted via --local-sr)
