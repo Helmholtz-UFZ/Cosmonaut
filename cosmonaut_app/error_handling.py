@@ -1,7 +1,7 @@
 """Error handling utilities for Dash apps.
 
 The modal, the response table and ``handle_error`` come from
-``cosmo_suite.error_handling``. Only what the framework cannot know stays here:
+``cosmo_ecosystem.error_handling``. Only what the framework cannot know stays here:
 two domain exceptions and the maintainer notification.
 
 Two deliberate divergences, both of the kind that fails silently
@@ -23,10 +23,12 @@ import logging
 from functools import partial
 
 import psycopg2
-from cosmo_suite.error_handling import JobNotFound as JobNotFound
-from cosmo_suite.error_handling import error_modal as error_modal
-from cosmo_suite.error_handling import handle_error as handle_error
-from cosmo_suite.object_storage_manager import ObjectStorageError as ObjectStorageError
+from cosmo_ecosystem.error_handling import JobNotFound as JobNotFound
+from cosmo_ecosystem.error_handling import error_modal as error_modal
+from cosmo_ecosystem.error_handling import handle_error as handle_error
+from cosmo_ecosystem.object_storage_manager import (
+    ObjectStorageError as ObjectStorageError,
+)
 
 from cosmonaut_app.config import MAINTAINER_EMAIL
 from cosmonaut_app.email_service import send_mail

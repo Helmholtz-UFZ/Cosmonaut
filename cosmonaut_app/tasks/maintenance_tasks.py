@@ -10,7 +10,7 @@ import shutil
 from datetime import date, datetime, timedelta
 
 from celery import Task
-from cosmo_suite.object_storage_manager import delete_directory_from_storage
+from cosmo_ecosystem.object_storage_manager import delete_directory_from_storage
 
 from cosmonaut_app.config import (
     DAYS_DELETE_NOT_SUBMITTED,

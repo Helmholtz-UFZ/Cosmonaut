@@ -7,20 +7,20 @@ stages:
 
 include:
   # The S3 server for the integration jobs. Keep ref on the tag pyproject.toml pins.
-  - project: "ufz/tb5-smm/met/wg7/cosmo-suite"
-    ref: "v0.8.0"
+  - project: "ufz/tb5-smm/met/wg7/cosmo-ecosystem"
+    ref: "v0.9.0"
     file: "/ci/object-storage.gitlab-ci.yml"
 
 variables:
   # Postgres. POSTGRES_DB/USER/PASSWORD configure the service image; the app reads
-  # the same names (they were POSTGRES_NAME/… before the cosmo_suite integration —
+  # the same names (they were POSTGRES_NAME/… before the cosmo_ecosystem integration —
   # the framework's name won, which collapsed the former duplicate pair into one).
   POSTGRES_DB: cosmonaut_db
   POSTGRES_USER: cosmonaut
   POSTGRES_PASSWORD: password
   POSTGRES_HOST_NAME: postgres
   POSTGRES_PORT: "5432"
-  # Object storage (ci/object-storage.gitlab-ci.yml in cosmo-suite)
+  # Object storage (ci/object-storage.gitlab-ci.yml in cosmo-ecosystem)
   OBJECT_STORAGE_ACCESS_KEY: accesskey
   OBJECT_STORAGE_SECRET_KEY: secretkey
   # App config
@@ -146,7 +146,7 @@ test-integration:
         POSTGRES_DB: cosmonaut_db
         POSTGRES_USER: cosmonaut
         POSTGRES_PASSWORD: password
-    - !reference [.cosmo-suite-object-storage, services]
+    - !reference [.cosmo-ecosystem-object-storage, services]
     - name: "redis:latest"
       alias: "redis"
   before_script:
@@ -154,7 +154,7 @@ test-integration:
     - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
     # Initialize database schema
     - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
-    - !reference [.cosmo-suite-object-storage, before_script]
+    - !reference [.cosmo-ecosystem-object-storage, before_script]
     - "cp env_test .env"
     # No rclone setup here: conftest runs setup_remote() and create_bucket().
     - "mkdir -p test/artifacts"
@@ -182,7 +182,7 @@ test-integration-live-osm:
         POSTGRES_DB: cosmonaut_db
         POSTGRES_USER: cosmonaut
         POSTGRES_PASSWORD: password
-    - !reference [.cosmo-suite-object-storage, services]
+    - !reference [.cosmo-ecosystem-object-storage, services]
     - name: "redis:latest"
       alias: "redis"
   variables:
@@ -199,7 +199,7 @@ test-integration-live-osm:
     - "until pg_isready -h postgres -p 5432 -U cosmonaut; do echo 'Waiting for PostgreSQL...'; sleep 2; done"
     # Initialize database schema
     - "PGPASSWORD=password psql -h postgres -U cosmonaut -d cosmonaut_db -f docker/init.sql"
-    - !reference [.cosmo-suite-object-storage, before_script]
+    - !reference [.cosmo-ecosystem-object-storage, before_script]
     - "cp env_test .env"
     # No rclone setup here: conftest runs setup_remote() and create_bucket().
     - "mkdir -p test/artifacts"
@@ -224,7 +224,7 @@ build-latest:
     # pushed. It runs the CMD's setup_remote() step only, derived from the image's
     # own CMD rather than copied — a copy would stay green even after the CMD
     # bends, which is exactly the failure this guards against. See
-    # docs/conventions/worker_image.md (cosmo-suite) for the full rationale: this
+    # docs/conventions/worker_image.md (cosmo-ecosystem) for the full rationale: this
     # is the test that would have caught the two-week rclone outage.
     # env_test, not a dedicated env_ci: it already carries dummy credentials for
     # every var config.py reads, and is already used by the test jobs above.

@@ -1,7 +1,7 @@
 """Database access for COSMONAUT.
 
 The engine, the session scope, the log queries and the generic job queries come
-from ``cosmo_suite.db_manager``. This module contributes the two things the
+from ``cosmo_ecosystem.db_manager``. This module contributes the two things the
 framework cannot know: the concrete ``jobs`` table, and one domain query.
 
 **One Base, one engine.** Until slice 2 this app declared its own
@@ -10,7 +10,7 @@ two connection pools against the same database, both mapping ``jobs`` and
 ``logs``. That is resolved here: ``JobTable`` is declared on the framework
 ``Base`` from the ``JobColumns`` mixin, and ``DbManager.job_table`` is pointed at
 it. See ../docs/decisions/20260806-two-sqlalchemy-engines-transitional.md, which
-this supersedes, and cosmo-suite's docs/conventions/database_schema.md.
+this supersedes, and cosmo-ecosystem's docs/conventions/database_schema.md.
 
 The authoritative DDL for this table stays ``docker/init.sql``. ``JobColumns``
 carries only the six columns every consumer app is measured to have; the seven
@@ -21,8 +21,8 @@ rather than a union.
 
 import logging
 
-from cosmo_suite.db_manager import Base, DbManager, JobColumns, SessionScope
-from cosmo_suite.error_handling import JobNotFound
+from cosmo_ecosystem.db_manager import Base, DbManager, JobColumns, SessionScope
+from cosmo_ecosystem.error_handling import JobNotFound
 from sqlalchemy import JSON, Column, Integer, String
 
 log = logging.getLogger(__name__)

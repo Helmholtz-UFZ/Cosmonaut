@@ -9,8 +9,8 @@ import uuid
 from datetime import date, timedelta
 
 import pandas as pd
-from cosmo_suite.base_job import BaseJob
-from cosmo_suite.object_storage_manager import (
+from cosmo_ecosystem.base_job import BaseJob
+from cosmo_ecosystem.object_storage_manager import (
     delete_directory_from_storage,
     get_files,
     save_files,
@@ -150,7 +150,7 @@ class CosmonautJob(BaseJob):
     All business data is stored in self.model (JobModel instance).
     Filesystem paths are stored as direct instance attributes.
 
-    Implements ``cosmo_suite.base_job.BaseJob``: ``job_id``, ``save``,
+    Implements ``cosmo_ecosystem.base_job.BaseJob``: ``job_id``, ``save``,
     ``delete``, ``submit`` and ``time_to_live`` are what framework code may call
     on a job it did not build. Everything else here is domain. ``working_dir`` is
     not in the contract but is required by ``files_route.serve_files``, which

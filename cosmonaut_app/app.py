@@ -2,8 +2,8 @@ import logging
 import logging.config
 from pathlib import Path
 
-from cosmo_suite.logger import get_logger_config_web
-from cosmo_suite.object_storage_manager import create_bucket, setup_remote
+from cosmo_ecosystem.logger import get_logger_config_web
+from cosmo_ecosystem.object_storage_manager import create_bucket, setup_remote
 from dash import Dash
 
 from cosmonaut_app.config import DEBUG, PORT
@@ -52,7 +52,7 @@ server = app.server  # Expose Flask server for WSGI
 # thread started at import can hold one of Celery's internal locks at that moment,
 # and the forked worker then blocks forever on its first task submission. Without
 # --preload every worker would start its own Beat instead, and every scheduled task
-# would run once per worker. See docs/conventions/celery_beat.md in cosmo-suite.
+# would run once per worker. See docs/conventions/celery_beat.md in cosmo-ecosystem.
 
 if __name__ == "__main__":
     # Watch local sensor-routing source for auto-reload (mounted via --local-sr)

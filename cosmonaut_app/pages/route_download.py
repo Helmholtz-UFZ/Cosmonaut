@@ -64,7 +64,7 @@ GPX files are stored in S3 object storage and retrieved via Flask routes.
 import logging
 
 import dash_bootstrap_components as dbc
-from cosmo_suite.files_route import _download_href
+from cosmo_ecosystem.files_route import _download_href
 from dash import Input, Output, State, callback, dcc, html, register_page
 from dash.exceptions import PreventUpdate
 

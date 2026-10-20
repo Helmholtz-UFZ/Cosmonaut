@@ -1,6 +1,6 @@
 """Pydantic models for user input and persisted job state.
 
-``UserModel`` subclasses ``cosmo_suite.pydantic_models.BaseJobConfig``, the minimal
+``UserModel`` subclasses ``cosmo_ecosystem.pydantic_models.BaseJobConfig``, the minimal
 contract: a ``job_id`` validated by ``validate_job_id`` plus
 ``validate_assignment=True``, so no model can be assigned an invalid job id after
 construction either.
@@ -17,7 +17,7 @@ import logging
 from datetime import date
 from typing import Annotated, Any
 
-from cosmo_suite.pydantic_models import BaseJobConfig
+from cosmo_ecosystem.pydantic_models import BaseJobConfig
 from email_validator import EmailNotValidError, validate_email
 from pydantic import AfterValidator, Field
 from pyproj import CRS

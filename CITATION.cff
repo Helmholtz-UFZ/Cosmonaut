@@ -7,7 +7,7 @@ abstract: >-
   sampling route over an accessible road network and exports it as an enriched GPX file
   that also marks road segments of high expected information gain. Developed for, and used
   operationally in, mobile cosmic-ray neutron sensing surveys, while the routing workflow
-  itself makes no assumption about the instrument. Part of the COSMO Suite and built on
+  itself makes no assumption about the instrument. Part of the Cosmo Ecosystem and built on
   its reusable framework.
 type: software
 authors:

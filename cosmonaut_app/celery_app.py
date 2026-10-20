@@ -9,7 +9,7 @@ Separated from background_job_manager to break a circular import:
     tasks/*.py → cosmonaut_job → background_job_manager → tasks/*.py
 """
 
-from cosmo_suite.tasks.test_tasks import long_running_test_task
+from cosmo_ecosystem.tasks.test_tasks import long_running_test_task
 
 from cosmonaut_app.background_job_manager import (
     NAME_MAINTENANCE_CLEANUP_TASK,

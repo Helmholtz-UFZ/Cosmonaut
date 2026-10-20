@@ -4,7 +4,7 @@ import os
 import dash
 import dash_bootstrap_components as dbc
 import dash_leaflet as dl
-from cosmo_suite.layouts import create_header as create_header
+from cosmo_ecosystem.layouts import create_header as create_header
 from dash import ctx, dcc, html, no_update
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate

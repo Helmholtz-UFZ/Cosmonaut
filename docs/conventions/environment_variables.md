@@ -5,11 +5,11 @@ loaded via `python-dotenv` and validated at startup with a strict `getenv()`
 wrapper that raises `ValueError` on any missing variable.
 
 The service-level half (Postgres, Redis, object storage, Flask) is read and
-validated by **`cosmo_suite.config`** and re-exported from `cosmonaut_app.config`,
+validated by **`cosmo_ecosystem.config`** and re-exported from `cosmonaut_app.config`,
 so consumers keep a single import site. Only cosmonaut's own variables (email,
 tileserver, Docker UID/GID) are read here.
 
-**Consequence: the framework owns those names.** `cosmo_suite.config` uses
+**Consequence: the framework owns those names.** `cosmo_ecosystem.config` uses
 `POSTGRES_DB` and `FLASK_DEBUG`; cosmonaut used `POSTGRES_NAME` and `DEBUG` before
 the integration. The python-level name `DEBUG` is unchanged — the framework
 derives it (`DEBUG = getenv("FLASK_DEBUG") == "1"`). The python-level name for the
@@ -47,7 +47,7 @@ Grouped by service. The full list lives in `config.env_vars`.
 
 ## How Config Loading Works
 
-1. `cosmo_suite.config` calls `load_dotenv(find_dotenv(usecwd=True))` at import
+1. `cosmo_ecosystem.config` calls `load_dotenv(find_dotenv(usecwd=True))` at import
    time. **It searches upward from the process CWD, not from next to `config.py`**
    (the framework lives in site-packages). Every entry point — `dev_up.sh`,
    `run_pytest.sh`, gunicorn, the celery worker, the deployment manifests — must
@@ -56,7 +56,7 @@ Grouped by service. The full list lives in `config.env_vars`.
    the variable is missing.
 3. All values are stored as **module-level constants** — import them from
    `cosmonaut_app.config`, whether the framework or cosmonaut reads them.
-4. `config.env_vars` is `cosmo_suite.config.env_vars + cosmonaut's own` and
+4. `config.env_vars` is `cosmo_ecosystem.config.env_vars + cosmonaut's own` and
    enumerates every required variable. Tests use this list to validate
    completeness across all env files.
 5. `WEB_WORK_DIR` is the one value cosmonaut deliberately does **not** take
