@@ -11,11 +11,11 @@ from datetime import timedelta
 from logging.config import dictConfig
 
 from celery import Task
-from cosmo_suite.logger import (
+from cosmo_ecosystem.logger import (
     get_logger_config_computation,
     get_logger_config_worker,
 )
-from cosmo_suite.object_storage_manager import get_presigned_download_url
+from cosmo_ecosystem.object_storage_manager import get_presigned_download_url
 from sensor_routing.full_pipeline_cli import sensor_routing_pipeline
 
 from cosmonaut_app.config import PORT, WEB_OUTSIDE_URL

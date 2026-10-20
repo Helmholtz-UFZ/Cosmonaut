@@ -88,7 +88,7 @@ shortest paths + Ant Colony Optimization over global matrices — O(n²), global
 ## Key external dependencies
 
 Dash 3.x + dash-bootstrap-components + dash-leaflet + dash-extensions (UI/maps);
-Celery[redis] (queue); SQLAlchemy + psycopg2 (Postgres); rclone + boto3 via cosmo-suite (object storage);
+Celery[redis] (queue); SQLAlchemy + psycopg2 (Postgres); rclone + boto3 via cosmo-ecosystem (object storage);
 pydantic v2 (config models); geopandas / shapely / pyproj / rasterio / GDAL (geospatial);
 ijson + requests (streaming Overpass); **sensor-routing** (the routing engine).
 

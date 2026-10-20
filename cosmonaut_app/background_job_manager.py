@@ -1,6 +1,6 @@
 """Background job manager for COSMONAUT App.
 
-Extends ``cosmo_suite.background_job_manager.BackgroundJobManager``: the generic
+Extends ``cosmo_ecosystem.background_job_manager.BackgroundJobManager``: the generic
 plumbing (``submit_job``, ``submit_named_job``, ``get_job_status``,
 ``get_task_result_info``, ``get_all_tasks_overview``, ``revoke_job``,
 ``submit_test_task``) comes from the framework; only the domain submissions are
@@ -19,14 +19,14 @@ import logging
 from logging.config import dictConfig
 
 from celery.signals import worker_process_init
-from cosmo_suite.background_job_manager import NAME_TEST_TASK as NAME_TEST_TASK
-from cosmo_suite.background_job_manager import (
+from cosmo_ecosystem.background_job_manager import NAME_TEST_TASK as NAME_TEST_TASK
+from cosmo_ecosystem.background_job_manager import (
     BackgroundJobManager as BaseBackgroundJobManager,
 )
-from cosmo_suite.background_job_manager import (
+from cosmo_ecosystem.background_job_manager import (
     configure_worker_logging as framework_configure_worker_logging,
 )
-from cosmo_suite.logger import get_logger_config_worker
+from cosmo_ecosystem.logger import get_logger_config_worker
 
 from cosmonaut_app.celery_config import CeleryConfig
 from cosmonaut_app.constants.general import EXCLUDED_LOG_PACKAGES
@@ -98,8 +98,8 @@ class BackgroundJobManager(BaseBackgroundJobManager):
         """Submit cosmonaut's maintenance cleanup task.
 
         Overrides the framework method, which submits
-        ``cosmo_suite.tasks.maintenance_tasks.cleanup`` — that task cleans up via
-        cosmo_suite.db_manager, which this app does not use.
+        ``cosmo_ecosystem.tasks.maintenance_tasks.cleanup`` — that task cleans up via
+        cosmo_ecosystem.db_manager, which this app does not use.
         """
         return self.submit_named_job(NAME_MAINTENANCE_CLEANUP_TASK, queue="default")
 

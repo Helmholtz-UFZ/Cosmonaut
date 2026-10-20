@@ -16,7 +16,7 @@ import urllib.request
 
 import pytest
 import redis
-from cosmo_suite.object_storage_manager import create_bucket, setup_remote
+from cosmo_ecosystem.object_storage_manager import create_bucket, setup_remote
 from playwright.sync_api import ConsoleMessage, Page
 from playwright.sync_api import Error as PlaywrightError
 from slugify import slugify

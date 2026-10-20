@@ -1,38 +1,46 @@
 """This module defines variables, dir structure and includes widely used functions.
 
 The service-level variables (Postgres, Redis, object storage, Flask) are read and
-validated by ``cosmo_suite.config`` at import time and re-exported here, so every
+validated by ``cosmo_ecosystem.config`` at import time and re-exported here, so every
 consumer keeps importing them from ``cosmonaut_app.config``. Only the variables the
 framework does not know about are read here.
 """
 
 import os
 
-from cosmo_suite.config import DEBUG as DEBUG
-from cosmo_suite.config import JOB_WORK_DIR_TEMPLATE as JOB_WORK_DIR_TEMPLATE
-from cosmo_suite.config import OBJECT_STORAGE_ACCESS_KEY as OBJECT_STORAGE_ACCESS_KEY
-from cosmo_suite.config import OBJECT_STORAGE_BUCKET as OBJECT_STORAGE_BUCKET
-from cosmo_suite.config import OBJECT_STORAGE_HOST as OBJECT_STORAGE_HOST
-from cosmo_suite.config import OBJECT_STORAGE_REMOTE_NAME as OBJECT_STORAGE_REMOTE_NAME
-from cosmo_suite.config import OBJECT_STORAGE_SECRET_KEY as OBJECT_STORAGE_SECRET_KEY
-from cosmo_suite.config import PORT as PORT
-from cosmo_suite.config import POSTGRES_DB as POSTGRES_DB
-from cosmo_suite.config import POSTGRES_HOST_NAME as POSTGRES_HOST_NAME
-from cosmo_suite.config import POSTGRES_PASSWORD as POSTGRES_PASSWORD
-from cosmo_suite.config import POSTGRES_PORT as POSTGRES_PORT
-from cosmo_suite.config import POSTGRES_USER as POSTGRES_USER
-from cosmo_suite.config import REDIS_DB as REDIS_DB
-from cosmo_suite.config import REDIS_HOST as REDIS_HOST
-from cosmo_suite.config import REDIS_PASSWORD as REDIS_PASSWORD
-from cosmo_suite.config import REDIS_PORT as REDIS_PORT
-from cosmo_suite.config import WEB_OUTSIDE_URL as WEB_OUTSIDE_URL
-from cosmo_suite.config import WEB_WORK_DIR as WEB_WORK_DIR
-from cosmo_suite.config import env_vars as framework_env_vars
-from cosmo_suite.config import getenv
-from cosmo_suite.constants.general import (
+from cosmo_ecosystem.config import DEBUG as DEBUG
+from cosmo_ecosystem.config import JOB_WORK_DIR_TEMPLATE as JOB_WORK_DIR_TEMPLATE
+from cosmo_ecosystem.config import (
+    OBJECT_STORAGE_ACCESS_KEY as OBJECT_STORAGE_ACCESS_KEY,
+)
+from cosmo_ecosystem.config import OBJECT_STORAGE_BUCKET as OBJECT_STORAGE_BUCKET
+from cosmo_ecosystem.config import OBJECT_STORAGE_HOST as OBJECT_STORAGE_HOST
+from cosmo_ecosystem.config import (
+    OBJECT_STORAGE_REMOTE_NAME as OBJECT_STORAGE_REMOTE_NAME,
+)
+from cosmo_ecosystem.config import (
+    OBJECT_STORAGE_SECRET_KEY as OBJECT_STORAGE_SECRET_KEY,
+)
+from cosmo_ecosystem.config import PORT as PORT
+from cosmo_ecosystem.config import POSTGRES_DB as POSTGRES_DB
+from cosmo_ecosystem.config import POSTGRES_HOST_NAME as POSTGRES_HOST_NAME
+from cosmo_ecosystem.config import POSTGRES_PASSWORD as POSTGRES_PASSWORD
+from cosmo_ecosystem.config import POSTGRES_PORT as POSTGRES_PORT
+from cosmo_ecosystem.config import POSTGRES_USER as POSTGRES_USER
+from cosmo_ecosystem.config import REDIS_DB as REDIS_DB
+from cosmo_ecosystem.config import REDIS_HOST as REDIS_HOST
+from cosmo_ecosystem.config import REDIS_PASSWORD as REDIS_PASSWORD
+from cosmo_ecosystem.config import REDIS_PORT as REDIS_PORT
+from cosmo_ecosystem.config import WEB_OUTSIDE_URL as WEB_OUTSIDE_URL
+from cosmo_ecosystem.config import WEB_WORK_DIR as WEB_WORK_DIR
+from cosmo_ecosystem.config import env_vars as framework_env_vars
+from cosmo_ecosystem.config import getenv
+from cosmo_ecosystem.constants.general import (
     DAYS_DELETE_NOT_SUBMITTED as DAYS_DELETE_NOT_SUBMITTED,
 )
-from cosmo_suite.constants.general import DAYS_DELETE_SUBMITTED as DAYS_DELETE_SUBMITTED
+from cosmo_ecosystem.constants.general import (
+    DAYS_DELETE_SUBMITTED as DAYS_DELETE_SUBMITTED,
+)
 
 # Needed for the test_env.py. Update!
 # The framework list is the service-level half; everything below is cosmonaut's own.

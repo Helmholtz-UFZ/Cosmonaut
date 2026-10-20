@@ -1,7 +1,7 @@
-# Framework Integration (`cosmo-suite`)
+# Framework Integration (`cosmo-ecosystem`)
 
 COSMONAUT shares its infrastructure — Dash shell, Celery, Postgres, object storage — with
-COSMOPOLITAN through the **`cosmo-suite`** package. This file is about working with
+COSMOPOLITAN through the **`cosmo-ecosystem`** package. This file is about working with
 that dependency. What each adopted module does is documented in its own docstring;
 what was decided and why is in `docs/decisions/`.
 
@@ -15,7 +15,7 @@ what was decided and why is in `docs/decisions/`.
 one is whatever `pyproject.toml` says, so this line cannot go stale):
 
 ```toml
-"cosmo-suite @ git+https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-suite@vX.Y.Z",
+"cosmo-ecosystem @ git+https://codebase.helmholtz.cloud/ufz/tb5-smm/met/wg7/cosmo-ecosystem@vX.Y.Z",
 ```
 
 `.gitlab-ci.yml` includes the framework's `ci/object-storage.gitlab-ci.yml` at the
@@ -37,7 +37,7 @@ Two things the pin needs on the app side, both easy to lose:
 
 ### 2. CWD rule — every entry point starts from the repo root
 
-`cosmo_suite.config` loads the environment with
+`cosmo_ecosystem.config` loads the environment with
 `load_dotenv(find_dotenv(usecwd=True))`. It searches upward from the **process CWD**,
 not from next to `config.py`, which lives in `site-packages`.
 
@@ -59,7 +59,7 @@ wholesale swap would have been a silent regression in four places — including 
 `get_files` default that would have clobbered unsynced street-selection edits, and a
 framework task time limit that would have killed exactly the large surveys the app
 exists for. See
-[decisions/20260806-cosmo-suite-slice1-adopt-by-measurement.md](../decisions/20260806-cosmo-suite-slice1-adopt-by-measurement.md).
+[decisions/20260806-cosmo-ecosystem-slice1-adopt-by-measurement.md](../decisions/20260806-cosmo-ecosystem-slice1-adopt-by-measurement.md).
 
 The corollary matters as much: **a workaround that stays local hits the next
 consumer.** Every divergence found in slice 1 went into the framework in `v0.4.0`,
@@ -75,7 +75,7 @@ both were found by reading the code, not by a red test.
 
 ### `ObjectStorageError` must be re-exported, never redefined
 
-The class lives in `cosmo_suite.object_storage_manager`. A local class of the same
+The class lives in `cosmo_ecosystem.object_storage_manager`. A local class of the same
 name in `error_handling.py` is a **different class**: every
 `except ObjectStorageError` silently stops catching and the exception falls through
 to the generic handler. `cosmonaut_app/error_handling.py` therefore imports it (a
@@ -90,7 +90,7 @@ yourself writing `class SomethingError(Exception)` and the framework raises a
 Flask's `send_from_directory` resolves a *relative* directory against
 `app.root_path` — the installed app package — not the CWD. The `.env` files ship
 `"./cosmonaut_app/work_dir"`, so an unresolved value means **every job file 404s**
-while nothing logs an error. `cosmo_suite.config` resolves it with `os.path.abspath`
+while nothing logs an error. `cosmo_ecosystem.config` resolves it with `os.path.abspath`
 since `v0.4.0`; before that the app did it locally.
 
 **When touching this: click a job picture.** No test covers it.
@@ -99,7 +99,7 @@ since `v0.4.0`; before that the app did it locally.
 
 ## Local port allocation
 
-The three stacks — cosmopolitan, cosmonaut, `cosmo-suite/examples/csv_profiler` —
+The three stacks — cosmopolitan, cosmonaut, `cosmo-ecosystem/examples/csv_profiler` —
 used to publish the same host ports, so **no two suites could run at once, in any
 combination**. Each repo now owns a disjoint block:
 
@@ -109,7 +109,7 @@ combination**. Each repo now owns a disjoint block:
 | **cosmonaut** | **8081** | **5433** | **6380** | **9010** | **9011** | **8011** |
 | csv_profiler | 8082 | 5434 | 6381 | 9020 | 9021 | — |
 
-**Canonical source:** `../cosmo-suite/docs/plan/local-port-allocation.md`. Do not
+**Canonical source:** `../cosmo-ecosystem/docs/plan/local-port-allocation.md`. Do not
 invent an allocation here — a second table is how the collision comes back, harder
 to find. Extend that one.
 
@@ -145,12 +145,12 @@ ports.**
   derived python names `DEBUG` and `PORT`. Details and the full list:
   [environment_variables.md](environment_variables.md).
 - **HTML ids**: whoever renders the component owns its id — framework pages take
-  theirs from `cosmo_suite.constants`, and so do the tests that locate them. Details:
+  theirs from `cosmo_ecosystem.constants`, and so do the tests that locate them. Details:
   [html_ids.md](html_ids.md).
 - **User-facing page prose**: the app owns it. The two framework pages are thin
   shims under `cosmonaut_app/pages/` whose only job is to be imported by Dash's page
   discovery (`register_page` must run after `Dash(...)`) and to carry the docstring
-  that `doc_generator` parses. The implementation lives in `cosmo_suite.pages.*`.
+  that `doc_generator` parses. The implementation lives in `cosmo_ecosystem.pages.*`.
 
 ---
 
@@ -159,10 +159,10 @@ ports.**
 Tracked in `docs/project-state.md`; kept here only as a pointer, so this file does
 not drift into a second changelog:
 
-- `cosmo_suite.pages.*` do not pass `wrapper_class` through to
+- `cosmo_ecosystem.pages.*` do not pass `wrapper_class` through to
   `page_container_column_layout`, so the app still keys its admin-page CSS on
   `#main-content-container` (see the comment in `assets/style.css`).
-- `cosmo_suite.layouts.toggle_navbar_collapse` is still registered at module import,
+- `cosmo_ecosystem.layouts.toggle_navbar_collapse` is still registered at module import,
   so importing a framework page adds one callback whose component this app does not
   mount. Inert — it never fires — but it belongs behind the same opt-in as the reset
   callbacks.

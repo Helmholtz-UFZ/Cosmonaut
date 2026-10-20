@@ -9,7 +9,7 @@ This test validates:
 
 import logging
 
-from cosmo_suite.constants import (
+from cosmo_ecosystem.constants import (
     ACTIVE_TASKS_TABLE_WORKER_MANAGEMENT_ID,
     KILL_MODAL_CONFIRM_BUTTON_WORKER_MANAGEMENT_ID,
     KILL_MODAL_WORKER_MANAGEMENT_ID,

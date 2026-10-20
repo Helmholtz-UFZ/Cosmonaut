@@ -6,7 +6,7 @@ from datetime import timedelta
 
 import gpxpy
 import qrcode
-from cosmo_suite.object_storage_manager import get_presigned_download_url
+from cosmo_ecosystem.object_storage_manager import get_presigned_download_url
 from pyproj import Transformer
 
 log = logging.getLogger(__name__)

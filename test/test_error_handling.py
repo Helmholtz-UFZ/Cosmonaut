@@ -10,8 +10,8 @@ from contextlib import contextmanager
 from unittest import mock
 
 import pytest
-from cosmo_suite.error_handling import error_responds_dict
-from cosmo_suite.object_storage_manager import ObjectStorageError as FrameworkError
+from cosmo_ecosystem.error_handling import error_responds_dict
+from cosmo_ecosystem.object_storage_manager import ObjectStorageError as FrameworkError
 
 from cosmonaut_app.error_handling import (
     ERROR_RESPONSES,
@@ -33,8 +33,8 @@ def _dash_stubbed():
     be a real serializable value rather than a MagicMock.
     """
     with (
-        mock.patch("cosmo_suite.error_handling.dash") as dash_mod,
-        mock.patch("cosmo_suite.error_handling.set_props"),
+        mock.patch("cosmo_ecosystem.error_handling.dash") as dash_mod,
+        mock.patch("cosmo_ecosystem.error_handling.set_props"),
     ):
         dash_mod.ctx.triggered = [{"prop_id": "x.n_clicks", "value": 1}]
         yield
@@ -65,7 +65,7 @@ def test_file_validation_error_stays_local_and_carries_its_message():
     Importing the framework class would blank the validation text in
     pages/data_upload.py and break the raise sites with a TypeError.
     """
-    from cosmo_suite.error_handling import FileValidationError as FrameworkFileError
+    from cosmo_ecosystem.error_handling import FileValidationError as FrameworkFileError
 
     assert FileValidationError is not FrameworkFileError
 

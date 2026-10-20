@@ -2,12 +2,12 @@
 
 Everything generic (broker/result URL, Redis socket timeouts, serialization,
 worker recycling, beat file location) comes from
-``cosmo_suite.celery_config.BaseCeleryConfig``. Only the domain routing, the beat
+``cosmo_ecosystem.celery_config.BaseCeleryConfig``. Only the domain routing, the beat
 schedule and the two overrides below are set here.
 """
 
 from celery.schedules import crontab
-from cosmo_suite.celery_config import BaseCeleryConfig
+from cosmo_ecosystem.celery_config import BaseCeleryConfig
 
 
 class CeleryConfig(BaseCeleryConfig):
@@ -24,10 +24,10 @@ class CeleryConfig(BaseCeleryConfig):
         "cosmonaut_app.tasks.routing_tasks.*": {"queue": "routing"},
         "cosmonaut_app.tasks.upload_tasks.*": {"queue": "upload"},
         "cosmonaut_app.tasks.maintenance_tasks.*": {"queue": "default"},
-        "cosmo_suite.tasks.test_tasks.*": {"queue": "test"},
+        "cosmo_ecosystem.tasks.test_tasks.*": {"queue": "test"},
     }
 
-    # No wall-clock ceiling on tasks. Redundant since cosmo-suite v0.4.0, which
+    # No wall-clock ceiling on tasks. Redundant since cosmo-ecosystem v0.4.0, which
     # made None the framework default after this app hit the former 65-minute
     # hard limit — kept explicit on purpose, so a future framework default cannot
     # silently reinstate one. The reason is domain-specific and only visible here:
@@ -39,7 +39,7 @@ class CeleryConfig(BaseCeleryConfig):
     task_time_limit = None
 
     # Celery Beat schedule - periodic tasks. Cosmonaut's cleanup, not the
-    # framework's: the framework task cleans up through cosmo_suite.db_manager,
+    # framework's: the framework task cleans up through cosmo_ecosystem.db_manager,
     # which this app does not use (db_manager.py is not part of slice 1).
     beat_schedule = {
         "daily-cleanup": {

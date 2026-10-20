@@ -19,7 +19,7 @@ problems, and monitoring application execution.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
-The page implementation is `cosmo_suite.pages.logs`, which registers itself under
+The page implementation is `cosmo_ecosystem.pages.logs`, which registers itself under
 the page key `pages.logs` on import. This module exists so Dash's `pages_folder`
 discovery imports it after `Dash(...)` is instantiated (`register_page` must run
 after app instantiation), and so the user documentation above stays app-owned —
@@ -28,17 +28,17 @@ after app instantiation), and so the user documentation above stays app-owned �
 Architecture (unchanged in the framework version): all filter components are
 State, never Input. Only three Input triggers — the auto-poll interval tick, the
 manual refresh button, and the live-mode switch. Its HTML ids come from
-`cosmo_suite.constants`.
+`cosmo_ecosystem.constants`.
 """
 
-import cosmo_suite.layouts
+import cosmo_ecosystem.layouts
 
 # Set BEFORE importing the page: page_container_column_layout reads this at
 # layout-build time, and pages/job_management.py builds its layout as a
 # module-level statement, so a value assigned afterwards would silently miss.
 # Assign the module attribute — `from … import default_wrapper_class` would bind
 # a copy of the value and configure nothing.
-# See cosmo-suite docs/conventions/framework_page_imports.md.
-cosmo_suite.layouts.default_wrapper_class = "no-map-page"
+# See cosmo-ecosystem docs/conventions/framework_page_imports.md.
+cosmo_ecosystem.layouts.default_wrapper_class = "no-map-page"
 
-import cosmo_suite.pages.logs  # noqa: E402,F401
+import cosmo_ecosystem.pages.logs  # noqa: E402,F401

@@ -66,7 +66,7 @@ import logging
 
 import dash
 import dash_bootstrap_components as dbc
-from cosmo_suite.object_storage_manager import save_files
+from cosmo_ecosystem.object_storage_manager import save_files
 from dash import (
     Input,
     Output,

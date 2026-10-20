@@ -1,7 +1,7 @@
 """Serve files from a directory.
 
 The generic routes — pictures and the work_dir zip — come from
-``cosmo_suite.files_route.serve_files``, which since v0.6.1 takes the app's own
+``cosmo_ecosystem.files_route.serve_files``, which since v0.6.1 takes the app's own
 job class. Only the GPX route stays here: it is the target of the QR code and the
 completion mail, and the framework has no counterpart for a domain file path.
 
@@ -12,8 +12,8 @@ the route it links to cannot drift apart — they are now defined in one place.
 import logging
 import os
 
-from cosmo_suite.files_route import create_download_button as create_download_button
-from cosmo_suite.files_route import serve_files as _serve_framework_files
+from cosmo_ecosystem.files_route import create_download_button as create_download_button
+from cosmo_ecosystem.files_route import serve_files as _serve_framework_files
 from flask import abort, send_file
 
 from cosmonaut_app.constants.general import GPX_FILE
