@@ -75,7 +75,7 @@ For specific implementation details, see:
 - [Logging](docs/conventions/logging.md) - Log levels, proper logger usage
 - [Linting](docs/conventions/linting.md) - Ruff version pinning, explicit rule set, noqa
 - [Callbacks](docs/conventions/callbacks.md) - Callback organization patterns
-- [Dash Leaflet](docs/conventions/dash_leaflet.md) - Map component gotchas
+- [Dash Leaflet](docs/conventions/dash_leaflet.md) - Map component gotchas, tile layers: Referer for OpenStreetMap, CSP `img-src` per tile host
 - [Deployment](docs/conventions/deployment.md) - Kubernetes/production gotchas (Gunicorn, HAProxy, resource limits)
 - [Environment Variables](docs/conventions/environment_variables.md) - Env files, config loading, secrets
 - [Registry & Project Rename](docs/conventions/registry_and_rename.md) - Where the registry path is hardcoded, and the rename procedure
