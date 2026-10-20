@@ -148,6 +148,12 @@ def _base_layers():
             dl.TileLayer(
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 attribution="© OpenStreetMap contributors",
+                # The cluster ingress sends `Referrer-Policy: same-origin`, which
+                # strips the Referer from tile requests; OSM's tile usage policy
+                # requires one and serves "Access blocked" tiles without it. Set
+                # per tile, origin only, so no job path reaches OSM. Guarded by
+                # test/test_osm_tile_referrer.py.
+                referrerPolicy="strict-origin-when-cross-origin",
             ),
             name="OpenStreetMap",
             checked=True,
