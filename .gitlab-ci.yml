@@ -373,7 +373,12 @@ release:
     # the release commit's own suite; cosmonaut has no such test and would
     # instead ship documentation quietly claiming the previous version.
     - 'echo "${VERSION}" > cosmonaut_app/assets/docs/doc_version.txt'
-    - "git add pyproject.toml CITATION.cff cosmonaut_app/assets/docs/doc_version.txt"
+    # uv.lock records the project's own version as well. Without this the
+    # release leaves it one version behind, and every local `uv run` afterwards
+    # rewrites that line. With unchanged dependencies, uv lock touches nothing else.
+    - "pip install --quiet uv"
+    - "uv lock"
+    - "git add pyproject.toml CITATION.cff cosmonaut_app/assets/docs/doc_version.txt uv.lock"
     - 'git commit -m "Release ${VERSION}"'
     - 'git tag -a "$VERSION" -m "Release ${VERSION}"'
     # Branch first, with ci.skip: the release commit itself needs no pipeline.
