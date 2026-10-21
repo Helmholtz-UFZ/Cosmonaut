@@ -2,20 +2,9 @@
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
+from test.help_functions_tests import job_row
 
-TEST_JOB_DATA = {
-    "job_id": "job12345678",
-    "submitted": True,
-    "email": "example@gmail.com",
-    "notified_end": False,
-    "stage": 3,
-    "status": "completed",
-    "version": "1.0",
-    "membership_upload": {"file_name": "test.csv"},
-    "predictor_upload": {"file_name": "test_predictors.csv"},
-    "epsg": 4326,
-    "config": {},
-}
+TEST_JOB_DATA = job_row("job12345678")
 
 
 def test_db_manager():
