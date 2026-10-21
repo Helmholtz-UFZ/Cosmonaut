@@ -6,12 +6,12 @@ import logging
 import math
 import os
 import uuid
-from datetime import date, timedelta
+from datetime import date
 
 import pandas as pd
 from cosmo_ecosystem.base_job import BaseJob
+from cosmo_ecosystem.job_retention import days_to_live, delete_job
 from cosmo_ecosystem.object_storage_manager import (
-    delete_directory_from_storage,
     get_files,
     save_files,
 )
@@ -29,11 +29,7 @@ from sensor_routing.full_pipeline_cli import (
 )
 
 from cosmonaut_app.background_job_manager import background_job_manager
-from cosmonaut_app.config import (
-    DAYS_DELETE_NOT_SUBMITTED,
-    DAYS_DELETE_SUBMITTED,
-    WEB_WORK_DIR,
-)
+from cosmonaut_app.config import WEB_WORK_DIR
 from cosmonaut_app.constants.general import (
     GPX_FILE,
     JOB_STATUS_COMPLETED,
@@ -343,12 +339,12 @@ class CosmonautJob(BaseJob):
         return position, zoom
 
     def delete(self):
-        """Delete the job from the database and object storage."""
-        log.debug(f"delete job {self.model.job_id}")
-        # delete job from database
-        DataBaseManager.delete_job(self.model.job_id)
-        # delete files from object storage
-        delete_directory_from_storage(self.model.job_id)
+        """Delete the job everywhere: remote prefix, local work dir and row.
+
+        Delegates to ``cosmo_ecosystem.job_retention.delete_job``, the same
+        deletion the nightly cleanup and the job manager use.
+        """
+        delete_job(self.model.job_id)
 
     def upload_membership(self, file_name, content, epsg_input, *, sync_files=True):
         """Upload and process membership CSV file."""
@@ -655,13 +651,12 @@ class CosmonautJob(BaseJob):
         return self.model.status
 
     def time_to_live(self) -> int:
-        """Return number of days until this job is deleted by cleanup."""
-        if self.model.submitted:
-            retention_days = DAYS_DELETE_SUBMITTED
-        else:
-            retention_days = DAYS_DELETE_NOT_SUBMITTED
-        deletion_date = self.model.start_date + timedelta(days=retention_days)
-        return (deletion_date - date.today()).days
+        """Return number of days until this job is deleted by cleanup.
+
+        The framework's expiry rule, so the number shown is the one the
+        cleanup applies.
+        """
+        return days_to_live(self.model.start_date, self.model.submitted)
 
     def get_completed_steps(self) -> list[str]:
         """Return step keys that are done, based on existing model state.

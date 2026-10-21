@@ -55,7 +55,7 @@ by [celery_config.py](../cosmonaut_app/celery_config.py):
 |--------|-------|------|
 | `upload_tasks.py` | `upload` | `process_upload_task` — download + project the OSM road network for the job's area |
 | `routing_tasks.py` | `routing` | `process_routing_job` — run sensor-routing, notify the user on completion |
-| `maintenance_tasks.py` | (default) | `cleanup_task` / `clean_up_jobs` — periodic cleanup of stale jobs |
+| `maintenance_tasks.py` | (default) | `cleanup_task` — periodic cleanup of logs and stale jobs (job cleanup is `cosmo_ecosystem.job_retention`) |
 
 Routing itself is delegated to the external **`sensor-routing`** library (all-pairs
 shortest paths + Ant Colony Optimization over global matrices — O(n²), globally coupled,

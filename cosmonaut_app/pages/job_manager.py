@@ -8,12 +8,13 @@ You can:
 - See job status at a glance with color coding (PENDING=orange, RUNNING=green,
   COMPLETED=blue, FAILED=red)
 - Select and delete individual jobs or multiple jobs at once
-- Trigger cleanup operations to remove old jobs automatically
+- Clean up: remove every unsubmitted job and every expired submitted job at once
 - Access individual job pages directly from the table by clicking Job ID
 
 The table uses color coding to quickly identify job statuses. You can select rows to
-perform bulk operations like deletion. Use the cleanup function to automatically remove
-jobs that exceed retention periods (2 days for unsubmitted, 60 days for submitted jobs).
+perform bulk operations like deletion. The "Clean" button removes all unsubmitted jobs
+immediately, and submitted jobs older than their retention period (60 days). Without it,
+the nightly cleanup removes unsubmitted jobs after 2 days.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
@@ -26,6 +27,7 @@ import re
 import dash
 import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
+from cosmo_ecosystem.job_retention import clean_up_jobs, delete_jobs
 from dash import Input, Output, State, callback, html
 
 from cosmonaut_app.constants.general import (
@@ -41,14 +43,12 @@ from cosmonaut_app.constants.html_ids import (
     LOADING_OVERLAY_MODAL_SHARED_ID,
     REFRESH_BUTTON_JOB_MANAGER_ID,
 )
-from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.layout import (
     build_url_step,
     create_header,
     page_container_column_layout,
 )
-from cosmonaut_app.tasks.maintenance_tasks import clean_up_jobs
 
 log = logging.getLogger(__name__)
 
@@ -287,7 +287,7 @@ def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows):
     This callback handles:
     - Refresh: Reload job data from database
     - Delete: Remove selected jobs
-    - Clean: Run cleanup task to remove old jobs
+    - Clean: Remove all unsubmitted jobs and expired submitted ones
 
     Parameters
     ----------
@@ -316,30 +316,25 @@ def manage_jobs(refresh_clicks, delete_clicks, clean_clicks, selected_rows):
 
     # Handle DELETE operation
     if DELETE_BUTTON_JOB_MANAGER_ID in triggered_ids and selected_rows:
-        log.info(f"Deleting {len(selected_rows)} selected jobs")
-
-        for row in selected_rows:
-            # Extract job_id from markdown link format: [job_id](url)
-            job_id = re.findall(r"\[(.*?)\]", row["job_id"])[0]
-            log.info(f"Deleting job: {job_id}")
-
-            try:
-                job = CosmonautJob(job_id=job_id, sync_files=False)
-                job.delete()
-                log.info(f"Successfully deleted job: {job_id}")
-            except Exception as e:
-                log.error(f"Failed to delete job {job_id}: {e}")
+        # Extract job_id from markdown link format: [job_id](url)
+        job_ids = [re.findall(r"\[(.*?)\]", row["job_id"])[0] for row in selected_rows]
+        log.info(f"Deleting jobs: {job_ids}")
+        # JobDeletionFailed is not caught: every other selected job is already
+        # deleted, and handle_error closes the loading overlay and shows the
+        # failed ids in the error modal.
+        delete_jobs(job_ids)
 
     # Handle CLEANUP operation
     elif CLEAN_UP_BUTTON_JOB_MANAGER_ID in triggered_ids:
-        log.info("Running cleanup task to remove old jobs")
+        log.info("Running cleanup to remove unsubmitted and expired jobs")
 
-        try:
-            # Call cleanup directly (blocking, but typically fast)
-            clean_up_jobs()
-            log.info("Cleanup task completed successfully")
-        except Exception as e:
-            log.error(f"Cleanup task failed: {e}")
+        # Called directly (blocking, but typically fast). Unsubmitted period 0,
+        # like the framework's job management page: Clean removes every
+        # unsubmitted job now, and submitted jobs past their retention period.
+        # JobCleanupFailed is not caught: the framework has already deleted every
+        # other job, and handle_error shows the failed ids in the error modal.
+        clean_up_jobs(days_delete_not_submitted=0)
+        log.info("Cleanup task completed successfully")
 
     # Fetch fresh job data from database
     jobs_dict = DataBaseManager.list_jobs()
