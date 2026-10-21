@@ -375,9 +375,12 @@ release:
     - 'echo "${VERSION}" > cosmonaut_app/assets/docs/doc_version.txt'
     # uv.lock records the project's own version as well. Without this the
     # release leaves it one version behind, and every local `uv run` afterwards
-    # rewrites that line. With unchanged dependencies, uv lock touches nothing else.
-    - "pip install --quiet uv"
-    - "uv lock"
+    # rewrites that line. Written directly, not via `uv lock`: locking re-resolves,
+    # which builds gdal from source for its metadata, and this image has no GDAL
+    # headers (release 0.3.12 failed on exactly that). The grep fails the job if
+    # the line was not found, so the lockfile cannot drift silently.
+    - 'sed -i "/^name = \"cosmonaut\"$/{n;s/^version = .*/version = \"${VERSION}\"/}" uv.lock'
+    - 'grep -A1 "^name = \"cosmonaut\"$" uv.lock | grep -qx "version = \"${VERSION}\"" || { echo "uv.lock: project version not updated"; exit 1; }'
     - "git add pyproject.toml CITATION.cff cosmonaut_app/assets/docs/doc_version.txt uv.lock"
     - 'git commit -m "Release ${VERSION}"'
     - 'git tag -a "$VERSION" -m "Release ${VERSION}"'
