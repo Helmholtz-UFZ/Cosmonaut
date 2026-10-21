@@ -48,6 +48,8 @@ Service requirements vary by test:
 | Test file | Services needed |
 |-----------|----------------|
 | `test_db_manager.py` | Postgres |
+| `test_maintenance_tasks.py` | Postgres, object storage |
+| `test_job_deletion.py` | Postgres, object storage |
 | `test_worker_management.py` | Redis, Celery worker |
 | `test_env.py` | None (reads env files only) |
 | `test_html_id_enforcement.py` | None (checks source code only) |

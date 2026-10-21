@@ -38,9 +38,10 @@ class CeleryConfig(BaseCeleryConfig):
     task_soft_time_limit = None
     task_time_limit = None
 
-    # Celery Beat schedule - periodic tasks. Cosmonaut's cleanup, not the
-    # framework's: the framework task cleans up through cosmo_ecosystem.db_manager,
-    # which this app does not use (db_manager.py is not part of slice 1).
+    # Celery Beat schedule - periodic tasks. Cosmonaut's cleanup task name, not
+    # the framework's: the task body runs the framework cleanup
+    # (cosmo_ecosystem.job_retention), but the name, route and schedule stay the
+    # app's own until the Celery wiring is unified.
     beat_schedule = {
         "daily-cleanup": {
             "task": "cosmonaut_app.tasks.maintenance_tasks.cleanup",

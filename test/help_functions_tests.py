@@ -1,6 +1,9 @@
+import datetime
 import time
 
 import pytest
+
+from cosmonaut_app.constants.general import JOB_STATUS_COMPLETED
 
 
 def check_all_errors(page):
@@ -62,3 +65,28 @@ def check_all_errors(page):
 
     if errors:
         pytest.fail("Errors detected:\n" + "\n".join(errors))
+
+
+def job_row(job_id, *, start_date=None, submitted=True):
+    """Return a complete ``jobs`` row for DataBaseManager.add_entry.
+
+    Args:
+        job_id: The row's job id.
+        start_date: Defaults to today. Never NULL: every real job has one, and
+            the cleanup reads it for every row in the table.
+        submitted: Whether the job counts as submitted for retention.
+    """
+    return {
+        "job_id": job_id,
+        "start_date": datetime.date.today() if start_date is None else start_date,
+        "submitted": submitted,
+        "email": "example@gmail.com",
+        "notified_end": False,
+        "stage": 3,
+        "status": JOB_STATUS_COMPLETED,
+        "version": "1.0",
+        "membership_upload": {"file_name": "test.csv"},
+        "predictor_upload": {"file_name": "test_predictors.csv"},
+        "epsg": 4326,
+        "config": {},
+    }
