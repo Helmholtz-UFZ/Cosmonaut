@@ -17,7 +17,7 @@ run each, save one, diff the other against it).
 Usage:
     # Saxony-scale RAM against the local wiktorn (Saxony extract):
     python test/fixtures/compare_osm_backends.py \
-        --membership ~/git/cache/sachsen/Saxony_..._membership_test.csv \
+        --membership ~/Documents/ufz/data/sachsen/Saxony_..._membership_test.csv \
         --overpass-url http://localhost:12345/api --epsg 25832
 
     # Fidelity diff of this run against a saved reference network:
