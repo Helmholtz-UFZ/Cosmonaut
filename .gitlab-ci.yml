@@ -34,6 +34,10 @@ variables:
   FLASK_DEBUG: "0"
   # Enable BuildKit for better Docker layer caching
   DOCKER_BUILDKIT: "1"
+  # Tag of the CI image the test jobs run in. main always uses `latest`; a branch
+  # whose changes touch the CI image inputs gets its own tag (set per job through
+  # rules:variables) so it cannot overwrite main's ci:latest.
+  CI_IMAGE_TAG: "latest"
 
 .docker_login: &docker_login
   - 'echo "${CI_REGISTRY_PASSWORD}" | docker login --username "$CI_REGISTRY_USER" --password-stdin "${CI_REGISTRY}"'
@@ -45,36 +49,52 @@ variables:
   tags:
     - "hifis"
 
-# Rebuilds the CI image only when the Dockerfile or Python deps change.
-# On main, always runs to keep the image current. On feature branches, skipped
-# unless ci.Dockerfile, pyproject.toml, or uv.lock changed — the existing
-# ci:latest from main is used by the test jobs instead.
+# Rebuilds the CI image only when its inputs change (ci.Dockerfile, pyproject.toml,
+# uv.lock) — on main and on branches alike; otherwise the test jobs reuse the
+# existing ci:latest.
+# main pushes the result as ci:latest. A branch pushes ci:<branch-slug> instead, and
+# that branch's test jobs pick it up via CI_IMAGE_TAG (see their rules), so a branch
+# never overwrites main's image. Branch changes are compared against main
+# (compare_to), otherwise a new branch would count every file as changed.
 # --build-arg BUILDKIT_INLINE_CACHE=1 embeds cache metadata in the pushed image
 # so future --cache-from runs get proper layer hits.
+.ci_image_changes: &ci_image_changes
+  paths:
+    - docker/ci.Dockerfile
+    - pyproject.toml
+    - uv.lock
+  compare_to: "refs/heads/main"
+
 build-ci-image:
   stage: "prepare"
   extends: ".base_before_build_script"
   before_script:
     - *docker_login
   script:
-    - docker pull "${CI_REGISTRY_IMAGE}/ci:latest" || true
+    - docker pull "${CI_REGISTRY_IMAGE}/ci:${CI_IMAGE_TAG}" || docker pull "${CI_REGISTRY_IMAGE}/ci:latest" || true
     - >
       docker build
+      --cache-from "${CI_REGISTRY_IMAGE}/ci:${CI_IMAGE_TAG}"
       --cache-from "${CI_REGISTRY_IMAGE}/ci:latest"
       --build-arg BUILDKIT_INLINE_CACHE=1
-      --tag "${CI_REGISTRY_IMAGE}/ci:latest"
+      --tag "${CI_REGISTRY_IMAGE}/ci:${CI_IMAGE_TAG}"
       -f docker/ci.Dockerfile .
-    - docker push "${CI_REGISTRY_IMAGE}/ci:latest"
+    - docker push "${CI_REGISTRY_IMAGE}/ci:${CI_IMAGE_TAG}"
   rules:
     # Nightly rebuild ships prod images from scratch — it doesn't use ci:latest,
     # so don't rebuild the CI image on the schedule.
     - if: "$CI_PIPELINE_SOURCE == 'schedule'"
       when: "never"
+    # main: no compare_to (it would diff main against itself); default tag `latest`.
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
-    - changes:
-        - docker/ci.Dockerfile
-        - pyproject.toml
-        - uv.lock
+      changes:
+        paths:
+          - docker/ci.Dockerfile
+          - pyproject.toml
+          - uv.lock
+    - changes: *ci_image_changes
+      variables:
+        CI_IMAGE_TAG: "$CI_COMMIT_REF_SLUG"
     - when: "never"
 
 # Ruff is a Rust binary — it never executes Python code, so GDAL and the full
@@ -102,12 +122,19 @@ linting:
 # Add new service-free test files to this list as they are created.
 test-unit:
   stage: "test"
-  image: "${CI_REGISTRY_IMAGE}/ci:latest"
+  image: "${CI_REGISTRY_IMAGE}/ci:${CI_IMAGE_TAG}"
   # Nightly rebuilds an existing tag's code in the CI image — these unit tests
   # don't exercise the freshly-built prod image, so they add nothing here. Skip
   # on the schedule (deps are pinned; this is the real protection).
   rules:
-    - if: "$CI_PIPELINE_SOURCE != 'schedule'"
+    - if: "$CI_PIPELINE_SOURCE == 'schedule'"
+      when: "never"
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    # Branch rebuilt the CI image: use its own tag (see build-ci-image).
+    - changes: *ci_image_changes
+      variables:
+        CI_IMAGE_TAG: "$CI_COMMIT_REF_SLUG"
+    - when: "on_success"
   before_script:
     - "cp env_test .env"
     - "mkdir -p test/artifacts"
@@ -135,9 +162,13 @@ test-unit:
 # Unit tests catch regressions there; integration tests gate merges.
 test-integration:
   stage: "test"
-  image: "${CI_REGISTRY_IMAGE}/ci:latest"
+  image: "${CI_REGISTRY_IMAGE}/ci:${CI_IMAGE_TAG}"
   rules:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'schedule'"
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+      changes: *ci_image_changes
+      variables:
+        CI_IMAGE_TAG: "$CI_COMMIT_REF_SLUG"
     - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
     - when: "never"
   services:
@@ -218,9 +249,21 @@ build-latest:
   before_script:
     - *docker_login
   script:
-    - "docker build -t ${CI_REGISTRY_IMAGE}/frontend:latest -f docker/prod.Dockerfile ."
+    # Layer cache from the previous :latest (inline cache metadata, see build-ci-image).
+    # Release builds (build-release, build-latest-tag) deliberately do NOT use this.
+    - "docker pull ${CI_REGISTRY_IMAGE}/frontend:latest || true"
+    - "docker pull ${CI_REGISTRY_IMAGE}/worker:latest || true"
+    - >
+      docker build
+      --cache-from ${CI_REGISTRY_IMAGE}/frontend:latest
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      -t ${CI_REGISTRY_IMAGE}/frontend:latest -f docker/prod.Dockerfile .
     - "docker push --all-tags ${CI_REGISTRY_IMAGE}/frontend"
-    - "docker build -t ${CI_REGISTRY_IMAGE}/worker:latest -f docker/worker.Dockerfile ."
+    - >
+      docker build
+      --cache-from ${CI_REGISTRY_IMAGE}/worker:latest
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      -t ${CI_REGISTRY_IMAGE}/worker:latest -f docker/worker.Dockerfile .
     # Worker-image smoke test, run against the image just built, before it is
     # pushed. It runs the CMD's setup_remote() step only, derived from the image's
     # own CMD rather than copied — a copy would stay green even after the CMD
@@ -253,9 +296,10 @@ build-release:
     - *docker_login
     - "apk update && apk add --no-cache jq yq"
   script:
-    - "docker build -t ${CI_REGISTRY_IMAGE}/frontend:${CI_COMMIT_TAG} -f docker/prod.Dockerfile ."
+    # --pull --no-cache: releases are built fresh so base-image/OS security updates land at every tag.
+    - "docker build --pull --no-cache -t ${CI_REGISTRY_IMAGE}/frontend:${CI_COMMIT_TAG} -f docker/prod.Dockerfile ."
     - "docker push --all-tags ${CI_REGISTRY_IMAGE}/frontend"
-    - "docker build -t ${CI_REGISTRY_IMAGE}/worker:${CI_COMMIT_TAG} -f docker/worker.Dockerfile ."
+    - "docker build --pull --no-cache -t ${CI_REGISTRY_IMAGE}/worker:${CI_COMMIT_TAG} -f docker/worker.Dockerfile ."
     - "docker push --all-tags ${CI_REGISTRY_IMAGE}/worker"
     - yq -i ".frontend.image.tag = \"${CI_COMMIT_TAG}\"" deployment/ufz/prod/values.yaml
     - yq -i ".worker.image.tag = \"${CI_COMMIT_TAG}\"" deployment/ufz/prod/values.yaml
@@ -282,9 +326,10 @@ build-latest-tag:
   script:
     - "GIT_LATEST_TAG=$(git describe --tags --abbrev=0)"
     - "calver=$(date +'%Y.%m.%d')"
-    - 'docker build -t "${CI_REGISTRY_IMAGE}/frontend:${GIT_LATEST_TAG}-${calver}" -f docker/prod.Dockerfile .'
+    # --pull --no-cache: the nightly rebuild exists to pick up security updates, so never reuse layers.
+    - 'docker build --pull --no-cache -t "${CI_REGISTRY_IMAGE}/frontend:${GIT_LATEST_TAG}-${calver}" -f docker/prod.Dockerfile .'
     - 'docker push --all-tags "${CI_REGISTRY_IMAGE}/frontend"'
-    - 'docker build -t "${CI_REGISTRY_IMAGE}/worker:${GIT_LATEST_TAG}-${calver}" -f docker/worker.Dockerfile .'
+    - 'docker build --pull --no-cache -t "${CI_REGISTRY_IMAGE}/worker:${GIT_LATEST_TAG}-${calver}" -f docker/worker.Dockerfile .'
     - 'docker push --all-tags "${CI_REGISTRY_IMAGE}/worker"'
     - yq -i ".frontend.image.tag = \"${GIT_LATEST_TAG}-${calver}\"" deployment/ufz/prod/values.yaml
     - yq -i ".worker.image.tag = \"${GIT_LATEST_TAG}-${calver}\"" deployment/ufz/prod/values.yaml
