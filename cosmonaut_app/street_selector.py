@@ -211,11 +211,11 @@ class StreetSelector:
             else:
                 self._save_edit_file(fc, path=self.transformed_path)
         self._save_edits()
-        # Database must be current but skip rclone sync — interactive edits
-        # (tag changes, road removals, keep-largest) happen frequently and the
-        # rclone round-trip blocks the callback for seconds/minutes.  Files are
-        # saved locally; object storage is synced when the routing job is submitted.
-        self.job.save(sync_files=False)
+        # Interactive edits (tag changes, road removals, keep-largest) happen
+        # frequently and an rclone round-trip would block the callback, so the
+        # files stay local until the routing job is submitted. The edits change
+        # no job column, hence no row write. Moving the edits' intent into the
+        # row is ticket 06.
 
         log.info(
             "Applied edits: %d features, tags=%d, track_grades=%d, removed=%d, "

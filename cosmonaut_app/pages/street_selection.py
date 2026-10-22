@@ -73,6 +73,7 @@ processing.
 """
 
 import logging
+import os
 from typing import Any
 
 import dash
@@ -93,6 +94,7 @@ from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.constants.general import (
     JOB_STATUS_PENDING,
+    OSM_DATA_DOWNLOAD_FILE,
     OSM_TAGS_MAPPING,
     TRACK_GRADES,
     UNGRADED_TRACK_GRADE,
@@ -224,7 +226,12 @@ def layout(job_id: str):
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
     job.model.stage = max(job.model.stage, 2)
-    job.save(sync_files=False)
+    job.update_columns("stage")
+    # Fetch the OSM download only when this pod lacks it: an unconditional pull
+    # would put the remote copies over street edits that are still local-only
+    # (street edits are not yet persisted by job_persistence).
+    if not os.path.exists(os.path.join(job.working_dir, OSM_DATA_DOWNLOAD_FILE)):
+        job.pull_files()
 
     completed_steps = job.get_completed_steps()
 
@@ -593,7 +600,7 @@ def poll_street_processing_status(n_intervals, pathname):
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     sp_status = job.get_street_processing_status()
 
     if sp_status == "COMPLETED":
@@ -647,7 +654,7 @@ def remove_selected(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     if job.get_status() != JOB_STATUS_PENDING:
         raise PreventUpdate
 
@@ -686,7 +693,7 @@ def keep_largest_subnetwork(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     if job.get_status() != JOB_STATUS_PENDING:
         raise PreventUpdate
 
@@ -742,7 +749,7 @@ def reset_edits(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     sel = StreetSelector(job)
     sel.reset()
     is_active = job.get_status() == JOB_STATUS_PENDING
@@ -850,7 +857,7 @@ def update_tags_dropdown(
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     if job.get_status() != JOB_STATUS_PENDING:
         # The checklist is only soft-disabled via CSS (pe-none) for non-active
         # jobs — keyboard toggling still fires this callback, so guard here.
@@ -886,7 +893,7 @@ def update_track_grades(
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     if job.get_status() != JOB_STATUS_PENDING:
         # Same CSS-only soft-disable as the road-type checklist — guard here.
         raise PreventUpdate
@@ -932,7 +939,7 @@ def restore_single_road(n_clicks_list, pathname, version):
         raise PreventUpdate
 
     road_id = ctx.triggered_id["index"]
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     sel = StreetSelector(job)
     sel.restore_road(road_id)
 
@@ -964,7 +971,7 @@ def clear_all_removed_roads(n_clicks, pathname, version):
     if not n_clicks or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     sel = StreetSelector(job)
     sel.clear_removed_roads()
 

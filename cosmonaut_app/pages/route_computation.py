@@ -121,7 +121,7 @@ def layout(job_id):
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     job.model.stage = max(job.model.stage, 4)
-    job.save(sync_files=False)
+    job.update_columns("stage")
 
     # Status badge
     status_badge = create_status_badge(status, job_id)
@@ -381,7 +381,7 @@ def update_status(n_intervals, trigger, job_id):
 
     Also controls button visibility based on status changes.
     """
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     status = job.get_status()
 
     color_map = {
@@ -424,7 +424,7 @@ def update_celery_info(trigger, job_id):
     # Only execute on initial load or explicit celery check trigger
     log.info(f"Updating Celery info for job {job_id}")
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
 
     # Get Celery worker information
 
@@ -506,7 +506,7 @@ def start_computation(n_clicks, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     current_status = job.get_status()
 
     # Prevent duplicate submission if already running
@@ -542,7 +542,7 @@ def cancel_computation(n_clicks, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     current_status = job.get_status()
 
     # Only cancel if actually running
@@ -580,7 +580,7 @@ def restart_computation(n_clicks, job_id):
     if n_clicks is None:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     current_status = job.get_status()
 
     # If currently running, don't restart (user should cancel first)

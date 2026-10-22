@@ -101,8 +101,9 @@ def layout(job_id):
     job = CosmonautJob(job_id=job_id)
     log.info(f"Route & Download layout called with job_id={job_id}")
     job.model.stage = max(job.model.stage, 5)
-    job.save(sync_files=False)
+    job.update_columns("stage")
 
+    job.pull_files()
     job.create_qr_code_routing()
 
     # Construct full download URL
@@ -206,7 +207,8 @@ def toggle_route_direction(reversed_value, job_id):
     if reversed_value is None or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
+    job.pull_files()
     # No-op when unchanged: page re-renders redeliver the current value.
     if job.is_route_reversed() == reversed_value:
         raise PreventUpdate

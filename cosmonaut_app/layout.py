@@ -941,7 +941,7 @@ def register_map_callbacks(app):
 
         job_id = parts[2]
         try:
-            job = CosmonautJob(job_id=job_id, sync_files=False)
+            job = CosmonautJob(job_id=job_id)
         except JobNotFound:
             log.info(f"Job {job_id} not found, returning empty")
             return empty_result
@@ -999,7 +999,7 @@ def register_map_callbacks(app):
             return empty_fc
 
         try:
-            job = CosmonautJob(job_id=job_id, sync_files=False)
+            job = CosmonautJob(job_id=job_id)
         except JobNotFound:
             return empty_fc
 

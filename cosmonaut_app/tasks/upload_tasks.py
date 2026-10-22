@@ -45,7 +45,8 @@ def process_upload_task(self, job_id, epsg_input):
     """
     log.info(f"Starting upload processing task for job_id={job_id}")
 
-    job = CosmonautJob(job_id=job_id, overwrite=True)
+    job = CosmonautJob(job_id=job_id)
+    job.pull_files()
 
     try:
         membership_path = os.path.join(job.working_dir, MEMBERSHIP_FILENAME)
