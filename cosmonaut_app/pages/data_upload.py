@@ -546,6 +546,11 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
     )
     plot.generate_plots()
     log.debug("Classification plots generated.")
+    # Write-through: the raster is an output of this request (a GDAL warp of the
+    # whole CSV), not a file another pod can recompute cheaply, and the map pulls
+    # it from the remote prefix (ADR 0001). The row is saved as it stands; the
+    # street-processing state follows below via update_columns.
+    job.save()
 
     tile_url = get_tile_url(job_id, job.working_dir)
 
@@ -554,7 +559,7 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         job.model.membership_upload["street_processing"] = task_id
     else:
         job.model.membership_upload["street_processing"] = "FAILED"
-    # Row only — the membership CSV went to object storage in upload_membership,
+    # Row only — the membership CSV and raster went to object storage above,
     # and the worker's save() uploads the rest when it finishes
     job.update_columns("membership_upload")
 

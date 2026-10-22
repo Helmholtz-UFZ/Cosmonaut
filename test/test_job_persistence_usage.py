@@ -28,6 +28,7 @@ from sensor_routing.constants import MEMBERSHIP_FILENAME, PREDICTOR_FILENAME
 from cosmonaut_app.constants.general import (
     GPX_FILE,
     JOB_STATUS_RUNNING,
+    MEMBERSHIP_TIF,
     ROUTE_OPTIONS_FILE,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
@@ -229,3 +230,26 @@ def test_a_file_route_answers_404_for_an_unknown_job(path):
     response = app.server.test_client().get(path.format("nosuchjob"))
 
     assert response.status_code == 404
+
+
+def test_the_membership_raster_is_in_object_storage_after_the_upload(
+    job, membership_file_path
+):
+    """The raster is an output of the web request, so no other pod can recompute it."""
+    dash.Dash(__name__, use_pages=True, pages_folder="")
+    handle = importlib.import_module(
+        "cosmonaut_app.pages.data_upload"
+    )._handle_membership_upload
+
+    with mock.patch(
+        "cosmonaut_app.pages.data_upload.background_job_manager.submit_upload_job",
+        return_value=("task", False),
+    ):
+        handle(
+            _data_url(membership_file_path),
+            "memberships.csv",
+            job.model.job_id,
+            25832,
+        )
+
+    assert MEMBERSHIP_TIF in _remote_files(job.model.job_id)
