@@ -84,7 +84,7 @@ open test/artifacts/<test-dir>/page.html
 | `PostgreSQL not available` | DB container failed health check | `docker logs postgres_cosmonaut_test` |
 | `Object storage did not start` / `Object storage (S3) connectivity check failed` | S3 server unhealthy or unreachable | `docker logs object_storage_cosmonaut_test` |
 | `Redis not available` | Redis failed health check | `docker logs redis_cosmonaut_test` |
-| Port already in use | Leftover Docker containers or another process on 5433/9010/6380 | 1. `docker compose down` in the current project first. 2. If persists, tell the user which port is blocked — a sibling project (cosmopolitan, etc.) may be running in parallel and only the user knows which is safe to stop. |
+| Port already in use | The dev stack is up (test and dev stacks share host ports), leftover test containers, or another process on 5433/9010/6380 | 1. Stop the dev stack first. 2. `docker compose down` in the current project. 3. If it persists, tell the user which port is blocked — a sibling project (cosmopolitan, etc.) may be running in parallel and only the user knows which is safe to stop. |
 | Docker not running | Docker daemon not started | `sudo systemctl start docker` |
 
 ---

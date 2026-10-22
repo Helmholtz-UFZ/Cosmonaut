@@ -29,6 +29,10 @@ to preserve them across runs).
 The dev stack (`postgres_cosmonaut` etc.) is never touched. Do not add `docker stop/rm`
 by name to the script.
 
+**Test and dev stacks still share host ports.** Separate names keep the containers
+apart, but both stacks publish the same host ports. A test run while the dev stack is
+up fails with "port already in use": stop the dev stack first.
+
 ## Code Rules
 
 - All tests go in `test/` (flat directory, no subdirectories)
