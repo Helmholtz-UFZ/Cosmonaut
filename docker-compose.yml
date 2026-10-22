@@ -79,7 +79,8 @@ services:
       retries: 15
 
   tileserver:
-    image: ghcr.io/developmentseed/titiler:latest
+    # Pinned to the version prod runs (cosmohelm appVersion); plain {z}/{x}/{y} works on 0.25.0 and 2.x.
+    image: ghcr.io/developmentseed/titiler:0.25.0
     container_name: cosmonaut-tileserver
     platform: linux/amd64
     ports:
