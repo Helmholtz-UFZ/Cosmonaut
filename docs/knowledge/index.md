@@ -14,7 +14,7 @@ Durable ideas used across the codebase.
 
 - [cosmonaut-job](concepts/cosmonaut-job.md) — The `CosmonautJob` state object: the two-tier
   persistence model (Postgres JSONB + object storage), `stage`/`status`/`street_processing` semantics,
-  and the `sync_files`/`overwrite` web-pod-vs-worker-pod rules.
+  and which persistence calls cost rclone (`pull_files`, `update_columns`, `save`).
 
 ## Systems
 

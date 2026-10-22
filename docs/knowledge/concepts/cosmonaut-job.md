@@ -21,22 +21,22 @@ coherent:
    routing parameter on the sensor-routing side needs no schema change here.
 2. **Files → object storage.** Each job has a `working_dir` at `WEB_WORK_DIR/<job_id>` holding the uploaded
    CSVs, the OSM GeoJSON files, `parameters.json`, logs, the route solution, GPX and QR code. `save()`
-   syncs this directory to object storage via rclone (`save_files`); `load()` pulls it back (`get_files`).
+   uploads this directory to object storage via rclone; `pull_files()` brings it back.
 
-## `sync_files` and `overwrite` — the web-vs-worker footgun
+## Persistence calls — what costs rclone
 
-Both `__init__`/`load` and `save` take keyword-only flags that control the (slow) rclone round-trip.
-Getting these wrong either loses recent edits or wastes seconds per callback:
+Persistence is the framework's `cosmo_ecosystem.job_persistence` (remote prefix authoritative, work dir a
+cache; see the framework's ADR 0001). `CosmonautJob` only maps its model to a row dict:
 
-- **`sync_files=False` on load** (Dash callbacks, web pod): local files are already current, so skip
-  the download. Pulling from object storage here would be slow *and* could overwrite recent local edits with
-  stale remote files.
-- **`overwrite=True` on load** (worker pods): force a clean copy from object storage (`rclone --checksum`).
-  The worker starts cold and must get exactly what the web pod last saved — e.g.
-  `CosmonautJob(job_id=job_id, overwrite=True)` in both [routing_tasks.py](../../../cosmonaut_app/tasks/routing_tasks.py)
-  and [upload_tasks.py](../../../cosmonaut_app/tasks/upload_tasks.py).
-- **`sync_files=False` on save**: skip the upload when several saves happen in quick succession and
-  only the last needs to sync (e.g. delete → upload → save would otherwise trigger 3+ rclone syncs).
+- **`CosmonautJob(job_id)`** reads the row only: no rclone. Polls and Dash callbacks use it as is.
+- **`job.pull_files()`** makes the work dir current with object storage (`rclone --checksum`, never deletes
+  local files). Call it where files are read: worker tasks, the Route & Download page, the file routes.
+- **`job.update_columns("stage", ...)`** writes named model fields to the row. No storage access. Status
+  and stage bumps use it.
+- **`job.save()`** uploads the work dir, then writes the whole row. Input changes (uploads, route
+  direction) use it so no edit exists only on local disk.
+- **Deleting a job file** goes through `job_persistence.delete_files`, which removes it locally and
+  remotely at once; a later upload deletes nothing remote.
 
 ## Stage, status, and the two progress trackers
 
@@ -64,13 +64,13 @@ files and plots, and resets `membership_upload`. `time_to_live()` computes days-
 
 ## Do / Don't
 
-- **Do** pass `sync_files=False` when loading a job inside a web (Dash) callback.
-- **Do** load with `overwrite=True` inside Celery tasks.
+- **Do** call `pull_files()` in Celery tasks and where a page or route reads job files.
+- **Do** use `update_columns` for status and stage changes; `save()` is for file changes.
 - **Don't** assume `street_processing` is a status string — it may be a Celery task ID.
 - **Don't** add a field to `JobModel` expecting it in the `config` JSONB (or vice-versa): the split
   is by membership in `FullPipelineConfig.model_fields`, not by where you declare it.
-- **Don't** write to `working_dir` and forget to `save()` — unsynced files never reach object storage and are
-  lost when the stateless web pod restarts.
+- **Don't** write to `working_dir` and forget to `save()` — files not uploaded never reach object storage and
+  are lost when the stateless web pod restarts. (Street edits are the known exception until ticket 06.)
 
 ## Related links
 

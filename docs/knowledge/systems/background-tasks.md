@@ -36,11 +36,11 @@ Task **registration** lives in `celery_app.py` (the worker entry point), kept se
 `BackgroundJobManager.submit_routing_job()` / `submit_upload_job()` call `app.send_task(name, args=[job_id, …], queue=…)`
 with a retry policy, and stash `task_name:<id>` in Redis (24 h TTL) so a later revoked-task lookup can
 recover the name. They return `(task_id, failed)`; the caller stores `task_id` on the job. The worker
-**re-loads the job by id with `overwrite=True`** — it never receives the job object over the wire, only
-the id, and pulls a clean copy from object storage (see [cosmonaut-job](../concepts/cosmonaut-job.md)).
+**re-loads the job by id and calls `pull_files()`** — it never receives the job object over the wire, only
+the id, and pulls a current copy from object storage (see [cosmonaut-job](../concepts/cosmonaut-job.md)).
 
 The canonical submit path is `CosmonautJob.submit()`: set `status=RUNNING`, `save()` (so the worker
-sees current files + `parameters.json`), enqueue, then store `celery_task_id` with `sync_files=False`.
+sees current files + `parameters.json`), enqueue, then store `celery_task_id` with `update_columns`.
 
 ## Status flows back lazily (no callbacks from the worker)
 
@@ -67,7 +67,7 @@ sync is the fallback for the window before the task's own write lands or when a 
 
 ## Do / Don't
 
-- **Do** pass only the `job_id` to a task and re-load with `overwrite=True` inside it.
+- **Do** pass only the `job_id` to a task and re-load and `pull_files()` inside it.
 - **Do** `save()` before enqueuing so the worker's object storage pull is current.
 - **Don't** expect the worker to update the UI directly — the web side syncs status lazily via the job.
 - **Don't** pass user input into task args that become object-storage keys; derive keys server-side from
@@ -79,7 +79,7 @@ sync is the fallback for the window before the task's own write lands or when a 
   [celery_config.py](../../../cosmonaut_app/celery_config.py),
   [celery_app.py](../../../cosmonaut_app/celery_app.py),
   [tasks/](../../../cosmonaut_app/tasks/)
-- Concept: [cosmonaut-job](../concepts/cosmonaut-job.md) (`submit()`, status sync, `overwrite` loads)
+- Concept: [cosmonaut-job](../concepts/cosmonaut-job.md) (`submit()`, status sync, `pull_files`)
 - Systems: [osm-backend](osm-backend.md) (`upload` queue work),
   [sensor-routing-integration](sensor-routing-integration.md) (`routing` queue work)
 - Overview: [architecture.md](../../architecture.md)
