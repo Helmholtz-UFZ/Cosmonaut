@@ -15,9 +15,11 @@ from cosmo_ecosystem import job_persistence
 from sensor_routing.constants import MEMBERSHIP_FILENAME
 
 from cosmonaut_app.config import MAINTAINER_EMAIL
+from cosmonaut_app.constants.general import OSM_DATA_DOWNLOAD_FILE
 from cosmonaut_app.cosmonaut_job import CosmonautJob, _transform_csv
 from cosmonaut_app.email_service import send_mail
 from cosmonaut_app.osm import OsmDownloader
+from cosmonaut_app.street_selector import file_sha256
 
 log = logging.getLogger(__name__)
 
@@ -57,6 +59,11 @@ def process_upload_task(self, job_id, epsg_input):
         osm.run_osm_query(job.working_dir)
         log.info(f"OSM roads queried and saved for job {job_id}")
 
+        # Once per download: the identity street edits and derived files are
+        # checked against (street_selector).
+        job.model.membership_upload["download_sha256"] = file_sha256(
+            os.path.join(job.working_dir, OSM_DATA_DOWNLOAD_FILE)
+        )
         job.model.membership_upload["street_processing"] = "COMPLETED"
         job.save()
 

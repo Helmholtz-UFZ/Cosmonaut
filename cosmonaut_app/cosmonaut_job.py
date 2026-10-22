@@ -43,7 +43,7 @@ from cosmonaut_app.constants.general import (
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.navigation_routing import RouteCreator
-from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel
+from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel, StreetEdits
 
 log = logging.getLogger(__name__)
 
@@ -203,6 +203,11 @@ class CosmonautJob(BaseJob):
         # rotated out (retention ≤ DAYS_DELETE_SUBMITTED).
         if "street_processing" not in self.model.membership_upload:
             self.model.membership_upload["street_processing"] = "PENDING"
+        # Backfill for jobs whose download predates its recorded checksum;
+        # street_selector adopts the stored download's checksum on first use.
+        # Removable on the same terms as the backfill above.
+        if "download_sha256" not in self.model.membership_upload:
+            self.model.membership_upload["download_sha256"] = None
 
         # The path only: the dir may be absent or stale on this pod.
         self.working_dir = job_persistence.local_dir(job_id)
@@ -392,6 +397,8 @@ class CosmonautJob(BaseJob):
             "zoom": zoom,
             "bounds": bounds,
             "street_processing": "PENDING",
+            # The upload worker records the new download's checksum.
+            "download_sha256": None,
         }
         self.save()
         log.debug("Finished uploading and processing membership file")
@@ -512,8 +519,10 @@ class CosmonautJob(BaseJob):
         self.model.membership_upload = default_membership_upload.copy()
         default_predictor_upload = JobModel.model_fields["predictor_upload"].default
         self.model.predictor_upload = default_predictor_upload.copy()
-        # The street edits refer to the deleted network's roads.
-        self.model.street_edits = None
+        # The street edits refer to the deleted network's roads. Explicit
+        # defaults, not NULL: a legacy street_edits.json left on another pod's
+        # disk is adopted only into a NULL column, so it can never come back.
+        self.model.street_edits = StreetEdits()
 
         self.update_columns("membership_upload", "predictor_upload", "street_edits")
 

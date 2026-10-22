@@ -19,10 +19,12 @@ from typing import Annotated, Any
 
 from cosmo_ecosystem.pydantic_models import BaseJobConfig
 from email_validator import EmailNotValidError, validate_email
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, BaseModel, Field
 from pyproj import CRS
 from pyproj.exceptions import CRSError
 from sensor_routing.full_pipeline_cli import FullPipelineConfig
+
+from cosmonaut_app.constants.general import DEFAULT_TRACK_GRADES, OSM_TAGS_MAPPING
 
 log = logging.getLogger(__name__)
 
@@ -59,6 +61,24 @@ def check_email(email: str) -> str:
         raise ValueError(f"Invalid email: {e}")
 
 
+class StreetEdits(BaseModel):
+    """A job's street-selection intent; the defaults are an unedited network.
+
+    The edited network is derived from the OSM download and this intent
+    (``street_selector``).
+    """
+
+    removed_roads: list[int] = []
+    selected_road_tags: list[str] = Field(
+        default_factory=lambda: list(OSM_TAGS_MAPPING)
+    )
+    # Allowed ``tracktype`` grades for highway=track, plus the ungraded bucket.
+    selected_track_grades: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_TRACK_GRADES)
+    )
+    keep_largest: bool = False
+
+
 class UserModel(BaseJobConfig, FullPipelineConfig):
     """Pydantic model for user input.
 
@@ -86,6 +106,9 @@ class UserModel(BaseJobConfig, FullPipelineConfig):
                 "center": [51.70, 11.20],
                 "zoom": 10,
                 "street_processing": "PENDING",
+                # sha256 of osm_data_download.geojson, recorded by the upload
+                # worker: the identity of the network street edits apply to.
+                "download_sha256": None,
             },
             description="Upload a file with the membership data",
             title="Membership upload",
@@ -124,7 +147,7 @@ class JobModel(UserModel):
     version: str = "0.1.5"
     celery_task_id: str | None = None
     start_date: date | None = None
-    # Street-selection intent (removed_roads, selected_road_tags,
-    # selected_track_grades, keep_largest), owned by street_selector.
-    # None until the first edit: the defaults apply.
-    street_edits: dict[str, Any] | None = None
+    # Street-selection intent, owned by street_selector. None (a NULL column)
+    # until the first edit: the defaults apply, and a legacy street_edits.json
+    # may still be adopted.
+    street_edits: StreetEdits | None = None

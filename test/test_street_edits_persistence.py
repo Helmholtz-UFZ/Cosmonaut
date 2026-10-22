@@ -6,6 +6,8 @@ Postgres and object storage. Outcomes only: rclone and row-write counts, the
 features in the files, what another pod sees.
 """
 
+import contextlib
+import hashlib
 import importlib
 import json
 import os
@@ -105,19 +107,40 @@ def street_selection_layout():
 def job():
     """Yield a job whose OSM download is stored and street processing done."""
     job = CosmonautJob()
-    job.model.membership_upload["street_processing"] = "COMPLETED"
-    _write_json(
-        job,
-        OSM_DATA_DOWNLOAD_FILE,
-        {"type": "FeatureCollection", "features": [_road(i) for i in _ROAD_IDS]},
-    )
-    job.save()
+    _store_download(job, _ROAD_IDS)
     yield job
     job_id = job.model.job_id
     delete_directory_from_storage(job_id)
     shutil.rmtree(JOB_WORK_DIR_TEMPLATE.format(job_id=job_id), ignore_errors=True)
     if DataBaseManager.check_existence(job_id):
         DataBaseManager.delete_job(job_id)
+
+
+def _store_download(job, road_ids):
+    """Store a new OSM download of road_ids, as the upload worker does."""
+    job_persistence.work_dir(job.job_id)
+    _write_json(
+        job,
+        OSM_DATA_DOWNLOAD_FILE,
+        {"type": "FeatureCollection", "features": [_road(i) for i in road_ids]},
+    )
+    with open(os.path.join(job.working_dir, OSM_DATA_DOWNLOAD_FILE), "rb") as f:
+        checksum = hashlib.sha256(f.read()).hexdigest()
+    job.model.membership_upload["street_processing"] = "COMPLETED"
+    job.model.membership_upload["download_sha256"] = checksum
+    job.save()
+
+
+@contextlib.contextmanager
+def _another_pod_meanwhile(job):
+    """Act as a pod with its own disk; this pod's work dir stays as it was."""
+    parked = job.working_dir + ".parked"
+    os.rename(job.working_dir, parked)
+    try:
+        yield CosmonautJob(job_id=job.model.job_id)
+    finally:
+        shutil.rmtree(job.working_dir, ignore_errors=True)
+        os.rename(parked, job.working_dir)
 
 
 def _write_json(job, name, data):
@@ -179,9 +202,11 @@ def test_opening_street_selection_recomputes_a_stale_derived_file(
 ):
     StreetSelector(CosmonautJob(job_id=job.model.job_id)).remove_roads([2])
     # Another pod restores road 2 and removes road 3: only the row changes here.
-    intent = {**CosmonautJob(job_id=job.model.job_id).model.street_edits}
-    intent["removed_roads"] = [3]
-    job_persistence.update_columns(job.model.job_id, {"street_edits": intent})
+    intent = CosmonautJob(job_id=job.model.job_id).model.street_edits
+    intent.removed_roads = [3]
+    job_persistence.update_columns(
+        job.model.job_id, {"street_edits": intent.model_dump(mode="json")}
+    )
 
     street_selection_layout(job.model.job_id)
 
@@ -237,3 +262,36 @@ def test_deleting_the_membership_forgets_the_street_edits(job):
     remote = _remote_files(job.model.job_id)
     assert OSM_DATA_EDITED_FILE not in remote
     assert STREET_DERIVED_HASHES_FILE not in remote
+
+
+def test_an_edited_network_built_from_another_download_is_recomputed(
+    job, street_selection_layout
+):
+    """Same intent, new download: the old derived file must not count as current."""
+    StreetSelector(CosmonautJob(job_id=job.model.job_id)).remove_roads([2])
+    with _another_pod_meanwhile(job) as other:
+        other.delete_membership()
+        _store_download(other, [1, 2, 3, 4])
+        StreetSelector(CosmonautJob(job_id=other.model.job_id)).remove_roads([2])
+
+    street_selection_layout(job.model.job_id)
+
+    assert _road_ids(job, OSM_DATA_EDITED_FILE) == [1, 3, 4]
+
+
+def test_an_edited_network_pulled_without_its_record_is_recomputed(
+    job, street_selection_layout
+):
+    """A pull may replace the derived file but keep this pod's record of it."""
+    # The upload worker stores an unedited network beside the download.
+    _write_json(
+        job,
+        OSM_DATA_EDITED_FILE,
+        {"type": "FeatureCollection", "features": [_road(i) for i in _ROAD_IDS]},
+    )
+    job.save()
+    StreetSelector(CosmonautJob(job_id=job.model.job_id)).remove_roads([2])
+
+    street_selection_layout(job.model.job_id)
+
+    assert _road_ids(job, OSM_DATA_EDITED_FILE) == [1, 3]
