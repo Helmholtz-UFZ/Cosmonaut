@@ -16,6 +16,7 @@ import urllib.request
 
 import pytest
 import redis
+from cosmo_ecosystem import object_storage_manager
 from cosmo_ecosystem.object_storage_manager import create_bucket, setup_remote
 from playwright.sync_api import ConsoleMessage, Page
 from playwright.sync_api import Error as PlaywrightError
@@ -117,6 +118,24 @@ def pytest_configure(config):
             pytest.exit(f"Object storage (S3) connectivity check failed: {e}")
     else:
         log.info("Skipping service health checks (--no-services flag set)")
+
+
+@pytest.fixture
+def rclone_transfers(monkeypatch):
+    """Record every rclone command object storage runs through its retry wrapper.
+
+    One entry per transfer; each also starts a connection check (``rclone
+    lsd``) when the caller asks for one, which ``pull_file`` does.
+    """
+    transfers = []
+    real = object_storage_manager.run_rclone_with_retry
+
+    def counting(params, *args, **kwargs):
+        transfers.append(params)
+        return real(params, *args, **kwargs)
+
+    monkeypatch.setattr(object_storage_manager, "run_rclone_with_retry", counting)
+    return transfers
 
 
 @pytest.fixture

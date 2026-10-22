@@ -41,7 +41,7 @@ from cosmonaut_app.constants.html_ids import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.error_handling import JobNotFound, error_modal
-from cosmonaut_app.map_utils import get_tile_url
+from cosmonaut_app.map_utils import map_layer_data
 from cosmonaut_app.street_selector import StreetSelector
 
 log = logging.getLogger(__name__)
@@ -956,8 +956,7 @@ def register_map_callbacks(app):
         else:
             viewport = no_update
 
-        tile_url = get_tile_url(job_id, job.working_dir)
-        raw_positions = job.get_route_polyline() or []
+        tile_url, raw_positions = map_layer_data(job)
         route_fc = {"type": "FeatureCollection", "features": []}
         if raw_positions:
             route_fc["features"] = [

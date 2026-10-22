@@ -6,7 +6,6 @@ Postgres and object storage. Outcomes only: rclone and row-write counts, the
 features in the files, what another pod sees.
 """
 
-import contextlib
 import hashlib
 import importlib
 import json
@@ -37,6 +36,7 @@ from cosmonaut_app.constants.general import (
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.street_selector import StreetSelector
+from test.help_functions_tests import another_pod_meanwhile
 
 _ROAD_IDS = [1, 2, 3]
 
@@ -129,18 +129,6 @@ def _store_download(job, road_ids):
     job.model.membership_upload["street_processing"] = "COMPLETED"
     job.model.membership_upload["download_sha256"] = checksum
     job.save()
-
-
-@contextlib.contextmanager
-def _another_pod_meanwhile(job):
-    """Act as a pod with its own disk; this pod's work dir stays as it was."""
-    parked = job.working_dir + ".parked"
-    os.rename(job.working_dir, parked)
-    try:
-        yield CosmonautJob(job_id=job.model.job_id)
-    finally:
-        shutil.rmtree(job.working_dir, ignore_errors=True)
-        os.rename(parked, job.working_dir)
 
 
 def _write_json(job, name, data):
@@ -269,7 +257,7 @@ def test_an_edited_network_built_from_another_download_is_recomputed(
 ):
     """Same intent, new download: the old derived file must not count as current."""
     StreetSelector(CosmonautJob(job_id=job.model.job_id)).remove_roads([2])
-    with _another_pod_meanwhile(job) as other:
+    with another_pod_meanwhile(job) as other:
         other.delete_membership()
         _store_download(other, [1, 2, 3, 4])
         StreetSelector(CosmonautJob(job_id=other.model.job_id)).remove_roads([2])
@@ -295,3 +283,37 @@ def test_an_edited_network_pulled_without_its_record_is_recomputed(
     street_selection_layout(job.model.job_id)
 
     assert _road_ids(job, OSM_DATA_EDITED_FILE) == [1, 3]
+
+
+_VIEWPORT = [[51.33, 12.36], [51.35, 12.38]]
+
+
+def _viewport_road_ids(job):
+    """Return the ids of the roads the map shows for job on this pod."""
+    selector = StreetSelector(CosmonautJob(job_id=job.model.job_id))
+    return sorted(f["id"] for f in selector.viewport_fc(_VIEWPORT, 14)["features"])
+
+
+def test_the_map_shows_edited_streets_on_a_pod_without_the_files(
+    job, rclone_transfers
+):
+    StreetSelector(CosmonautJob(job_id=job.model.job_id)).remove_roads([2])
+    _another_pod(job)
+    rclone_transfers.clear()
+
+    first_view = _viewport_road_ids(job)
+    pulls_on_first_view = len(rclone_transfers)
+    rclone_transfers.clear()
+    after_map_move = _viewport_road_ids(job)
+
+    assert first_view == after_map_move == [1, 3]
+    assert pulls_on_first_view == 1  # pull_file of the download
+    assert rclone_transfers == []
+
+
+def test_the_map_shows_no_streets_once_another_pod_deleted_the_membership(job):
+    StreetSelector(CosmonautJob(job_id=job.model.job_id)).remove_roads([2])
+    with another_pod_meanwhile(job) as other:
+        other.delete_membership()
+
+    assert _viewport_road_ids(job) == []

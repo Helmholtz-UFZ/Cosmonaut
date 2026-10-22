@@ -437,10 +437,11 @@ class StreetSelector:
     def initial_fc(self) -> dict:
         """Return FeatureCollection for page load.
 
-        Returns empty FeatureCollection if the edit file does not exist yet
-        (e.g. street processing has not completed).
+        Returns empty FeatureCollection while the job has no download (e.g.
+        street processing has not completed). Refreshes first, see
+        :meth:`viewport_fc`.
         """
-        if not os.path.exists(self.edit_path):
+        if not self.refresh():
             return {"type": "FeatureCollection", "features": []}
         return self.visible_fc()
 
@@ -455,8 +456,13 @@ class StreetSelector:
         are included.  Geometries are simplified with a zoom-dependent
         tolerance so zoomed-out views are lightweight while zoomed-in
         views stay sharp.
+
+        Runs on every map move, on any pod, so it reads the edited network
+        through :meth:`refresh`, never as a plain local file: no rclone call
+        while the file is current, one download pull and one recompute on a
+        pod that lacks it, and no streets while the job has no download.
         """
-        if not os.path.exists(self.edit_path):
+        if not self.refresh():
             return {"type": "FeatureCollection", "features": []}
 
         features = self._load_edit_features()
