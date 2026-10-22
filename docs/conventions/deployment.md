@@ -3,6 +3,17 @@
 Production runs on Kubernetes (UFZ cluster, ArgoCD). This doc covers non-obvious
 gotchas that don't surface in local docker-compose development.
 
+Helm charts and their defaults (e.g. the tileserver image, TiTiler appVersion 0.25.0)
+live in a separate repo, `cosmohelm` (`git@codebase.helmholtz.cloud:ufz/tb5-smm/met/wg7/cosmohelm.git`,
+local clone `~/git/cosmohelm`, chart `helm/charts/tileserver`), not in this one.
+
+## Production database is named `cosmonaut_stage`
+
+The prod image uses the database `cosmonaut_stage` (via `env_prod`) on
+`postgres-dev.intranet.ufz.de`; the name is historical, it is prod. The app connects as
+`cosmonaut_stage_rw`, but only the schema owner `cosmonaut_stage_adm` can run DDL, so a
+schema change must be run as the owner before the deploy.
+
 ## Gunicorn
 
 - **Always set `--timeout` explicitly.** The default is 30 seconds — enough for
