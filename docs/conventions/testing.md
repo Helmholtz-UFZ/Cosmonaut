@@ -23,6 +23,12 @@ these first — they usually explain the failure without needing another run. No
 that `run_pytest.sh` clears previous artifacts by default (use `--keep-artifacts`
 to preserve them across runs).
 
+**Test containers have their own names.** `run_pytest.sh` runs compose project
+`cosmonaut_test` with `postgres_cosmonaut_test`, `object_storage_cosmonaut_test` and
+`redis_cosmonaut_test`, and its cleanup only does `docker compose down` on that project.
+The dev stack (`postgres_cosmonaut` etc.) is never touched. Do not add `docker stop/rm`
+by name to the script.
+
 ## Code Rules
 
 - All tests go in `test/` (flat directory, no subdirectories)

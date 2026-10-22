@@ -2,6 +2,15 @@
 
 set -e
 
+# Test containers get their own project and container names. The dev stack
+# (docker-compose.yml defaults: postgres_cosmonaut, ...) uses the plain names, and the
+# old script ran `docker stop/rm` on exactly those, deleting the dev containers
+# (2026-10-22). Everything below, including cleanup, goes through this project only.
+export COMPOSE_PROJECT_NAME=cosmonaut_test
+export POSTGRES_CONTAINER_NAME=postgres_cosmonaut_test
+export OBJECT_STORAGE_CONTAINER_NAME=object_storage_cosmonaut_test
+export REDIS_CONTAINER_NAME=redis_cosmonaut_test
+
 trap cleaning_up EXIT
 
 # Cleanup function - restores environment and stops services
@@ -11,9 +20,8 @@ cleaning_up() {
         mv .env.bak .env
     fi
 
-    # Stop and remove containers
-    docker stop postgres_cosmonaut object_storage_cosmonaut redis_cosmonaut >/dev/null 2>&1 || true
-    docker rm postgres_cosmonaut object_storage_cosmonaut redis_cosmonaut >/dev/null 2>&1 || true
+    # Remove only this run's containers: `compose down` acts on the project
+    # COMPOSE_PROJECT_NAME (set at the top), never on the dev stack or any other container.
     docker compose down >/dev/null 2>&1 || true
 }
 
@@ -60,6 +68,9 @@ show_help() {
     echo "  -h, --help        Show this help message"
     echo ""
     echo "Environment:"
+    echo "  Test containers: postgres_cosmonaut_test, object_storage_cosmonaut_test,"
+    echo "                    redis_cosmonaut_test (compose project cosmonaut_test). The dev stack's"
+    echo "                    postgres_cosmonaut etc. are never stopped or removed."
     echo "  COSMO_ECOSYSTEM_PATH  Test against a local cosmo-ecosystem checkout instead of"
     echo "                    the tag pinned in pyproject.toml/uv.lock. When set, the script"
     echo "                    runs 'uv sync --frozen', then 'uv pip install --python .venv"
@@ -200,10 +211,10 @@ if [ "$START_SERVICES" -eq 1 ]; then
     # the connection unexpectedly". Measured window ~1s, wider on a loaded
     # machine. .gitlab-ci.yml already checks over TCP, which is why CI never saw
     # this.
-    check_service "docker exec postgres_cosmonaut pg_isready -q -h 127.0.0.1 2>/dev/null" "PostgreSQL"
+    check_service "docker exec $POSTGRES_CONTAINER_NAME pg_isready -q -h 127.0.0.1 2>/dev/null" "PostgreSQL"
     # The compose healthcheck owns the server-specific probe; this only reads its verdict.
-    check_service "docker inspect -f '{{.State.Health.Status}}' object_storage_cosmonaut 2>/dev/null | grep -qx healthy" "Object storage"
-    check_service "docker exec redis_cosmonaut redis-cli ping 2>/dev/null | grep -q PONG" "Redis"
+    check_service "docker inspect -f '{{.State.Health.Status}}' $OBJECT_STORAGE_CONTAINER_NAME 2>/dev/null | grep -qx healthy" "Object storage"
+    check_service "docker exec $REDIS_CONTAINER_NAME redis-cli ping 2>/dev/null | grep -q PONG" "Redis"
 else
     echo "Skipping service management (assuming services already running)"
 fi

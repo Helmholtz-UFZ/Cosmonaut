@@ -49,13 +49,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    container_name: postgres_cosmonaut
+    container_name: ${POSTGRES_CONTAINER_NAME:-postgres_cosmonaut}
     volumes:
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   redis:
     image: redis:7-alpine
-    container_name: redis_cosmonaut
+    container_name: ${REDIS_CONTAINER_NAME:-redis_cosmonaut}
     ports:
       - "${REDIS_HOST_PORT:-6379}:6379"
     command: redis-server --appendonly yes
@@ -65,7 +65,7 @@ services:
   # framework's ci/object-storage.gitlab-ci.yml).
   object-storage:
     image: rustfs/rustfs:1.0.0
-    container_name: object_storage_cosmonaut
+    container_name: ${OBJECT_STORAGE_CONTAINER_NAME:-object_storage_cosmonaut}
     ports:
       - "${OBJECT_STORAGE_HOST_PORT:-9000}:9000"
       - "${OBJECT_STORAGE_CONSOLE_HOST_PORT:-9001}:9001" # Web console at /rustfs/console/
