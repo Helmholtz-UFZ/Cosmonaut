@@ -1,9 +1,19 @@
 """Street selection domain logic.
 
 The StreetSelector class encapsulates the load/modify/save/project cycle for
-a job's street network. All user operations are stored declaratively in
-``street_edits.json`` and re-derived from the immutable download file on
-every change via :meth:`apply_edits`.
+a job's street network. All user operations are stored declaratively as the
+job's *intent* in the ``street_edits`` column of its row, and re-derived from
+the immutable download file on every change via :meth:`apply_edits`.
+
+The edited and projected GeoJSON are derived files (ADR 0001 in
+cosmo-ecosystem): they may exist only on local disk until the job is submitted,
+and are recomputed when missing or stale. ``street_derived_hashes.json`` records,
+per derived file, the hash of the intent it was built from; a file whose hash
+does not match the row's intent is stale. A sidecar rather than a property inside
+the GeoJSON so a freshness check reads a few bytes instead of parsing a large
+network, and so the routing input carries no foreign member. Each file's hash is
+dropped before the file is rewritten and recorded after, so a half-written file
+never looks current.
 
 Note: ``apply_edits`` re-derives the full edited network from the download
 file on every call. For large networks this may cause noticeable latency.
@@ -13,11 +23,13 @@ could mitigate this in the future.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from typing import TYPE_CHECKING
 
 import orjson
+from cosmo_ecosystem import job_persistence
 from sensor_routing.constants import OSM_FILENAME
 from shapely import STRtree
 from shapely.geometry import box, mapping, shape
@@ -27,6 +39,7 @@ from cosmonaut_app.constants.general import (
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
     OSM_TAGS_MAPPING,
+    STREET_DERIVED_HASHES_FILE,
     STREET_EDITS_FILE,
     TRACK_GRADES,
     UNGRADED_TRACK_GRADE,
@@ -47,6 +60,44 @@ log = logging.getLogger(__name__)
 _DEFAULT_TAGS = list(OSM_TAGS_MAPPING.keys())
 # Properties the browser actually uses (style_handle, tooltips, click handler).
 _DISPLAY_PROPERTIES = {"highway", "tooltip"}
+
+
+def default_intent() -> dict:
+    """Return the street-edit intent of a job nobody has edited yet."""
+    return {
+        "removed_roads": [],
+        "selected_road_tags": list(_DEFAULT_TAGS),
+        "selected_track_grades": list(DEFAULT_TRACK_GRADES),
+        "keep_largest": False,
+    }
+
+
+def adopt_legacy_edits(job: CosmonautJob) -> None:
+    """Move a job's intent from the legacy ``street_edits.json`` into its row.
+
+    Jobs edited before the intent moved to the row keep it in that file, on
+    local disk or (after a submit) in object storage. Only acts when the row has
+    no intent yet and the file is in the local work dir; the file is then
+    deleted everywhere so the row is the only copy. Call it before a pull where
+    the local copy may be newer than the stored one (the old code kept edits
+    local until submit), and again after the pull.
+    """
+    legacy_path = os.path.join(job.working_dir, STREET_EDITS_FILE)
+    if job.model.street_edits is not None or not os.path.exists(legacy_path):
+        return
+    with open(legacy_path, "rb") as f:
+        edits = orjson.loads(f.read())
+    # Edit files written before the track-grade filter existed lack this key.
+    # Those networks were downloaded without the default grade filter, so "all
+    # grades" preserves the job's existing behaviour (unlike
+    # DEFAULT_TRACK_GRADES, which would silently drop grade4/5 tracks).
+    if "selected_track_grades" not in edits:
+        edits["selected_track_grades"] = TRACK_GRADES + [UNGRADED_TRACK_GRADE]
+    log.info(f"Adopt legacy street edits of job {job.model.job_id} into its row")
+    job.model.street_edits = edits
+    job.update_columns("street_edits")
+    job_persistence.delete_files(job.model.job_id, [STREET_EDITS_FILE])
+
 
 # Module-level cache: avoids re-parsing large GeoJSON files on every callback.
 # Keyed by absolute path → (mtime, features).  The download file is immutable
@@ -76,7 +127,8 @@ def _zoom_to_tolerance(zoom: float) -> float:
 class StreetSelector:
     """Encapsulates street selection state and operations for a job.
 
-    All edit state is persisted in ``street_edits.json`` with four keys:
+    All edit state is the job's intent, persisted in the ``street_edits``
+    column of its row with four keys:
 
     - ``removed_roads`` – list of feature IDs explicitly deleted by the user.
     - ``selected_road_tags`` – list of road-type labels currently enabled.
@@ -84,9 +136,11 @@ class StreetSelector:
       highway=track features (plus the ungraded bucket).
     - ``keep_largest`` – whether the keep-largest-component filter is active.
 
-    Every mutating method calls :meth:`apply_edits` which re-derives
-    ``osm_data_edited.geojson`` and ``osm_data_transformed.geojson`` from the
-    immutable ``osm_data_download.geojson``.
+    Every mutating method calls :meth:`apply_edits` which writes the intent to
+    the row and re-derives ``osm_data_edited.geojson`` (and, unless deferred,
+    ``osm_data_transformed.geojson``) from the immutable
+    ``osm_data_download.geojson``. :meth:`refresh` and :meth:`ensure_projected`
+    recompute those derived files when they are missing or stale.
     """
 
     def __init__(self, job: CosmonautJob):
@@ -94,9 +148,14 @@ class StreetSelector:
         self.download_path = os.path.join(job.working_dir, OSM_DATA_DOWNLOAD_FILE)
         self.edit_path = os.path.join(job.working_dir, OSM_DATA_EDITED_FILE)
         self.transformed_path = os.path.join(job.working_dir, OSM_FILENAME)
-        self.edits_path = os.path.join(job.working_dir, STREET_EDITS_FILE)
+        self.hashes_path = os.path.join(job.working_dir, STREET_DERIVED_HASHES_FILE)
 
-        edits = self._load_edits()
+        adopt_legacy_edits(job)
+        edits = (
+            default_intent()
+            if job.model.street_edits is None
+            else job.model.street_edits
+        )
         self.removed_roads: list[int] = edits["removed_roads"]
         self.selected_road_tags: list[str] = edits["selected_road_tags"]
         self.selected_track_grades: list[str] = edits["selected_track_grades"]
@@ -168,7 +227,10 @@ class StreetSelector:
     # -- apply / derive ---------------------------------------------------
 
     def apply_edits(self, *, defer_projection: bool = False) -> bool:
-        """Re-derive the edited network from the download baseline.
+        """Write the intent to the job's row, then re-derive the edited network.
+
+        One row write and no object storage access: the derived files stay
+        local until the job is submitted.
 
         Applies operations in order:
         1. Filter by ``selected_road_tags``
@@ -183,6 +245,12 @@ class StreetSelector:
 
         Returns False if the resulting feature set is empty.
         """
+        self.job.model.street_edits = self._intent()
+        self.job.update_columns("street_edits")
+        return self._derive(defer_projection=defer_projection)
+
+    def _derive(self, *, defer_projection: bool) -> bool:
+        """Write the derived files for the current intent; no row write."""
         features = self._load_download_features()
         features = self._filter_by_tags(features, self.selected_road_tags)
         features = [
@@ -199,23 +267,11 @@ class StreetSelector:
             features = remove_disconnected_roads(G, largest, features)
 
         fc = {"type": "FeatureCollection", "features": features}
+        self._forget_hash(OSM_DATA_EDITED_FILE)
         self._save_edit_file(fc)
+        self._record_hash(OSM_DATA_EDITED_FILE)
         if not defer_projection:
-            if features:
-                project_features_to_file(
-                    features,
-                    self.transformed_path,
-                    src_epsg=4326,
-                    dst_epsg=self.job.model.epsg,
-                )
-            else:
-                self._save_edit_file(fc, path=self.transformed_path)
-        self._save_edits()
-        # Interactive edits (tag changes, road removals, keep-largest) happen
-        # frequently and an rclone round-trip would block the callback, so the
-        # files stay local until the routing job is submitted. The edits change
-        # no job column, hence no row write. Moving the edits' intent into the
-        # row is ticket 06.
+            self._project(features)
 
         log.info(
             "Applied edits: %d features, tags=%d, track_grades=%d, removed=%d, "
@@ -229,21 +285,35 @@ class StreetSelector:
         )
         return bool(features)
 
-    def ensure_projected(self) -> None:
-        """Project the edited network to the job's EPSG if not up-to-date.
+    def refresh(self) -> None:
+        """Recompute the edited network if it is missing or stale.
 
-        Compares modification times: if the edited file is newer than the
-        transformed file, reprojection is needed.  Safe to call multiple
-        times — it's a no-op when the transformed file is already current.
+        Stale means built from another intent than the row's (or another
+        EPSG). No-op before the download exists (street processing not done)
+        and when the file is current. Writes no row.
         """
-        if not os.path.exists(self.edit_path):
+        if not os.path.exists(self.download_path):
             return
-        needs_projection = not os.path.exists(
-            self.transformed_path
-        ) or os.path.getmtime(self.edit_path) > os.path.getmtime(self.transformed_path)
-        if not needs_projection:
+        if self._is_current(OSM_DATA_EDITED_FILE):
             return
-        features = self._load_edit_features()
+        log.info(f"Recompute the edited street network of job {self.job.model.job_id}")
+        self._derive(defer_projection=True)
+
+    def ensure_projected(self) -> None:
+        """Make the edited and the projected network current with the intent.
+
+        Recomputes the edited file first if needed (:meth:`refresh`), then
+        projects it to the job's EPSG unless the projected file already matches
+        the intent. Safe to call multiple times.
+        """
+        self.refresh()
+        if not os.path.exists(self.edit_path) or self._is_current(OSM_FILENAME):
+            return
+        self._project(self._load_edit_features())
+
+    def _project(self, features: list) -> None:
+        """Write *features* projected to the job's EPSG as the routing input."""
+        self._forget_hash(OSM_FILENAME)
         if features:
             project_features_to_file(
                 features,
@@ -256,6 +326,7 @@ class StreetSelector:
                 {"type": "FeatureCollection", "features": []},
                 path=self.transformed_path,
             )
+        self._record_hash(OSM_FILENAME)
         log.info("Projected %d features to EPSG %s", len(features), self.job.model.epsg)
 
     # -- read-only helpers ------------------------------------------------
@@ -351,40 +422,49 @@ class StreetSelector:
 
     # -- private I/O helpers ----------------------------------------------
 
-    def _load_edits(self) -> dict:
-        """Load street_edits.json or create it with defaults if missing."""
-        defaults = {
-            "removed_roads": [],
-            "selected_road_tags": list(_DEFAULT_TAGS),
-            "selected_track_grades": list(DEFAULT_TRACK_GRADES),
-            "keep_largest": False,
-        }
-        if os.path.exists(self.edits_path):
-            with open(self.edits_path, "rb") as f:
-                edits = orjson.loads(f.read())
-            # Migration: edit files written before the track-grade filter
-            # existed lack this key. Those networks were downloaded without
-            # the default grade filter, so "all grades" preserves the job's
-            # existing behaviour (unlike DEFAULT_TRACK_GRADES, which would
-            # silently drop grade4/5 tracks from an in-flight job).
-            if "selected_track_grades" not in edits:
-                edits["selected_track_grades"] = TRACK_GRADES + [UNGRADED_TRACK_GRADE]
-            return edits
-        # Create the file so it exists for future reads
-        with open(self.edits_path, "wb") as f:
-            f.write(orjson.dumps(defaults))
-        return defaults
-
-    def _save_edits(self) -> None:
-        """Persist the current edit state to street_edits.json."""
-        data = {
+    def _intent(self) -> dict:
+        """Return the current edit state as the row's intent."""
+        return {
             "removed_roads": self.removed_roads,
             "selected_road_tags": self.selected_road_tags,
             "selected_track_grades": self.selected_track_grades,
             "keep_largest": self.keep_largest_applied,
         }
-        with open(self.edits_path, "wb") as f:
-            f.write(orjson.dumps(data))
+
+    def _intent_hash(self) -> str:
+        """Hash what the derived files are built from: intent and EPSG."""
+        source = {"intent": self._intent(), "epsg": self.job.model.epsg}
+        return hashlib.sha256(
+            orjson.dumps(source, option=orjson.OPT_SORT_KEYS)
+        ).hexdigest()
+
+    def _read_hashes(self) -> dict:
+        if not os.path.exists(self.hashes_path):
+            return {}
+        with open(self.hashes_path, "rb") as f:
+            return orjson.loads(f.read())
+
+    def _write_hashes(self, hashes: dict) -> None:
+        with open(self.hashes_path, "wb") as f:
+            f.write(orjson.dumps(hashes))
+
+    def _record_hash(self, file_name: str) -> None:
+        hashes = self._read_hashes()
+        hashes[file_name] = self._intent_hash()
+        self._write_hashes(hashes)
+
+    def _forget_hash(self, file_name: str) -> None:
+        hashes = self._read_hashes()
+        if file_name in hashes:
+            del hashes[file_name]
+            self._write_hashes(hashes)
+
+    def _is_current(self, file_name: str) -> bool:
+        """Return whether the derived *file_name* exists and matches the intent."""
+        if not os.path.exists(os.path.join(self.job.working_dir, file_name)):
+            return False
+        hashes = self._read_hashes()
+        return file_name in hashes and hashes[file_name] == self._intent_hash()
 
     def _load_download_features(self) -> list:
         return self._cached_load(self.download_path)

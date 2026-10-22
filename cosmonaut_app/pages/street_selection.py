@@ -61,11 +61,14 @@ parameters for the final route calculation.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
-Street selection state is persisted to ``street_edits.json`` in the job's
-work directory. The file records removed road IDs, selected tag filters,
-allowed track grades, and a boolean flag for keep-largest. Every edit re-derives
-``osm_data_edited.geojson`` and ``osm_data_transformed.geojson`` from the
-immutable ``osm_data_download.geojson`` via :meth:`StreetSelector.apply_edits`.
+Street selection state (the intent) is persisted in the ``street_edits`` column
+of the job's row: removed road IDs, selected tag filters, allowed track grades,
+and a boolean flag for keep-largest. Every edit writes the row and re-derives
+``osm_data_edited.geojson`` from the immutable ``osm_data_download.geojson`` via
+:meth:`StreetSelector.apply_edits`; no object storage access per edit. The
+edited and projected GeoJSON are derived files: the layout pulls the work dir
+and recomputes them when missing or stale (:meth:`StreetSelector.refresh`), and
+submit uploads them.
 
 Interactive callbacks use Dash Leaflet click events with feature_id tracking.
 The StreetSelector class handles graph connectivity analysis and road network
@@ -73,7 +76,6 @@ processing.
 """
 
 import logging
-import os
 from typing import Any
 
 import dash
@@ -94,7 +96,6 @@ from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.constants.general import (
     JOB_STATUS_PENDING,
-    OSM_DATA_DOWNLOAD_FILE,
     OSM_TAGS_MAPPING,
     TRACK_GRADES,
     UNGRADED_TRACK_GRADE,
@@ -132,7 +133,7 @@ from cosmonaut_app.layout import (
     page_container_fullscreen_layout,
     progress_footer,
 )
-from cosmonaut_app.street_selector import StreetSelector
+from cosmonaut_app.street_selector import StreetSelector, adopt_legacy_edits
 
 log = logging.getLogger(__name__)
 
@@ -227,11 +228,13 @@ def layout(job_id: str):
     is_active = status == JOB_STATUS_PENDING
     job.model.stage = max(job.model.stage, 2)
     job.update_columns("stage")
-    # Fetch the OSM download only when this pod lacks it: an unconditional pull
-    # would put the remote copies over street edits that are still local-only
-    # (street edits are not yet persisted by job_persistence).
-    if not os.path.exists(os.path.join(job.working_dir, OSM_DATA_DOWNLOAD_FILE)):
-        job.pull_files()
+    # A legacy street_edits.json still on this pod's disk may be newer than the
+    # stored copy (edits used to stay local until submit): adopt it before the
+    # pull can overwrite it. The intent lives in the row from then on.
+    adopt_legacy_edits(job)
+    # The remote copy wins. Street edits keep their intent in the row, and the
+    # derived GeoJSON is recomputed below if the pull left it missing or stale.
+    job.pull_files()
 
     completed_steps = job.get_completed_steps()
 
@@ -246,6 +249,7 @@ def layout(job_id: str):
         return _street_processing_failed_layout(job_id, completed_steps)
 
     sel = StreetSelector(job)
+    sel.refresh()
 
     card_body = []
 

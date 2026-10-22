@@ -38,6 +38,7 @@ from cosmonaut_app.constants.general import (
     OSM_DATA_EDITED_FILE,
     QR_CODE_FILE,
     ROUTE_OPTIONS_FILE,
+    STREET_DERIVED_HASHES_FILE,
     STREET_EDITS_FILE,
 )
 from cosmonaut_app.db_manager import DataBaseManager
@@ -473,7 +474,10 @@ class CosmonautJob(BaseJob):
         return "RUNNING"
 
     def delete_membership(self):
-        """Delete membership file, predictor, OSM files, plots everywhere; reset state."""
+        """Delete membership, predictor, OSM files, plots everywhere; reset state.
+
+        The street-edit intent is reset too.
+        """
         log.info(f"Deleting membership data for job {self.model.job_id}")
 
         # Revoke running upload task if street_processing holds a task ID
@@ -496,6 +500,8 @@ class CosmonautJob(BaseJob):
                 OSM_DATA_DOWNLOAD_FILE,
                 OSM_DATA_EDITED_FILE,
                 OSM_FILENAME,
+                STREET_DERIVED_HASHES_FILE,
+                # Legacy intent file of jobs edited before the street_edits column.
                 STREET_EDITS_FILE,
                 *plot_files,
                 "membership.tif",
@@ -507,8 +513,10 @@ class CosmonautJob(BaseJob):
         self.model.membership_upload = default_membership_upload.copy()
         default_predictor_upload = JobModel.model_fields["predictor_upload"].default
         self.model.predictor_upload = default_predictor_upload.copy()
+        # The street edits refer to the deleted network's roads.
+        self.model.street_edits = None
 
-        self.update_columns("membership_upload", "predictor_upload")
+        self.update_columns("membership_upload", "predictor_upload", "street_edits")
 
         log.info(f"Membership data deleted for job {self.model.job_id}")
 

@@ -4,7 +4,7 @@ LOG_FILE_NAME = "worker.log"
 GPX_FILE = "route.gpx"
 QR_CODE_FILE = "qr_code.png"
 # Per-job presentation options for the computed route (currently: direction).
-# File-based like street_edits.json — interactive, reversible, no DB column.
+# File-based — interactive, reversible, no DB column.
 ROUTE_OPTIONS_FILE = "route_options.json"
 
 # Membership raster (WGS84 GeoTIFF for TiTiler)
@@ -28,7 +28,11 @@ EXCLUDED_LOG_PACKAGES = ("matplotlib", "PIL", "pyogrio", "rasterio")
 # OSM data file names
 OSM_DATA_DOWNLOAD_FILE = "osm_data_download.geojson"
 OSM_DATA_EDITED_FILE = "osm_data_edited.geojson"
+# Legacy: street-edit intent before it moved into the jobs.street_edits column.
+# Read once to migrate a job that still has it, then deleted.
 STREET_EDITS_FILE = "street_edits.json"
+# Records the intent hash each derived street file was built from.
+STREET_DERIVED_HASHES_FILE = "street_derived_hashes.json"
 
 # Mapping of road classification labels to OSM highway tag values.
 # Must only offer types the download actually fetches (HIGHWAY_TYPES in

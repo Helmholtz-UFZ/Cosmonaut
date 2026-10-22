@@ -124,3 +124,7 @@ class JobModel(UserModel):
     version: str = "0.1.5"
     celery_task_id: str | None = None
     start_date: date | None = None
+    # Street-selection intent (removed_roads, selected_road_tags,
+    # selected_track_grades, keep_largest), owned by street_selector.
+    # None until the first edit: the defaults apply.
+    street_edits: dict[str, Any] | None = None
