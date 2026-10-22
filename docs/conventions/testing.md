@@ -66,7 +66,7 @@ Service requirements vary by test:
 - `pytest_configure()` verifies all services are reachable before any tests run (gated by `--no-services`)
 - `dash_app` (session) — starts the Dash app via werkzeug make_server in a background thread, polls until responsive, shuts down cleanly
 - `page` (function) — wraps pytest-playwright's page fixture; captures HTML, console logs, server logs, and worker logs on failure
-- `celery_worker` (session) — starts a real Celery worker subprocess with log capture, terminates on teardown
+- `celery_worker` (session) — starts a real Celery worker subprocess with log capture, terminates on teardown. The worker has its own temp `WEB_WORK_DIR`, so web and worker share no disk (ADR 0001, cosmo-ecosystem). The e2e test asserts the finished job's log reaches the page; it goes red if the `pull_file` fallback in `CosmonautJob.get_logs` is removed
 - `membership_file_path` / `predictor_file_path` (session) — copies test data files to temp dir
 - `logger` — configured logger with suppressed third-party noise
 

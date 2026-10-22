@@ -27,6 +27,7 @@ from cosmonaut_app.constants.html_ids import (
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
     EMAIL_INPUT_USER_INFO_ID,
     LOADING_OVERLAY_MODAL_SHARED_ID,
+    LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTING_PARAMS_ID,
@@ -128,6 +129,15 @@ def test_complete_routing_workflow(
     # Wait for computation to complete (Next button becomes enabled)
     expect(page.locator(f"#{NEXT_BUTTON_ROUTE_COMPUTATION_ID}")).to_be_enabled(
         timeout=240000
+    )
+    # Web and worker share no disk (see celery_worker): the worker's log reaches the
+    # page only through object storage. With the finished-job pull_file fallback in
+    # CosmonautJob.get_logs removed, this shows "No log file found." instead.
+    expect(page.locator(f"#{LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID}")).not_to_have_text(
+        "No log file found.", timeout=15000
+    )
+    expect(page.locator(f"#{LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID}")).not_to_have_text(
+        "Logs empty."
     )
     page.locator(f"#{NEXT_BUTTON_ROUTE_COMPUTATION_ID}").click()
     # Note: check_all_errors skipped here as we're navigating to route_download

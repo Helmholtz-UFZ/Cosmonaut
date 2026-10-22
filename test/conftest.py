@@ -390,7 +390,16 @@ def celery_worker(request, overpass_stub):
     # overpass_stub fixture for why a monkeypatch cannot. None means the stub stood
     # down (SKIP_OSM_CACHE=1): leave the variable alone so the nightly live-Overpass
     # job really reaches Overpass.
-    worker_env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    # The worker gets its own WEB_WORK_DIR (read by cosmo_ecosystem.config at import),
+    # so web and worker share no disk, as in ADR 0001 (cosmo-ecosystem). Prod shares a
+    # PVC, but code must not rely on it: a log that exists only in the worker's dir
+    # slipped through every suite that ran both on one disk.
+    worker_work_dir = tempfile.mkdtemp(prefix="worker_work_dir_")
+    worker_env = {
+        **os.environ,
+        "PYTHONUNBUFFERED": "1",
+        "WEB_WORK_DIR": worker_work_dir,
+    }
     if overpass_stub is not None:
         worker_env["OVERPASS_URL"] = overpass_stub
     worker_process = subprocess.Popen(
@@ -456,6 +465,8 @@ def celery_worker(request, overpass_stub):
             os.killpg(os.getpgid(worker_process.pid), signal.SIGKILL)
         except (ProcessLookupError, OSError):
             pass
+    finally:
+        shutil.rmtree(worker_work_dir, ignore_errors=True)
 
 
 @pytest.fixture(scope="session")
