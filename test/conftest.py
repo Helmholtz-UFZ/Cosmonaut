@@ -356,7 +356,7 @@ def overpass_stub():
 
 
 @pytest.fixture(scope="session")
-def celery_worker(request, overpass_stub):
+def celery_worker(request, overpass_stub, tmp_path_factory):
     """Start a Celery worker for testing background job processing.
 
     This fixture spawns a Celery worker subprocess that:
@@ -394,11 +394,11 @@ def celery_worker(request, overpass_stub):
     # so web and worker share no disk, as in ADR 0001 (cosmo-ecosystem). Prod shares a
     # PVC, but code must not rely on it: a log that exists only in the worker's dir
     # slipped through every suite that ran both on one disk.
-    worker_work_dir = tempfile.mkdtemp(prefix="worker_work_dir_")
+    worker_work_dir = tmp_path_factory.mktemp("worker_work_dir")
     worker_env = {
         **os.environ,
         "PYTHONUNBUFFERED": "1",
-        "WEB_WORK_DIR": worker_work_dir,
+        "WEB_WORK_DIR": str(worker_work_dir),
     }
     if overpass_stub is not None:
         worker_env["OVERPASS_URL"] = overpass_stub
@@ -465,8 +465,6 @@ def celery_worker(request, overpass_stub):
             os.killpg(os.getpgid(worker_process.pid), signal.SIGKILL)
         except (ProcessLookupError, OSError):
             pass
-    finally:
-        shutil.rmtree(worker_work_dir, ignore_errors=True)
 
 
 @pytest.fixture(scope="session")
