@@ -26,7 +26,6 @@ from sensor_routing.full_pipeline_cli import (
 )
 
 from cosmonaut_app.background_job_manager import background_job_manager
-from cosmonaut_app.config import JOB_WORK_DIR_TEMPLATE
 from cosmonaut_app.constants.general import (
     GPX_FILE,
     JOB_STATUS_COMPLETED,
@@ -149,9 +148,12 @@ class CosmonautJob(BaseJob):
     on a job it did not build. Everything else here is domain.
 
     Persistence is ``cosmo_ecosystem.job_persistence``: constructing a job reads
-    its row only, and ``pull_files`` makes the work dir current with object
-    storage where code needs the files. ``save`` uploads the work dir, then writes
-    the row; ``update_columns`` writes named columns and touches no storage.
+    its row only and ``working_dir`` is just the path. Code that reads the files
+    calls ``job_persistence.work_dir(job_id)`` (or ``pull_file`` for one file)
+    first. ``save`` uploads the work dir, then writes the row; methods that
+    change files pull before they write, so the upload cannot push an outdated
+    local copy over a newer stored one. ``update_columns`` writes named columns
+    and touches no storage.
     """
 
     @property
@@ -171,8 +173,8 @@ class CosmonautJob(BaseJob):
 
         Args:
             job_id: Load an existing job's row. ``None`` creates a new job.
-                Construction makes no rclone call; call ``pull_files`` where
-                the job's files are needed.
+                Construction makes no rclone call; call
+                ``job_persistence.work_dir`` where the job's files are needed.
 
         Raises:
             JobNotFound: If ``job_id`` has no row.
@@ -202,15 +204,8 @@ class CosmonautJob(BaseJob):
         if "street_processing" not in self.model.membership_upload:
             self.model.membership_upload["street_processing"] = "PENDING"
 
-        self._create_working_dir()
-
-    def pull_files(self) -> str:
-        """Make the work dir current with object storage and return its path.
-
-        One rclone call per file set; call it where the files are read, not on
-        every load.
-        """
-        return job_persistence.work_dir(self.model.job_id)
+        # The path only: the dir may be absent or stale on this pod.
+        self.working_dir = job_persistence.local_dir(job_id)
 
     def _blank_job(self):
         """Create a new job with a unique ID."""
@@ -222,14 +217,9 @@ class CosmonautJob(BaseJob):
 
         self.model.job_id = job_id
         self.model.start_date = date.today()
-        self._create_working_dir()
+        self.working_dir = job_persistence.local_dir(job_id)
 
         self.save()
-
-    def _create_working_dir(self):
-        """Create the (still unpulled) working directory for the job."""
-        self.working_dir = JOB_WORK_DIR_TEMPLATE.format(job_id=self.model.job_id)
-        os.makedirs(self.working_dir, exist_ok=True)
 
     def _row(self) -> dict:
         """Return the model as the job table's columns, config nested."""
@@ -250,9 +240,13 @@ class CosmonautJob(BaseJob):
         """Upload the work dir to object storage, then write the job's row.
 
         Files first, row second (``job_persistence.save``). Use it where inputs
-        or outputs change; ``update_columns`` is the row-only write.
+        or outputs change, after pulling (``job_persistence.work_dir``): the
+        upload is ``rclone copy --checksum``, so every local file that differs
+        from the stored one wins. ``update_columns`` is the row-only write.
         """
         log.info(f"Save job {self.model.job_id}")
+        # parameters.json is written before job_persistence.save creates the dir.
+        os.makedirs(self.working_dir, exist_ok=True)
         self.dump_routing_params()
         job_persistence.save(self.model.job_id, self._row())
 
@@ -347,6 +341,8 @@ class CosmonautJob(BaseJob):
     def upload_membership(self, file_name, content, epsg_input):
         """Upload and process membership CSV file; written through to storage."""
         log.info(f"Upload membership file {file_name} with EPSG {epsg_input}")
+        # Pull before writing: the save below uploads the whole work dir.
+        job_persistence.work_dir(self.model.job_id)
 
         # Remove previous membership file if it exists
         previous_file = self.model.membership_upload["file_name"]
@@ -404,6 +400,9 @@ class CosmonautJob(BaseJob):
     def upload_predictor(self, content):
         """Upload and validate predictor CSV file; written through to storage."""
         log.info(f"Upload predictor file for job {self.model.job_id}")
+        # Pull before writing: the save below uploads the whole work dir, and
+        # the consistency check reads the membership file.
+        job_persistence.work_dir(self.model.job_id)
 
         _content_type, content_string = content.split(",", 1)
         decoded = base64.b64decode(content_string)
@@ -591,8 +590,12 @@ class CosmonautJob(BaseJob):
             self.model.submitted = True
             self.model.status = JOB_STATUS_RUNNING
             self.model.stage = max(self.model.stage, 4)
-            # Upload the files first — the worker pulls them from object storage
-            # via work_dir(). Also writes parameters.json via dump_routing_params().
+            # Pull, then upload: the worker pulls from object storage, and an
+            # outdated local copy must not replace the stored one. A pull may
+            # replace derived street files that ran ahead of storage; the worker
+            # recomputes them (StreetSelector.ensure_projected). The save also
+            # writes parameters.json via dump_routing_params().
+            job_persistence.work_dir(self.model.job_id)
             self.save()
 
             celery_task_id, failed = background_job_manager.submit_routing_job(self)

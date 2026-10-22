@@ -80,6 +80,7 @@ from typing import Any
 
 import dash
 import dash_bootstrap_components as dbc
+from cosmo_ecosystem import job_persistence
 from dash import (
     ALL,
     Input,
@@ -234,7 +235,7 @@ def layout(job_id: str):
     adopt_legacy_edits(job)
     # The remote copy wins. Street edits keep their intent in the row, and the
     # derived GeoJSON is recomputed below if the pull left it missing or stale.
-    job.pull_files()
+    job_persistence.work_dir(job.job_id)
 
     completed_steps = job.get_completed_steps()
 

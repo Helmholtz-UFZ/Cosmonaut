@@ -4,6 +4,7 @@ Runs against real Postgres and object storage. Outcomes only: rclone call
 counts, files present locally and remotely, what a route serves.
 """
 
+import base64
 import importlib
 import os
 import shutil
@@ -11,7 +12,7 @@ from unittest import mock
 
 import dash
 import pytest
-from cosmo_ecosystem import object_storage_manager
+from cosmo_ecosystem import job_persistence, object_storage_manager
 from cosmo_ecosystem.config import (
     JOB_WORK_DIR_TEMPLATE,
     OBJECT_STORAGE_BUCKET,
@@ -24,7 +25,11 @@ from cosmo_ecosystem.object_storage_manager import (
 )
 from sensor_routing.constants import MEMBERSHIP_FILENAME, PREDICTOR_FILENAME
 
-from cosmonaut_app.constants.general import GPX_FILE, JOB_STATUS_RUNNING
+from cosmonaut_app.constants.general import (
+    GPX_FILE,
+    JOB_STATUS_RUNNING,
+    ROUTE_OPTIONS_FILE,
+)
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.files_route import serve_files
@@ -87,6 +92,35 @@ def _write(job, name, content):
     """Write content to name in job's work dir."""
     with open(os.path.join(job.working_dir, name), "w") as f:
         f.write(content)
+
+
+def _stored(job_id, name):
+    """Return the content of name as object storage holds it."""
+    shutil.rmtree(job_persistence.local_dir(job_id))
+    with open(os.path.join(job_persistence.work_dir(job_id), name)) as f:
+        return f.read()
+
+
+def _data_url(path):
+    """Return path's content as the data URL a dcc.Upload delivers."""
+    with open(path, "rb") as f:
+        return "data:text/csv;base64," + base64.b64encode(f.read()).decode()
+
+
+def _upload_membership(job, membership_file_path, predictor_file_path):
+    job.upload_membership("memberships.csv", _data_url(membership_file_path), 25832)
+
+
+def _upload_predictor(job, membership_file_path, predictor_file_path):
+    job.upload_predictor(_data_url(predictor_file_path))
+
+
+def _submit(job, membership_file_path, predictor_file_path):
+    with mock.patch(
+        "cosmonaut_app.cosmonaut_job.background_job_manager.submit_routing_job",
+        return_value=("task", False),
+    ):
+        job.submit()
 
 
 def _celery_says(status):
@@ -164,3 +198,34 @@ def test_deleting_the_predictor_removes_it_from_object_storage(job):
     remote = _remote_files(job_id)
     assert PREDICTOR_FILENAME not in remote
     assert MEMBERSHIP_FILENAME in remote
+
+
+@pytest.mark.parametrize(
+    "modify", [_upload_membership, _upload_predictor, _submit], ids=lambda f: f.__name__
+)
+def test_a_web_modification_keeps_a_newer_stored_file(
+    job, modify, membership_file_path, predictor_file_path
+):
+    """A pod with an outdated copy must not push it over the stored one."""
+    job_id = job.model.job_id
+    _upload_membership(job, membership_file_path, predictor_file_path)
+    _write(job, ROUTE_OPTIONS_FILE, "fresh")
+    save_files(job_id)
+    _write(job, ROUTE_OPTIONS_FILE, "stale")
+
+    modify(CosmonautJob(job_id=job_id), membership_file_path, predictor_file_path)
+
+    assert _stored(job_id, ROUTE_OPTIONS_FILE) == "fresh"
+
+
+@pytest.mark.parametrize(
+    "path", ["/pictures/{}/plot.png", "/download/{}.zip", f"/download/{{}}/{GPX_FILE}"]
+)
+def test_a_file_route_answers_404_for_an_unknown_job(path):
+    app = dash.Dash(__name__)
+    app.layout = dash.html.Div()
+    serve_files(app)
+
+    response = app.server.test_client().get(path.format("nosuchjob"))
+
+    assert response.status_code == 404

@@ -197,7 +197,7 @@ def test_submit_uploads_the_derived_files_and_the_worker_finds_them(job):
     assert OSM_DATA_EDITED_FILE in _remote_files(job.model.job_id)
     # The routing worker on another pod: pull, then make the routing input.
     worker_job = _another_pod(job)
-    worker_job.pull_files()
+    job_persistence.work_dir(worker_job.job_id)
     StreetSelector(worker_job).ensure_projected()
     assert _road_ids(worker_job, OSM_DATA_EDITED_FILE) == [1, 3]
     assert _road_ids(worker_job, OSM_FILENAME) == [1, 3]

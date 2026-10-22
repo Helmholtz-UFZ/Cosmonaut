@@ -11,6 +11,7 @@ from datetime import timedelta
 from logging.config import dictConfig
 
 from celery import Task
+from cosmo_ecosystem import job_persistence
 from cosmo_ecosystem.logger import (
     get_logger_config_computation,
     get_logger_config_worker,
@@ -70,7 +71,7 @@ def process_routing_job(self, job_id):
 
     # Load job to get work directory
     job = CosmonautJob(job_id=job_id)
-    job.pull_files()
+    job_persistence.work_dir(job.job_id)
 
     # Send submission notification before computation starts
     _notify_submission(job)

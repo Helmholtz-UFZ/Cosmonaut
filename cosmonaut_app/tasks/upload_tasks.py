@@ -11,6 +11,7 @@ import os
 import requests.exceptions
 import urllib3.exceptions
 from celery import Task
+from cosmo_ecosystem import job_persistence
 from sensor_routing.constants import MEMBERSHIP_FILENAME
 
 from cosmonaut_app.config import MAINTAINER_EMAIL
@@ -46,7 +47,7 @@ def process_upload_task(self, job_id, epsg_input):
     log.info(f"Starting upload processing task for job_id={job_id}")
 
     job = CosmonautJob(job_id=job_id)
-    job.pull_files()
+    job_persistence.work_dir(job.job_id)
 
     try:
         membership_path = os.path.join(job.working_dir, MEMBERSHIP_FILENAME)

@@ -21,7 +21,7 @@ coherent:
    routing parameter on the sensor-routing side needs no schema change here.
 2. **Files → object storage.** Each job has a `working_dir` at `WEB_WORK_DIR/<job_id>` holding the uploaded
    CSVs, the OSM GeoJSON files, `parameters.json`, logs, the route solution, GPX and QR code. `save()`
-   uploads this directory to object storage via rclone; `pull_files()` brings it back.
+   uploads this directory to object storage via rclone; `job_persistence.work_dir(job_id)` brings it back.
 
 ## Persistence calls — what costs rclone
 
@@ -29,12 +29,17 @@ Persistence is the framework's `cosmo_ecosystem.job_persistence` (remote prefix 
 cache; see the framework's ADR 0001). `CosmonautJob` only maps its model to a row dict:
 
 - **`CosmonautJob(job_id)`** reads the row only: no rclone. Polls and Dash callbacks use it as is.
-- **`job.pull_files()`** makes the work dir current with object storage (`rclone --checksum`, never deletes
-  local files). Call it where files are read: worker tasks, the Route & Download page, the file routes.
+- **`job_persistence.work_dir(job.job_id)`** makes the work dir current with object storage (`rclone
+  --checksum`, never deletes local files); `job.working_dir` is only the path (`local_dir`). Call it where
+  files are read: worker tasks, the Route & Download page, the file routes.
+- **`job_persistence.pull_file(job_id, name)`** pulls one file (two rclone subprocesses): the GPX route
+  and the map callbacks.
 - **`job.update_columns("stage", ...)`** writes named model fields to the row. No storage access. Status
   and stage bumps use it.
 - **`job.save()`** uploads the work dir, then writes the whole row. Input changes (uploads, route
-  direction) use it so no edit exists only on local disk.
+  direction) use it so no edit exists only on local disk. **Pull before you write and save**
+  (`upload_membership`, `upload_predictor` and `submit` do it themselves): the upload is `rclone copy
+  --checksum`, so an outdated local file would replace the newer stored one.
 - **Deleting a job file** goes through `job_persistence.delete_files`, which removes it locally and
   remotely at once; a later upload deletes nothing remote.
 
@@ -64,7 +69,7 @@ files and plots, and resets `membership_upload`. `time_to_live()` computes days-
 
 ## Do / Don't
 
-- **Do** call `pull_files()` in Celery tasks and where a page or route reads job files.
+- **Do** call `job_persistence.work_dir(job.job_id)` in Celery tasks and where a page or route reads job files.
 - **Do** use `update_columns` for status and stage changes; `save()` is for file changes.
 - **Don't** assume `street_processing` is a status string — it may be a Celery task ID.
 - **Don't** add a field to `JobModel` expecting it in the `config` JSONB (or vice-versa): the split
