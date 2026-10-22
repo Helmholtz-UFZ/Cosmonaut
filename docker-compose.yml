@@ -42,7 +42,9 @@ services:
         condition: service_started
 
   postgres:
-    image: postgis/postgis:latest
+    # Pinned: `latest` moves silently (TiTiler 2.x broke the maps that way). 17-3.5 is
+    # what :latest was on 2026-10-22 (PG 17.5, PostGIS 3.5.2); Docker Hub has no patch tag.
+    image: postgis/postgis:17-3.5
     ports:
       - "${POSTGRES_HOST_PORT:-5432}:5432"
     environment:

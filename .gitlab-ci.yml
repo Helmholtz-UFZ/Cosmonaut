@@ -116,6 +116,10 @@ linting:
   script:
     - "pip install --quiet ruff==0.16.0"
     - "ruff check ."
+    # Unpinned images move silently (titiler:latest went to 2.x). Fails on `:latest` or
+    # a tagless `image:` in compose files. `cosmonaut` and `cosmonaut-worker` are
+    # tagless on purpose: they are built locally from the `build:` section.
+    - "! grep -nE '^[[:space:]]*image:[[:space:]]*[^#[:space:]]+' docker-compose*.yml | grep -vE 'image:[[:space:]]*cosmonaut(-worker)?[[:space:]]*$' | grep -E 'image:[[:space:]]*([^:#[:space:]]+|[^#[:space:]]+:latest)[[:space:]]*(#.*)?$'"
 
 # Unit tests: no external services needed.
 # Only files confirmed to work without DB/Redis/object storage are listed here.
