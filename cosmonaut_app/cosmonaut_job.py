@@ -691,15 +691,26 @@ class CosmonautJob(BaseJob):
         return completed
 
     def get_logs(self) -> str:
-        """Retrieve the job's log from the local work dir.
+        """Retrieve the job's log.
 
-        Reads the log file on this pod's disk; it is not pulled from object
-        storage, so it is current only while web and worker share a work dir.
+        While the job runs, the log is read from this pod's work dir only, with
+        no object storage call. Once the job is finished (COMPLETED or FAILED)
+        and the log is not on this pod's disk (web and worker share no disk),
+        it is pulled once from object storage (ADR 0001: the remote prefix is
+        authoritative, the work dir is a cache) and is local from then on.
 
         Returns:
             str: Job logs as a string
         """
         log.info(f"Retrieving logs for job {self.model.job_id}")
+        log_file_path = os.path.join(self.working_dir, LOG_FILE_NAME)
+        if not os.path.exists(log_file_path) and self.model.status in (
+            JOB_STATUS_COMPLETED,
+            JOB_STATUS_FAILED,
+        ):
+            log_file_path = job_persistence.pull_file(
+                self.model.job_id, LOG_FILE_NAME
+            )
         log_file_path = os.path.join(self.working_dir, LOG_FILE_NAME)
         if os.path.exists(log_file_path):
             with open(log_file_path) as f:
