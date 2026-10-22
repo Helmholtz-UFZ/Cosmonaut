@@ -9,12 +9,9 @@ import uuid
 from datetime import date
 
 import pandas as pd
+from cosmo_ecosystem import job_persistence
 from cosmo_ecosystem.base_job import BaseJob
-from cosmo_ecosystem.job_retention import days_to_live, delete_job
-from cosmo_ecosystem.object_storage_manager import (
-    get_files,
-    save_files,
-)
+from cosmo_ecosystem.job_retention import days_to_live
 from pyproj import CRS, Transformer
 from sensor_routing.constants import (
     MEMBERSHIP_FILENAME,
@@ -29,7 +26,6 @@ from sensor_routing.full_pipeline_cli import (
 )
 
 from cosmonaut_app.background_job_manager import background_job_manager
-from cosmonaut_app.config import WEB_WORK_DIR
 from cosmonaut_app.constants.general import (
     GPX_FILE,
     JOB_STATUS_COMPLETED,
@@ -41,12 +37,13 @@ from cosmonaut_app.constants.general import (
     OSM_DATA_EDITED_FILE,
     QR_CODE_FILE,
     ROUTE_OPTIONS_FILE,
+    STREET_DERIVED_HASHES_FILE,
     STREET_EDITS_FILE,
 )
-from cosmonaut_app.db_manager import DataBaseManager, JobNotFound
+from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.navigation_routing import RouteCreator
-from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel
+from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel, StreetEdits
 
 log = logging.getLogger(__name__)
 
@@ -148,9 +145,15 @@ class CosmonautJob(BaseJob):
 
     Implements ``cosmo_ecosystem.base_job.BaseJob``: ``job_id``, ``save``,
     ``delete``, ``submit`` and ``time_to_live`` are what framework code may call
-    on a job it did not build. Everything else here is domain. ``working_dir`` is
-    not in the contract but is required by ``files_route.serve_files``, which
-    says so in its own docstring.
+    on a job it did not build. Everything else here is domain.
+
+    Persistence is ``cosmo_ecosystem.job_persistence``: constructing a job reads
+    its row only and ``working_dir`` is just the path. Code that reads the files
+    calls ``job_persistence.work_dir(job_id)`` (or ``pull_file`` for one file)
+    first. ``save`` uploads the work dir, then writes the row; methods that
+    change files pull before they write, so the upload cannot push an outdated
+    local copy over a newer stored one. ``update_columns`` writes named columns
+    and touches no storage.
     """
 
     @property
@@ -165,41 +168,27 @@ class CosmonautJob(BaseJob):
         """
         return self.model.job_id
 
-    def __init__(
-        self, job_id=None, *, sync_files: bool = True, overwrite: bool = False
-    ):
+    def __init__(self, job_id=None):
         """Init class by id or make a new one.
 
         Args:
-            job_id: Load an existing job. ``None`` creates a new job.
-            sync_files: When True (default), download files from object
-                storage on load.  Pass False in Dash callbacks on the web
-                pod where local files are already current — this avoids a
-                slow rclone round-trip and prevents stale remote files from
-                overwriting recent local edits.
-            overwrite: When True, download all remote files even if they
-                exist locally (``--checksum``).  When False (default), only
-                download files missing locally (``--ignore-existing``),
-                preserving local edits.  Use True on worker pods that need
-                a clean copy from object storage.
+            job_id: Load an existing job's row. ``None`` creates a new job.
+                Construction makes no rclone call; call
+                ``job_persistence.work_dir`` where the job's files are needed.
+
+        Raises:
+            JobNotFound: If ``job_id`` has no row.
         """
         if job_id is not None:
             log.info(f"Load job with id {job_id}")
-            if not DataBaseManager.check_existence(job_id):
-                raise JobNotFound(job_id)
-            self.load(job_id, sync_files=sync_files, overwrite=overwrite)
+            self.load(job_id)
         else:
             log.info("Create new job")
             self._blank_job()
 
-    def load(self, job_id, *, sync_files: bool = True, overwrite: bool = False):
-        """
-        Get job information from the database,
-        load the data from object storage,
-        and store files in the working directory.
-        """
-        # Get job information from the database
-        job_data = DataBaseManager.get_job_columns(job_id)
+    def load(self, job_id):
+        """Load the job's row into the model. Reads the database only."""
+        job_data = job_persistence.load_row(job_id)
 
         # Extract config JSON and merge back into job_data
         config_data = job_data.pop("config", {})
@@ -214,12 +203,14 @@ class CosmonautJob(BaseJob):
         # rotated out (retention ≤ DAYS_DELETE_SUBMITTED).
         if "street_processing" not in self.model.membership_upload:
             self.model.membership_upload["street_processing"] = "PENDING"
+        # Backfill for jobs whose download predates its recorded checksum;
+        # street_selector adopts the stored download's checksum on first use.
+        # Removable on the same terms as the backfill above.
+        if "download_sha256" not in self.model.membership_upload:
+            self.model.membership_upload["download_sha256"] = None
 
-        # Set up filesystem paths
-        self._create_working_dir()
-
-        if sync_files:
-            get_files(self.model.job_id, overwrite=overwrite)
+        # The path only: the dir may be absent or stale on this pod.
+        self.working_dir = job_persistence.local_dir(job_id)
 
     def _blank_job(self):
         """Create a new job with a unique ID."""
@@ -231,33 +222,16 @@ class CosmonautJob(BaseJob):
 
         self.model.job_id = job_id
         self.model.start_date = date.today()
-        self._create_working_dir()
+        self.working_dir = job_persistence.local_dir(job_id)
 
         self.save()
 
-    def _create_working_dir(self):
-        """Create the working directory for the job."""
-        self.working_dir = os.path.join(WEB_WORK_DIR, self.model.job_id)
-        os.makedirs(self.working_dir, exist_ok=True)
-
-    def save(self, *, sync_files: bool = True):
-        """Save the job to the database and optionally sync files to object storage.
-
-        Args:
-            sync_files: When False, skip the rclone sync to object storage.
-                Use this when multiple saves happen in quick succession and only the
-                last one needs to sync (e.g. during upload where delete → upload → save
-                would otherwise trigger 3+ slow rclone syncs).
-        """
-        log.info(f"Save job {self.model.job_id}")
-
-        # Get all data from model
+    def _row(self) -> dict:
+        """Return the model as the job table's columns, config nested."""
         data = self.model.model_dump(mode="json")
 
         # Separate Config fields from JobModel fields
         config_field_names = set(FullPipelineConfig.model_fields.keys())
-
-        # Extract config fields into separate dict
         config_data = {}
         for field_name in list(data.keys()):
             if field_name in config_field_names:
@@ -265,14 +239,37 @@ class CosmonautJob(BaseJob):
 
         # Add config as JSON field
         data["config"] = config_data
+        return data
 
-        # Save to database
-        DataBaseManager.add_entry(data)
+    def save(self):
+        """Upload the work dir to object storage, then write the job's row.
 
+        Files first, row second (``job_persistence.save``). Use it where inputs
+        or outputs change, after pulling (``job_persistence.work_dir``): the
+        upload is ``rclone copy --checksum``, so every local file that differs
+        from the stored one wins. ``update_columns`` is the row-only write.
+        """
+        log.info(f"Save job {self.model.job_id}")
+        # parameters.json is written before job_persistence.save creates the dir.
+        os.makedirs(self.working_dir, exist_ok=True)
         self.dump_routing_params()
+        job_persistence.save(self.model.job_id, self._row())
 
-        if sync_files:
-            save_files(self.model.job_id)
+    def update_columns(self, *fields: str):
+        """Write the named model fields to the job's row. No storage access.
+
+        Args:
+            *fields: ``JobModel`` field names. Config fields land in the one
+                ``config`` column, which is written whole.
+        """
+        row = self._row()
+        config_field_names = set(FullPipelineConfig.model_fields.keys())
+        columns = {}
+        for field_name in fields:
+            column = "config" if field_name in config_field_names else field_name
+            columns[column] = row[column]
+        log.info(f"Update columns {sorted(columns)} of job {self.model.job_id}")
+        job_persistence.update_columns(self.model.job_id, columns)
 
     def dump_routing_params(self):
         """
@@ -341,20 +338,22 @@ class CosmonautJob(BaseJob):
     def delete(self):
         """Delete the job everywhere: remote prefix, local work dir and row.
 
-        Delegates to ``cosmo_ecosystem.job_retention.delete_job``, the same
+        Delegates to ``cosmo_ecosystem.job_persistence.delete_job``, the same
         deletion the nightly cleanup and the job manager use.
         """
-        delete_job(self.model.job_id)
+        job_persistence.delete_job(self.model.job_id)
 
-    def upload_membership(self, file_name, content, epsg_input, *, sync_files=True):
-        """Upload and process membership CSV file."""
+    def upload_membership(self, file_name, content, epsg_input):
+        """Upload and process membership CSV file; written through to storage."""
         log.info(f"Upload membership file {file_name} with EPSG {epsg_input}")
+        # Pull before writing: the save below uploads the whole work dir.
+        job_persistence.work_dir(self.model.job_id)
 
         # Remove previous membership file if it exists
         previous_file = self.model.membership_upload["file_name"]
         previous_file_path = os.path.join(self.working_dir, previous_file)
         if os.path.exists(previous_file_path):
-            os.remove(previous_file_path)
+            job_persistence.delete_files(self.model.job_id, [previous_file])
             log.info(f"Removed previous membership file {previous_file}")
 
         _content_type, content_string = content.split(",", 1)
@@ -371,6 +370,8 @@ class CosmonautJob(BaseJob):
             membership_df = parse_membership_file(file_path)
         except Exception as e:
             log.info(f"Membership file validation failed: {e}")
+            # Local only: the rejected file was never uploaded, and the stored
+            # copy (if any) still matches the row.
             os.remove(file_path)
             raise FileValidationError(str(e))
 
@@ -396,14 +397,19 @@ class CosmonautJob(BaseJob):
             "zoom": zoom,
             "bounds": bounds,
             "street_processing": "PENDING",
+            # The upload worker records the new download's checksum.
+            "download_sha256": None,
         }
-        self.save(sync_files=sync_files)
+        self.save()
         log.debug("Finished uploading and processing membership file")
         return file_path, bounds, membership_df
 
     def upload_predictor(self, content):
-        """Upload and validate predictor CSV file."""
+        """Upload and validate predictor CSV file; written through to storage."""
         log.info(f"Upload predictor file for job {self.model.job_id}")
+        # Pull before writing: the save below uploads the whole work dir, and
+        # the consistency check reads the membership file.
+        job_persistence.work_dir(self.model.job_id)
 
         _content_type, content_string = content.split(",", 1)
         decoded = base64.b64decode(content_string)
@@ -435,21 +441,18 @@ class CosmonautJob(BaseJob):
             "file_name": PREDICTOR_FILENAME,
             "len": len(decoded),
         }
-        self.save(sync_files=False)
+        self.save()
         log.debug("Finished uploading and processing predictor file")
 
-    def delete_predictor(self, *, sync_files: bool = True):
-        """Delete predictor file and reset predictor_upload."""
+    def delete_predictor(self):
+        """Delete predictor file everywhere and reset predictor_upload."""
         log.info(f"Deleting predictor data for job {self.model.job_id}")
 
-        file_path = os.path.join(self.working_dir, PREDICTOR_FILENAME)
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            log.debug(f"Deleted predictor file: {file_path}")
+        job_persistence.delete_files(self.model.job_id, [PREDICTOR_FILENAME])
 
         default_predictor_upload = JobModel.model_fields["predictor_upload"].default
         self.model.predictor_upload = default_predictor_upload.copy()
-        self.save(sync_files=sync_files)
+        self.update_columns("predictor_upload")
 
         log.info(f"Predictor data deleted for job {self.model.job_id}")
 
@@ -468,16 +471,19 @@ class CosmonautJob(BaseJob):
         if celery_status == "SUCCESS":
             self.model.membership_upload["street_processing"] = "COMPLETED"
             self.model.stage = max(self.model.stage, 2)
-            self.save(sync_files=False)
+            self.update_columns("membership_upload", "stage")
             return "COMPLETED"
         elif celery_status in ("FAILURE", "REVOKED"):
             self.model.membership_upload["street_processing"] = "FAILED"
-            self.save(sync_files=False)
+            self.update_columns("membership_upload")
             return "FAILED"
         return "RUNNING"
 
-    def delete_membership(self, *, sync_files: bool = True):
-        """Delete membership file, predictor, OSM files, plots and reset state."""
+    def delete_membership(self):
+        """Delete membership, predictor, OSM files, plots everywhere; reset state.
+
+        The street-edit intent is reset too.
+        """
         log.info(f"Deleting membership data for job {self.model.job_id}")
 
         # Revoke running upload task if street_processing holds a task ID
@@ -486,41 +492,39 @@ class CosmonautJob(BaseJob):
             background_job_manager.revoke_job(sp, terminate=True)
             log.info(f"Revoked upload processing task {sp} for job {self.model.job_id}")
 
-        # Cascade: delete predictor first (skip sync — we sync at the end)
-        self.delete_predictor(sync_files=False)
+        # Plot files (new name + legacy names). Only those on this pod's disk
+        # are found; the others are overwritten by the next upload's plots.
+        plot_files = [
+            os.path.relpath(plot_file, self.working_dir)
+            for plot_file in glob.glob(os.path.join(self.working_dir, "*_output*.tif"))
+        ]
+        job_persistence.delete_files(
+            self.model.job_id,
+            [
+                MEMBERSHIP_FILENAME,
+                PREDICTOR_FILENAME,
+                OSM_DATA_DOWNLOAD_FILE,
+                OSM_DATA_EDITED_FILE,
+                OSM_FILENAME,
+                STREET_DERIVED_HASHES_FILE,
+                # Legacy intent file of jobs edited before the street_edits column.
+                STREET_EDITS_FILE,
+                *plot_files,
+                "membership.tif",
+            ],
+        )
 
-        # Delete membership CSV file
-        membership_path = os.path.join(self.working_dir, MEMBERSHIP_FILENAME)
-        if os.path.exists(membership_path):
-            os.remove(membership_path)
-            log.debug(f"Deleted membership file: {membership_path}")
-
-        # Delete OSM data files
-        for osm_name in [
-            OSM_DATA_DOWNLOAD_FILE,
-            OSM_DATA_EDITED_FILE,
-            OSM_FILENAME,
-            STREET_EDITS_FILE,
-        ]:
-            osm_path = os.path.join(self.working_dir, osm_name)
-            if os.path.exists(osm_path):
-                os.remove(osm_path)
-                log.debug(f"Deleted OSM file: {osm_path}")
-
-        # Delete plot files (new name + legacy names)
-        for plot_file in glob.glob(os.path.join(self.working_dir, "*_output*.tif")):
-            os.remove(plot_file)
-            log.debug(f"Deleted plot file: {plot_file}")
-        membership_tif = os.path.join(self.working_dir, "membership.tif")
-        if os.path.exists(membership_tif):
-            os.remove(membership_tif)
-            log.debug(f"Deleted plot file: {membership_tif}")
-
-        # Reset membership_upload to default values
+        # Reset the uploads to default values
         default_membership_upload = JobModel.model_fields["membership_upload"].default
         self.model.membership_upload = default_membership_upload.copy()
+        default_predictor_upload = JobModel.model_fields["predictor_upload"].default
+        self.model.predictor_upload = default_predictor_upload.copy()
+        # The street edits refer to the deleted network's roads. Explicit
+        # defaults, not NULL: a legacy street_edits.json left on another pod's
+        # disk is adopted only into a NULL column, so it can never come back.
+        self.model.street_edits = StreetEdits()
 
-        self.save(sync_files=sync_files)
+        self.update_columns("membership_upload", "predictor_upload", "street_edits")
 
         log.info(f"Membership data deleted for job {self.model.job_id}")
 
@@ -551,9 +555,9 @@ class CosmonautJob(BaseJob):
     def set_route_reversed(self, reversed_flag: bool):
         """Persist the route direction and regenerate GPX + QR code to match.
 
-        Syncs to object storage (via create_qr_code_routing -> save): the QR
-        code's presigned URL points at the object storage copy of route.gpx, and
-        the download route re-pulls the working dir from object storage.
+        Written through to object storage (via create_qr_code_routing -> save):
+        the QR code's presigned URL points at the object storage copy of
+        route.gpx, and the download route pulls from object storage.
         """
         log.info(
             f"Setting route direction for job {self.model.job_id}: "
@@ -564,9 +568,7 @@ class CosmonautJob(BaseJob):
             json.dump({"reversed": reversed_flag}, f)
 
         # Force regeneration — create_gpx skips existing files.
-        gpx_path = os.path.join(self.working_dir, GPX_FILE)
-        if os.path.exists(gpx_path):
-            os.remove(gpx_path)
+        job_persistence.delete_files(self.model.job_id, [GPX_FILE])
         self.create_qr_code_routing()
 
     def get_route_polyline(self):
@@ -597,8 +599,12 @@ class CosmonautJob(BaseJob):
             self.model.submitted = True
             self.model.status = JOB_STATUS_RUNNING
             self.model.stage = max(self.model.stage, 4)
-            # Sync files — the worker pulls from object storage via get_files().
-            # Also writes parameters.json via dump_routing_params().
+            # Pull, then upload: the worker pulls from object storage, and an
+            # outdated local copy must not replace the stored one. A pull may
+            # replace derived street files that ran ahead of storage; the worker
+            # recomputes them (StreetSelector.ensure_projected). The save also
+            # writes parameters.json via dump_routing_params().
+            job_persistence.work_dir(self.model.job_id)
             self.save()
 
             celery_task_id, failed = background_job_manager.submit_routing_job(self)
@@ -609,7 +615,7 @@ class CosmonautJob(BaseJob):
 
             # Store task ID — DB update only, worker already has the files
             self.model.celery_task_id = celery_task_id
-            self.save(sync_files=False)
+            self.update_columns("celery_task_id")
 
             log.info(f"Job {self.model.job_id} submitted with task_id={celery_task_id}")
             return celery_task_id
@@ -638,11 +644,11 @@ class CosmonautJob(BaseJob):
             # Map Celery states to job statuses
             if celery_status == "SUCCESS":
                 self.model.status = JOB_STATUS_COMPLETED
-                self.save(sync_files=False)
+                self.update_columns("status")
                 log.info(f"Synced job {self.model.job_id} status to COMPLETED")
             elif celery_status in ["FAILURE", "REVOKED"]:
                 self.model.status = JOB_STATUS_FAILED
-                self.save(sync_files=False)
+                self.update_columns("status")
                 log.warning(
                     f"Synced job {self.model.job_id} status to FAILED "
                     f"(Celery: {celery_status})"
@@ -685,7 +691,10 @@ class CosmonautJob(BaseJob):
         return completed
 
     def get_logs(self) -> str:
-        """Retrieve logs for the job from object storage.
+        """Retrieve the job's log from the local work dir.
+
+        Reads the log file on this pod's disk; it is not pulled from object
+        storage, so it is current only while web and worker share a work dir.
 
         Returns:
             str: Job logs as a string
@@ -707,11 +716,11 @@ class CosmonautJob(BaseJob):
 
         This method:
         - Cancels the Celery task if job is currently RUNNING
-        - Deletes output files (logs, solutions, GPX, QR codes)
+        - Deletes output files (logs, solutions, GPX, QR codes) everywhere
         - Preserves input files (uploaded data, parameters, OSM data, plots)
         - Sets status to PENDING
         - Clears celery_task_id and submitted flag
-        - Saves changes to database and object storage
+        - Updates the database row
         """
         log.info(f"Resetting job {self.model.job_id}")
 
@@ -721,12 +730,9 @@ class CosmonautJob(BaseJob):
             background_job_manager.revoke_job(self.model.celery_task_id, terminate=True)
 
         # Delete known output files
-        output_files = [LOG_FILE_NAME, ROUTE_FILENAME, GPX_FILE, QR_CODE_FILE]
-        for fname in output_files:
-            fpath = os.path.join(self.working_dir, fname)
-            if os.path.isfile(fpath):
-                os.unlink(fpath)
-                log.debug(f"Deleted output file: {fpath}")
+        job_persistence.delete_files(
+            self.model.job_id, [LOG_FILE_NAME, ROUTE_FILENAME, GPX_FILE, QR_CODE_FILE]
+        )
 
         # Reset job state
         self.model.status = JOB_STATUS_PENDING
@@ -734,7 +740,6 @@ class CosmonautJob(BaseJob):
         self.model.submitted = False
         self.model.stage = min(self.model.stage, 4)
 
-        # Save changes
-        self.save()
+        self.update_columns("status", "celery_task_id", "submitted", "stage")
 
         log.info(f"Job {self.model.job_id} reset to PENDING")

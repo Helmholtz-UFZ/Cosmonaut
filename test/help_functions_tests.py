@@ -1,9 +1,13 @@
+import contextlib
 import datetime
+import os
+import shutil
 import time
 
 import pytest
 
 from cosmonaut_app.constants.general import JOB_STATUS_COMPLETED
+from cosmonaut_app.cosmonaut_job import CosmonautJob
 
 
 def check_all_errors(page):
@@ -90,3 +94,16 @@ def job_row(job_id, *, start_date=None, submitted=True):
         "epsg": 4326,
         "config": {},
     }
+
+
+@contextlib.contextmanager
+def another_pod_meanwhile(job):
+    """Yield job as loaded on a pod with its own disk; this pod's work dir is
+    parked meanwhile and comes back exactly as it was."""
+    parked = job.working_dir + ".parked"
+    os.rename(job.working_dir, parked)
+    try:
+        yield CosmonautJob(job_id=job.model.job_id)
+    finally:
+        shutil.rmtree(job.working_dir, ignore_errors=True)
+        os.rename(parked, job.working_dir)

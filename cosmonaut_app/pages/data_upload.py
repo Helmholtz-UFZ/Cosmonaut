@@ -66,7 +66,6 @@ import logging
 
 import dash
 import dash_bootstrap_components as dbc
-from cosmo_ecosystem.object_storage_manager import save_files
 from dash import (
     Input,
     Output,
@@ -520,12 +519,12 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         )
         return result
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     job.model.epsg = epsg_input
-    job.delete_membership(sync_files=False)
+    job.delete_membership()
     try:
         file_path, bounds, membership_df = job.upload_membership(
-            filename, contents, epsg_input, sync_files=False
+            filename, contents, epsg_input
         )
     except FileValidationError as e:
         result = _no_update_upload()
@@ -540,13 +539,6 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         )
         return result
 
-    # Single sync to object storage before plot generation — the worker pulls
-    # files via get_files() so the membership CSV must be in object storage before the
-    # task starts.  Syncing here (before plots) keeps the payload small and fast.
-    # Previous intermediate saves used sync_files=False to avoid redundant rclone
-    # calls that blocked this synchronous callback for minutes on large uploads.
-    save_files(job.model.job_id)
-
     log.debug("Upload finished, generating plots and submitting OSM task")
 
     plot = ClassificationPlot(
@@ -554,6 +546,11 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
     )
     plot.generate_plots()
     log.debug("Classification plots generated.")
+    # Write-through: the raster is an output of this request (a GDAL warp of the
+    # whole CSV), not a file another pod can recompute cheaply, and the map pulls
+    # it from the remote prefix (ADR 0001). The row is saved as it stands; the
+    # street-processing state follows below via update_columns.
+    job.save()
 
     tile_url = get_tile_url(job_id, job.working_dir)
 
@@ -562,8 +559,9 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         job.model.membership_upload["street_processing"] = task_id
     else:
         job.model.membership_upload["street_processing"] = "FAILED"
-    # Skip sync — the worker's save() will sync everything when it finishes
-    job.save(sync_files=False)
+    # Row only — the membership CSV and raster went to object storage above,
+    # and the worker's save() uploads the rest when it finishes
+    job.update_columns("membership_upload")
 
     log.debug(f"Membership file uploaded and processed for job {job_id}")
 
@@ -613,7 +611,7 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
 
     log.info(f"Uploading predictor file for job {job_id}")
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     try:
         job.upload_predictor(predictor_contents)
     except FileValidationError as e:
@@ -841,7 +839,7 @@ def delete_membership_file(n_clicks, job_id):
 
     log.info(f"Delete membership button clicked for job {job_id}")
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
 
     if job.model.status != JOB_STATUS_PENDING:
         log.warning(f"Cannot delete upload - job {job_id} status is {job.model.status}")
@@ -891,7 +889,7 @@ def delete_predictor_file(n_clicks, job_id):
 
     log.info(f"Delete predictor button clicked for job {job_id}")
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
 
     if job.model.status != JOB_STATUS_PENDING:
         log.warning(
@@ -958,7 +956,7 @@ def poll_street_processing(n_intervals, job_id):
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     status = job.get_street_processing_status()
 
     if status == "COMPLETED":

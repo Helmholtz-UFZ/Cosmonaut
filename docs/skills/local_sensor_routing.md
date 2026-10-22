@@ -101,7 +101,8 @@ Easting,Northing,Mask,DEM,Slope,SOC,Clay,...
 ### File 3 — `osm_data_transformed.geojson` (`OSM_FILENAME`)
 
 **Produced by:** `OsmDownloader.run_osm_query()` (called during membership upload) and
-then **regenerated** by `StreetSelector.save()` after every street-selection change.
+then **regenerated** by `StreetSelector.ensure_projected()` (in the routing worker) from the
+edited network whenever it does not match the street-edit intent in the job row.
 The file is the projected version of the edited road network; the user never uploads it.
 
 **Key properties required by sensor-routing** (`point_mapping.py`):

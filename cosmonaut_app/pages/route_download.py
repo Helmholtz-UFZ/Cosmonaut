@@ -64,6 +64,7 @@ GPX files are stored in S3 object storage and retrieved via Flask routes.
 import logging
 
 import dash_bootstrap_components as dbc
+from cosmo_ecosystem import job_persistence
 from cosmo_ecosystem.files_route import _download_href
 from dash import Input, Output, State, callback, dcc, html, register_page
 from dash.exceptions import PreventUpdate
@@ -101,8 +102,9 @@ def layout(job_id):
     job = CosmonautJob(job_id=job_id)
     log.info(f"Route & Download layout called with job_id={job_id}")
     job.model.stage = max(job.model.stage, 5)
-    job.save(sync_files=False)
+    job.update_columns("stage")
 
+    job_persistence.work_dir(job.job_id)
     job.create_qr_code_routing()
 
     # Construct full download URL
@@ -206,7 +208,8 @@ def toggle_route_direction(reversed_value, job_id):
     if reversed_value is None or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
+    job_persistence.work_dir(job.job_id)
     # No-op when unchanged: page re-renders redeliver the current value.
     if job.is_route_reversed() == reversed_value:
         raise PreventUpdate

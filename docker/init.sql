@@ -18,7 +18,9 @@ CREATE TABLE jobs (
     epsg INT,
     config JSONB,
     celery_task_id VARCHAR,
-    start_date DATE
+    start_date DATE,
+    -- Street-selection intent; the edited/projected GeoJSON derive from it.
+    street_edits JSONB
 );
 
 -- Application logging table

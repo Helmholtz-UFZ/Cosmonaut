@@ -181,7 +181,7 @@ def layout(job_id):
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
     job.model.stage = max(job.model.stage, 3)
-    job.save(sync_files=False)
+    job.update_columns("stage")
 
     # Create form with FormFactory (active parameter controls disabled state and styling)
     # IDs are always preserved for callbacks regardless of active state
@@ -255,7 +255,7 @@ def toggle_advanced_options(n_clicks, is_open):
 )
 def update_routing_params(**inputs):
     job_id = inputs.pop("job_id")
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
 
     triggered_ids = {
         t["prop_id"].split(".")[0]
@@ -276,12 +276,14 @@ def update_routing_params(**inputs):
     valid, output_dict = form_factory.validate_callback(inputs)
     log.info(f"Routing params callback triggered by {triggered_ids}, valid={valid}")
     if valid and NEXT_BUTTON_ROUTING_PARAMS_ID in triggered_ids:
+        changed_fields = []
         for key, value in inputs.items():
             if hasattr(job.model, key):
                 setattr(job.model, key, value)
+                changed_fields.append(key)
         job.model.stage = max(job.model.stage, 3)
-        # Skip file sync — submit() syncs before the worker starts
-        job.save(sync_files=False)
+        # Row only — submit() uploads the files before the worker starts
+        job.update_columns("stage", *changed_fields)
         return {
             **output_dict,
             "url": build_url_step("route_computation", job_id),

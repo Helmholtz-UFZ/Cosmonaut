@@ -13,7 +13,7 @@ it. See ../docs/decisions/20260806-two-sqlalchemy-engines-transitional.md, which
 this supersedes, and cosmo-ecosystem's docs/conventions/database_schema.md.
 
 The authoritative DDL for this table stays ``docker/init.sql``. ``JobColumns``
-carries only the six columns every consumer app is measured to have; the seven
+carries only the six columns every consumer app is measured to have; the eight
 below are cosmonaut's own — extra columns are invisible to the framework's
 queries, missing ones would not be, which is why the mixin is an intersection
 rather than a union.
@@ -45,6 +45,7 @@ class JobTable(JobColumns, Base):
     epsg = Column("epsg", Integer)
     config = Column("config", JSON)
     celery_task_id = Column("celery_task_id", String, nullable=True)
+    street_edits = Column("street_edits", JSON, nullable=True)
 
 
 # Assigned on DbManager itself, not on the subclass below: the framework pages

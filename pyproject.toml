@@ -15,7 +15,7 @@ dependencies = [
     # Shared Dash + Celery + PostgreSQL + S3 framework, pinned to a frozen tag.
     # COSMOPOLITAN pins the same tag; a framework change is an MR + new tag there,
     # then both apps re-pin. Never edit the framework from an app repo.
-    "cosmo-ecosystem @ git+https://github.com/Helmholtz-UFZ/CosmoEcosystem@v0.10.0",
+    "cosmo-ecosystem @ git+https://github.com/Helmholtz-UFZ/CosmoEcosystem@v0.11.0",
     "dash>=3.2.0,<4",
     "dash-ag-grid>=32.0.0,<33",
     "dash-bootstrap-components>=2.0.3,<3",

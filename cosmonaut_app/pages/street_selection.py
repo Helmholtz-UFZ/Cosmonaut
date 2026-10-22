@@ -61,11 +61,14 @@ parameters for the final route calculation.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
-Street selection state is persisted to ``street_edits.json`` in the job's
-work directory. The file records removed road IDs, selected tag filters,
-allowed track grades, and a boolean flag for keep-largest. Every edit re-derives
-``osm_data_edited.geojson`` and ``osm_data_transformed.geojson`` from the
-immutable ``osm_data_download.geojson`` via :meth:`StreetSelector.apply_edits`.
+Street selection state (the intent) is persisted in the ``street_edits`` column
+of the job's row: removed road IDs, selected tag filters, allowed track grades,
+and a boolean flag for keep-largest. Every edit writes the row and re-derives
+``osm_data_edited.geojson`` from the immutable ``osm_data_download.geojson`` via
+:meth:`StreetSelector.apply_edits`; no object storage access per edit. The
+edited and projected GeoJSON are derived files: the layout pulls the work dir
+and recomputes them when missing or stale (:meth:`StreetSelector.refresh`), and
+submit uploads them.
 
 Interactive callbacks use Dash Leaflet click events with feature_id tracking.
 The StreetSelector class handles graph connectivity analysis and road network
@@ -77,6 +80,7 @@ from typing import Any
 
 import dash
 import dash_bootstrap_components as dbc
+from cosmo_ecosystem import job_persistence
 from dash import (
     ALL,
     Input,
@@ -130,7 +134,7 @@ from cosmonaut_app.layout import (
     page_container_fullscreen_layout,
     progress_footer,
 )
-from cosmonaut_app.street_selector import StreetSelector
+from cosmonaut_app.street_selector import StreetSelector, adopt_legacy_edits
 
 log = logging.getLogger(__name__)
 
@@ -224,7 +228,14 @@ def layout(job_id: str):
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
     job.model.stage = max(job.model.stage, 2)
-    job.save(sync_files=False)
+    job.update_columns("stage")
+    # A legacy street_edits.json still on this pod's disk may be newer than the
+    # stored copy (edits used to stay local until submit): adopt it before the
+    # pull can overwrite it. The intent lives in the row from then on.
+    adopt_legacy_edits(job)
+    # The remote copy wins. Street edits keep their intent in the row, and the
+    # derived GeoJSON is recomputed below if the pull left it missing or stale.
+    job_persistence.work_dir(job.job_id)
 
     completed_steps = job.get_completed_steps()
 
@@ -239,6 +250,7 @@ def layout(job_id: str):
         return _street_processing_failed_layout(job_id, completed_steps)
 
     sel = StreetSelector(job)
+    sel.refresh()
 
     card_body = []
 
@@ -593,7 +605,7 @@ def poll_street_processing_status(n_intervals, pathname):
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     sp_status = job.get_street_processing_status()
 
     if sp_status == "COMPLETED":
@@ -647,7 +659,7 @@ def remove_selected(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     if job.get_status() != JOB_STATUS_PENDING:
         raise PreventUpdate
 
@@ -686,7 +698,7 @@ def keep_largest_subnetwork(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     if job.get_status() != JOB_STATUS_PENDING:
         raise PreventUpdate
 
@@ -742,7 +754,7 @@ def reset_edits(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     sel = StreetSelector(job)
     sel.reset()
     is_active = job.get_status() == JOB_STATUS_PENDING
@@ -850,7 +862,7 @@ def update_tags_dropdown(
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     if job.get_status() != JOB_STATUS_PENDING:
         # The checklist is only soft-disabled via CSS (pe-none) for non-active
         # jobs — keyboard toggling still fires this callback, so guard here.
@@ -886,7 +898,7 @@ def update_track_grades(
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     if job.get_status() != JOB_STATUS_PENDING:
         # Same CSS-only soft-disable as the road-type checklist — guard here.
         raise PreventUpdate
@@ -932,7 +944,7 @@ def restore_single_road(n_clicks_list, pathname, version):
         raise PreventUpdate
 
     road_id = ctx.triggered_id["index"]
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     sel = StreetSelector(job)
     sel.restore_road(road_id)
 
@@ -964,7 +976,7 @@ def clear_all_removed_roads(n_clicks, pathname, version):
     if not n_clicks or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id, sync_files=False)
+    job = CosmonautJob(job_id=job_id)
     sel = StreetSelector(job)
     sel.clear_removed_roads()
 
