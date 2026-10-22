@@ -37,7 +37,8 @@ Written into the job `working_dir`:
 | `osm_data_edited.geojson` | EPSG:4326 | Editable copy (starts identical to the download; the Street Selection page edits this) |
 | `osm_data_transformed.geojson` (`OSM_FILENAME`) | job EPSG | The projected file **sensor-routing reads** |
 
-The transformed file is regenerated from the edited file after every street-selection change — see
+The edited and transformed files are derived from the download and the street-edit intent in the job
+row, and recomputed when missing or stale (the transformed one before routing) — see
 [sensor-routing-integration](sensor-routing-integration.md) and `street_selector.py`, which reproject
 through the **shared** [projection.py](../../../cosmonaut_app/osm/projection.py) so the download path
 and the edit path produce byte-identical output.

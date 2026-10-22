@@ -70,7 +70,9 @@ files and plots, and resets `membership_upload`. `time_to_live()` computes days-
 - **Don't** add a field to `JobModel` expecting it in the `config` JSONB (or vice-versa): the split
   is by membership in `FullPipelineConfig.model_fields`, not by where you declare it.
 - **Don't** write to `working_dir` and forget to `save()` — files not uploaded never reach object storage and
-  are lost when the stateless web pod restarts. (Street edits are the known exception until ticket 06.)
+  are lost when the stateless web pod restarts. Street edits are the sanctioned exception: their intent
+  is in the `street_edits` column and the edited/projected GeoJSON are derived files that `StreetSelector`
+  recomputes when missing or stale (see `street_selector.py`).
 
 ## Related links
 
