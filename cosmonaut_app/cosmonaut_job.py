@@ -711,7 +711,6 @@ class CosmonautJob(BaseJob):
             log_file_path = job_persistence.pull_file(
                 self.model.job_id, LOG_FILE_NAME
             )
-        log_file_path = os.path.join(self.working_dir, LOG_FILE_NAME)
         if os.path.exists(log_file_path):
             with open(log_file_path) as f:
                 log_content = f.read()
