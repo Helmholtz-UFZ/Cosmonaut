@@ -384,8 +384,8 @@ wheels = [
 
 [[package]]
 name = "cosmo-ecosystem"
-version = "0.10.0"
-source = { git = "https://github.com/Helmholtz-UFZ/CosmoEcosystem?rev=v0.10.0#e7e52a2f6148aaa1d1c7734f6da83f3c1db96a42" }
+version = "0.11.0"
+source = { git = "https://github.com/Helmholtz-UFZ/CosmoEcosystem?rev=v0.11.0#ce716a16356c804558e0df4b546c0dd8ce618fa6" }
 dependencies = [
     { name = "boto3" },
     { name = "celery", extra = ["redis"] },
@@ -450,7 +450,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "celery", extras = ["redis"], specifier = ">=5.4.0,<6" },
-    { name = "cosmo-ecosystem", git = "https://github.com/Helmholtz-UFZ/CosmoEcosystem?rev=v0.10.0" },
+    { name = "cosmo-ecosystem", git = "https://github.com/Helmholtz-UFZ/CosmoEcosystem?rev=v0.11.0" },
     { name = "dash", specifier = ">=3.2.0,<4" },
     { name = "dash-ag-grid", specifier = ">=32.0.0,<33" },
     { name = "dash-bootstrap-components", specifier = ">=2.0.3,<3" },
