@@ -116,6 +116,54 @@ linting:
   script:
     - "pip install --quiet ruff==0.16.0"
     - "ruff check ."
+    # Unpinned images move silently (titiler:latest went to 2.x). Every `image:` in the
+    # compose files needs an explicit tag, written plainly: no `:latest`, no quotes, no
+    # trailing comment. Services with a `build:` key are skipped, since their `image:`
+    # only names the locally built image. Plain line scan, no YAML parser: the python
+    # image has none, and compose service keys sit at a fixed two-space indent.
+    - |
+      python3 - <<'EOF'
+      import glob
+      import re
+      import sys
+
+      problems = []
+      for path in sorted(glob.glob("docker-compose*.yml")):
+          service = None
+          images = {}  # service -> (line number, raw value)
+          built = set()  # services with a build: key
+          for number, line in enumerate(open(path), start=1):
+              if re.match(r"\S", line) and not line.startswith("#"):
+                  service = None  # a new top-level key ends the services block
+              match = re.match(r"  ([\w.-]+):\s*$", line)
+              if match:
+                  service = match.group(1)
+              if service is None:
+                  continue
+              if re.match(r"    build:", line):
+                  built.add(service)
+              match = re.match(r"    image:\s*(.*?)\s*$", line)
+              if match:
+                  images[service] = (number, match.group(1))
+          for service, (number, value) in images.items():
+              if service in built:
+                  continue
+              if "#" in value or '"' in value or "'" in value:
+                  problem = "quoted image or trailing comment"
+              else:
+                  # A tag is a colon in the last path segment: host:5000/img has none.
+                  name, _, tag = value.rpartition("/")[2].partition(":")
+                  if not tag:
+                      problem = "no tag"
+                  elif tag == "latest":
+                      problem = ":latest"
+                  else:
+                      continue
+              problems.append(f"{path}:{number}: {service}: {value!r}: {problem}")
+
+      print("\n".join(problems) or "all compose images are pinned")
+      sys.exit(bool(problems))
+      EOF
 
 # Unit tests: no external services needed.
 # Only files confirmed to work without DB/Redis/object storage are listed here.
