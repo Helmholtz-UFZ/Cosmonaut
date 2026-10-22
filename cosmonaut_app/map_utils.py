@@ -29,7 +29,7 @@ def create_tile_layer_component(
     encoded_url = urllib.parse.quote(file_path, safe=":/")
 
     tile_url = (
-        f"{TILESERVER_URL}/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}@1x"
+        f"{TILESERVER_URL}/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}"
         f"?url={encoded_url}&maxzoom=15{colormap_params}"
     )
     log.info(f"Using map URL: {tile_url}")
