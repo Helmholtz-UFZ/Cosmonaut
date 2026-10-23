@@ -34,6 +34,7 @@ from cosmonaut_app.constants.general import (
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.files_route import serve_files
+from test.help_functions_tests import celery_says
 
 
 @pytest.fixture
@@ -124,14 +125,6 @@ def _submit(job, membership_file_path, predictor_file_path):
         job.submit()
 
 
-def _celery_says(status):
-    """Patch the Celery state lookup the pollers use."""
-    return mock.patch(
-        "cosmonaut_app.cosmonaut_job.background_job_manager.get_job_status",
-        return_value={"status": status},
-    )
-
-
 def test_loading_a_job_makes_no_rclone_calls(job, rclone_calls):
     rclone_calls.clear()
 
@@ -149,7 +142,7 @@ def test_the_status_pollers_make_no_rclone_calls(job, rclone_calls, pollers):
     rclone_calls.clear()
 
     poll_street_processing, poll_street_processing_status, update_status = pollers
-    with _celery_says("SUCCESS"):
+    with celery_says("SUCCESS"):
         poll_street_processing(1, job_id)
         poll_street_processing_status(1, f"/job/{job_id}/street-selection")
         update_status(1, None, job_id)

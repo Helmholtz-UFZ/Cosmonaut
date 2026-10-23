@@ -3,6 +3,7 @@ import datetime
 import os
 import shutil
 import time
+from unittest import mock
 
 import pytest
 
@@ -107,3 +108,11 @@ def another_pod_meanwhile(job):
     finally:
         shutil.rmtree(job.working_dir, ignore_errors=True)
         os.rename(parked, job.working_dir)
+
+
+def celery_says(status):
+    """Patch the Celery state lookup to report status."""
+    return mock.patch(
+        "cosmonaut_app.cosmonaut_job.background_job_manager.get_job_status",
+        return_value={"status": status},
+    )

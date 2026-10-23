@@ -573,7 +573,7 @@ def cancel_computation(n_clicks, job_id):
     prevent_initial_call=True,
 )
 def restart_computation(n_clicks, job_id):
-    """Restart the computation (cancel if running, then start).
+    """Restart a computation that is not running: reset, then start.
 
     Checks current status to handle edge cases (multiple tabs).
     Closes loading modal, enables polling interval, and triggers celery info update.
@@ -588,10 +588,6 @@ def restart_computation(n_clicks, job_id):
     if current_status == JOB_STATUS_RUNNING:
         log.warning(f"Job {job_id} is running, cannot restart. Cancel first.")
         return False, no_update, no_update
-
-    # Cancel existing task if it exists (safety check)
-    if job.model.celery_task_id:
-        job.cancel()
 
     job.reset()
     job.submit()

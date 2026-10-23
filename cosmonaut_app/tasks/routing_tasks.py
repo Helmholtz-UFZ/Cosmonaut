@@ -10,7 +10,6 @@ ends as FAILED in the row and as a successful Celery task.
 import logging
 from datetime import timedelta
 
-from celery import Task
 from cosmo_ecosystem import job_run
 from cosmo_ecosystem.object_storage_manager import get_presigned_download_url
 from sensor_routing.full_pipeline_cli import sensor_routing_pipeline
@@ -22,39 +21,33 @@ from cosmonaut_app.constants.general import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.email_service import send_mail
+from cosmonaut_app.error_handling import JobNotFound
 from cosmonaut_app.street_selector import StreetSelector
 
 log = logging.getLogger(__name__)
 
 
-class RoutingTask(Task):
-    """Base class for routing tasks with custom error handling."""
-
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
-        """Handle task failure."""
-        log.error(f"Task {task_id} failed: {exc}")
-        # This is not defensive programming designed intentionally like this.
-        job_id = args[0] if args else kwargs.get("job_id")
-        if job_id:
-            log.error(f"Job {job_id} failed with error: {str(exc)}")
-
-
 def process_routing_job(self, job_id):
     """Celery task to process a routing job.
 
-    Sends the submission mail, runs the route computation as a job run, then
-    sends the end mail for either outcome, from the job's row as the run left it.
+    Runs the route computation as a job run (the submission mail included),
+    then sends the end mail for either outcome, from the job's row as the run
+    left it. A job deleted meanwhile gets no end mail and fails no task
+    (cosmo-ecosystem ADR 0002: a run's outcome lives in the row, not in Celery).
 
     Args:
         job_id: ID of the job to process
     """
     log.info(f"Starting routing job task for job_id={job_id}")
-    _notify_submission(CosmonautJob(job_id=job_id))
-
     status = job_run.run(job_id, compute_route, EXCLUDED_LOG_PACKAGES)
     log.info(f"Routing job {job_id} finished with status {status}")
 
-    _notify_user(CosmonautJob(job_id=job_id), status)
+    try:
+        job = CosmonautJob(job_id=job_id)
+    except JobNotFound:
+        log.info(f"Job {job_id} was deleted during its run; no end mail sent.")
+        return
+    _notify_user(job, status)
 
 
 def compute_route(job_id, work_dir):
@@ -62,9 +55,12 @@ def compute_route(job_id, work_dir):
 
     The ``compute`` of the job run: it signals failure only by raising and
     writes no status; the run uploads the work dir and writes the status.
+    The submission mail is sent here, not before the run, because it needs the
+    job loaded, and a load failing outside the run would leave the row RUNNING.
     """
     log.info(f"Starting routing job computation for job_id={job_id}")
     job = CosmonautJob(job_id=job_id)
+    _notify_submission(job)
     StreetSelector(job).ensure_projected()
     sensor_routing_pipeline(work_dir)
 

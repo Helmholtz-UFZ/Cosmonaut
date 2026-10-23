@@ -11,7 +11,6 @@ from datetime import date
 import pandas as pd
 from cosmo_ecosystem import job_log, job_persistence
 from cosmo_ecosystem.base_job import BaseJob
-from cosmo_ecosystem.job_log import JobLogHandler
 from cosmo_ecosystem.job_retention import days_to_live
 from pyproj import CRS, Transformer
 from sensor_routing.constants import (
@@ -609,7 +608,7 @@ class CosmonautJob(BaseJob):
             celery_task_id, failed = background_job_manager.submit_routing_job(self)
 
             if failed:
-                log.error(f"Failed to submit job {self.model.job_id}")
+                self._fail_to_start()
                 return None
 
             # Store task ID — DB update only, worker already has the files
@@ -622,6 +621,19 @@ class CosmonautJob(BaseJob):
         except Exception as e:
             log.error(f"Failed to submit job {self.model.job_id}: {str(e)}")
             raise
+
+    def _fail_to_start(self):
+        """Write FAILED and say so in the job log: the job was never enqueued.
+
+        The RUNNING written before the enqueue must not outlive a failed
+        enqueue (cosmo-ecosystem ADR 0002); wording as the framework's
+        ``Job.submit``.
+        """
+        message = f"Cannot start job {self.model.job_id}."
+        log.error(message)
+        job_log.append(self.model.job_id, message, level=logging.ERROR)
+        self.model.status = JOB_STATUS_FAILED
+        self.update_columns("status")
 
     def get_status(self) -> str:
         """Return the job's status as its row holds it.
@@ -645,15 +657,7 @@ class CosmonautJob(BaseJob):
         background_job_manager.revoke_job(self.model.celery_task_id, terminate=True)
         message = f"Job {self.model.job_id}: run cancelled by user."
         log.info(message)
-        # Handed to the handler directly, not through a logger: another thread
-        # of this web process logging meanwhile must not land in this job log.
-        handler = JobLogHandler(self.model.job_id)
-        try:
-            handler.handle(
-                log.makeRecord(log.name, logging.INFO, __file__, 0, message, (), None)
-            )
-        finally:
-            handler.close()
+        job_log.append(self.model.job_id, message)
         self.model.status = JOB_STATUS_FAILED
         self.update_columns("status")
 

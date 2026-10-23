@@ -41,35 +41,40 @@ the id, and pulls a current copy from object storage (see [cosmonaut-job](../con
 
 The canonical submit path is `CosmonautJob.submit()`: set `status=RUNNING`, `save()` (so the worker
 sees current files + `parameters.json`), enqueue, then store `celery_task_id` with `update_columns`.
+An enqueue that reports failure writes `FAILED` and "Cannot start job <id>." to the job log.
 
-## Status flows back lazily (no callbacks from the worker)
+## Status lives in the job row (cosmo-ecosystem ADR 0002)
 
-Workers do **not** push status to the web pod. Instead the job object pulls it from Celery on demand:
+Workers do **not** push status to the web pod, and the web pod does **not** ask Celery for a
+route computation's status. The job row is the only source:
 
-- `CosmonautJob.get_status()` — only if the job is `RUNNING` with a `celery_task_id`, query Celery and
-  map `SUCCESS → COMPLETED`, `FAILURE`/`REVOKED → FAILED`, persisting the change.
-- `CosmonautJob.get_street_processing_status()` — same idea for the upload task, reading the task ID
-  stored in `membership_upload["street_processing"]` (see the overloaded-field note in
+- `process_routing_job` runs the computation through `cosmo_ecosystem.job_run.run`, which writes
+  `RUNNING`, then `COMPLETED` (after uploading the work dir) or `FAILED`, and captures the job log in
+  the database (`cosmo_ecosystem.job_log`), readable from any pod while the run goes on. A failed run
+  ends as a *successful* Celery task; the end mail runs after `run` for both outcomes.
+- `CosmonautJob.get_status()` reads the row only; `get_logs()` returns `job_log.read`.
+- `CosmonautJob.cancel()` (cancel button, and `reset()` of a RUNNING job) revokes the task, then writes
+  `FAILED` and a "run cancelled by user" record via `job_log.append`: a terminated worker writes nothing.
+- `CosmonautJob.get_street_processing_status()` still asks Celery, for the upload task only, reading
+  the task ID stored in `membership_upload["street_processing"]` (see the overloaded-field note in
   [cosmonaut-job](../concepts/cosmonaut-job.md)).
-
-So a page renders current status by *asking*, not by having been *told*. The task itself also writes a
-terminal `status` in its own `try/except` (`COMPLETED`/`FAILED`) and sends the user email — the lazy
-sync is the fallback for the window before the task's own write lands or when a task is revoked.
 
 ## Error handling and retries
 
-- Both task base classes (`UploadTask`, `RoutingTask`) implement `on_failure` to log against the job id.
+- `UploadTask` implements `on_failure` to log against the job id. The routing task needs none: `run`
+  turns every failure into `FAILED` in the row and never re-raises.
 - `process_upload_task` retries transient network/Overpass errors (`ConnectionError`, `Timeout`,
   `ReadTimeoutError`, and HTTP 429/502/503/504) with exponential backoff, max 3; other errors mark
   `street_processing=FAILED` and email the maintainer. (See the `e.response is not None` gotcha in
   [osm-backend](osm-backend.md).)
-- `revoke_job(task_id, terminate=True)` cancels/kills a task — used by `reset()` and `delete_membership()`.
+- `revoke_job(task_id, terminate=True)` cancels/kills a task — used by `cancel()` and `delete_membership()`.
 
 ## Do / Don't
 
 - **Do** pass only the `job_id` to a task and re-load and `job_persistence.work_dir()` inside it.
 - **Do** `save()` before enqueuing so the worker's object storage pull is current.
-- **Don't** expect the worker to update the UI directly — the web side syncs status lazily via the job.
+- **Don't** expect the worker to update the UI directly — the web side polls the job row.
+- **Don't** derive a route computation's status from Celery; read the job row (ADR 0002).
 - **Don't** pass user input into task args that become object-storage keys; derive keys server-side from
   the validated `job_id`.
 
@@ -79,7 +84,7 @@ sync is the fallback for the window before the task's own write lands or when a 
   [celery_config.py](../../../cosmonaut_app/celery_config.py),
   [celery_app.py](../../../cosmonaut_app/celery_app.py),
   [tasks/](../../../cosmonaut_app/tasks/)
-- Concept: [cosmonaut-job](../concepts/cosmonaut-job.md) (`submit()`, status sync, `work_dir`)
+- Concept: [cosmonaut-job](../concepts/cosmonaut-job.md) (`submit()`, `cancel()`, `work_dir`)
 - Systems: [osm-backend](osm-backend.md) (`upload` queue work),
   [sensor-routing-integration](sensor-routing-integration.md) (`routing` queue work)
 - Overview: [architecture.md](../../architecture.md)
