@@ -314,15 +314,15 @@ or if you need to report problems to system administrators.
 
 **Computation Logs:**
 
-The logs section displays worker output as it becomes available. During RUNNING state,
-logs update every 3 seconds via polling. Once the computation completes (COMPLETED or
-FAILED status), the full worker logs are displayed, containing:
+The logs section displays the log of the latest computation run as it is written.
+During RUNNING state, logs update every 3 seconds via polling. Once the computation
+completes (COMPLETED or FAILED status), the full log is displayed, containing:
 - Algorithm execution steps and progress
 - Parameters used for the optimization
 - Statistics about the generated route
 - Any warnings or errors encountered
 
-The logs are synced from the worker container after the job finishes.
+A cancelled computation shows FAILED, with the cancel noted at the end of the log.
 
 <img src="/assets/docs/screenshots/route_computation.png" alt="Route Computation" class="mw-100" />
 

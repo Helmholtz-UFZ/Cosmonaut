@@ -19,12 +19,12 @@ from cosmonaut_app.background_job_manager import (
     background_job_manager,
 )
 from cosmonaut_app.tasks.maintenance_tasks import MaintenanceTask, cleanup_task
-from cosmonaut_app.tasks.routing_tasks import RoutingTask, process_routing_job
+from cosmonaut_app.tasks.routing_tasks import process_routing_job
 from cosmonaut_app.tasks.upload_tasks import UploadTask, process_upload_task
 
 app = background_job_manager.app
 
-app.task(bind=True, base=RoutingTask, name=NAME_ROUTING_TASK)(process_routing_job)
+app.task(bind=True, name=NAME_ROUTING_TASK)(process_routing_job)
 # The test task comes from the framework. NAME_TEST_TASK is the framework's name,
 # and the framework worker-management page submits exactly that name — registering
 # a local task under a local name would leave the page's button enqueueing into a

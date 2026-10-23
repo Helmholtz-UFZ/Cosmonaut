@@ -9,7 +9,7 @@ import uuid
 from datetime import date
 
 import pandas as pd
-from cosmo_ecosystem import job_persistence
+from cosmo_ecosystem import job_log, job_persistence
 from cosmo_ecosystem.base_job import BaseJob
 from cosmo_ecosystem.job_retention import days_to_live
 from pyproj import CRS, Transformer
@@ -32,7 +32,6 @@ from cosmonaut_app.constants.general import (
     JOB_STATUS_FAILED,
     JOB_STATUS_PENDING,
     JOB_STATUS_RUNNING,
-    LOG_FILE_NAME,
     OSM_DATA_DOWNLOAD_FILE,
     OSM_DATA_EDITED_FILE,
     QR_CODE_FILE,
@@ -540,9 +539,7 @@ class CosmonautJob(BaseJob):
         )
         # Honor the persisted direction — a GPX regenerated after an object storage
         # round-trip must match what the user chose on Route Download.
-        qr_code_url = route_creator.create_gpx(reverse=self.is_route_reversed())
-        self.save()
-        return qr_code_url
+        return route_creator.create_gpx(reverse=self.is_route_reversed())
 
     def is_route_reversed(self) -> bool:
         """Return the persisted route direction (False when never toggled)."""
@@ -555,7 +552,7 @@ class CosmonautJob(BaseJob):
     def set_route_reversed(self, reversed_flag: bool):
         """Persist the route direction and regenerate GPX + QR code to match.
 
-        Written through to object storage (via create_qr_code_routing -> save):
+        Written through to object storage (save after create_qr_code_routing):
         the QR code's presigned URL points at the object storage copy of
         route.gpx, and the download route pulls from object storage.
         """
@@ -570,6 +567,7 @@ class CosmonautJob(BaseJob):
         # Force regeneration — create_gpx skips existing files.
         job_persistence.delete_files(self.model.job_id, [GPX_FILE])
         self.create_qr_code_routing()
+        self.save()
 
     def get_route_polyline(self):
         """Return the route as WGS84 [[lat, lon], ...] positions, or None if unavailable.
@@ -594,67 +592,79 @@ class CosmonautJob(BaseJob):
     def submit(self):
         """Submit the job to background worker."""
         log.info(f"Submitting job {self.model.job_id} to background worker")
+        # Mark as submitted and set status to RUNNING
+        self.model.submitted = True
+        self.model.status = JOB_STATUS_RUNNING
+        self.model.stage = max(self.model.stage, 4)
+        # Pull, then upload: the worker pulls from object storage, and an
+        # outdated local copy must not replace the stored one. A pull may
+        # replace derived street files that ran ahead of storage; the worker
+        # recomputes them (StreetSelector.ensure_projected). The save also
+        # writes parameters.json via dump_routing_params().
+        job_persistence.work_dir(self.model.job_id)
+        self.save()
+
+        # As the framework's Job.submit: a raising enqueue is re-raised after
+        # FAILED is written (it must reach the global error handler), a
+        # reported failure returns.
         try:
-            # Mark as submitted and set status to RUNNING
-            self.model.submitted = True
-            self.model.status = JOB_STATUS_RUNNING
-            self.model.stage = max(self.model.stage, 4)
-            # Pull, then upload: the worker pulls from object storage, and an
-            # outdated local copy must not replace the stored one. A pull may
-            # replace derived street files that ran ahead of storage; the worker
-            # recomputes them (StreetSelector.ensure_projected). The save also
-            # writes parameters.json via dump_routing_params().
-            job_persistence.work_dir(self.model.job_id)
-            self.save()
-
             celery_task_id, failed = background_job_manager.submit_routing_job(self)
-
-            if failed:
-                log.error(f"Failed to submit job {self.model.job_id}")
-                return None
-
-            # Store task ID — DB update only, worker already has the files
-            self.model.celery_task_id = celery_task_id
-            self.update_columns("celery_task_id")
-
-            log.info(f"Job {self.model.job_id} submitted with task_id={celery_task_id}")
-            return celery_task_id
-
-        except Exception as e:
-            log.error(f"Failed to submit job {self.model.job_id}: {str(e)}")
+        except Exception:  # noqa: BLE001
+            # Convention exception (CLAUDE.md: specific exceptions only): whatever
+            # the enqueue raises, the RUNNING written above must not outlive it.
+            # Re-raised below.
+            self._fail_to_start()
             raise
 
-    def get_status(self) -> str:
-        """Get current job status, syncing from Celery if terminated.
+        if failed:
+            self._fail_to_start()
+            return None
 
-        If job has a Celery task and is currently RUNNING, checks Celery state
-        and updates database status if task has terminated (SUCCESS/FAILURE).
+        # Store task ID — DB update only, worker already has the files
+        self.model.celery_task_id = celery_task_id
+        self.update_columns("celery_task_id")
+
+        log.info(f"Job {self.model.job_id} submitted with task_id={celery_task_id}")
+        return celery_task_id
+
+    def _fail_to_start(self):
+        """Write FAILED and say so in the job log: the job was never enqueued.
+
+        The RUNNING written before the enqueue must not outlive a failed
+        enqueue (cosmo-ecosystem ADR 0002); wording as the framework's
+        ``Job.submit``.
+        """
+        message = f"Cannot start job {self.model.job_id}."
+        log.error(message)
+        job_log.append(self.model.job_id, message, level=logging.ERROR)
+        self.model.status = JOB_STATUS_FAILED
+        self.update_columns("status")
+
+    def get_status(self) -> str:
+        """Return the job's status as its row holds it.
+
+        The job row is the only source of a job's status (cosmo-ecosystem
+        ADR 0002): the job run writes RUNNING, COMPLETED or FAILED, and a cancel
+        writes FAILED. The Celery state is not consulted.
 
         Returns:
-            str: Current job status (PENDING, RUNNING, COMPLETED, or FAILED)
+            str: PENDING, RUNNING, COMPLETED or FAILED
         """
-        # Only sync if job has a celery task and is currently RUNNING
-        if self.model.celery_task_id and self.model.status == JOB_STATUS_RUNNING:
-            # Query Celery for task status
-            celery_status_info = background_job_manager.get_job_status(
-                self.model.celery_task_id
-            )
-            celery_status = celery_status_info["status"]
-
-            # Map Celery states to job statuses
-            if celery_status == "SUCCESS":
-                self.model.status = JOB_STATUS_COMPLETED
-                self.update_columns("status")
-                log.info(f"Synced job {self.model.job_id} status to COMPLETED")
-            elif celery_status in ["FAILURE", "REVOKED"]:
-                self.model.status = JOB_STATUS_FAILED
-                self.update_columns("status")
-                log.warning(
-                    f"Synced job {self.model.job_id} status to FAILED "
-                    f"(Celery: {celery_status})"
-                )
-
         return self.model.status
+
+    def cancel(self):
+        """Cancel the job's run: revoke its task, then record FAILED.
+
+        A terminated worker writes nothing, so the canceller writes FAILED to
+        the row and a record to the job log (cosmo-ecosystem ADR 0002). A run
+        that wrote COMPLETED just before the kill is overwritten, accepted.
+        """
+        background_job_manager.revoke_job(self.model.celery_task_id, terminate=True)
+        message = f"Job {self.model.job_id}: run cancelled by user."
+        log.info(message)
+        job_log.append(self.model.job_id, message)
+        self.model.status = JOB_STATUS_FAILED
+        self.update_columns("status")
 
     def time_to_live(self) -> int:
         """Return number of days until this job is deleted by cleanup.
@@ -691,42 +701,19 @@ class CosmonautJob(BaseJob):
         return completed
 
     def get_logs(self) -> str:
-        """Retrieve the job's log.
+        """Return the job log of the job's latest run, from the database.
 
-        While the job runs, the log is read from this pod's work dir only, with
-        no object storage call. Once the job is finished (COMPLETED or FAILED)
-        and the log is not on this pod's disk (web and worker share no disk),
-        it is pulled once from object storage (ADR 0001: the remote prefix is
-        authoritative, the work dir is a cache) and is local from then on.
-
-        Returns:
-            str: Job logs as a string
+        Readable from any pod while the run is still going.
         """
-        log.info(f"Retrieving logs for job {self.model.job_id}")
-        log_file_path = os.path.join(self.working_dir, LOG_FILE_NAME)
-        if not os.path.exists(log_file_path) and self.model.status in (
-            JOB_STATUS_COMPLETED,
-            JOB_STATUS_FAILED,
-        ):
-            log_file_path = job_persistence.pull_file(
-                self.model.job_id, LOG_FILE_NAME
-            )
-        if os.path.exists(log_file_path):
-            with open(log_file_path) as f:
-                log_content = f.read()
-            if not log_content.strip():
-                log_content = "Logs empty."
-        else:
-            log_content = "No log file found."
-
-        return log_content
+        return job_log.read(self.model.job_id)
 
     def reset(self):
         """Reset job to PENDING state by clearing output files and task state.
 
         This method:
-        - Cancels the Celery task if job is currently RUNNING
-        - Deletes output files (logs, solutions, GPX, QR codes) everywhere
+        - Cancels the run if job is currently RUNNING
+        - Deletes output files (solutions, GPX, QR codes) everywhere
+        - Clears the job log
         - Preserves input files (uploaded data, parameters, OSM data, plots)
         - Sets status to PENDING
         - Clears celery_task_id and submitted flag
@@ -734,15 +721,15 @@ class CosmonautJob(BaseJob):
         """
         log.info(f"Resetting job {self.model.job_id}")
 
-        # If job is currently running, cancel the Celery task first
         if self.model.status == JOB_STATUS_RUNNING and self.model.celery_task_id:
             log.info(f"Cancelling running task {self.model.celery_task_id}")
-            background_job_manager.revoke_job(self.model.celery_task_id, terminate=True)
+            self.cancel()
 
         # Delete known output files
         job_persistence.delete_files(
-            self.model.job_id, [LOG_FILE_NAME, ROUTE_FILENAME, GPX_FILE, QR_CODE_FILE]
+            self.model.job_id, [ROUTE_FILENAME, GPX_FILE, QR_CODE_FILE]
         )
+        job_log.clear(self.model.job_id)
 
         # Reset job state
         self.model.status = JOB_STATUS_PENDING

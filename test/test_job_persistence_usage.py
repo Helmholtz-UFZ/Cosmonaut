@@ -28,13 +28,13 @@ from sensor_routing.constants import MEMBERSHIP_FILENAME, PREDICTOR_FILENAME
 from cosmonaut_app.constants.general import (
     GPX_FILE,
     JOB_STATUS_RUNNING,
-    LOG_FILE_NAME,
     MEMBERSHIP_TIF,
     ROUTE_OPTIONS_FILE,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.files_route import serve_files
+from test.help_functions_tests import celery_says
 
 
 @pytest.fixture
@@ -125,14 +125,6 @@ def _submit(job, membership_file_path, predictor_file_path):
         job.submit()
 
 
-def _celery_says(status):
-    """Patch the Celery state lookup the pollers use."""
-    return mock.patch(
-        "cosmonaut_app.cosmonaut_job.background_job_manager.get_job_status",
-        return_value={"status": status},
-    )
-
-
 def test_loading_a_job_makes_no_rclone_calls(job, rclone_calls):
     rclone_calls.clear()
 
@@ -146,19 +138,18 @@ def test_the_status_pollers_make_no_rclone_calls(job, rclone_calls, pollers):
     job.model.status = JOB_STATUS_RUNNING
     job.model.celery_task_id = "task"
     job.model.membership_upload["street_processing"] = "task"
-    # The run's log is local, so the poll that sees the job finish pulls nothing.
-    _write(job, LOG_FILE_NAME, "log")
     job.save()
     rclone_calls.clear()
 
     poll_street_processing, poll_street_processing_status, update_status = pollers
-    with _celery_says("SUCCESS"):
+    with celery_says("SUCCESS"):
         poll_street_processing(1, job_id)
         poll_street_processing_status(1, f"/job/{job_id}/street-selection")
         update_status(1, None, job_id)
 
     assert rclone_calls == []
-    assert DataBaseManager.get_job_columns(job_id)["status"] == "COMPLETED"
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["membership_upload"]["street_processing"] == "COMPLETED"
 
 
 def test_a_served_gpx_is_the_one_in_object_storage(job):

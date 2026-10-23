@@ -385,7 +385,7 @@ def celery_worker(request, overpass_stub, tmp_path_factory):
     # Start Celery worker process
     # Command adapted from cosmopolitan reference but using uv instead of poetry
     # Both stdout and stderr go to the log file: Celery's own logging uses stderr,
-    # but the routing task switches logging to stdout via dictConfig.
+    # print() and stray output go to stdout.
     # OVERPASS_URL is the only seam that reaches the worker subprocess — see the
     # overpass_stub fixture for why a monkeypatch cannot. None means the stub stood
     # down (SKIP_OSM_CACHE=1): leave the variable alone so the nightly live-Overpass

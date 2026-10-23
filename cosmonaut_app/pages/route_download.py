@@ -106,6 +106,7 @@ def layout(job_id):
 
     job_persistence.work_dir(job.job_id)
     job.create_qr_code_routing()
+    job.save()
 
     # Construct full download URL
     download_url = get_download_url(job_id)
