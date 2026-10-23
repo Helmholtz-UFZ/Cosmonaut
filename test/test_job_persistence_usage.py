@@ -28,7 +28,6 @@ from sensor_routing.constants import MEMBERSHIP_FILENAME, PREDICTOR_FILENAME
 from cosmonaut_app.constants.general import (
     GPX_FILE,
     JOB_STATUS_RUNNING,
-    LOG_FILE_NAME,
     MEMBERSHIP_TIF,
     ROUTE_OPTIONS_FILE,
 )
@@ -146,8 +145,6 @@ def test_the_status_pollers_make_no_rclone_calls(job, rclone_calls, pollers):
     job.model.status = JOB_STATUS_RUNNING
     job.model.celery_task_id = "task"
     job.model.membership_upload["street_processing"] = "task"
-    # The run's log is local, so the poll that sees the job finish pulls nothing.
-    _write(job, LOG_FILE_NAME, "log")
     job.save()
     rclone_calls.clear()
 
@@ -158,7 +155,8 @@ def test_the_status_pollers_make_no_rclone_calls(job, rclone_calls, pollers):
         update_status(1, None, job_id)
 
     assert rclone_calls == []
-    assert DataBaseManager.get_job_columns(job_id)["status"] == "COMPLETED"
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["membership_upload"]["street_processing"] == "COMPLETED"
 
 
 def test_a_served_gpx_is_the_one_in_object_storage(job):

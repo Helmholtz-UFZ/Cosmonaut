@@ -1,6 +1,5 @@
 """General application constants for COSMONAUT."""
 
-LOG_FILE_NAME = "worker.log"
 GPX_FILE = "route.gpx"
 QR_CODE_FILE = "qr_code.png"
 # Per-job presentation options for the computed route (currently: direction).

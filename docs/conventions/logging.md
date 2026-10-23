@@ -73,9 +73,9 @@ log.error(f"Error processing job: {str(e)}", exc_info=True)
 
 ## Logger Configuration
 
-Configuration is in `cosmonaut_app/logger.py`:
+Configuration is in the framework, `cosmo_ecosystem.logger` (wired up in `app.py` and `background_job_manager.py`):
 - Web/worker: Console + PostgreSQL database logging
-- Computation tasks: File-based logging in job output directory
+- Job runs: `cosmo_ecosystem.job_run.run` captures the run into the job log (`job_logs` table, read with `job_log.read`); no log file, no `dictConfig` swap
 - Third-party package filtering to reduce noise
 
 ---

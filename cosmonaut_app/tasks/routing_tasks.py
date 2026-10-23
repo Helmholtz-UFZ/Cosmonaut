@@ -1,21 +1,17 @@
 """Routing tasks for COSMONAUT App.
 
-This module contains Celery tasks for processing routing jobs.
-Currently implements a placeholder that computes a hash of parameters.
-This will be replaced with actual routing algorithm implementation.
+The routing task runs the sensor-routing pipeline through the framework's job
+run (``cosmo_ecosystem.job_run.run``), which captures the job log, fetches and
+uploads the work dir and writes the final status to the job row. The job row is
+the only source of the job's status (cosmo-ecosystem ADR 0002): a failed run
+ends as FAILED in the row and as a successful Celery task.
 """
 
 import logging
-import os
 from datetime import timedelta
-from logging.config import dictConfig
 
 from celery import Task
-from cosmo_ecosystem import job_persistence
-from cosmo_ecosystem.logger import (
-    get_logger_config_computation,
-    get_logger_config_worker,
-)
+from cosmo_ecosystem import job_run
 from cosmo_ecosystem.object_storage_manager import get_presigned_download_url
 from sensor_routing.full_pipeline_cli import sensor_routing_pipeline
 
@@ -23,8 +19,6 @@ from cosmonaut_app.config import PORT, WEB_OUTSIDE_URL
 from cosmonaut_app.constants.general import (
     EXCLUDED_LOG_PACKAGES,
     JOB_STATUS_COMPLETED,
-    JOB_STATUS_FAILED,
-    LOG_FILE_NAME,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.email_service import send_mail
@@ -45,83 +39,38 @@ class RoutingTask(Task):
             log.error(f"Job {job_id} failed with error: {str(exc)}")
 
 
-def flush_all_handlers():
-    """Flush all logging handlers."""
-    logger = logging.getLogger()
-    for handler in logger.handlers:
-        try:
-            handler.flush()
-        except Exception:
-            pass
-
-
 def process_routing_job(self, job_id):
     """Celery task to process a routing job.
 
+    Sends the submission mail, runs the route computation as a job run, then
+    sends the end mail for either outcome, from the job's row as the run left it.
+
     Args:
         job_id: ID of the job to process
-
-    Steps:
-    1. Load job from database
-    2. Switch logging to file in work_dir (mimicking cosmopolitan's computation_tasks)
-    3. Call sensor_routing_pipeline() function
-    4. Flush handlers and switch logging back to web config
     """
     log.info(f"Starting routing job task for job_id={job_id}")
+    _notify_submission(CosmonautJob(job_id=job_id))
 
-    # Load job to get work directory
+    status = job_run.run(job_id, compute_route, EXCLUDED_LOG_PACKAGES)
+    log.info(f"Routing job {job_id} finished with status {status}")
+
+    _notify_user(CosmonautJob(job_id=job_id), status)
+
+
+def compute_route(job_id, work_dir):
+    """Compute the job's route, GPX and QR code into its work dir.
+
+    The ``compute`` of the job run: it signals failure only by raising and
+    writes no status; the run uploads the work dir and writes the status.
+    """
+    log.info(f"Starting routing job computation for job_id={job_id}")
     job = CosmonautJob(job_id=job_id)
-    job_persistence.work_dir(job.job_id)
+    StreetSelector(job).ensure_projected()
+    sensor_routing_pipeline(work_dir)
 
-    # Send submission notification before computation starts
-    _notify_submission(job)
-
-    # Switch logging to file in work directory
-    dictConfig(
-        get_logger_config_computation(
-            os.path.join(job.working_dir, LOG_FILE_NAME), EXCLUDED_LOG_PACKAGES
-        )
-    )
-
-    try:
-        log.info(f"Starting routing job computation for job_id={job_id}")
-
-        StreetSelector(job).ensure_projected()
-        sensor_routing_pipeline(job.working_dir)
-
-        # Post-processing: Create GPX and QR code
-        log.info(f"Starting post-processing for job {job.model.job_id}")
-        job.create_qr_code_routing()
-        log.info(f"Post-processing complete. QR code generated for job {job.model.job_id}")
-
-        log.info(f"Job {job_id} completed successfully")
-
-        # Flush all handlers before switching back
-        flush_all_handlers()
-
-        # Switch logging back to worker config
-        dictConfig(get_logger_config_worker(EXCLUDED_LOG_PACKAGES))
-
-        log.info(f"Routing job {job_id} finished")
-
-        job.model.status = JOB_STATUS_COMPLETED
-        job.save()
-
-        _notify_user(job, JOB_STATUS_COMPLETED)
-
-    except Exception as e:
-        log.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
-
-        # Flush handlers and switch back even on error
-        flush_all_handlers()
-        dictConfig(get_logger_config_worker(EXCLUDED_LOG_PACKAGES))
-
-        job.model.status = JOB_STATUS_FAILED
-        job.save()
-
-        _notify_user(job, JOB_STATUS_FAILED)
-
-        raise
+    log.info(f"Starting post-processing for job {job_id}")
+    job.create_qr_code_routing()
+    log.info(f"Post-processing complete. QR code generated for job {job_id}")
 
 
 def _notify_submission(job):
@@ -163,9 +112,7 @@ def _notify_user(job, status):
     if status == JOB_STATUS_COMPLETED:
         # Object key derived server-side from validated job_id — never pass user input here.
         object_key = f"{job_id}/route.gpx"
-        download_url = get_presigned_download_url(
-            object_key, expiry=timedelta(days=7)
-        )
+        download_url = get_presigned_download_url(object_key, expiry=timedelta(days=7))
         subject = f"COSMONAUT Job {job_id} completed"
         body = (
             f"Your routing job {job_id} has completed successfully.\n\n"
@@ -178,6 +125,6 @@ def _notify_user(job, status):
     try:
         send_mail([job.model.email], subject, body)
         job.model.notified_end = True
-        job.save()
+        job.update_columns("notified_end")
     except Exception:  # noqa - must not let email failure crash notification path
         log.error(f"Failed to send notification email for job {job_id}", exc_info=True)

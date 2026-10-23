@@ -46,15 +46,15 @@ or if you need to report problems to system administrators.
 
 **Computation Logs:**
 
-The logs section displays worker output as it becomes available. During RUNNING state,
-logs update every 3 seconds via polling. Once the computation completes (COMPLETED or
-FAILED status), the full worker logs are displayed, containing:
+The logs section displays the log of the latest computation run as it is written.
+During RUNNING state, logs update every 3 seconds via polling. Once the computation
+completes (COMPLETED or FAILED status), the full log is displayed, containing:
 - Algorithm execution steps and progress
 - Parameters used for the optimization
 - Statistics about the generated route
 - Any warnings or errors encountered
 
-The logs are synced from the worker container after the job finishes.
+A cancelled computation shows FAILED, with the cancel noted at the end of the log.
 
 # Notes (This section is for developer notes and will not appear in the user documentation.)
 
@@ -62,7 +62,8 @@ Page runs in split layout with map on left (shows data upload locations) and con
 Uses Bootstrap-only styling (no custom CSS except whiteSpace for log wrapping).
 Polling interval (3s) only active when job is RUNNING, automatically disabled when complete.
 All control callbacks include status checks to prevent duplicate operations from multiple browser tabs.
-Worker runs in separate Docker container, so real-time log streaming is not possible.
+The log is the job log in the database (cosmo_ecosystem.job_log), written by the worker's
+job run and readable from any pod; the status comes from the job row only (ADR 0002).
 Celery worker info updates only on page load and after start/restart (performance optimization).
 """
 
@@ -556,7 +557,7 @@ def cancel_computation(n_clicks, job_id):
         log.warning(f"Job {job_id} has no celery_task_id to cancel")
         return False, no_update
 
-    background_job_manager.revoke_job(job.model.celery_task_id, terminate=True)
+    job.cancel()
     log.info(f"Cancelled computation for job {job_id}")
 
     # Close modal, trigger status check
@@ -590,7 +591,7 @@ def restart_computation(n_clicks, job_id):
 
     # Cancel existing task if it exists (safety check)
     if job.model.celery_task_id:
-        background_job_manager.revoke_job(job.model.celery_task_id, terminate=True)
+        job.cancel()
 
     job.reset()
     job.submit()
