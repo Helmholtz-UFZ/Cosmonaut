@@ -196,6 +196,26 @@ def test_a_failed_enqueue_shows_failed_with_the_reason_in_the_job_log(running_jo
     assert f"Cannot start job {job.job_id}." in shown.get_logs()
 
 
+def test_a_raising_enqueue_shows_failed_with_the_reason_in_the_job_log(running_job):
+    job = CosmonautJob(job_id=running_job.job_id)
+    job.model.status = JOB_STATUS_PENDING
+    job.model.celery_task_id = None
+    job.update_columns("status", "celery_task_id")
+
+    with (
+        mock.patch(
+            "cosmonaut_app.cosmonaut_job.background_job_manager.submit_routing_job",
+            side_effect=ConnectionError("broker unreachable"),
+        ),
+        pytest.raises(ConnectionError),
+    ):
+        job.submit()
+
+    shown = CosmonautJob(job_id=job.job_id)
+    assert shown.get_status() == JOB_STATUS_FAILED
+    assert f"Cannot start job {job.job_id}." in shown.get_logs()
+
+
 @pytest.mark.parametrize("finished_status", [JOB_STATUS_FAILED, JOB_STATUS_COMPLETED])
 def test_a_restart_of_a_finished_job_revokes_no_task(
     running_job, route_computation, finished_status

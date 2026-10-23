@@ -592,35 +592,40 @@ class CosmonautJob(BaseJob):
     def submit(self):
         """Submit the job to background worker."""
         log.info(f"Submitting job {self.model.job_id} to background worker")
+        # Mark as submitted and set status to RUNNING
+        self.model.submitted = True
+        self.model.status = JOB_STATUS_RUNNING
+        self.model.stage = max(self.model.stage, 4)
+        # Pull, then upload: the worker pulls from object storage, and an
+        # outdated local copy must not replace the stored one. A pull may
+        # replace derived street files that ran ahead of storage; the worker
+        # recomputes them (StreetSelector.ensure_projected). The save also
+        # writes parameters.json via dump_routing_params().
+        job_persistence.work_dir(self.model.job_id)
+        self.save()
+
+        # As the framework's Job.submit: a raising enqueue is re-raised after
+        # FAILED is written (it must reach the global error handler), a
+        # reported failure returns.
         try:
-            # Mark as submitted and set status to RUNNING
-            self.model.submitted = True
-            self.model.status = JOB_STATUS_RUNNING
-            self.model.stage = max(self.model.stage, 4)
-            # Pull, then upload: the worker pulls from object storage, and an
-            # outdated local copy must not replace the stored one. A pull may
-            # replace derived street files that ran ahead of storage; the worker
-            # recomputes them (StreetSelector.ensure_projected). The save also
-            # writes parameters.json via dump_routing_params().
-            job_persistence.work_dir(self.model.job_id)
-            self.save()
-
             celery_task_id, failed = background_job_manager.submit_routing_job(self)
-
-            if failed:
-                self._fail_to_start()
-                return None
-
-            # Store task ID — DB update only, worker already has the files
-            self.model.celery_task_id = celery_task_id
-            self.update_columns("celery_task_id")
-
-            log.info(f"Job {self.model.job_id} submitted with task_id={celery_task_id}")
-            return celery_task_id
-
-        except Exception as e:
-            log.error(f"Failed to submit job {self.model.job_id}: {str(e)}")
+        except Exception:  # noqa: BLE001
+            # Convention exception (CLAUDE.md: specific exceptions only): whatever
+            # the enqueue raises, the RUNNING written above must not outlive it.
+            # Re-raised below.
+            self._fail_to_start()
             raise
+
+        if failed:
+            self._fail_to_start()
+            return None
+
+        # Store task ID — DB update only, worker already has the files
+        self.model.celery_task_id = celery_task_id
+        self.update_columns("celery_task_id")
+
+        log.info(f"Job {self.model.job_id} submitted with task_id={celery_task_id}")
+        return celery_task_id
 
     def _fail_to_start(self):
         """Write FAILED and say so in the job log: the job was never enqueued.
