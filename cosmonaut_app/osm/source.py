@@ -19,8 +19,8 @@ log = logging.getLogger(__name__)
 #
 # Soft env lookup (not config.getenv) on purpose: the URL has a working default,
 # so it must NOT become a required variable that test_env enforces across all
-# five env files. Promote it to a strict config var only once the deployment
-# story is settled (see docs/project-state.md, issue #36).
+# five env files. Production sets it in env_prod; promoting it to a strict
+# config var is still open (see docs/knowledge/systems/osm-backend.md).
 DEFAULT_OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 OVERPASS_URL = os.getenv("OVERPASS_URL", DEFAULT_OVERPASS_URL)
 

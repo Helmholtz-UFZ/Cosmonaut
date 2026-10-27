@@ -1,7 +1,7 @@
 # Decision: Replace osmnx with a Direct Overpass Query for OSM Road Download
 
 **Date:** 2026-06-05
-**Status:** Accepted (download approach); production swap of `upload_tasks.py` pending
+**Status:** Accepted and in production (UFZ-hosted Overpass since 0.3.15, 2026-10-27)
 **Context:** GitLab issue #36 — large-area (Saxony) scaling. The app's OSM road
 download (`cosmonaut_app/osm_downloader.py`) builds an osmnx networkx graph over the
 convex hull of the survey points. For all of Saxony this needs **~12.5 GB peak RAM**
@@ -111,8 +111,10 @@ against the **same** Overpass endpoint (osmnx cache disabled):
   no osmnx baseline). **Caveat: osmnx is still installed transitively** — it's a
   dependency of `sensor-routing==0.2.6`, so the image/CI does not get lighter until
   sensor-routing drops it (raise with Can; sensor-routing may not actually use it).
-- Decide the production Overpass source (self-hosted wiktorn vs `.pbf` reader) and add it
-  to the deployment; promote `OVERPASS_URL` to a strict config var at that point.
+- ~~Decide the production Overpass source (self-hosted wiktorn vs `.pbf` reader) and add it
+  to the deployment~~ **Done** — UFZ IT hosts wiktorn on the clusters; `env_prod` points
+  `OVERPASS_URL` at it (see [osm-backend](../knowledge/systems/osm-backend.md#production-source-ufz-hosted-overpass)).
+  Promoting `OVERPASS_URL` to a strict config var is still open.
 - ~~Optional: stream the Overpass response / write GeoJSON incrementally to push the
   3.2 GB peak lower.~~ **Done** — `OverpassSource.stream_ways` (ijson) +
   `StreamingGeoJsonWriter` + per-way pyproj projection bring Saxony to 152 MB. Also

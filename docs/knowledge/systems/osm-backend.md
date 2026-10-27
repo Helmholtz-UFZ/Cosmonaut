@@ -78,10 +78,22 @@ OVERPASS_URL = os.getenv("OVERPASS_URL", "https://overpass-api.de/api/interprete
 ```
 
 This is a **soft** env lookup (plain `os.getenv`, not the strict `config` loader) on purpose: it has
-a working default, so it must not become a required variable enforced across all env files. Point it
-at a self-hosted wiktorn instance or a UFZ endpoint for large areas. The `OsmSource` ABC keeps the
-door open for a future `.osm.pbf` reader without touching the transform. **`TODO:` promote `OVERPASS_URL`
-to a strict config var once the deployment Overpass source is chosen (project-state issue #36).**
+a working default, so it must not become a required variable enforced across all env files. The
+`OsmSource` ABC keeps the door open for a future `.osm.pbf` reader without touching the transform.
+**`TODO:` promote `OVERPASS_URL` to a strict config var now that production has its own source.**
+
+### Production source: UFZ-hosted Overpass
+
+Since release 0.3.15 (2026-10-27) production queries an Overpass instance run by UFZ IT (Hannes
+Bohring, wiktorn image) instead of the public endpoint. The URL lives in `env_prod` / `env_dev_prod`,
+which the frontend and worker images bake in as `.env`, so changing it needs a new release tag, not a
+`values.yaml` edit. A stage instance runs on `overpass.web-intern-stage.app.ufz.de`.
+
+- **Germany only.** An AOI outside Germany returns **zero ways, not an error**, so a cross-border
+  survey silently loses its foreign roads.
+- **No rate limit**, unlike the public endpoint.
+- The host root shows the default **"Welcome to nginx!"** page; that is normal, the API is under
+  `/api/` (health check: `/api/status`).
 
 Set the **full** interpreter URL (`http://host:12345/api/interpreter`) — the client POSTs
 `OVERPASS_URL` verbatim and does **not** append `/interpreter`. Standing up a local instance and
