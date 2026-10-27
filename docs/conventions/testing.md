@@ -23,6 +23,16 @@ these first — they usually explain the failure without needing another run. No
 that `run_pytest.sh` clears previous artifacts by default (use `--keep-artifacts`
 to preserve them across runs).
 
+**Test containers have their own names.** `run_pytest.sh` runs compose project
+`cosmonaut_test` with `postgres_cosmonaut_test`, `object_storage_cosmonaut_test` and
+`redis_cosmonaut_test`, and its cleanup only does `docker compose down` on that project.
+The dev stack (`postgres_cosmonaut` etc.) is never touched. Do not add `docker stop/rm`
+by name to the script.
+
+**Test and dev stacks still share host ports.** Separate names keep the containers
+apart, but both stacks publish the same host ports. A test run while the dev stack is
+up fails with "port already in use": stop the dev stack first.
+
 ## Code Rules
 
 - All tests go in `test/` (flat directory, no subdirectories)
@@ -60,7 +70,7 @@ Service requirements vary by test:
 - `pytest_configure()` verifies all services are reachable before any tests run (gated by `--no-services`)
 - `dash_app` (session) — starts the Dash app via werkzeug make_server in a background thread, polls until responsive, shuts down cleanly
 - `page` (function) — wraps pytest-playwright's page fixture; captures HTML, console logs, server logs, and worker logs on failure
-- `celery_worker` (session) — starts a real Celery worker subprocess with log capture, terminates on teardown
+- `celery_worker` (session) — starts a real Celery worker subprocess with log capture, terminates on teardown. The worker has its own temp `WEB_WORK_DIR`, so web and worker share no disk (ADR 0001, cosmo-ecosystem). The e2e test asserts the finished job's log reaches the page; it goes red if the `pull_file` fallback in `CosmonautJob.get_logs` is removed
 - `membership_file_path` / `predictor_file_path` (session) — copies test data files to temp dir
 - `logger` — configured logger with suppressed third-party noise
 

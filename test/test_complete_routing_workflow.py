@@ -27,6 +27,7 @@ from cosmonaut_app.constants.html_ids import (
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
     EMAIL_INPUT_USER_INFO_ID,
     LOADING_OVERLAY_MODAL_SHARED_ID,
+    LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_DATA_UPLOAD_ID,
     NEXT_BUTTON_ROUTE_COMPUTATION_ID,
     NEXT_BUTTON_ROUTING_PARAMS_ID,
@@ -129,6 +130,12 @@ def test_complete_routing_workflow(
     expect(page.locator(f"#{NEXT_BUTTON_ROUTE_COMPUTATION_ID}")).to_be_enabled(
         timeout=240000
     )
+    # Web and worker share no disk (see celery_worker): the worker's log reaches the
+    # page only through the job log in the database. The positive match is the first
+    # line compute_route logs inside the job run, so it is always in a healthy log.
+    expect(page.locator(f"#{LOG_VIEWER_PRE_ROUTE_COMPUTATION_ID}")).to_contain_text(
+        "Starting routing job computation", timeout=15000
+    )
     page.locator(f"#{NEXT_BUTTON_ROUTE_COMPUTATION_ID}").click()
     # Note: check_all_errors skipped here as we're navigating to route_download
 
@@ -139,8 +146,8 @@ def test_complete_routing_workflow(
 
     # === Verify email notification was sent ===
     # Poll rather than read once: the UI gate above is `status == COMPLETED`,
-    # written by the worker's first job.save(). notified_end is written by a
-    # *second* save inside _notify_user, which runs after it. Reading the row
+    # written by the worker's job run. notified_end is written by a second
+    # write inside _notify_user, which runs after the run. Reading the row
     # immediately can land between the two — it passes on a fast machine and
     # fails on CI, which is what happened.
     job_row = DataBaseManager.get_job_columns(job_id)
@@ -228,7 +235,6 @@ def test_complete_routing_workflow(
                 "transient/pm_output.json",
                 "transient/point_hull_collection.json",
                 "transient/slow_coords.json",
-                "worker.log",
             }
             assert set(zip_file_names) == expected_files, (
                 f"Unexpected files in work_dir zip.\n"

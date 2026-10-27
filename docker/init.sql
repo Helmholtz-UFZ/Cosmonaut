@@ -40,6 +40,22 @@ CREATE INDEX IF NOT EXISTS logs_timestamp_idx ON logs (timestamp);
 CREATE INDEX IF NOT EXISTS logs_pid_idx ON logs (pid);
 CREATE INDEX IF NOT EXISTS logs_level_idx ON logs (level);
 
+-- Job log: the log records of a job's latest job run, one row per record
+-- (cosmo_ecosystem.job_log; matches the framework ORM JobLogTable). Separate
+-- from logs, so the log purge does not cut a job log short.
+DROP TABLE IF EXISTS job_logs;
+
+CREATE TABLE job_logs (
+    id BIGSERIAL PRIMARY KEY,
+    job_id VARCHAR NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    level VARCHAR(10) NOT NULL,
+    module VARCHAR NOT NULL,
+    message TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS job_logs_job_id_idx ON job_logs (job_id);
+
 -- psql -U cosmonaut -p 5432 -h localhost -d cosmonaut_db
 -- psql -U USER -p PORT -h HOST -d DATABASE
 -- The staging/production hosts and admin roles are deployment details, not part

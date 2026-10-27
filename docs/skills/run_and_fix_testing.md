@@ -81,10 +81,10 @@ open test/artifacts/<test-dir>/page.html
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `PostgreSQL not available` | DB container failed health check | `docker logs postgres_cosmonaut` |
-| `Object storage did not start` / `Object storage (S3) connectivity check failed` | S3 server unhealthy or unreachable | `docker logs object_storage_cosmonaut` |
-| `Redis not available` | Redis failed health check | `docker logs redis_cosmonaut` |
-| Port already in use | Leftover Docker containers or another process on 5433/9010/6380 | 1. `docker compose down` in the current project first. 2. If persists, tell the user which port is blocked — a sibling project (cosmopolitan, etc.) may be running in parallel and only the user knows which is safe to stop. |
+| `PostgreSQL not available` | DB container failed health check | `docker logs postgres_cosmonaut_test` |
+| `Object storage did not start` / `Object storage (S3) connectivity check failed` | S3 server unhealthy or unreachable | `docker logs object_storage_cosmonaut_test` |
+| `Redis not available` | Redis failed health check | `docker logs redis_cosmonaut_test` |
+| Port already in use | The dev stack is up (test and dev stacks share host ports), leftover test containers, or another process on 5433/9010/6380 | 1. Stop the dev stack first. 2. `docker compose down` in the current project. 3. If it persists, tell the user which port is blocked — a sibling project (cosmopolitan, etc.) may be running in parallel and only the user knows which is safe to stop. |
 | Docker not running | Docker daemon not started | `sudo systemctl start docker` |
 
 ---
@@ -148,25 +148,25 @@ If tests require services and startup errors occur, verify each service manually
 **PostgreSQL:**
 
 ```bash
-docker ps | grep postgres_cosmonaut
-docker logs postgres_cosmonaut
-docker exec postgres_cosmonaut pg_isready -U cosmonaut
+docker ps | grep postgres_cosmonaut_test
+docker logs postgres_cosmonaut_test
+docker exec postgres_cosmonaut_test pg_isready -U cosmonaut
 ```
 
 **Object storage (RustFS):**
 
 ```bash
-docker ps | grep object_storage_cosmonaut
-docker logs object_storage_cosmonaut
+docker ps | grep object_storage_cosmonaut_test
+docker logs object_storage_cosmonaut_test
 curl -sf http://localhost:9010/health/ready
 ```
 
 **Redis:**
 
 ```bash
-docker ps | grep redis_cosmonaut
-docker logs redis_cosmonaut
-docker exec redis_cosmonaut redis-cli ping
+docker ps | grep redis_cosmonaut_test
+docker logs redis_cosmonaut_test
+docker exec redis_cosmonaut_test redis-cli ping
 ```
 
 **Clean up and restart:**

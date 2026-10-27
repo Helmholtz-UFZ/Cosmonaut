@@ -55,8 +55,8 @@ cache; see the framework's ADR 0001). `CosmonautJob` only maps its model to a ro
 - **`membership_upload["street_processing"]` is overloaded on purpose:** it holds either a status
   string (`"PENDING"` / `"COMPLETED"` / `"FAILED"`) **or** a live Celery task ID. `get_street_processing_status()`
   branches on this — if the value isn't one of the three known strings it treats it as a task ID and
-  queries Celery, promoting it to a real status (and bumping `stage`) once the task terminates. The
-  same pattern drives `get_status()`, which lazily syncs `RUNNING` → `COMPLETED`/`FAILED` from Celery.
+  queries Celery, promoting it to a real status (and bumping `stage`) once the task terminates.
+  `get_status()` does not follow this pattern: it reads the row only (cosmo-ecosystem ADR 0002).
 
 ## Lifecycle methods
 
