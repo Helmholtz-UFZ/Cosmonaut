@@ -271,8 +271,9 @@ test-integration-live-osm:
     # fixture. Without it this job would be served that fixture and would prove
     # nothing about the live contract.
     # To test a specific endpoint (e.g. the UFZ Overpass instead of the public
-    # one), set OVERPASS_URL as a CI variable — it beats env_test's value (load_dotenv
-    # does not override), the worker inherits it and conftest leaves it alone. The job log names the endpoint it used.
+    # one), set OVERPASS_URL as a CI variable — it beats env_test's value
+    # (load_dotenv does not override), the worker inherits it and conftest leaves
+    # it alone. The job log names the endpoint it used.
     SKIP_OSM_CACHE: "1"
   before_script:
     # Wait for PostgreSQL to be ready

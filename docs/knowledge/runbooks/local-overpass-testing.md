@@ -31,8 +31,8 @@ needs `docker login registry.hzdr.de` first (GitLab PAT, scope `read_registry`).
 
 ## 2. Point COSMONAUT at it
 
-Set **`OVERPASS_URL`** — read by [`osm/source.py`](../../../cosmonaut_app/osm/source.py)
-via `os.getenv` (soft, default = public). For the local mock stack put it in
+Set **`OVERPASS_URL`** — a required variable read by [`config.py`](../../../cosmonaut_app/config.py)
+and used by [`osm/source.py`](../../../cosmonaut_app/osm/source.py). For the local mock stack put it in
 [`env_dev_mock`](../../../env_dev_mock):
 
 ```dotenv

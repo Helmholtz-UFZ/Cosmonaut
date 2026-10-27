@@ -17,6 +17,7 @@ TILESERVER_URL="http://127.0.0.1:8001"
 ### Overpass (OSM road network) ###
 # The integration suite points the worker at a local stub instead; only the nightly
 # live-OSM job (SKIP_OSM_CACHE=1) reaches this endpoint.
+# Public, not the UFZ stage host: whether GitLab CI runners reach the UFZ cluster is untested.
 OVERPASS_URL="https://overpass-api.de/api/interpreter"
 
 ### Email ###

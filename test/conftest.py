@@ -302,7 +302,7 @@ def overpass_stub():
     its full timeout — it does not look like a network problem).
 
     The seam that *does* cross the boundary is the production environment
-    variable ``OVERPASS_URL``, read in ``cosmonaut_app.osm.source`` at import
+    variable ``OVERPASS_URL``, read in ``cosmonaut_app.config`` at import
     time. This fixture serves ``test/fixtures/overpass_test_aoi.json`` — a real
     ``out geom`` response for the committed test AOI — and hands back its URL so
     ``celery_worker`` can point the worker at it. No production code knows it
