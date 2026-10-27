@@ -19,7 +19,8 @@ New package `cosmonaut_app/osm/`:
 
 - `source.py` — `OverpassSource` (HTTP `out geom`), behind an `OsmSource` interface so
   the backend is swappable (self-hosted Overpass now, a local `.osm.pbf` reader later).
-  Endpoint is env-configurable via `OVERPASS_URL` (soft default = public Overpass).
+  Endpoint is env-configurable via `OVERPASS_URL` (soft default = public Overpass at the
+  time; a strict config var since 2026-10-27).
 - `transform.py` — raw ways → GeoJSON features. Replicates osmnx `truncate_by_edge`
   and osmnx oneway inference; no networkx graph.
 - `downloader.py` — drop-in `OsmDownloader` (same constructor + `run_osm_query`, same
@@ -114,7 +115,7 @@ against the **same** Overpass endpoint (osmnx cache disabled):
 - ~~Decide the production Overpass source (self-hosted wiktorn vs `.pbf` reader) and add it
   to the deployment~~ **Done** — UFZ IT hosts wiktorn on the clusters; `env_prod` points
   `OVERPASS_URL` at it (see [osm-backend](../knowledge/systems/osm-backend.md#production-source-ufz-hosted-overpass)).
-  Promoting `OVERPASS_URL` to a strict config var is still open.
+  `OVERPASS_URL` is now a strict config var (no public default).
 - ~~Optional: stream the Overpass response / write GeoJSON incrementally to push the
   3.2 GB peak lower.~~ **Done** — `OverpassSource.stream_ways` (ijson) +
   `StreamingGeoJsonWriter` + per-way pyproj projection bring Saxony to 152 MB. Also

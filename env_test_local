@@ -20,6 +20,11 @@ MAINTAINER_EMAIL="louis-ferdinand.trinkle@ufz.de"
 TILESERVER_HOST_PORT=8011
 TILESERVER_URL="http://127.0.0.1:8011"
 
+### Overpass (OSM road network) ###
+# The integration suite points the worker at a local stub instead; only the nightly
+# live-OSM job (SKIP_OSM_CACHE=1) reaches this endpoint.
+OVERPASS_URL="https://overpass-api.de/api/interpreter"
+
 ### Email ###
 EMAIL_SERVER="test"
 EMAIL_PORT="587"

@@ -49,6 +49,7 @@ env_vars = framework_env_vars + [
     "DOCKER_GID",
     "GUNICORN",
     "TILESERVER_URL",
+    "OVERPASS_URL",
     "MAINTAINER_EMAIL",
     "EMAIL_SERVER",
     "EMAIL_PORT",
@@ -71,6 +72,10 @@ MAINTAINER_EMAIL = [e.strip() for e in getenv("MAINTAINER_EMAIL").split(",")]
 
 # Tile Server URL
 TILESERVER_URL = getenv("TILESERVER_URL")
+
+# Overpass interpreter endpoint for the OSM road download (full .../api/interpreter URL,
+# POSTed verbatim)
+OVERPASS_URL = getenv("OVERPASS_URL")
 
 # Email Configuration
 EMAIL_SERVER = getenv("EMAIL_SERVER")

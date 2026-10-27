@@ -7,7 +7,7 @@ wrapper that raises `ValueError` on any missing variable.
 The service-level half (Postgres, Redis, object storage, Flask) is read and
 validated by **`cosmo_ecosystem.config`** and re-exported from `cosmonaut_app.config`,
 so consumers keep a single import site. Only cosmonaut's own variables (email,
-tileserver, Docker UID/GID) are read here.
+tileserver, Overpass, Docker UID/GID) are read here.
 
 **Consequence: the framework owns those names.** `cosmo_ecosystem.config` uses
 `POSTGRES_DB` and `FLASK_DEBUG`; cosmonaut used `POSTGRES_NAME` and `DEBUG` before
@@ -40,6 +40,7 @@ Grouped by service. The full list lives in `config.env_vars`.
 - **Object Storage (S3)**: `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY`, `OBJECT_STORAGE_HOST`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_REMOTE_NAME`
 - **Compose only, not read by `config.py`**: `POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`, `OBJECT_STORAGE_HOST_PORT`, `OBJECT_STORAGE_CONSOLE_HOST_PORT`, `TILESERVER_HOST_PORT` (defaults in `docker-compose.yml`)
 - **Tileserver**: `TILESERVER_URL`
+- **Overpass**: `OVERPASS_URL` (full `…/api/interpreter` URL; see [osm-backend](../knowledge/systems/osm-backend.md))
 - **Email**: `MAINTAINER_EMAIL`, `EMAIL_SERVER`, `EMAIL_PORT`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_SENDER`
 - **Docker**: `DOCKER_UID`, `DOCKER_GID`
 

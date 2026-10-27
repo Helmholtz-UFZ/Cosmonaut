@@ -71,16 +71,10 @@ one-way tags **or** roundabouts become `oneway: "yes"`.
 
 ## Swapping the source
 
-`OverpassSource` defaults to the public endpoint but reads `OVERPASS_URL` from the environment:
-
-```python
-OVERPASS_URL = os.getenv("OVERPASS_URL", "https://overpass-api.de/api/interpreter")
-```
-
-This is a **soft** env lookup (plain `os.getenv`, not the strict `config` loader) on purpose: it has
-a working default, so it must not become a required variable enforced across all env files. The
-`OsmSource` ABC keeps the door open for a future `.osm.pbf` reader without touching the transform.
-**`TODO:` promote `OVERPASS_URL` to a strict config var now that production has its own source.**
+`OverpassSource` queries `OVERPASS_URL`, a **required** variable read by the strict `getenv()` in
+`cosmonaut_app/config.py` and set in every env file. There is no public fallback: a missing variable
+fails at startup instead of silently degrading to the rate-limited public endpoint. The `OsmSource`
+ABC keeps the door open for a future `.osm.pbf` reader without touching the transform.
 
 ### Production source: UFZ-hosted Overpass
 

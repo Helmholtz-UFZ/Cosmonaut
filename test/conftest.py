@@ -25,6 +25,7 @@ from sqlalchemy.exc import OperationalError
 from werkzeug.serving import make_server
 
 from cosmonaut_app.config import (
+    OVERPASS_URL,
     PORT,
     REDIS_DB,
     REDIS_HOST,
@@ -310,14 +311,13 @@ def overpass_stub():
     Disabled by ``SKIP_OSM_CACHE=1`` — the same switch ``osm_cache_patch`` honours,
     set by the nightly ``test-integration-live-osm`` job. Then no stub starts and
     no ``OVERPASS_URL`` is injected, so the worker queries whatever the environment
-    says: the built-in public default, or a UFZ endpoint supplied as a CI variable.
+    says: env_test's public endpoint, or a UFZ endpoint supplied as a CI variable.
     That job exists to exercise the real Overpass contract, so it must not be
     silently served a fixture.
     """
     if os.getenv("SKIP_OSM_CACHE") == "1":
-        endpoint = os.getenv("OVERPASS_URL", "the built-in default (public Overpass)")
         log.info(
-            f"Overpass stub disabled (SKIP_OSM_CACHE=1) — worker will query {endpoint}"
+            f"Overpass stub disabled (SKIP_OSM_CACHE=1) — worker will query {OVERPASS_URL}"
         )
         yield None
         return

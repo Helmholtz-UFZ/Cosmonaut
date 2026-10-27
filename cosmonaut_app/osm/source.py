@@ -7,22 +7,13 @@ reader later — without touching the transform that builds the routing GeoJSON.
 """
 
 import logging
-import os
 
 import ijson
 import requests
 
-log = logging.getLogger(__name__)
+from cosmonaut_app.config import OVERPASS_URL
 
-# Public Overpass is the default. Override with OVERPASS_URL to point at a
-# self-hosted instance (wiktorn) or a UFZ-provided endpoint.
-#
-# Soft env lookup (not config.getenv) on purpose: the URL has a working default,
-# so it must NOT become a required variable that test_env enforces across all
-# five env files. Production sets it in env_prod; promoting it to a strict
-# config var is still open (see docs/knowledge/systems/osm-backend.md).
-DEFAULT_OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-OVERPASS_URL = os.getenv("OVERPASS_URL", DEFAULT_OVERPASS_URL)
+log = logging.getLogger(__name__)
 
 # Server-side budget declared in the query, and the client read timeout.
 # Saxony-sized queries against a self-hosted instance are fast; the public
