@@ -13,6 +13,10 @@ MAINTAINER_EMAIL="louis-ferdinand.trinkle@ufz.de"
 ### Tile Server ###
 TILESERVER_URL="http://127.0.0.1:8001"
 
+### Overpass (OSM road network) ###
+# Self-hosted by UFZ IT (Germany extract); the public overpass-api.de is the fallback.
+OVERPASS_URL="https://overpass.web-intern.app.ufz.de/api/interpreter"
+
 ### Email ###
 EMAIL_SERVER="fill and copy to env_dev_prod_priv"
 EMAIL_PORT="587"
