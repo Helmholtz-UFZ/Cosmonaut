@@ -873,14 +873,11 @@ def register_reset_callbacks(app):
             log.error(f"Could not extract job_id from pathname: {pathname}")
             raise PreventUpdate
 
-        # Load job and reset
-        try:
-            job = CosmonautJob(job_id=job_id)
-            job.reset()
-            log.info(f"Job {job_id} reset successfully from {pathname}")
-        except Exception as e:
-            log.error(f"Failed to reset job {job_id}: {e}")
-            raise PreventUpdate
+        # A failing load or reset reaches the global error handler, which shows
+        # the user why the reset did not happen.
+        job = CosmonautJob(job_id=job_id)
+        job.reset()
+        log.info(f"Job {job_id} reset successfully from {pathname}")
 
         # Return same pathname to reload page with new state
         return pathname

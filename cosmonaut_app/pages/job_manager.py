@@ -94,8 +94,9 @@ def _resolve_reload_url(job_id: str, status: str, stage: int) -> str:
         return build_url_step("route_download", job_id)
     if status in (JOB_STATUS_RUNNING, JOB_STATUS_FAILED):
         return build_url_step("route_computation", job_id)
-    # PENDING: use stage to determine page
-    page = _STAGE_TO_PAGE.get(stage, "user_info")
+    # PENDING: use stage to determine page. A PENDING job's stage is 0–4: stage 5 is
+    # only set on a COMPLETED job, and a reset caps it at 4.
+    page = _STAGE_TO_PAGE[stage]
     return build_url_step(page, job_id)
 
 
