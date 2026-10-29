@@ -43,7 +43,7 @@ Seven guided steps plus admin/utility pages. Pages live in
 | 6 | `/job/<job_id>/route-computation` | Route Computation (runs sensor-routing) |
 | 7 | `/job/<job_id>/route-download` | Route Download (GPX + QR/email) |
 
-Utility pages (not part of the linear flow): `/job-manager`, `/worker-management`,
+Utility pages (not part of the linear flow): `/job-management`, `/worker-management`,
 `/logs`, `/documentation`.
 
 ## Background pipeline (Celery)

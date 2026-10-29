@@ -148,18 +148,6 @@ START_JOB_BUTTON_HOME_ID = "start-job-button-home-id"
 
 
 # ============================================================================
-# JOB_MANAGER
-# ============================================================================
-
-# --- Buttons ---
-CLEAN_UP_BUTTON_JOB_MANAGER_ID = "clean-up-button-job-manager-id"
-DELETE_BUTTON_JOB_MANAGER_ID = "delete-button-job-manager-id"
-REFRESH_BUTTON_JOB_MANAGER_ID = "refresh-button-job-manager-id"
-
-# --- Tables ---
-JOBS_TABLE_JOB_MANAGER_ID = "jobs-table-job-manager-id"
-
-# ============================================================================
 # ROUTE_COMPUTATION
 # ============================================================================
 

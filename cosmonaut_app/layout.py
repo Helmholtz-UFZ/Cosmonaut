@@ -367,9 +367,9 @@ def create_navbar():
                                 dbc.NavLink(
                                     [
                                         html.I(className="bi bi-list-task me-1"),
-                                        "Job manager",
+                                        "Job management",
                                     ],
-                                    href=dash.page_registry["pages.job_manager"][
+                                    href=dash.page_registry["pages.job_management"][
                                         "relative_path"
                                     ],
                                 )
@@ -703,6 +703,38 @@ def create_card_input(
 def build_url_step(step, job_id):
     base_path = dash.page_registry[f"pages.{step}"]["path_template"]
     return base_path.replace("<job_id>", job_id)
+
+
+_STAGE_TO_PAGE = {
+    0: "user_info",
+    1: "data_upload",
+    2: "street_selection",
+    3: "routing_params",
+    4: "route_computation",
+}
+
+
+def resolve_reload_url(job_id: str, status: str, stage: int) -> str:
+    """Resolve the page where the user resumes a job, e.g. from the job management table.
+
+    Status takes priority: COMPLETED always goes to route_download, RUNNING/FAILED to
+    route_computation. For PENDING jobs, stage determines the page.
+
+    Args:
+        job_id: The job ID
+        status: Job status (PENDING/RUNNING/COMPLETED/FAILED)
+        stage: Workflow stage (0-4), only used if status is PENDING
+
+    Returns:
+        URL path to navigate to
+    """
+    if status == JOB_STATUS_COMPLETED:
+        return build_url_step("route_download", job_id)
+    if status in (JOB_STATUS_RUNNING, JOB_STATUS_FAILED):
+        return build_url_step("route_computation", job_id)
+    # PENDING: use stage to determine page. A PENDING job's stage is 0–4: stage 5 is
+    # only set on a COMPLETED job, and a reset caps it at 4.
+    return build_url_step(_STAGE_TO_PAGE[stage], job_id)
 
 
 def progress_footer(

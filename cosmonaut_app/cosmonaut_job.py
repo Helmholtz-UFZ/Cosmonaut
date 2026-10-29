@@ -338,7 +338,7 @@ class CosmonautJob(BaseJob):
         """Delete the job everywhere: remote prefix, local work dir and row.
 
         Delegates to ``cosmo_ecosystem.job_persistence.delete_job``, the same
-        deletion the nightly cleanup and the job manager use.
+        deletion the nightly cleanup and the job management page use.
         """
         job_persistence.delete_job(self.model.job_id)
 
