@@ -22,9 +22,10 @@ local copy of the name would be a second source of truth that silently drifts.
 
 Rule of thumb: whoever renders the component owns its id.
 
-- `cosmonaut_app/pages/logs.py` and `pages/worker_management.py` are shims for
-  `cosmo_ecosystem.pages.*`. Everything they render is framework-owned, so
-  `test/test_worker_management.py` imports its locators from `cosmo_ecosystem.constants`.
+- `cosmonaut_app/pages/logs.py`, `pages/worker_management.py` and
+  `pages/job_management.py` are shims for `cosmo_ecosystem.pages.*`. Everything they
+  render is framework-owned, so `test/test_worker_management.py` imports its locators
+  from `cosmo_ecosystem.constants`.
 - `LOADING_OVERLAY_MODAL_SHARED_ID` is the one shared component: cosmonaut's
   `layout.py` mounts it and a framework page drives it. Both names and **values**
   must stay identical (`"loading-overlay-modal-shared-id"`) or the framework page's
