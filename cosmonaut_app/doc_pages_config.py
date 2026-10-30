@@ -22,7 +22,7 @@ USER_WORKFLOW_PAGES = [
 ADMIN_PAGES = [
     ("logs", "Application Logs"),
     ("worker_management", "Worker Management"),
-    ("job_manager", "Job Manager"),
+    ("job_management", "Job Management"),
 ]
 
 # Pages to exclude from documentation

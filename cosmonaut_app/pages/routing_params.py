@@ -164,9 +164,11 @@ _advanced_collapse = dbc.Collapse(
 )
 
 card_body_with_placeholder = [
-    *_essential_rows[:2],   # segment_number+time_limit, max_distance+optimization_objective
+    *_essential_rows[
+        :2
+    ],  # segment_number+time_limit, max_distance+optimization_objective
     _objective_caption,
-    *_essential_rows[2:],   # num_points row
+    *_essential_rows[2:],  # num_points row
     _toggle_button,
     _advanced_collapse,
 ]

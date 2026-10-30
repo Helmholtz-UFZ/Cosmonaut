@@ -8,7 +8,7 @@ job by clicking the "Create new job" button.
 
 Each job is assigned a unique identifier that tracks your data, route selections,
 and final navigation output through the entire workflow. You can also continue
-work on a previous routing project by opening it from the Job manager in the
+work on a previous routing project by opening it from the Job management page in the
 navigation header.
 
 From here, you'll proceed through the workflow to provide job information, upload
@@ -63,7 +63,7 @@ card_body = [
         color="primary",
     ),
     html.Div(
-        "Or reopen an existing job via the Job manager in the navbar.",
+        "Or reopen an existing job via Job management in the navbar.",
         className="text-muted small mt-2",
     ),
 ]

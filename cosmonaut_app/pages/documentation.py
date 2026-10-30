@@ -25,7 +25,7 @@ The generated documentation includes:
 **Administrative Pages** (3 management interfaces):
 - Logs: Application log viewer with filtering and search
 - Worker Management: Celery worker monitoring and task management
-- Job Manager: Job lifecycle management and database cleanup
+- Job Management: Job lifecycle management and database cleanup
 
 Each page section in the documentation includes:
 - Descriptive text extracted from the page module's docstring

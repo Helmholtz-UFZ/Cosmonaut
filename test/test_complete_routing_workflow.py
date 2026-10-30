@@ -157,9 +157,9 @@ def test_complete_routing_workflow(
         time.sleep(1)
         job_row = DataBaseManager.get_job_columns(job_id)
 
-    assert (
-        job_row["email"] == "test@ufz.de"
-    ), f"Expected email 'test@ufz.de' in DB, got '{job_row['email']}'"
+    assert job_row["email"] == "test@ufz.de", (
+        f"Expected email 'test@ufz.de' in DB, got '{job_row['email']}'"
+    )
     assert job_row["notified_end"] is True, (
         "Expected notified_end=True in DB after job completion — "
         "email notification was not recorded"
@@ -167,12 +167,12 @@ def test_complete_routing_workflow(
 
     # Verify email notifications were logged by the worker
     worker_log = worker_log_path.read_text()
-    assert (
-        "Send mail about submitted job" in worker_log
-    ), "Worker log missing submission email log"
-    assert (
-        "Send mail about finished job" in worker_log
-    ), "Worker log missing finished email log"
+    assert "Send mail about submitted job" in worker_log, (
+        "Worker log missing submission email log"
+    )
+    assert "Send mail about finished job" in worker_log, (
+        "Worker log missing finished email log"
+    )
 
     # === Download work_dir zip and verify contents ===
     download_link = page.locator("a[href*='/download/'][href$='.zip']")

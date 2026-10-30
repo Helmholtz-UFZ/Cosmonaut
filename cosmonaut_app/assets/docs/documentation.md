@@ -77,7 +77,7 @@ job by clicking the "Create new job" button.
 
 Each job is assigned a unique identifier that tracks your data, route selections,
 and final navigation output through the entire workflow. You can also continue
-work on a previous routing project by opening it from the Job manager in the
+work on a previous routing project by opening it from the Job management page in the
 navigation header.
 
 From here, you'll proceed through the workflow to provide job information, upload
@@ -454,7 +454,7 @@ resource usage during peak periods.
 
 <img src="/assets/docs/screenshots/worker_management.png" alt="Worker Management" class="mw-100" />
 
-### Job Manager
+### Job Management
 
 Manage all jobs from a central dashboard.
 
@@ -462,18 +462,19 @@ Manage all jobs from a central dashboard.
 
 This administrative page provides a comprehensive overview of all jobs in the system.
 You can:
-- View all jobs in a table with status, start date, and submission details
+- View all jobs in a table with status, start date and time, and submission details
 - See job status at a glance with color coding (PENDING=orange, RUNNING=green,
   COMPLETED=blue, FAILED=red)
 - Select and delete individual jobs or multiple jobs at once
-- Trigger cleanup operations to remove old jobs automatically
+- Clean up: remove every unsubmitted job and every expired submitted job at once
 - Access individual job pages directly from the table by clicking Job ID
 
 The table uses color coding to quickly identify job statuses. You can select rows to
-perform bulk operations like deletion. Use the cleanup function to automatically remove
-jobs that exceed retention periods (2 days for unsubmitted, 60 days for submitted jobs).
+perform bulk operations like deletion. The "Clean" button removes all unsubmitted jobs
+immediately, and submitted jobs older than their retention period (60 days). Without it,
+the nightly cleanup removes unsubmitted jobs after 2 days.
 
-<img src="/assets/docs/screenshots/job_manager.png" alt="Job Manager" class="mw-100" />
+<img src="/assets/docs/screenshots/job_management.png" alt="Job Management" class="mw-100" />
 
 ---
 

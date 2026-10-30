@@ -75,9 +75,7 @@ def layout(job_id):
     # Determine initial helper text and collapse state from stored email
     stored_email = job.model.email
     if not stored_email:
-        _initial_helper = (
-            "Optional — without an email you won't receive job-completion notifications."
-        )
+        _initial_helper = "Optional — without an email you won't receive job-completion notifications."
         _initial_helper_cls = "text-warning small mt-2"
         _initial_valid = False
         _initial_invalid = False

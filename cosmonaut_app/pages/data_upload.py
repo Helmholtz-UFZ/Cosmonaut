@@ -295,7 +295,10 @@ def layout(job_id):
                                                 _first_sentence(DESCRIPTION_MEMBERSHIP),
                                                 className="text-muted",
                                             ),
-                                            _help_icon(MEMBERSHIP_HELP_ICON_ID, DESCRIPTION_MEMBERSHIP),
+                                            _help_icon(
+                                                MEMBERSHIP_HELP_ICON_ID,
+                                                DESCRIPTION_MEMBERSHIP,
+                                            ),
                                         ],
                                     ),
                                 ],
@@ -385,7 +388,10 @@ def layout(job_id):
                                                 _first_sentence(DESCRIPTION_PREDICTOR),
                                                 className="text-muted",
                                             ),
-                                            _help_icon(PREDICTOR_HELP_ICON_ID, DESCRIPTION_PREDICTOR),
+                                            _help_icon(
+                                                PREDICTOR_HELP_ICON_ID,
+                                                DESCRIPTION_PREDICTOR,
+                                            ),
                                         ],
                                     ),
                                 ],

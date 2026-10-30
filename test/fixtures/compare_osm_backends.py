@@ -97,7 +97,10 @@ def _shared_node_to_roads(features_by_id, shared_ids):
     """sensor-routing's node->roads map over a restricted osmid set, normalized
     to {node: frozenset(roads)} for order-independent comparison."""
     collection = {"features": [features_by_id[osmid] for osmid in shared_ids]}
-    return {node: frozenset(roads) for node, roads in build_node_to_roads_map(collection).items()}
+    return {
+        node: frozenset(roads)
+        for node, roads in build_node_to_roads_map(collection).items()
+    }
 
 
 def _compare(reference, new):
@@ -109,9 +112,15 @@ def _compare(reference, new):
     """
     ref_ids, new_ids = set(reference), set(new)
     only_ref, only_new = ref_ids - new_ids, new_ids - ref_ids
-    print(f"  osmids: reference={len(ref_ids)} new={len(new_ids)} shared={len(ref_ids & new_ids)}")
-    print(f"  ONLY in reference (new is missing): {len(only_ref)} -> {sorted(only_ref)[:10]}")
-    print(f"  ONLY in new (new adds):             {len(only_new)} -> {sorted(only_new)[:10]}")
+    print(
+        f"  osmids: reference={len(ref_ids)} new={len(new_ids)} shared={len(ref_ids & new_ids)}"
+    )
+    print(
+        f"  ONLY in reference (new is missing): {len(only_ref)} -> {sorted(only_ref)[:10]}"
+    )
+    print(
+        f"  ONLY in new (new adds):             {len(only_new)} -> {sorted(only_new)[:10]}"
+    )
 
     set_mismatch, rotation_only, tag_mismatch, geom_max_delta = [], [], [], 0.0
     for osmid in ref_ids & new_ids:
@@ -123,7 +132,10 @@ def _compare(reference, new):
         for tag in ROUTING_TAGS:
             if rp[tag] != np_[tag]:
                 tag_mismatch.append((osmid, tag, rp[tag], np_[tag]))
-        rc, nc = reference[osmid]["geometry"]["coordinates"], new[osmid]["geometry"]["coordinates"]
+        rc, nc = (
+            reference[osmid]["geometry"]["coordinates"],
+            new[osmid]["geometry"]["coordinates"],
+        )
         if rp["nodes"] == np_["nodes"] and len(rc) == len(nc):
             for (rx, ry), (nx, ny) in zip(rc, nc):
                 geom_max_delta = max(geom_max_delta, abs(rx - nx), abs(ry - ny))
@@ -137,13 +149,19 @@ def _compare(reference, new):
 
 def main():
     parser = argparse.ArgumentParser()
-    default_membership = os.path.join(os.path.dirname(__file__), "..", "memberships.csv")
+    default_membership = os.path.join(
+        os.path.dirname(__file__), "..", "memberships.csv"
+    )
     parser.add_argument("--membership", default=default_membership)
-    parser.add_argument("--overpass-url", default="https://overpass-api.de/api",
-                        help="osmnx-style base URL (…/api); /interpreter is appended")
+    parser.add_argument(
+        "--overpass-url",
+        default="https://overpass-api.de/api",
+        help="osmnx-style base URL (…/api); /interpreter is appended",
+    )
     parser.add_argument("--epsg", type=int, default=25832)
-    parser.add_argument("--reference",
-                        help="transformed.geojson to diff the new output against")
+    parser.add_argument(
+        "--reference", help="transformed.geojson to diff the new output against"
+    )
     args = parser.parse_args()
 
     new_dir = tempfile.mkdtemp(prefix="osm_new_")
@@ -151,7 +169,9 @@ def main():
     print(f"Overpass: {args.overpass_url}  EPSG:{args.epsg}\n")
 
     print("Running Overpass-direct backend (isolated)…")
-    stats = _run_isolated(_run_backend, args.membership, args.epsg, args.overpass_url, new_dir)
+    stats = _run_isolated(
+        _run_backend, args.membership, args.epsg, args.overpass_url, new_dir
+    )
     out_path = os.path.join(new_dir, OSM_FILENAME)
     out_mb = os.path.getsize(out_path) / (1024 * 1024)
     new_feats = _index_by_osmid(out_path)
@@ -170,11 +190,17 @@ def main():
     ref_map = _shared_node_to_roads(ref_feats, shared_ids)
     new_map = _shared_node_to_roads(new_feats, shared_ids)
     connectivity_ok = ref_map == new_map
-    print(f"  shared-graph nodes: reference={len(ref_map)} new={len(new_map)} "
-          f"identical={connectivity_ok}")
+    print(
+        f"  shared-graph nodes: reference={len(ref_map)} new={len(new_map)} "
+        f"identical={connectivity_ok}"
+    )
 
     print("\n" + "=" * 60)
-    verdict = "ROUTE-EQUIVALENT ✓" if (features_ok and connectivity_ok) else "DIFFERENCES FOUND ✗"
+    verdict = (
+        "ROUTE-EQUIVALENT ✓"
+        if (features_ok and connectivity_ok)
+        else "DIFFERENCES FOUND ✗"
+    )
     print(f"VERDICT: {verdict}")
     print("=" * 60)
     sys.exit(0 if (features_ok and connectivity_ok) else 1)

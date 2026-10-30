@@ -34,7 +34,7 @@ All error handling is centralized in `cosmonaut_app/error_handling.py`.
 - `JobCleanupFailed(job_ids)` / `JobDeletionFailed(job_ids)` - From
   `cosmo_ecosystem.error_handling`, imported, never redefined. Raised after every
   other job was handled: the first by the framework cleanup (nightly task, job
-  manager Clean), the second by the framework `delete_jobs` (job manager Delete).
+  management Clean), the second by the framework `delete_jobs` (job management Delete).
   The framework error table shows their message (the failed ids) in the modal, so
   callbacks let them through instead of catching them
 - `WrongCeleryTaskId(task_id)` - Invalid Celery task ID

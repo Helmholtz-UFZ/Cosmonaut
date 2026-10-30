@@ -294,9 +294,7 @@ def _viewport_road_ids(job):
     return sorted(f["id"] for f in selector.viewport_fc(_VIEWPORT, 14)["features"])
 
 
-def test_the_map_shows_edited_streets_on_a_pod_without_the_files(
-    job, rclone_transfers
-):
+def test_the_map_shows_edited_streets_on_a_pod_without_the_files(job, rclone_transfers):
     StreetSelector(CosmonautJob(job_id=job.model.job_id)).remove_roads([2])
     _another_pod(job)
     rclone_transfers.clear()

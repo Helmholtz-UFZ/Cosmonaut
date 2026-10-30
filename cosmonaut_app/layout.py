@@ -140,6 +140,7 @@ click_handler = assign("""function(e, ctx) {
 # Layout Components
 # ============================================================================
 
+
 # Selectable base maps (radio buttons in the LayersControl). All three are
 # free, keyless tile services; attribution per provider terms.
 def _base_layers():
@@ -185,6 +186,8 @@ def _base_layers():
             checked=False,
         ),
     ]
+
+
 steps_jobs = {
     "user_info": ["Information", "Provide user information"],
     "data_upload": ["Upload", "Upload classification data"],
@@ -367,9 +370,9 @@ def create_navbar():
                                 dbc.NavLink(
                                     [
                                         html.I(className="bi bi-list-task me-1"),
-                                        "Job manager",
+                                        "Job management",
                                     ],
-                                    href=dash.page_registry["pages.job_manager"][
+                                    href=dash.page_registry["pages.job_management"][
                                         "relative_path"
                                     ],
                                 )
@@ -705,6 +708,38 @@ def build_url_step(step, job_id):
     return base_path.replace("<job_id>", job_id)
 
 
+_STAGE_TO_PAGE = {
+    0: "user_info",
+    1: "data_upload",
+    2: "street_selection",
+    3: "routing_params",
+    4: "route_computation",
+}
+
+
+def resolve_reload_url(job_id: str, status: str, stage: int) -> str:
+    """Resolve the page where the user resumes a job, e.g. from the job management table.
+
+    Status takes priority: COMPLETED always goes to route_download, RUNNING/FAILED to
+    route_computation. For PENDING jobs, stage determines the page.
+
+    Args:
+        job_id: The job ID
+        status: Job status (PENDING/RUNNING/COMPLETED/FAILED)
+        stage: Workflow stage (0-4), only used if status is PENDING
+
+    Returns:
+        URL path to navigate to
+    """
+    if status == JOB_STATUS_COMPLETED:
+        return build_url_step("route_download", job_id)
+    if status in (JOB_STATUS_RUNNING, JOB_STATUS_FAILED):
+        return build_url_step("route_computation", job_id)
+    # PENDING: use stage to determine page. A PENDING job's stage is 0–4: stage 5 is
+    # only set on a COMPLETED job, and a reset caps it at 4.
+    return build_url_step(_STAGE_TO_PAGE[stage], job_id)
+
+
 def progress_footer(
     prev_id=None,
     prev_url=None,
@@ -873,14 +908,11 @@ def register_reset_callbacks(app):
             log.error(f"Could not extract job_id from pathname: {pathname}")
             raise PreventUpdate
 
-        # Load job and reset
-        try:
-            job = CosmonautJob(job_id=job_id)
-            job.reset()
-            log.info(f"Job {job_id} reset successfully from {pathname}")
-        except Exception as e:
-            log.error(f"Failed to reset job {job_id}: {e}")
-            raise PreventUpdate
+        # A failing load or reset reaches the global error handler, which shows
+        # the user why the reset did not happen.
+        job = CosmonautJob(job_id=job_id)
+        job.reset()
+        log.info(f"Job {job_id} reset successfully from {pathname}")
 
         # Return same pathname to reload page with new state
         return pathname
@@ -1042,7 +1074,9 @@ dash.clientside_callback(
     """
     function(n_clicks) {
         if (!n_clicks) { return window.dash_clientside.no_update; }
-        var el = document.getElementById('""" + JOB_ID_KICKER_CODE_SHARED_ID + """');
+        var el = document.getElementById('"""
+    + JOB_ID_KICKER_CODE_SHARED_ID
+    + """');
         if (!el) { return window.dash_clientside.no_update; }
         navigator.clipboard.writeText(el.innerText).then(function() {
             el.classList.add('bg-success', 'bg-opacity-25');

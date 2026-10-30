@@ -76,7 +76,9 @@ def _truncate_by_edge(nodes, coords, polygon):
         return None, None
 
     # A run of segments [a..b] covers nodes [a .. b+1] inclusive.
-    return nodes[first_segment : last_segment + 2], coords[first_segment : last_segment + 2]
+    return nodes[first_segment : last_segment + 2], coords[
+        first_segment : last_segment + 2
+    ]
 
 
 def _infer_oneway(tags):

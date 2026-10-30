@@ -26,7 +26,7 @@ PAGE_CONFIG = {
     # Admin pages
     "logs": ("/logs", 1),
     "worker_management": ("/worker-management", 2),
-    "job_manager": ("/job-manager", 5),
+    "job_management": ("/job-management", 5),
 }
 
 
@@ -228,14 +228,14 @@ class ScreenshotGenerator:
             # CRITICAL: Check for 404 errors
             if response and response.status == 404:
                 error_msg = (
-                    f"\n{'='*80}\n"
+                    f"\n{'=' * 80}\n"
                     f"ERROR: 404 Not Found for page '{page_name}'\n"
                     f"URL: {full_url}\n"
-                    f"{'='*80}\n"
+                    f"{'=' * 80}\n"
                     f"This means the URL in PAGE_CONFIG does not match the actual page route.\n"
                     f"Check the 'path' or 'path_template' in cosmonaut_app/pages/{page_name}.py\n"
                     f"and update PAGE_CONFIG in screenshot_generator.py accordingly.\n"
-                    f"{'='*80}\n"
+                    f"{'=' * 80}\n"
                 )
                 log.error(error_msg)
                 raise ValueError(error_msg)

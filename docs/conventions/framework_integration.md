@@ -147,10 +147,13 @@ ports.**
 - **HTML ids**: whoever renders the component owns its id — framework pages take
   theirs from `cosmo_ecosystem.constants`, and so do the tests that locate them. Details:
   [html_ids.md](html_ids.md).
-- **User-facing page prose**: the app owns it. The two framework pages are thin
-  shims under `cosmonaut_app/pages/` whose only job is to be imported by Dash's page
-  discovery (`register_page` must run after `Dash(...)`) and to carry the docstring
-  that `doc_generator` parses. The implementation lives in `cosmo_ecosystem.pages.*`.
+- **User-facing page prose**: the app owns it. The three framework pages (logs,
+  worker management, job management) are thin shims under `cosmonaut_app/pages/`
+  whose only job is to be imported by Dash's page discovery (`register_page` must run
+  after `Dash(...)`) and to carry the docstring that `doc_generator` parses. The
+  implementation lives in `cosmo_ecosystem.pages.*`. `job_management.py` also sets
+  `cosmo_ecosystem.pages.job_link` before the import, the one COSMONAUT-specific
+  part of that page: the row link to the page where a job resumes.
 
 ---
 
@@ -159,13 +162,6 @@ ports.**
 Tracked in `docs/project-state.md`; kept here only as a pointer, so this file does
 not drift into a second changelog:
 
-- `cosmo_ecosystem.pages.*` do not pass `wrapper_class` through to
-  `page_container_column_layout`, so the app still keys its admin-page CSS on
-  `#main-content-container` (see the comment in `assets/style.css`).
-- `cosmo_ecosystem.layouts.toggle_navbar_collapse` is still registered at module import,
-  so importing a framework page adds one callback whose component this app does not
-  mount. Inert — it never fires — but it belongs behind the same opt-in as the reset
-  callbacks.
 - `files_route.py` and `error_handling.py` wait on framework seams that do not exist
   yet (a registrable domain file route; an `on_unhandled` hook, without which the
   maintainer mails would be lost silently).
