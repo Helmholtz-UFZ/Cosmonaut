@@ -1,6 +1,5 @@
 __pycache__
 flask
-.python-version
 cosmonaut_app/upload/*
 pyvenv.cfg
 cosmonaut_app/download/*
