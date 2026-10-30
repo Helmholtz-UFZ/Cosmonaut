@@ -131,20 +131,6 @@ At the start of every session, read `docs/project-state.md` for current
 priorities, recent changes, and open questions. Before ending a session
 that involved significant decisions or new patterns, update this file.
 
-## Identity Files — Read First, No Exceptions
-
-You CANNOT respond to the user until you have attempted to read these files from the
-project root. Use the Read tool (not Glob — they are symlinks). If Read fails, try
-resolving the symlink target via `ls -la` and read that path. If they don't exist, move
-on — but you must try.
-
-1. `SOUL.md` — Who you are
-2. `USER.md` — Who you're working with
-
-This applies regardless of what the user asked. A meta-question, a greeting, a one-liner
-— doesn't matter. Attempt to read both files before your first response. Every session.
-No exceptions.
-
 ## Skills Protocol
 
 ### When to Create a Skill
