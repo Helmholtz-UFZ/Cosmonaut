@@ -501,9 +501,7 @@ def osm_cache_patch(monkeypatch):
         log.info("OSM cache patch skipped (SKIP_OSM_CACHE=1) — using live Overpass API")
         return
 
-    cache_dir = os.path.join(
-        os.path.dirname(__file__), "fixtures", "osm_cache"
-    )
+    cache_dir = os.path.join(os.path.dirname(__file__), "fixtures", "osm_cache")
 
     def _cached_run_osm_query(self, download_folder):
         """Copy cached OSM files instead of querying Overpass."""
@@ -522,4 +520,5 @@ def osm_cache_patch(monkeypatch):
             shutil.copy2(src, dst)
 
     from cosmonaut_app.osm import OsmDownloader
+
     monkeypatch.setattr(OsmDownloader, "run_osm_query", _cached_run_osm_query)

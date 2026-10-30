@@ -140,6 +140,7 @@ click_handler = assign("""function(e, ctx) {
 # Layout Components
 # ============================================================================
 
+
 # Selectable base maps (radio buttons in the LayersControl). All three are
 # free, keyless tile services; attribution per provider terms.
 def _base_layers():
@@ -185,6 +186,8 @@ def _base_layers():
             checked=False,
         ),
     ]
+
+
 steps_jobs = {
     "user_info": ["Information", "Provide user information"],
     "data_upload": ["Upload", "Upload classification data"],
@@ -1071,7 +1074,9 @@ dash.clientside_callback(
     """
     function(n_clicks) {
         if (!n_clicks) { return window.dash_clientside.no_update; }
-        var el = document.getElementById('""" + JOB_ID_KICKER_CODE_SHARED_ID + """');
+        var el = document.getElementById('"""
+    + JOB_ID_KICKER_CODE_SHARED_ID
+    + """');
         if (!el) { return window.dash_clientside.no_update; }
         navigator.clipboard.writeText(el.innerText).then(function() {
             el.classList.add('bg-success', 'bg-opacity-25');

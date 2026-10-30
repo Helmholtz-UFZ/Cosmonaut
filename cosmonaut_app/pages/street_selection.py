@@ -387,9 +387,7 @@ def layout(job_id: str):
             # Removed roads panel
             dbc.Label("Removed roads", className="mt-3 mb-1"),
             html.Div(
-                _build_removed_roads_panel(
-                    sel.get_removed_roads_info(), is_active
-                ),
+                _build_removed_roads_panel(sel.get_removed_roads_info(), is_active),
                 id=REMOVED_ROADS_LIST_DIV_STREET_SELECTION_ID,
             ),
             dbc.Button(
@@ -1000,7 +998,9 @@ dash.clientside_callback(
         return [n === 0 ? "Selected: 0" : "Selected: " + n, color];
     }
     """,
-    [Output(SELECTED_BADGE_STREET_SELECTION_ID, "children"),
-     Output(SELECTED_BADGE_STREET_SELECTION_ID, "color")],
+    [
+        Output(SELECTED_BADGE_STREET_SELECTION_ID, "children"),
+        Output(SELECTED_BADGE_STREET_SELECTION_ID, "color"),
+    ],
     Input(OSM_GEOJSON_LAYER_MAP_SHARED_ID, "hideout"),
 )

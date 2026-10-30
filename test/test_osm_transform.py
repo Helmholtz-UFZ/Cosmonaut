@@ -249,7 +249,9 @@ def test_downloader_streams_three_files(tmp_path):
         data, epsg_output=25832, source=_FakeSource([way, grade5_way, ungraded_way])
     ).run_osm_query(str(tmp_path))
 
-    with open(os.path.join(tmp_path, "osm_data_download.geojson"), encoding="utf-8") as f:
+    with open(
+        os.path.join(tmp_path, "osm_data_download.geojson"), encoding="utf-8"
+    ) as f:
         download = json.load(f)
     with open(os.path.join(tmp_path, "osm_data_edited.geojson"), encoding="utf-8") as f:
         edited = json.load(f)
@@ -264,7 +266,11 @@ def test_downloader_streams_three_files(tmp_path):
     assert [f["properties"]["osmid"] for f in transformed["features"]] == [1]
     assert download["features"][0] == edited["features"][0]
     props = download["features"][0]["properties"]
-    assert props["osmid"] == 1 and props["nodes"] == [10, 11, 12] and props["oneway"] == "yes"
+    assert (
+        props["osmid"] == 1
+        and props["nodes"] == [10, 11, 12]
+        and props["oneway"] == "yes"
+    )
     # transformed file: CRS header + reprojected (no longer lon/lat) coordinates
     assert transformed["crs"]["properties"]["name"] == "urn:ogc:def:crs:EPSG::25832"
     assert transformed["features"][0]["geometry"]["coordinates"][0][0] > 100000

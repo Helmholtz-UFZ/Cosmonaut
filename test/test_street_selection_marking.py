@@ -124,15 +124,15 @@ def test_street_click_marks_road_after_hard_load(
     )
 
     page.mouse.click(pixel[0], pixel[1])
-    expect(
-        page.locator(f"#{SELECTED_BADGE_STREET_SELECTION_ID}")
-    ).to_have_text("Selected: 1", timeout=5000)
+    expect(page.locator(f"#{SELECTED_BADGE_STREET_SELECTION_ID}")).to_have_text(
+        "Selected: 1", timeout=5000
+    )
 
     # Clicking the same spot again unmarks it.
     page.mouse.click(pixel[0], pixel[1])
-    expect(
-        page.locator(f"#{SELECTED_BADGE_STREET_SELECTION_ID}")
-    ).to_have_text("Selected: 0", timeout=5000)
+    expect(page.locator(f"#{SELECTED_BADGE_STREET_SELECTION_ID}")).to_have_text(
+        "Selected: 0", timeout=5000
+    )
 
     # The map legend toggle collapses and re-expands the legend.
     legend_body = page.locator(f"#{MAP_LEGEND_COLLAPSE_SHARED_ID}")

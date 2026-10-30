@@ -10,10 +10,12 @@ from cosmonaut_app.cosmonaut_job import CosmonautJob
 
 def _create_dummy_classification_data():
     """Create a dummy classification DataFrame for testing."""
-    return pd.DataFrame({
-        "Latitude": [50.0, 50.1, 50.05],
-        "Longitude": [10.0, 10.1, 10.05],
-    })
+    return pd.DataFrame(
+        {
+            "Latitude": [50.0, 50.1, 50.05],
+            "Longitude": [10.0, 10.1, 10.05],
+        }
+    )
 
 
 def _http_error(status_code):
@@ -40,12 +42,15 @@ def test_process_upload_task_retries_on_connection_error():
     task_mock = mock.MagicMock()
     task_mock.request.retries = 0
 
-    with mock.patch(
-        "cosmonaut_app.tasks.upload_tasks._transform_csv",
-        return_value=_create_dummy_classification_data(),
-    ), mock.patch(
-        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
-        side_effect=requests.exceptions.ConnectionError("Connection failed"),
+    with (
+        mock.patch(
+            "cosmonaut_app.tasks.upload_tasks._transform_csv",
+            return_value=_create_dummy_classification_data(),
+        ),
+        mock.patch(
+            "cosmonaut_app.osm.OsmDownloader.run_osm_query",
+            side_effect=requests.exceptions.ConnectionError("Connection failed"),
+        ),
     ):
         process_upload_task(task_mock, job_id, 4326)
 
@@ -66,12 +71,15 @@ def test_process_upload_task_retries_on_timeout():
     task_mock = mock.MagicMock()
     task_mock.request.retries = 1
 
-    with mock.patch(
-        "cosmonaut_app.tasks.upload_tasks._transform_csv",
-        return_value=_create_dummy_classification_data(),
-    ), mock.patch(
-        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
-        side_effect=requests.exceptions.Timeout("Request timed out"),
+    with (
+        mock.patch(
+            "cosmonaut_app.tasks.upload_tasks._transform_csv",
+            return_value=_create_dummy_classification_data(),
+        ),
+        mock.patch(
+            "cosmonaut_app.osm.OsmDownloader.run_osm_query",
+            side_effect=requests.exceptions.Timeout("Request timed out"),
+        ),
     ):
         process_upload_task(task_mock, job_id, 4326)
 
@@ -92,12 +100,15 @@ def test_process_upload_task_retries_on_http_429():
     task_mock = mock.MagicMock()
     task_mock.request.retries = 0
 
-    with mock.patch(
-        "cosmonaut_app.tasks.upload_tasks._transform_csv",
-        return_value=_create_dummy_classification_data(),
-    ), mock.patch(
-        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
-        side_effect=_http_error(429),
+    with (
+        mock.patch(
+            "cosmonaut_app.tasks.upload_tasks._transform_csv",
+            return_value=_create_dummy_classification_data(),
+        ),
+        mock.patch(
+            "cosmonaut_app.osm.OsmDownloader.run_osm_query",
+            side_effect=_http_error(429),
+        ),
     ):
         process_upload_task(task_mock, job_id, 4326)
 
@@ -115,12 +126,15 @@ def test_process_upload_task_retries_on_http_503():
     task_mock = mock.MagicMock()
     task_mock.request.retries = 2
 
-    with mock.patch(
-        "cosmonaut_app.tasks.upload_tasks._transform_csv",
-        return_value=_create_dummy_classification_data(),
-    ), mock.patch(
-        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
-        side_effect=_http_error(503),
+    with (
+        mock.patch(
+            "cosmonaut_app.tasks.upload_tasks._transform_csv",
+            return_value=_create_dummy_classification_data(),
+        ),
+        mock.patch(
+            "cosmonaut_app.osm.OsmDownloader.run_osm_query",
+            side_effect=_http_error(503),
+        ),
     ):
         process_upload_task(task_mock, job_id, 4326)
 
@@ -140,12 +154,15 @@ def test_process_upload_task_does_not_retry_on_non_transient_http_error():
     task_mock = mock.MagicMock()
     task_mock.request.retries = 0
 
-    with mock.patch(
-        "cosmonaut_app.tasks.upload_tasks._transform_csv",
-        return_value=_create_dummy_classification_data(),
-    ), mock.patch(
-        "cosmonaut_app.osm.OsmDownloader.run_osm_query",
-        side_effect=_http_error(404),
+    with (
+        mock.patch(
+            "cosmonaut_app.tasks.upload_tasks._transform_csv",
+            return_value=_create_dummy_classification_data(),
+        ),
+        mock.patch(
+            "cosmonaut_app.osm.OsmDownloader.run_osm_query",
+            side_effect=_http_error(404),
+        ),
     ):
         try:
             process_upload_task(task_mock, job_id, 4326)

@@ -74,7 +74,7 @@ def process_upload_task(self, job_id, epsg_input):
         requests.exceptions.Timeout,
         urllib3.exceptions.ReadTimeoutError,
     ) as e:
-        countdown = 2 ** self.request.retries * 5
+        countdown = 2**self.request.retries * 5
         log.warning(
             f"Transient network error in upload processing for job {job_id}, "
             f"retry attempt {self.request.retries + 1}/3 in {countdown}s: {str(e)}"
@@ -86,7 +86,7 @@ def process_upload_task(self, job_id, epsg_input):
         # `response.ok`, which is False for every status >= 400 (i.e. exactly the
         # transient codes below), so it would never retry. Test identity instead.
         if e.response is not None and e.response.status_code in (429, 502, 503, 504):
-            countdown = 2 ** self.request.retries * 5
+            countdown = 2**self.request.retries * 5
             log.warning(
                 f"Overpass API transient error (HTTP {e.response.status_code}) "
                 f"for job {job_id}, retry attempt {self.request.retries + 1}/3 in {countdown}s"
