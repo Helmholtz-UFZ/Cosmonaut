@@ -75,6 +75,11 @@ default-groups = [
     "dev"
 ]
 
+# ruff 0.16 added *.md to its default file set and formats Python code blocks in
+# Markdown, which broke the code examples in the docs. Docs are not formatted.
+[tool.ruff]
+extend-exclude = ["*.md"]
+
 [tool.ruff.lint]
 # Explicit rule set instead of ruff's built-in defaults. Those defaults are not a
 # stable contract: 0.16.0 grew them from 59 to 413 rules and simultaneously

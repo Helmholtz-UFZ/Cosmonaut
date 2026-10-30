@@ -65,7 +65,8 @@ import pandas  # noqa
 - **`ruff-format` does not sort imports.** That is `check --select I` only, which is
   why `I` is in the set.
 - **Since 0.16.0, `*.md` is in ruff's default file set** and Python code blocks in
-  Markdown get formatted. Keep it in mind before running `ruff format` over the repo.
+  Markdown get formatted, which broke the docs' code examples once (2026-10-30).
+  `extend-exclude = ["*.md"]` in `pyproject.toml` keeps docs out of ruff.
 - **`RUF100` couples noqa comments to `select`.** Narrowing the rule set turns existing
   `# noqa: XYZ` into "unused noqa" errors, so a `select` change may require a noqa
   sweep in the same commit.
