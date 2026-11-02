@@ -60,9 +60,10 @@ cache; see the framework's ADR 0001). `CosmonautJob` only maps its model to a ro
 
 ## Lifecycle methods
 
-`submit()` flips `status` to `RUNNING`, saves (so the worker can pull a clean copy), and enqueues the
-routing task. `reset()` cancels a running task, deletes **output** files (logs, solution, GPX, QR) but
-**preserves inputs** (uploaded data, parameters, OSM data), and returns the job to `PENDING`.
+`submit()` saves (so the worker can pull a clean copy), queues the run with `job_run.mark_queued`
+(`RUNNING`, no heartbeat), and enqueues the routing task. `reset()` cancels a running task, deletes
+**output** files (logs, solution, GPX, QR) but **preserves inputs** (uploaded data, parameters, OSM
+data), and returns the job to `PENDING` with no heartbeat.
 `delete_membership()` cascades — it revokes any in-flight upload task, deletes the predictor, the OSM
 files and plots, and resets `membership_upload`. `time_to_live()` computes days-until-cleanup from
 `start_date` and the submitted/not-submitted retention windows.
