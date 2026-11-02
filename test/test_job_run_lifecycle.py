@@ -265,3 +265,22 @@ def test_a_reset_leaves_the_job_pending_without_a_heartbeat(running_job):
     row = DataBaseManager.get_job_columns(job_id)
     assert row["status"] == JOB_STATUS_PENDING
     assert row["heartbeat_at"] is None
+
+
+def test_the_queued_delivery_of_a_cancelled_job_is_dropped_without_a_mail(
+    running_job,
+):
+    job_id = running_job.job_id
+    job = CosmonautJob(job_id=job_id)
+    with _enqueue_returns("task-of-the-cancelled-run", False):
+        job.submit()
+    job.cancel()
+
+    with mock.patch("cosmonaut_app.tasks.routing_tasks.send_mail") as send_mail:
+        process_routing_job(None, job_id)
+
+    send_mail.assert_not_called()
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["status"] == JOB_STATUS_FAILED
+    assert row["notified_end"] is False
+    assert "run cancelled by user" in job_log.read(job_id)
