@@ -7,6 +7,9 @@ framework manager takes a bare id and never touches a job object.
 
 ``track_task_name`` defaults to True in both framework helpers, which is what keeps
 a revoked task from showing up as "Unknown" on the worker-management page.
+
+Neither passes a queue: the routes assembled from the task specs in
+``cosmonaut_app.domain`` decide it.
 """
 
 import cosmo_ecosystem.background_job_manager
@@ -20,13 +23,14 @@ def manager():
 
     The app's modules reach it through here. Not bound by a `from … import` at
     import: cosmonaut_app.domain imports this module (through the tasks and
-    cosmonaut_job), and binding the manager then would assemble the Celery app while the domain module is still half-imported.
+    cosmonaut_job), and binding the manager then would assemble the Celery app while
+    the domain module is still half-imported.
     """
     return cosmo_ecosystem.background_job_manager.background_job_manager
 
 
 def submit_routing_job(job) -> tuple[str | None, bool]:
-    """Submit a routing job to the routing queue.
+    """Submit a routing job; the queue comes from the task spec in domain.py.
 
     Args:
         job: CosmonautJob instance to submit
@@ -35,11 +39,11 @@ def submit_routing_job(job) -> tuple[str | None, bool]:
         tuple: (celery_task_id, failed_boolean)
                celery_task_id is None if submission failed
     """
-    return manager().submit_job(NAME_ROUTING_TASK, job.model.job_id, "routing")
+    return manager().submit_job(NAME_ROUTING_TASK, job.model.job_id)
 
 
 def submit_upload_job(job, epsg_input: int) -> tuple[str | None, bool]:
-    """Submit an upload post-processing job to the upload queue.
+    """Submit an upload post-processing job; the queue comes from its task spec.
 
     Args:
         job: CosmonautJob instance to submit
@@ -55,5 +59,4 @@ def submit_upload_job(job, epsg_input: int) -> tuple[str | None, bool]:
     return manager().submit_named_job(
         NAME_UPLOAD_TASK,
         args=[job.model.job_id, epsg_input],
-        queue="upload",
     )
