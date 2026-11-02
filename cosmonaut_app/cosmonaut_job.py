@@ -742,18 +742,9 @@ class CosmonautJob(BaseJob):
         self.model.submitted = False
         self.model.stage = min(self.model.stage, 4)
 
+        self.update_columns("celery_task_id", "submitted", "stage")
         # PENDING and no heartbeat in one write: the last run's heartbeat
         # would keep the next run from claiming the row (ADR 0004).
-        # heartbeat_at is no JobModel field, so update_columns cannot write it.
-        job_persistence.update_columns(
-            self.model.job_id,
-            {
-                "status": self.model.status,
-                "celery_task_id": self.model.celery_task_id,
-                "submitted": self.model.submitted,
-                "stage": self.model.stage,
-                "heartbeat_at": None,
-            },
-        )
+        job_run.mark_pending(self.model.job_id)
 
         log.info(f"Job {self.model.job_id} reset to PENDING")
