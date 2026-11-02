@@ -73,7 +73,7 @@ log.error(f"Error processing job: {str(e)}", exc_info=True)
 
 ## Logger Configuration
 
-Configuration is in the framework, `cosmo_ecosystem.logger` (wired up in `app.py` and `background_job_manager.py`):
+Configuration is in the framework, `cosmo_ecosystem.logger` (wired up in `app.py`; the worker's from `excluded_log_packages` in `domain.py`, connected by the framework's Celery assembly):
 - Web/worker: Console + PostgreSQL database logging
 - Job runs: `cosmo_ecosystem.job_run.run` captures the run into the job log (`job_logs` table, read with `job_log.read`); no log file, no `dictConfig` swap
 - Third-party package filtering to reduce noise
