@@ -71,10 +71,10 @@ import logging
 
 import dash
 import dash_bootstrap_components as dbc
+from cosmo_ecosystem.background_job_manager import background_job_manager
 from dash import Input, Output, State, callback, dcc, html, no_update, register_page
 from dash.exceptions import PreventUpdate
 
-from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,

@@ -113,6 +113,6 @@ def another_pod_meanwhile(job):
 def celery_says(status):
     """Patch the Celery state lookup to report status."""
     return mock.patch(
-        "cosmonaut_app.cosmonaut_job.background_job_manager.get_job_status",
+        "cosmo_ecosystem.background_job_manager.background_job_manager.get_job_status",
         return_value={"status": status},
     )

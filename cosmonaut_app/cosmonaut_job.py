@@ -25,7 +25,6 @@ from sensor_routing.full_pipeline_cli import (
     validate_predictor_membership_consistency,
 )
 
-from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.constants.general import (
     GPX_FILE,
     JOB_STATUS_COMPLETED,
@@ -43,6 +42,7 @@ from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.error_handling import FileValidationError
 from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel, StreetEdits
+from cosmonaut_app.submissions import manager, submit_routing_job
 
 log = logging.getLogger(__name__)
 
@@ -465,7 +465,7 @@ class CosmonautJob(BaseJob):
         if sp in ("PENDING", "COMPLETED", "FAILED"):
             return sp
         # sp is a Celery task ID — check its status
-        celery_info = background_job_manager.get_job_status(sp)
+        celery_info = manager().get_job_status(sp)
         celery_status = celery_info["status"]
         if celery_status == "SUCCESS":
             self.model.membership_upload["street_processing"] = "COMPLETED"
@@ -488,7 +488,7 @@ class CosmonautJob(BaseJob):
         # Revoke running upload task if street_processing holds a task ID
         sp = self.model.membership_upload["street_processing"]
         if sp not in ("PENDING", "COMPLETED", "FAILED"):
-            background_job_manager.revoke_job(sp, terminate=True)
+            manager().revoke_job(sp, terminate=True)
             log.info(f"Revoked upload processing task {sp} for job {self.model.job_id}")
 
         # Plot files (new name + legacy names). Only those on this pod's disk
@@ -608,7 +608,7 @@ class CosmonautJob(BaseJob):
         # FAILED is written (it must reach the global error handler), a
         # reported failure returns.
         try:
-            celery_task_id, failed = background_job_manager.submit_routing_job(self)
+            celery_task_id, failed = submit_routing_job(self)
         except Exception:  # noqa: BLE001
             # Convention exception (CLAUDE.md: specific exceptions only): whatever
             # the enqueue raises, the RUNNING written above must not outlive it.
@@ -659,7 +659,7 @@ class CosmonautJob(BaseJob):
         the row and a record to the job log (cosmo-ecosystem ADR 0002). A run
         that wrote COMPLETED just before the kill is overwritten, accepted.
         """
-        background_job_manager.revoke_job(self.model.celery_task_id, terminate=True)
+        manager().revoke_job(self.model.celery_task_id, terminate=True)
         message = f"Job {self.model.job_id}: run cancelled by user."
         log.info(message)
         job_log.append(self.model.job_id, message)

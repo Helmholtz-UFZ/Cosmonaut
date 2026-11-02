@@ -59,7 +59,7 @@ def running_job():
 def _celery_must_not_be_asked():
     """Patch the Celery state lookup to fail the test when it is called."""
     return mock.patch(
-        "cosmonaut_app.cosmonaut_job.background_job_manager.get_job_status",
+        "cosmo_ecosystem.background_job_manager.background_job_manager.get_job_status",
         side_effect=AssertionError("the Celery state was consulted"),
     )
 
@@ -67,7 +67,7 @@ def _celery_must_not_be_asked():
 def _revoking_must_not_happen():
     """Patch the Celery revoke to fail the test when it is called."""
     return mock.patch(
-        "cosmonaut_app.cosmonaut_job.background_job_manager.revoke_job",
+        "cosmo_ecosystem.background_job_manager.background_job_manager.revoke_job",
         side_effect=AssertionError("a task was revoked"),
     )
 
@@ -75,7 +75,7 @@ def _revoking_must_not_happen():
 def _enqueue_returns(celery_task_id, failed):
     """Patch the routing enqueue to report (celery_task_id, failed)."""
     return mock.patch(
-        "cosmonaut_app.cosmonaut_job.background_job_manager.submit_routing_job",
+        "cosmonaut_app.cosmonaut_job.submit_routing_job",
         return_value=(celery_task_id, failed),
     )
 
@@ -204,7 +204,7 @@ def test_a_raising_enqueue_shows_failed_with_the_reason_in_the_job_log(running_j
 
     with (
         mock.patch(
-            "cosmonaut_app.cosmonaut_job.background_job_manager.submit_routing_job",
+            "cosmonaut_app.cosmonaut_job.submit_routing_job",
             side_effect=ConnectionError("broker unreachable"),
         ),
         pytest.raises(ConnectionError),

@@ -4,11 +4,8 @@ import time
 
 import pytest
 from celery import states
-
-from cosmonaut_app.background_job_manager import (
-    NAME_TEST_TASK,
-    background_job_manager,
-)
+from cosmo_ecosystem.background_job_manager import background_job_manager
+from cosmo_ecosystem.celery_app import NAME_TEST_TASK
 
 
 def test_worker_management_workflow(celery_worker, logger):
