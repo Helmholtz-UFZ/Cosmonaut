@@ -3,6 +3,8 @@
 FROM python:3.13-slim
 
 ENV MPLCONFIGDIR=/python_docker/cosmonaut/.config/matplotlib
+# The domain module the framework assembles the Celery app from (cosmo-ecosystem ADR 0003).
+ENV COSMO_DOMAIN=cosmonaut_app.domain
 ENV TZ=Europe/Berlin
 
 RUN useradd -m -u 1000 appuser && \
@@ -44,12 +46,14 @@ USER appuser
 # --beat embeds the Celery Beat scheduler. It belongs here and not in the web
 # process (see app.py), and it relies on there being exactly one worker pod: a
 # second replica would run every scheduled task twice.
+# The app is the framework's, assembled from COSMO_DOMAIN. No --queues: the worker
+# consumes every queue a task spec routes to (task_queues), so a new task cannot
+# land in a queue nobody listens on.
 CMD echo "Starting Celery worker..." && \
     python3 -c "from cosmo_ecosystem.object_storage_manager import setup_remote; setup_remote()" && \
-    exec celery -A cosmonaut_app.celery_app.celery worker \
+    exec celery -A cosmo_ecosystem.celery_app.celery worker \
         --loglevel=info \
         --concurrency=4 \
-        --queues=default,routing,test,upload \
         --beat \
         --hostname=worker@%h \
         --without-gossip \

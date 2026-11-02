@@ -41,6 +41,8 @@ RUN playwright install --with-deps chromium
 # Runtime-only ENVs — do not affect any build step above, so they live last.
 # Changing these busts only the final cheap ENV layer, not the expensive ones above.
 ENV TZ=Europe/Berlin
+# The domain module the framework assembles the Celery app from (cosmo-ecosystem ADR 0003).
+ENV COSMO_DOMAIN=cosmonaut_app.domain
 # Skip venv sync when uv run is called from the project directory.
 # The venv is pre-built in this image, so syncing is never needed and adds
 # startup delay to subprocess-spawned commands (e.g. the Celery worker in conftest.py).

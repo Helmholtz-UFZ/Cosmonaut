@@ -360,7 +360,9 @@ def celery_worker(request, overpass_stub, tmp_path_factory):
     """Start a Celery worker for testing background job processing.
 
     This fixture spawns a Celery worker subprocess that:
-    - Listens to both "routing" and "celery" (default) queues
+    - Runs the framework's app, assembled from COSMO_DOMAIN, like the worker image
+    - Has no --queues, like the worker image: it consumes every queue a task
+      spec routes to
     - Uses concurrency=1 for deterministic testing
     - Uses prefork pool for proper task termination
     - Enables task events for inspect() API functionality
@@ -408,12 +410,14 @@ def celery_worker(request, overpass_stub, tmp_path_factory):
             "run",
             "celery",
             "-A",
-            "cosmonaut_app.celery_app.celery",
+            # The framework's app, assembled from COSMO_DOMAIN, as in the worker
+            # image. No --queues, as there: the worker consumes every queue a task
+            # spec routes to.
+            "cosmo_ecosystem.celery_app.celery",
             "worker",
             "--loglevel=debug",
             "--concurrency=1",
             "--pool=prefork",  # Use prefork pool for proper task termination
-            "--queues=routing,test,upload",  # Listen to routing, test, and upload queues
             "--hostname=worker@test",  # Give worker a name for identification
             "-E",  # Enable task events for inspect() API to work
         ],

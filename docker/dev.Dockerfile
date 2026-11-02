@@ -3,6 +3,8 @@
 FROM python:3.13-slim
 
 ENV MPLCONFIGDIR=/python_docker/cosmonaut/.config/matplotlib
+# The domain module the framework assembles the Celery app from (cosmo-ecosystem ADR 0003).
+ENV COSMO_DOMAIN=cosmonaut_app.domain
 
 RUN useradd -m -u 1000 appuser && \
     apt-get update && \
