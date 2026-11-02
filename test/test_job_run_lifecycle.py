@@ -284,3 +284,17 @@ def test_the_queued_delivery_of_a_cancelled_job_is_dropped_without_a_mail(
     assert row["status"] == JOB_STATUS_FAILED
     assert row["notified_end"] is False
     assert "run cancelled by user" in job_log.read(job_id)
+
+
+def test_saving_a_job_loaded_before_a_heartbeat_keeps_the_runs_heartbeat(
+    running_job,
+):
+    """The heartbeat belongs to the run: a web save of a job loaded earlier
+    must not put an older (here: no) heartbeat back over it (ADR 0004)."""
+    job_id = running_job.job_id
+    loaded_before = CosmonautJob(job_id=job_id)
+    _give_the_row_a_heartbeat(job_id)
+
+    loaded_before.save()
+
+    assert DataBaseManager.get_job_columns(job_id)["heartbeat_at"] is not None
