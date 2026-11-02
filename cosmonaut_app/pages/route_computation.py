@@ -71,7 +71,6 @@ import logging
 
 import dash
 import dash_bootstrap_components as dbc
-from cosmo_ecosystem.background_job_manager import background_job_manager
 from dash import Input, Output, State, callback, dcc, html, no_update, register_page
 from dash.exceptions import PreventUpdate
 
@@ -104,6 +103,7 @@ from cosmonaut_app.layout import (
     page_container_fullscreen_layout,
     progress_footer,
 )
+from cosmonaut_app.submissions import manager
 
 log = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ def update_celery_info(trigger, job_id):
 
     # Get Celery worker information
 
-    tasks_overview = background_job_manager.get_all_tasks_overview()
+    tasks_overview = manager().get_all_tasks_overview()
 
     # Check worker availability
     workers = tasks_overview["workers"]
@@ -442,9 +442,7 @@ def update_celery_info(trigger, job_id):
     worker_name_text = "N/A"
 
     if job.model.celery_task_id:
-        celery_status_info = background_job_manager.get_job_status(
-            job.model.celery_task_id
-        )
+        celery_status_info = manager().get_job_status(job.model.celery_task_id)
         task_status_text = celery_status_info["status"]
 
         # Find which worker is processing this task by searching active tasks
