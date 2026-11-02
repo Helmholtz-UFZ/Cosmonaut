@@ -48,14 +48,23 @@ Utility pages (not part of the linear flow): `/job-management`, `/worker-managem
 
 ## Background pipeline (Celery)
 
-Tasks live in [cosmonaut_app/tasks/](../cosmonaut_app/tasks/) and are routed to queues
-by [celery_config.py](../cosmonaut_app/celery_config.py):
+Tasks live in [cosmonaut_app/tasks/](../cosmonaut_app/tasks/). The worker and the web
+process run the one Celery app the framework assembles (`cosmo_ecosystem.celery_app`)
+from the domain module [domain.py](../cosmonaut_app/domain.py), named by
+`COSMO_DOMAIN=cosmonaut_app.domain`. Its task specs set each task's queue; the
+framework adds its own cleanup and test task:
 
-| Module | Queue | Does |
-|--------|-------|------|
-| `upload_tasks.py` | `upload` | `process_upload_task` — download + project the OSM road network for the job's area |
-| `routing_tasks.py` | `routing` | `process_routing_job` — run sensor-routing, notify the user on completion |
-| `maintenance_tasks.py` | (default) | `cleanup_task` — periodic cleanup of logs and stale jobs (job cleanup is `cosmo_ecosystem.job_retention`) |
+| Task | Queue | Does |
+|------|-------|------|
+| `upload_tasks.process_upload_task` | `upload` | download + project the OSM road network for the job's area (base class `UploadTask`) |
+| `routing_tasks.process_routing_job` | `routing` | run sensor-routing, notify the user on completion |
+| framework `cleanup` | `maintenance` | nightly at 03:00 (UTC): logs older than 30 days (`log_retention_days`), then expired jobs (`cosmo_ecosystem.job_retention`) |
+| framework `long_running_test` | `test` | sleep task for the worker-management page |
+
+The worker starts as `celery -A cosmo_ecosystem.celery_app.celery worker --beat`,
+without `--queues`: it consumes every queue a task spec names. Submissions are module
+functions in [submissions.py](../cosmonaut_app/submissions.py) over the framework's
+`background_job_manager`.
 
 Routing itself is delegated to the external **`sensor-routing`** library (all-pairs
 shortest paths + Ant Colony Optimization over global matrices — O(n²), globally coupled,
@@ -68,9 +77,10 @@ shortest paths + Ant Colony Optimization over global matrices — O(n²), global
 | Path | Responsibility |
 |------|----------------|
 | `app.py` | Dash app construction + `use_pages` bootstrap |
-| `celery_app.py`, `celery_config.py` | Celery app + queue routing |
+| `domain.py` | Domain module: task specs, Celery time limits, log retention |
+| `submissions.py` | Routing and upload submissions over the framework manager |
 | `pages/` | One module per workflow/utility page (self-registering) |
-| `tasks/` | Celery tasks (upload, routing, maintenance) |
+| `tasks/` | Celery tasks (upload, routing) |
 | `components/` | Reusable layout components |
 | `constants/` | `html_ids.py` (centralized HTML IDs — never literals) + `general.py` |
 | `osm/` | Overpass-direct OSM backend: `source.py` (stream), `transform.py`, `downloader.py`, `projection.py`, `geojson_writer.py` (atomic GeoJSON) |

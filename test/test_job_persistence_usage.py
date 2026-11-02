@@ -119,7 +119,7 @@ def _upload_predictor(job, membership_file_path, predictor_file_path):
 
 def _submit(job, membership_file_path, predictor_file_path):
     with mock.patch(
-        "cosmonaut_app.cosmonaut_job.background_job_manager.submit_routing_job",
+        "cosmonaut_app.cosmonaut_job.submit_routing_job",
         return_value=("task", False),
     ):
         job.submit()
@@ -236,7 +236,7 @@ def test_the_membership_raster_is_in_object_storage_after_the_upload(
     )._handle_membership_upload
 
     with mock.patch(
-        "cosmonaut_app.pages.data_upload.background_job_manager.submit_upload_job",
+        "cosmonaut_app.pages.data_upload.submit_upload_job",
         return_value=("task", False),
     ):
         handle(

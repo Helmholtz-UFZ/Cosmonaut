@@ -45,6 +45,7 @@ from cosmo_ecosystem.constants.general import (
 # Needed for the test_env.py. Update!
 # The framework list is the service-level half; everything below is cosmonaut's own.
 env_vars = framework_env_vars + [
+    "COSMO_DOMAIN",
     "DOCKER_UID",
     "DOCKER_GID",
     "GUNICORN",

@@ -7,33 +7,28 @@ their status flows back to the UI.
 
 ## Queues
 
-[celery_config.py](../../../cosmonaut_app/celery_config.py) routes tasks by module:
+Web process and worker run the one Celery app the framework assembles
+(`cosmo_ecosystem.celery_app`) from [domain.py](../../../cosmonaut_app/domain.py), the module
+`COSMO_DOMAIN` names. Each of its task specs names the task's queue; routes, the worker's queues
+and the beat schedule all come from the specs. The framework adds its cleanup and test task:
 
-```python
-task_routes = {
-    "cosmonaut_app.tasks.routing_tasks.*": {"queue": "routing"},
-    "cosmonaut_app.tasks.upload_tasks.*":  {"queue": "upload"},
-}
-```
-
-In practice four queues are used (submitters in
-[background_job_manager.py](../../../cosmonaut_app/background_job_manager.py) also pass `queue=`
-explicitly):
-
-| Queue | Task module | Work |
-|-------|-------------|------|
+| Queue | Task | Work |
+|-------|------|------|
 | `upload` | [upload_tasks.py](../../../cosmonaut_app/tasks/upload_tasks.py) | `process_upload` — OSM download + projection for the job's area |
 | `routing` | [routing_tasks.py](../../../cosmonaut_app/tasks/routing_tasks.py) | `process_routing` — run sensor-routing, build GPX + QR, notify |
-| `default` | [maintenance_tasks.py](../../../cosmonaut_app/tasks/maintenance_tasks.py) | `cleanup` — delete jobs past their retention window |
-| `test` | `test_tasks.py` | a sleep task for worker/health testing |
+| `maintenance` | framework `cleanup` | nightly at 03:00 UTC: logs older than 30 days, then jobs past their retention window |
+| `test` | framework `long_running_test` | a sleep task for worker/health testing |
 
-Task **registration** lives in `celery_app.py` (the worker entry point), kept separate from
-`background_job_manager.py` to avoid a circular import (`tasks/* → cosmonaut_job → background_job_manager → tasks/*`).
-`background_job_manager` is a lazy singleton created on first attribute access, not at import time.
+The worker runs `celery -A cosmo_ecosystem.celery_app.celery worker --beat` without `--queues`.
+The domain module and everything it imports (the tasks, `cosmonaut_job`, `submissions`) must not
+touch the Celery app or the manager at import: assembly imports the domain module, so that would
+assemble the app while the domain module is half-imported. They reach the manager at call time
+through `submissions.manager()` (cosmo-ecosystem `docs/conventions/domain_module.md`).
 
 ## Submitting work
 
-`BackgroundJobManager.submit_routing_job()` / `submit_upload_job()` call `app.send_task(name, args=[job_id, …], queue=…)`
+`submissions.submit_routing_job()` / `submit_upload_job()` call the framework manager's
+`submit_job` / `submit_named_job`, which `send_task(name, args=[job_id, …], queue=…)`
 with a retry policy, and stash `task_name:<id>` in Redis (24 h TTL) so a later revoked-task lookup can
 recover the name. They return `(task_id, failed)`; the caller stores `task_id` on the job. The worker
 **re-loads the job by id and calls `job_persistence.work_dir(job_id)`** — it never receives the job object over the wire, only
@@ -80,9 +75,8 @@ route computation's status. The job row is the only source:
 
 ## Related links
 
-- Code: [background_job_manager.py](../../../cosmonaut_app/background_job_manager.py),
-  [celery_config.py](../../../cosmonaut_app/celery_config.py),
-  [celery_app.py](../../../cosmonaut_app/celery_app.py),
+- Code: [domain.py](../../../cosmonaut_app/domain.py),
+  [submissions.py](../../../cosmonaut_app/submissions.py),
   [tasks/](../../../cosmonaut_app/tasks/)
 - Concept: [cosmonaut-job](../concepts/cosmonaut-job.md) (`submit()`, `cancel()`, `work_dir`)
 - Systems: [osm-backend](osm-backend.md) (`upload` queue work),

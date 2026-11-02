@@ -95,6 +95,7 @@ Service requirements vary by test:
 |-----------|----------------|
 | `test_db_manager.py` | Postgres |
 | `test_maintenance_tasks.py` | Postgres, object storage |
+| `test_one_celery_app.py` | Postgres, object storage (imports `app.py`) |
 | `test_job_deletion.py` | Postgres, object storage |
 | `test_worker_management.py` | Redis, Celery worker |
 | `test_env.py` | None (reads env files only) |

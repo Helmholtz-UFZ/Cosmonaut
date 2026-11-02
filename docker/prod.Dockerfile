@@ -5,6 +5,8 @@ FROM python:3.13-slim
 ARG REQUIREMENTS_SHA
 
 ENV MPLCONFIGDIR=/python_docker/cosmonaut/.config/matplotlib
+# The domain module the framework assembles the Celery app from (cosmo-ecosystem ADR 0003).
+ENV COSMO_DOMAIN=cosmonaut_app.domain
 ENV TZ=Europe/Berlin
 
 RUN useradd -m -u 1000 appuser && \

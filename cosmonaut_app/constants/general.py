@@ -15,9 +15,6 @@ JOB_STATUS_RUNNING = "RUNNING"
 JOB_STATUS_COMPLETED = "COMPLETED"
 JOB_STATUS_FAILED = "FAILED"
 
-# Maintenance constants
-LOG_RETENTION_DAYS = 30  # Days to retain logs in PostgreSQL database
-
 # Third-party packages whose DEBUG output would otherwise fill the logs table.
 # Passed to every cosmo_ecosystem.logger builder; the framework adds its own
 # (watchdog, selenium) on top, so those are not repeated here. All four run

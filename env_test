@@ -5,6 +5,10 @@ GUNICORN=0
 FLASK_DEBUG=0
 COSMONAUT_TESTING="true"
 
+### Domain module ###
+# Names the module the framework assembles the Celery app from (cosmo-ecosystem ADR 0003).
+COSMO_DOMAIN="cosmonaut_app.domain"
+
 ### Webserver ###
 WEB_WORK_DIR="./cosmonaut_app/work_dir"
 FLASK_PORT=8080

@@ -46,7 +46,7 @@ sensor-routing package and displayed in the UI tooltip on the upload button.
 **Road network background task flow:**
 
 After a successful membership upload, a Celery task (process_upload_task) is
-submitted to the ``upload`` queue via background_job_manager.submit_upload_job().
+submitted to the ``upload`` queue via submissions.submit_upload_job().
 The task streams the road network from Overpass (``cosmonaut_app/osm/``) and
 projects it to the user's EPSG. This runs in a worker to keep the download and
 projection work off the web process.
@@ -83,7 +83,6 @@ from sensor_routing.full_pipeline_cli import (
     DESCRIPTION_PREDICTOR,
 )
 
-from cosmonaut_app.background_job_manager import background_job_manager
 from cosmonaut_app.classification_plot import ClassificationPlot
 from cosmonaut_app.constants.general import (
     DEFAULT_MAP_CENTER,
@@ -126,6 +125,7 @@ from cosmonaut_app.layout import (
 )
 from cosmonaut_app.map_utils import get_tile_url
 from cosmonaut_app.pydantic_models import check_epsg
+from cosmonaut_app.submissions import submit_upload_job
 
 log = logging.getLogger(__name__)
 
@@ -560,7 +560,7 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
 
     tile_url = get_tile_url(job_id, job.working_dir)
 
-    task_id, failed = background_job_manager.submit_upload_job(job, epsg_input)
+    task_id, failed = submit_upload_job(job, epsg_input)
     if not failed:
         job.model.membership_upload["street_processing"] = task_id
     else:

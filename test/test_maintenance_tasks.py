@@ -1,24 +1,29 @@
-"""Test the nightly cleanup task against real Postgres and object storage."""
+"""Test the nightly cleanup task against real Postgres and object storage.
+
+The task is the framework's (``cosmo_ecosystem.tasks.maintenance_tasks``), run
+through the app assembled from ``cosmonaut_app.domain``, as Beat triggers it.
+"""
 
 import datetime
 import os
 import shutil
 
+from cosmo_ecosystem.celery_app import NAME_CLEANUP_TASK, get_app
 from cosmo_ecosystem.config import (
     JOB_WORK_DIR_TEMPLATE,
     OBJECT_STORAGE_BUCKET,
     OBJECT_STORAGE_REMOTE_NAME,
 )
+from cosmo_ecosystem.db_manager import LogTable
 from cosmo_ecosystem.object_storage_manager import (
     delete_directory_from_storage,
     get_remote_files,
     save_files,
 )
 
-from cosmonaut_app.background_job_manager import NAME_MAINTENANCE_CLEANUP_TASK
-from cosmonaut_app.celery_app import celery
 from cosmonaut_app.config import DAYS_DELETE_SUBMITTED
 from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.domain import log_retention_days
 from test.help_functions_tests import job_row
 
 FILE_NAME = "route.gpx"
@@ -56,7 +61,7 @@ def test_cleanup_removes_an_expired_job_this_pod_never_touched_from_storage():
     try:
         # Calling the registered task runs its body in this process, through
         # the same name the beat schedule and the worker use.
-        celery.tasks[NAME_MAINTENANCE_CLEANUP_TASK]()
+        get_app().tasks[NAME_CLEANUP_TASK]()
 
         assert not DataBaseManager.check_existence(job_id)
         assert _remote_files(job_id) == set()
@@ -65,3 +70,38 @@ def test_cleanup_removes_an_expired_job_this_pod_never_touched_from_storage():
         shutil.rmtree(work_dir, ignore_errors=True)
         if DataBaseManager.check_existence(job_id):
             DataBaseManager.delete_job(job_id)
+
+
+def _seed_log(message, days_old):
+    """Insert a log row timestamped days_old days ago."""
+    with DataBaseManager.session_scope() as session:
+        session.add(
+            LogTable(
+                timestamp=datetime.datetime.now() - datetime.timedelta(days=days_old),
+                pid=0,
+                level="INFO",
+                module="test_cleanup",
+                message=message,
+            )
+        )
+
+
+def _test_log_messages():
+    """Return the messages of every log row this test seeded and is still there."""
+    with DataBaseManager.session_scope() as session:
+        rows = session.query(LogTable).filter_by(module="test_cleanup").all()
+        return {row.message for row in rows}
+
+
+def test_cleanup_keeps_logs_for_the_domain_retention_days():
+    """The nightly cleanup drops log rows older than the domain's retention."""
+    _seed_log("past retention", days_old=log_retention_days + 1)
+    _seed_log("within retention", days_old=log_retention_days - 1)
+
+    try:
+        get_app().tasks[NAME_CLEANUP_TASK]()
+
+        assert _test_log_messages() == {"within retention"}
+    finally:
+        with DataBaseManager.session_scope() as session:
+            session.query(LogTable).filter_by(module="test_cleanup").delete()

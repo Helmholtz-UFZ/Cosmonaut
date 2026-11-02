@@ -360,7 +360,9 @@ def celery_worker(request, overpass_stub, tmp_path_factory):
     """Start a Celery worker for testing background job processing.
 
     This fixture spawns a Celery worker subprocess that:
-    - Listens to both "routing" and "celery" (default) queues
+    - Runs the framework's app, assembled from COSMO_DOMAIN, like the worker image
+    - Has no --queues, like the worker image: it consumes every queue a task
+      spec routes to
     - Uses concurrency=1 for deterministic testing
     - Uses prefork pool for proper task termination
     - Enables task events for inspect() API functionality
@@ -395,10 +397,18 @@ def celery_worker(request, overpass_stub, tmp_path_factory):
     # PVC, but code must not rely on it: a log that exists only in the worker's dir
     # slipped through every suite that ran both on one disk.
     worker_work_dir = tmp_path_factory.mktemp("worker_work_dir")
+    # PYTHONPATH puts the repo root on the worker's path, as the worker image does.
+    # `celery -A` adds the cwd only while it imports the -A module itself; the
+    # framework app imports COSMO_DOMAIN (cosmonaut_app.domain) lazily afterwards,
+    # and the CI image installs the dependencies but not cosmonaut_app.
+    worker_pythonpath = [str(pathlib.Path(__file__).parent.parent)]
+    if "PYTHONPATH" in os.environ:
+        worker_pythonpath.append(os.environ["PYTHONPATH"])
     worker_env = {
         **os.environ,
         "PYTHONUNBUFFERED": "1",
         "WEB_WORK_DIR": str(worker_work_dir),
+        "PYTHONPATH": os.pathsep.join(worker_pythonpath),
     }
     if overpass_stub is not None:
         worker_env["OVERPASS_URL"] = overpass_stub
@@ -408,12 +418,14 @@ def celery_worker(request, overpass_stub, tmp_path_factory):
             "run",
             "celery",
             "-A",
-            "cosmonaut_app.celery_app.celery",
+            # The framework's app, assembled from COSMO_DOMAIN, as in the worker
+            # image. No --queues, as there: the worker consumes every queue a task
+            # spec routes to.
+            "cosmo_ecosystem.celery_app.celery",
             "worker",
             "--loglevel=debug",
             "--concurrency=1",
             "--pool=prefork",  # Use prefork pool for proper task termination
-            "--queues=routing,test,upload",  # Listen to routing, test, and upload queues
             "--hostname=worker@test",  # Give worker a name for identification
             "-E",  # Enable task events for inspect() API to work
         ],

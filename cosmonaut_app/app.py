@@ -6,6 +6,10 @@ from cosmo_ecosystem.logger import get_logger_config_web
 from cosmo_ecosystem.object_storage_manager import create_bucket, setup_remote
 from dash import Dash
 
+# The domain module (COSMO_DOMAIN) sets DbManager.job_table on import, so it comes
+# before any page. The framework imports the same module when it assembles the
+# Celery app.
+import cosmonaut_app.domain  # noqa: F401
 from cosmonaut_app.config import DEBUG, PORT
 from cosmonaut_app.constants.general import EXCLUDED_LOG_PACKAGES
 from cosmonaut_app.error_handling import handle_error_with_notification
