@@ -89,7 +89,7 @@ services:
       # Every host-published port reads ${<SERVICE>_HOST_PORT:-<default>}: host side
       # variable, container side fixed. With the variable unset the default applies,
       # so prod/CI/k8s see no change at all.
-      # Local allocation across the three suites: ../cosmo-ecosystem/docs/plan/local-port-allocation.md
+      # Local allocation across the three dev stacks: ../cosmo-ecosystem/docs/plan/local-port-allocation.md
       - "${TILESERVER_HOST_PORT:-8001}:80"
     volumes:
       - "./cosmonaut_app/work_dir:/data:ro"

@@ -81,10 +81,10 @@ open test/artifacts/<test-dir>/page.html
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `PostgreSQL not available` | DB container failed health check | `docker logs postgres_cosmonaut_test` |
-| `Object storage did not start` / `Object storage (S3) connectivity check failed` | S3 server unhealthy or unreachable | `docker logs object_storage_cosmonaut_test` |
-| `Redis not available` | Redis failed health check | `docker logs redis_cosmonaut_test` |
-| Port already in use | The dev stack is up (test and dev stacks share host ports), leftover test containers, or another process on 5433/9010/6380 | 1. Stop the dev stack first. 2. `docker compose down` in the current project. 3. If it persists, tell the user which port is blocked — a sibling project (cosmopolitan, etc.) may be running in parallel and only the user knows which is safe to stop. |
+| `PostgreSQL not available` | DB container failed health check | `docker logs postgres_<project>` |
+| `Object storage did not start` / `Object storage (S3) connectivity check failed` | S3 server unhealthy or unreachable | `docker logs object_storage_<project>` |
+| `Redis not available` | Redis failed health check | `docker logs redis_<project>` |
+| Port already allocated | Another process took a picked free port before compose bound it (rare race) | Rerun; the next run picks new ports. With `--no-services`, the `env_test_local` slot ports are in use by something else: tell the user which. |
 | Docker not running | Docker daemon not started | `sudo systemctl start docker` |
 
 ---
@@ -144,48 +144,41 @@ done
 ### Step 4: Check service health
 
 If tests require services and startup errors occur, verify each service manually.
+`<project>` is the `Compose project: cosmonaut_test_<hash>` line `run_pytest.sh`
+prints at start (one per worktree); the services listen on the printed ports. The
+containers exist only while the run is going; its cleanup removes them.
 
 **PostgreSQL:**
 
 ```bash
-docker ps | grep postgres_cosmonaut_test
-docker logs postgres_cosmonaut_test
-docker exec postgres_cosmonaut_test pg_isready -U cosmonaut
+docker ps --filter label=com.docker.compose.project=<project>
+docker logs postgres_<project>
+docker exec postgres_<project> pg_isready
 ```
 
 **Object storage (RustFS):**
 
 ```bash
-docker ps | grep object_storage_cosmonaut_test
-docker logs object_storage_cosmonaut_test
-curl -sf http://localhost:9010/health/ready
+docker logs object_storage_<project>
+curl -sf http://localhost:<object storage port>/health/ready
 ```
 
 **Redis:**
 
 ```bash
-docker ps | grep redis_cosmonaut_test
-docker logs redis_cosmonaut_test
-docker exec redis_cosmonaut_test redis-cli ping
+docker logs redis_<project>
+docker exec redis_<project> redis-cli ping
 ```
 
 **Clean up and restart:**
 
-When `run_pytest.sh` fails with `PostgreSQL not available` despite the health check
-passing, the containers are likely in a stale state from a previous run. **Always
-`docker compose down` before retrying** — `run_pytest.sh` only starts containers, it
-does not restart them:
+`run_pytest.sh` runs `docker compose down -v` on its worktree's project before it
+starts, so a crashed earlier run's leftovers are cleared by simply rerunning. A plain
+`docker compose down` in the shell targets the dev stack, not the test project. To
+remove a test stack by hand:
 
 ```bash
-docker compose down
-./run_pytest.sh
-```
-
-If lingering containers cause port conflicts:
-
-```bash
-docker ps -a | grep cosmonaut
-docker compose down --remove-orphans
+docker compose -p <project> down -v
 ```
 
 ---
