@@ -18,8 +18,6 @@ export POSTGRES_CONTAINER_NAME="postgres_${COMPOSE_PROJECT_NAME}"
 export OBJECT_STORAGE_CONTAINER_NAME="object_storage_${COMPOSE_PROJECT_NAME}"
 export REDIS_CONTAINER_NAME="redis_${COMPOSE_PROJECT_NAME}"
 
-trap cleaning_up EXIT
-
 # Cleanup function - restores environment and stops services
 cleaning_up() {
     # Restore original .env
@@ -30,8 +28,11 @@ cleaning_up() {
     # Remove only this run's containers and volumes: `compose down -v` acts on the
     # project COMPOSE_PROJECT_NAME (set at the top), never on the dev stack or any
     # other worktree's stack. -v drops the anonymous data volumes of the postgres and
-    # redis images, which would otherwise pile up once per run.
-    docker compose down -v >/dev/null 2>&1 || true
+    # redis images, which would otherwise pile up once per run. --no-services started
+    # nothing, so it removes nothing: the stack it runs against may be another run's.
+    if [ "$START_SERVICES" -eq 1 ]; then
+        docker compose down -v >/dev/null 2>&1 || true
+    fi
 }
 
 # Service health check with retry logic
@@ -194,6 +195,11 @@ if [ -n "${COSMO_ECOSYSTEM_PATH:-}" ]; then
     # overlay without the test code knowing about it.
     export UV_NO_SYNC=1
 fi
+
+# Set only after argument parsing: --help and a bad option exit above, and with the
+# trap already set they would run `compose down -v` on this worktree's project,
+# deleting the stack of a run going on here at the same time.
+trap cleaning_up EXIT
 
 # Backup existing .env
 if [ -f .env ]; then
