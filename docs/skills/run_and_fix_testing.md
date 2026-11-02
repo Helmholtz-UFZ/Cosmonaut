@@ -153,7 +153,8 @@ containers exist only while the run is going; its cleanup removes them.
 ```bash
 docker ps --filter label=com.docker.compose.project=<project>
 docker logs postgres_<project>
-docker exec postgres_<project> pg_isready
+# -h 127.0.0.1: over TCP, as the tests connect (the socket answers too early)
+docker exec postgres_<project> pg_isready -h 127.0.0.1
 ```
 
 **Object storage (RustFS):**

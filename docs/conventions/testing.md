@@ -30,7 +30,8 @@ their suites at the same time. See [below](#one-test-stack-per-worktree).
 ## One test stack per worktree
 
 - **Compose project from the worktree.** The project is `cosmonaut_test_<hash>`, where
-  `<hash>` is the first 8 hex digits of the sha256 of the worktree's absolute path.
+  `<hash>` is the first 8 hex digits of the sha256 of `pwd -P` (the worktree's
+  absolute path, since the script runs from the worktree root).
   Containers are `postgres_<project>`, `object_storage_<project>` and
   `redis_<project>`; volumes carry the project prefix. The same worktree always gets
   the same name, so the `down -v` at the start of a run clears what a crashed earlier
