@@ -20,7 +20,12 @@ CREATE TABLE jobs (
     celery_task_id VARCHAR,
     start_date DATE,
     -- Street-selection intent; the edited/projected GeoJSON derive from it.
-    street_edits JSONB
+    street_edits JSONB,
+    -- Liveness of the current job run (cosmo_ecosystem.job_run, ADR 0004 of
+    -- cosmo-ecosystem): NULL while queued, now() of the database on the claim
+    -- and every heartbeat. The sweep fails RUNNING rows whose heartbeat is stale.
+    -- Existing databases: ALTER TABLE jobs ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ;
+    heartbeat_at TIMESTAMPTZ
 );
 
 -- Application logging table
