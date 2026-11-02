@@ -23,15 +23,51 @@ these first — they usually explain the failure without needing another run. No
 that `run_pytest.sh` clears previous artifacts by default (use `--keep-artifacts`
 to preserve them across runs).
 
-**Test containers have their own names.** `run_pytest.sh` runs compose project
-`cosmonaut_test` with `postgres_cosmonaut_test`, `object_storage_cosmonaut_test` and
-`redis_cosmonaut_test`, and its cleanup only does `docker compose down` on that project.
-The dev stack (`postgres_cosmonaut` etc.) is never touched. Do not add `docker stop/rm`
-by name to the script.
+**One test stack per worktree.** Every `run_pytest.sh` run brings up its own stack, so
+any number of worktrees (of this repo and of COSMOPOLITAN and cosmo-ecosystem) can run
+their suites at the same time. See [below](#one-test-stack-per-worktree).
 
-**Test and dev stacks still share host ports.** Separate names keep the containers
-apart, but both stacks publish the same host ports. A test run while the dev stack is
-up fails with "port already in use": stop the dev stack first.
+## One test stack per worktree
+
+- **Compose project from the worktree.** The project is `cosmonaut_test_<hash>`, where
+  `<hash>` is the first 8 hex digits of the sha256 of `pwd -P` (the worktree's
+  absolute path, since the script runs from the worktree root).
+  Containers are `postgres_<project>`, `object_storage_<project>` and
+  `redis_<project>`; volumes carry the project prefix. The same worktree always gets
+  the same name, so the `down -v` at the start of a run clears what a crashed earlier
+  run left there, and the `down -v` at the end removes only this run's stack. Do not
+  add `docker stop/rm` by name to the script: on 2026-10-22 that deleted the dev
+  containers.
+- **Free ports picked at start.** The script asks the OS for five free TCP ports
+  (Flask, Postgres, Redis, object storage API and console) and appends them to the
+  run's `.env`, both the app-facing variables (`FLASK_PORT`, `POSTGRES_PORT`,
+  `REDIS_PORT`, `OBJECT_STORAGE_HOST`) and the published `*_HOST_PORT`. The last
+  assignment of a key wins for python-dotenv and compose, so `env_test_local` keeps
+  its slot values. The e2e Dash server and the Celery worker read the same `.env`, so
+  they use the run's ports too. The suite does not start the tileserver, so it gets no
+  port. A port taken between picking and binding fails loudly as "port is already
+  allocated"; rerun.
+- **Tests must not leave a different `.env` behind.** `test_env.py` rewrites `.env`
+  from fixed env files; its `restored_env` fixture puts the run's `.env` and
+  `os.environ` back, or later tests and the worker would talk to the slot ports.
+- **Finding a running stack.** The run prints `Compose project: …` and the ports at
+  start; `docker ps --filter label=com.docker.compose.project=<project>` shows its
+  containers.
+- **`--no-services`** picks no ports and tears nothing down: it runs against the
+  `env_test_local` values, i.e. a stack you started yourself on the cosmonaut slot.
+
+The dev stack (`postgres_cosmonaut` & co.) is a different project and is never stopped
+by a test run, and since the test ports are picked free, a running dev stack no longer
+gets in the way either. The port slots in
+`../cosmo-ecosystem/docs/plan/local-port-allocation.md` apply to dev stacks (and
+`--no-services`) only.
+
+`check_parallel_runs.sh` (next to `run_pytest.sh`) is the acceptance check: it creates
+a throwaway detached worktree of `HEAD`, runs `run_pytest.sh` on a fast subset that
+touches every service (`test_job_deletion`, `test_env`, `test_worker_management`) in
+both worktrees at once, and passes when both are green and no container or volume of
+either project is left. Run it after changing `run_pytest.sh` (commit first: the probe
+worktree sees only `HEAD`). It is not a CI job; CI has no parallel worktrees.
 
 ## Code Rules
 

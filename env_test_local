@@ -14,9 +14,11 @@ MAINTAINER_EMAIL="louis-ferdinand.trinkle@ufz.de"
 ### Tile Server ###
 # Host port for the tileserver container (docker-compose reads this directly;
 # the app only ever sees TILESERVER_URL). Local allocation across the three
-# suites lives in ../cosmo-ecosystem/docs/plan/local-port-allocation.md — cosmonaut
+# stacks lives in ../cosmo-ecosystem/docs/plan/local-port-allocation.md — cosmonaut
 # owns 8081 / 5433 / 6380 / 9010 / 9011 / 8011 so its stack can run next to
-# cosmopolitan's and csv_profiler's.
+# cosmopolitan's and csv_profiler's. A normal run_pytest.sh run overrides the ports
+# of the services it starts with free ones it picks at start (one stack per
+# worktree); these values apply to --no-services runs.
 TILESERVER_HOST_PORT=8011
 TILESERVER_URL="http://127.0.0.1:8011"
 

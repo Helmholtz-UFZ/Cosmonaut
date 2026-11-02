@@ -6,12 +6,17 @@ set -e
 # (docker-compose.yml defaults: postgres_cosmonaut, ...) uses the plain names, and the
 # old script ran `docker stop/rm` on exactly those, deleting the dev containers
 # (2026-10-22). Everything below, including cleanup, goes through this project only.
-export COMPOSE_PROJECT_NAME=cosmonaut_test
-export POSTGRES_CONTAINER_NAME=postgres_cosmonaut_test
-export OBJECT_STORAGE_CONTAINER_NAME=object_storage_cosmonaut_test
-export REDIS_CONTAINER_NAME=redis_cosmonaut_test
-
-trap cleaning_up EXIT
+#
+# Every worktree gets its own test stack, so several worktrees (and the sister repos)
+# can run their suites at the same time. The project name, and with it the container
+# names and volumes, carries a short hash of this directory's absolute path: stable
+# for one worktree, so a rerun finds and clears a crashed run's leftovers, and
+# different for every other worktree, so a run only ever stops what it started.
+STACK_ID=$(pwd -P | sha256sum | cut -c1-8)
+export COMPOSE_PROJECT_NAME="cosmonaut_test_${STACK_ID}"
+export POSTGRES_CONTAINER_NAME="postgres_${COMPOSE_PROJECT_NAME}"
+export OBJECT_STORAGE_CONTAINER_NAME="object_storage_${COMPOSE_PROJECT_NAME}"
+export REDIS_CONTAINER_NAME="redis_${COMPOSE_PROJECT_NAME}"
 
 # Cleanup function - restores environment and stops services
 cleaning_up() {
@@ -20,9 +25,14 @@ cleaning_up() {
         mv .env.bak .env
     fi
 
-    # Remove only this run's containers: `compose down` acts on the project
-    # COMPOSE_PROJECT_NAME (set at the top), never on the dev stack or any other container.
-    docker compose down >/dev/null 2>&1 || true
+    # Remove only this run's containers and volumes: `compose down -v` acts on the
+    # project COMPOSE_PROJECT_NAME (set at the top), never on the dev stack or any
+    # other worktree's stack. -v drops the anonymous data volumes of the postgres and
+    # redis images, which would otherwise pile up once per run. --no-services started
+    # nothing, so it removes nothing: the stack it runs against may be another run's.
+    if [ "$START_SERVICES" -eq 1 ]; then
+        docker compose down -v >/dev/null 2>&1 || true
+    fi
 }
 
 # Service health check with retry logic
@@ -68,9 +78,12 @@ show_help() {
     echo "  -h, --help        Show this help message"
     echo ""
     echo "Environment:"
-    echo "  Test containers: postgres_cosmonaut_test, object_storage_cosmonaut_test,"
-    echo "                    redis_cosmonaut_test (compose project cosmonaut_test). The dev stack's"
-    echo "                    postgres_cosmonaut etc. are never stopped or removed."
+    echo "  Test stack:       compose project ${COMPOSE_PROJECT_NAME} (one per worktree),"
+    echo "                    containers postgres_/object_storage_/redis_<project>, on free"
+    echo "                    host ports picked at start and printed, so worktrees can run"
+    echo "                    their suites in parallel. The dev stack's postgres_cosmonaut"
+    echo "                    etc. are never stopped or removed."
+    echo "                    With --no-services the ports from env_test_local apply."
     echo "  COSMO_ECOSYSTEM_PATH  Test against a local cosmo-ecosystem checkout instead of"
     echo "                    the tag pinned in pyproject.toml/uv.lock. When set, the script"
     echo "                    runs 'uv sync --frozen', then 'uv pip install --python .venv"
@@ -183,6 +196,11 @@ if [ -n "${COSMO_ECOSYSTEM_PATH:-}" ]; then
     export UV_NO_SYNC=1
 fi
 
+# Set only after argument parsing: --help and a bad option exit above, and with the
+# trap already set they would run `compose down -v` on this worktree's project,
+# deleting the stack of a run going on here at the same time.
+trap cleaning_up EXIT
+
 # Backup existing .env
 if [ -f .env ]; then
     mv .env .env.bak
@@ -191,12 +209,54 @@ fi
 # Use test environment configuration
 cp env_test_local .env
 
+if [ "$START_SERVICES" -eq 1 ]; then
+    # Ask the OS for free host ports instead of using env_test_local's fixed slot,
+    # which another worktree's test stack may hold. All sockets are open at once, so
+    # the ports are distinct. Between closing them here and compose binding them
+    # another process could take one; that race is accepted, compose then fails
+    # loudly with "port is already allocated". The tileserver is not started by the
+    # suite, so it gets no port.
+    read -r FLASK POSTGRES REDIS OBJECT_STORAGE OBJECT_STORAGE_CONSOLE < <(python3 -c '
+import socket
+socks = [socket.socket() for _ in range(5)]
+# "" = all interfaces, as compose publishes (0.0.0.0): a port that is free only on
+# loopback would still collide there.
+for s in socks:
+    s.bind(("", 0))
+print(*(s.getsockname()[1] for s in socks))
+') || {
+        # read sees EOF when python3 fails; without this set -e exits silently.
+        echo "FAIL: could not pick free ports"
+        exit 1
+    }
+    # Appended, so these win over env_test_local's values in the same file
+    # (python-dotenv, compose and `source` all take the last assignment of a key).
+    # The suite runs on the host, so the app-facing port and the published host port
+    # are the same number. FLASK_PORT is where the e2e Dash server binds.
+    cat >>.env <<EOF
+
+### Per-run ports, written by run_pytest.sh ###
+FLASK_PORT=${FLASK}
+POSTGRES_PORT="${POSTGRES}"
+POSTGRES_HOST_PORT=${POSTGRES}
+REDIS_PORT=${REDIS}
+REDIS_HOST_PORT=${REDIS}
+OBJECT_STORAGE_HOST="http://127.0.0.1:${OBJECT_STORAGE}"
+OBJECT_STORAGE_HOST_PORT=${OBJECT_STORAGE}
+OBJECT_STORAGE_CONSOLE_HOST_PORT=${OBJECT_STORAGE_CONSOLE}
+EOF
+    # check_parallel_runs.sh parses this line to find the run's project: keep the format.
+    echo "Compose project: ${COMPOSE_PROJECT_NAME}"
+    echo "Ports: flask ${FLASK}, postgres ${POSTGRES}, redis ${REDIS}," \
+        "object storage ${OBJECT_STORAGE} (console ${OBJECT_STORAGE_CONSOLE})"
+fi
+
 # Source for environment variables
 source .env
 
 if [ "$START_SERVICES" -eq 1 ]; then
-    # Clean up existing containers
-    docker compose down 2>/dev/null || true
+    # Clear leftovers of a crashed earlier run (this worktree's project only)
+    docker compose down -v 2>/dev/null || true
 
     # Start services (quiet output)
     echo "Starting services: postgres, object-storage, redis"
