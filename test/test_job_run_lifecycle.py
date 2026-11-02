@@ -254,3 +254,14 @@ def test_a_resubmit_queues_the_run_without_the_last_runs_heartbeat(running_job):
     row = DataBaseManager.get_job_columns(job_id)
     assert row["status"] == JOB_STATUS_RUNNING
     assert row["heartbeat_at"] is None
+
+
+def test_a_reset_leaves_the_job_pending_without_a_heartbeat(running_job):
+    job_id = running_job.job_id
+    _give_the_row_a_heartbeat(job_id)
+
+    CosmonautJob(job_id=job_id).reset()
+
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["status"] == JOB_STATUS_PENDING
+    assert row["heartbeat_at"] is None
