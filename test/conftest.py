@@ -397,10 +397,18 @@ def celery_worker(request, overpass_stub, tmp_path_factory):
     # PVC, but code must not rely on it: a log that exists only in the worker's dir
     # slipped through every suite that ran both on one disk.
     worker_work_dir = tmp_path_factory.mktemp("worker_work_dir")
+    # PYTHONPATH puts the repo root on the worker's path, as the worker image does.
+    # `celery -A` adds the cwd only while it imports the -A module itself; the
+    # framework app imports COSMO_DOMAIN (cosmonaut_app.domain) lazily afterwards,
+    # and the CI image installs the dependencies but not cosmonaut_app.
+    worker_pythonpath = [str(pathlib.Path(__file__).parent.parent)]
+    if "PYTHONPATH" in os.environ:
+        worker_pythonpath.append(os.environ["PYTHONPATH"])
     worker_env = {
         **os.environ,
         "PYTHONUNBUFFERED": "1",
         "WEB_WORK_DIR": str(worker_work_dir),
+        "PYTHONPATH": os.pathsep.join(worker_pythonpath),
     }
     if overpass_stub is not None:
         worker_env["OVERPASS_URL"] = overpass_stub
