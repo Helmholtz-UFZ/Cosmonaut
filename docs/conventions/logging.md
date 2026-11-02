@@ -101,11 +101,7 @@ The worker runs Celery Beat embedded (`--beat`, `docker/worker.Dockerfile`). By 
 root logger on startup, replacing all handlers with its own stdout-only handler. This
 silently drops the PostgreSQL handler.
 
-**Always keep this in `CeleryConfig`:**
-
-```python
-worker_hijack_root_logger = False
-```
-
-Without it, logs appear in the container stdout (in Celery format) but never reach
-the database, and the `/logs` page shows nothing.
+`worker_hijack_root_logger = False` is set in the framework's `BaseCeleryConfig`, which
+`CeleryConfig` in `cosmonaut_app/domain.py` inherits. Do not override it to
+`True`: logs would then appear in the container stdout (in Celery format) but never
+reach the database, and the `/logs` page would show nothing.
