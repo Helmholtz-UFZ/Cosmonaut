@@ -14,8 +14,11 @@ import sys
 from celery.schedules import crontab
 from cosmo_ecosystem.celery_app import NAME_CLEANUP_TASK, get_app
 
-NAME_ROUTING_TASK = "cosmonaut_app.tasks.routing_tasks.process_routing"
-NAME_UPLOAD_TASK = "cosmonaut_app.tasks.upload_tasks.process_upload"
+from cosmonaut_app.submissions import NAME_ROUTING_TASK, NAME_UPLOAD_TASK
+
+# Longer than importing the app with all its pages takes, short enough to fail a hang.
+SUBPROCESS_TIMEOUT_SECONDS = 120
+
 
 REPORT = """
 import json
@@ -25,6 +28,8 @@ from celery import _state
 import cosmonaut_app.app  # imports every page, the framework ones included
 from cosmo_ecosystem.background_job_manager import background_job_manager
 
+# Private on purpose: Celery has no public API for the apps alive in a process, and
+# counting them is the whole point of this guardrail.
 apps = list(_state._get_active_apps())
 print(json.dumps({
     "count": len(apps),
@@ -40,6 +45,7 @@ def test_web_process_holds_one_celery_app_with_the_domain_routes():
         env=dict(os.environ),
         capture_output=True,
         text=True,
+        timeout=SUBPROCESS_TIMEOUT_SECONDS,
     )
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout.strip().splitlines()[-1])

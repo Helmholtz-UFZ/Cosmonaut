@@ -23,6 +23,7 @@ from cosmo_ecosystem.object_storage_manager import (
 
 from cosmonaut_app.config import DAYS_DELETE_SUBMITTED
 from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.domain import log_retention_days
 from test.help_functions_tests import job_row
 
 FILE_NAME = "route.gpx"
@@ -92,10 +93,10 @@ def _test_log_messages():
         return {row.message for row in rows}
 
 
-def test_cleanup_keeps_logs_for_thirty_days():
-    """COSMONAUT keeps its log rows 30 days; the nightly cleanup drops the rest."""
-    _seed_log("past retention", days_old=31)
-    _seed_log("within retention", days_old=29)
+def test_cleanup_keeps_logs_for_the_domain_retention_days():
+    """The nightly cleanup drops log rows older than the domain's retention."""
+    _seed_log("past retention", days_old=log_retention_days + 1)
+    _seed_log("within retention", days_old=log_retention_days - 1)
 
     try:
         get_app().tasks[NAME_CLEANUP_TASK]()
