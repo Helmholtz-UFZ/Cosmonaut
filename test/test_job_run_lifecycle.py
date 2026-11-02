@@ -17,7 +17,7 @@ from cosmo_ecosystem import job_log, job_persistence
 from cosmo_ecosystem.db_manager import DbManager
 from cosmo_ecosystem.job_log import JobLogHandler
 from pydantic import ValidationError
-from sqlalchemy import update
+from sqlalchemy import func, update
 
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
@@ -78,6 +78,16 @@ def _enqueue_returns(celery_task_id, failed):
         "cosmonaut_app.cosmonaut_job.submit_routing_job",
         return_value=(celery_task_id, failed),
     )
+
+
+def _give_the_row_a_heartbeat(job_id):
+    """Set the row's heartbeat, as a job run that claimed it does."""
+    with DbManager.session_scope() as session:
+        session.execute(
+            update(JobTable)
+            .where(JobTable.job_id == job_id)
+            .values(heartbeat_at=func.now())
+        )
 
 
 def _log_to_job_log(job_id, message):
@@ -228,3 +238,19 @@ def test_a_restart_of_a_finished_job_revokes_no_task(
         route_computation.restart_computation(1, job_id)
 
     assert CosmonautJob(job_id=job_id).get_status() == JOB_STATUS_RUNNING
+
+
+def test_a_resubmit_queues_the_run_without_the_last_runs_heartbeat(running_job):
+    """The run claims only a RUNNING row without a heartbeat; an old heartbeat
+    left by the last run would get the new run dropped."""
+    job_id = running_job.job_id
+    _give_the_row_a_heartbeat(job_id)
+    running_job.model.status = JOB_STATUS_FAILED
+    running_job.update_columns("status")
+
+    with _enqueue_returns("task-of-the-resubmit", False):
+        CosmonautJob(job_id=job_id).submit()
+
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["status"] == JOB_STATUS_RUNNING
+    assert row["heartbeat_at"] is None

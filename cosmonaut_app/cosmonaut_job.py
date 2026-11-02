@@ -9,7 +9,7 @@ import uuid
 from datetime import date
 
 import pandas as pd
-from cosmo_ecosystem import job_log, job_persistence
+from cosmo_ecosystem import job_log, job_persistence, job_run
 from cosmo_ecosystem.base_job import BaseJob
 from cosmo_ecosystem.job_retention import days_to_live
 from pyproj import CRS, Transformer
@@ -592,9 +592,7 @@ class CosmonautJob(BaseJob):
     def submit(self):
         """Submit the job to background worker."""
         log.info(f"Submitting job {self.model.job_id} to background worker")
-        # Mark as submitted and set status to RUNNING
         self.model.submitted = True
-        self.model.status = JOB_STATUS_RUNNING
         self.model.stage = max(self.model.stage, 4)
         # Pull, then upload: the worker pulls from object storage, and an
         # outdated local copy must not replace the stored one. A pull may
@@ -603,6 +601,13 @@ class CosmonautJob(BaseJob):
         # writes parameters.json via dump_routing_params().
         job_persistence.work_dir(self.model.job_id)
         self.save()
+        # Queue the run before the enqueue, as the framework's Job.submit:
+        # RUNNING and no heartbeat in one write, the only state the run
+        # claims (ADR 0004). A fast worker may finish before the enqueue
+        # returns, and a RUNNING written after it would overwrite its status
+        # (ADR 0002).
+        job_run.mark_queued(self.model.job_id)
+        self.model.status = JOB_STATUS_RUNNING
 
         # As the framework's Job.submit: a raising enqueue is re-raised after
         # FAILED is written (it must reach the global error handler), a
