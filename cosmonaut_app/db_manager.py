@@ -14,7 +14,7 @@ this supersedes, and cosmo-ecosystem's docs/conventions/database_schema.md.
 
 The authoritative DDL for this table stays ``docker/init.sql``. ``JobColumns``
 carries only the columns every consumer app has (the measured six plus the
-framework's run-owned ``heartbeat_at``); the eight below are cosmonaut's own —
+framework's run-owned ``heartbeat_at`` and ``run_id``); the eight below are cosmonaut's own —
 extra columns are invisible to the framework's queries, missing ones would not
 be, which is why the mixin is an intersection rather than a union.
 """
@@ -32,9 +32,10 @@ class JobTable(JobColumns, Base):
     """Represents the 'jobs' table in the database.
 
     job_id, start_date, submitted, notified_end, status, version and
-    heartbeat_at come from JobColumns; heartbeat_at belongs to the job run
-    (cosmo_ecosystem.job_run) and is not in JobModel, so a save never writes
-    it. Everything below is cosmonaut's own and has no meaning to framework
+    heartbeat_at and run_id come from JobColumns. status, submitted,
+    heartbeat_at and run_id are run-owned (``RUN_OWNED_COLUMNS``): only the
+    transitions of cosmo_ecosystem.job_run write them and a save never does
+    (cosmo-ecosystem ADR 0005). Everything below is cosmonaut's own and has no meaning to framework
     code.
     """
 

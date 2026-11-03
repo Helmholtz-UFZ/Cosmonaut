@@ -15,7 +15,7 @@ from unittest import mock
 import dash
 import pytest
 from cosmo_ecosystem import job_log, job_persistence
-from cosmo_ecosystem.db_manager import DbManager
+from cosmo_ecosystem.db_manager import RUN_OWNED_COLUMNS, DbManager
 from cosmo_ecosystem.job_log import JobLogHandler
 from cosmo_ecosystem.job_run import CANCELLED_MESSAGE
 from cosmo_ecosystem.object_storage_manager import ObjectStorageError
@@ -525,3 +525,23 @@ def test_a_start_click_on_a_job_another_tab_queued_enqueues_nothing(
     enqueue.assert_not_called()
     row = DataBaseManager.get_job_columns(job_id)
     assert row["celery_task_id"] == "task-of-the-other-tab"
+
+
+def test_a_saved_row_names_none_of_the_run_owned_columns(running_job):
+    job = CosmonautJob(job_id=running_job.job_id)
+
+    with mock.patch.object(job_persistence, "save") as save:
+        job.save()
+
+    saved_row = save.call_args.args[1]
+    assert set(saved_row).isdisjoint(RUN_OWNED_COLUMNS)
+
+
+def test_a_new_job_starts_pending_and_not_submitted():
+    job = CosmonautJob()
+    try:
+        row = DataBaseManager.get_job_columns(job.job_id)
+        assert row["status"] == JOB_STATUS_PENDING
+        assert row["submitted"] is False
+    finally:
+        job_persistence.delete_job(job.job_id)

@@ -11,6 +11,7 @@ from datetime import date
 import pandas as pd
 from cosmo_ecosystem import job_log, job_persistence, job_run
 from cosmo_ecosystem.base_job import BaseJob
+from cosmo_ecosystem.db_manager import RUN_OWNED_COLUMNS
 from cosmo_ecosystem.job_retention import days_to_live
 from pyproj import CRS, Transformer
 from sensor_routing.constants import (
@@ -227,7 +228,14 @@ class CosmonautJob(BaseJob):
 
     def _row(self) -> dict:
         """Return the model as the job table's columns, config nested."""
-        data = self.model.model_dump(mode="json")
+        # The run's columns belong to the job run's transitions, never to a
+        # save: a job object loaded earlier must not put an old state back
+        # (cosmo-ecosystem ADR 0005). A new row starts PENDING, not submitted.
+        data = {
+            column: value
+            for column, value in self.model.model_dump(mode="json").items()
+            if column not in RUN_OWNED_COLUMNS
+        }
 
         # Separate Config fields from JobModel fields
         config_field_names = set(FullPipelineConfig.model_fields.keys())
