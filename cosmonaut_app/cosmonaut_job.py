@@ -365,13 +365,17 @@ class CosmonautJob(BaseJob):
 
         return position, zoom
 
-    def delete(self):
+    def delete(self) -> bool:
         """Delete the job everywhere: remote prefix, local work dir and row.
 
         Delegates to ``cosmo_ecosystem.job_persistence.delete_job``, the same
         deletion the nightly cleanup and the job management page use.
+
+        Returns:
+            Whether the job was deleted; False means it is RUNNING and nothing
+            was deleted (cosmo-ecosystem ADR 0005).
         """
-        job_persistence.delete_job(self.model.job_id)
+        return job_persistence.delete_job(self.model.job_id)
 
     def upload_membership(self, file_name, content, epsg_input):
         """Upload and process membership CSV file; written through to storage."""
