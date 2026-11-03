@@ -15,15 +15,15 @@ this supersedes, and cosmo-ecosystem's docs/conventions/database_schema.md.
 The authoritative DDL for this table stays ``docker/init.sql``. ``JobColumns``
 carries only the columns every consumer app has (the measured six plus the
 framework's run-owned ``heartbeat_at`` and ``run_id``); the eight below are
-cosmonaut's own — extra columns are invisible to the framework's queries, missing ones would not
-be, which is why the mixin is an intersection rather than a union.
+cosmonaut's own — extra columns are invisible to the framework's queries, missing
+ones would not be, which is why the mixin is an intersection rather than a union.
 """
 
 import logging
 
 from cosmo_ecosystem.db_manager import Base, DbManager, JobColumns, SessionScope
 from cosmo_ecosystem.error_handling import JobNotFound
-from sqlalchemy import JSON, Column, Integer, String, update
+from sqlalchemy import JSON, Column, Integer, String, func, update
 
 from cosmonaut_app.constants.general import JOB_STATUS_COMPLETED, JOB_STATUS_FAILED
 
@@ -87,6 +87,26 @@ class DataBaseManager(DbManager):
             if job_row is None:
                 raise JobNotFound(job_id)
             return job_row.stage
+
+    @classmethod
+    def raise_stage(cls, job_id, stage):
+        """Raise the job's stage to ``stage``; never lower it.
+
+        One update (``GREATEST``), so a page that loaded the job earlier cannot
+        put an older, lower stage back over what another page wrote meanwhile.
+
+        Raises:
+            JobNotFound: If the job has no row.
+        """
+        with cls.session_scope() as session:
+            result = session.execute(
+                update(JobTable)
+                .where(JobTable.job_id == job_id)
+                .values(stage=func.greatest(func.coalesce(JobTable.stage, 0), stage))
+            )
+            applied = result.rowcount == 1
+        if not applied:
+            raise JobNotFound(job_id)
 
     @classmethod
     def mark_end_notified(cls, job_id):

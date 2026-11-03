@@ -122,8 +122,7 @@ def layout(job_id):
     """Create layout for routing computation page."""
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
-    job.model.stage = max(job.model.stage, 4)
-    job.update_columns("stage")
+    job.raise_stage(4)
 
     # Status badge
     status_badge = create_status_badge(status, job_id)

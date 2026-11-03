@@ -68,6 +68,7 @@ import uuid
 
 import dash
 import dash_bootstrap_components as dbc
+from cosmo_ecosystem import job_persistence
 from dash import (
     Input,
     Output,
@@ -116,7 +117,7 @@ from cosmonaut_app.constants.html_ids import (
     STREET_PROCESSING_STATUS_DIV_DATA_UPLOAD_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.error_handling import FileValidationError
+from cosmonaut_app.error_handling import FileValidationError, JobNotPending
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
@@ -534,6 +535,10 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
         return result
 
     job = CosmonautJob(job_id=job_id)
+    # The inputs are disabled for a job that is not PENDING, but a stale tab still
+    # fires this callback; refuse before anything is deleted or uploaded.
+    if job.get_status() != JOB_STATUS_PENDING:
+        raise JobNotPending(job_id)
     job.model.epsg = epsg_input
     job.delete_membership()
     try:
@@ -562,9 +567,9 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
     log.debug("Classification plots generated.")
     # Write-through: the raster is an output of this request (a GDAL warp of the
     # whole CSV), not a file another pod can recompute cheaply, and the map pulls
-    # it from the remote prefix (ADR 0001). The row is saved as it stands; the
-    # street-processing state follows below via update_columns.
-    job.save()
+    # it from the remote prefix (ADR 0001). Files only: upload_membership wrote
+    # the row, and the street-processing state follows below via update_columns.
+    job_persistence.upload_work_dir(job_id)
 
     tile_url = get_tile_url(job_id, job.working_dir)
 
@@ -637,6 +642,8 @@ def _handle_predictor_upload(predictor_contents, predictor_filename, job_id):
     log.info(f"Uploading predictor file for job {job_id}")
 
     job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
+        raise JobNotPending(job_id)
     try:
         job.upload_predictor(predictor_contents)
     except FileValidationError as e:

@@ -40,7 +40,7 @@ from cosmonaut_app.constants.general import (
     STREET_EDITS_FILE,
 )
 from cosmonaut_app.db_manager import DataBaseManager
-from cosmonaut_app.error_handling import FileValidationError
+from cosmonaut_app.error_handling import FileValidationError, JobNotPending
 from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel, StreetEdits
 from cosmonaut_app.submissions import manager, submit_routing_job
@@ -301,6 +301,35 @@ class CosmonautJob(BaseJob):
         log.info(f"Update input {sorted(columns)} of job {self.model.job_id}")
         return job_persistence.update_input(self.model.job_id, columns)
 
+    def raise_stage(self, stage: int):
+        """Raise the job's stage to ``stage`` in the row; never lower it."""
+        DataBaseManager.raise_stage(self.model.job_id, stage)
+        self.model.stage = max(self.model.stage, stage)
+
+    def _require_input(self, *fields: str):
+        """Write the input fields while the row is PENDING, or raise.
+
+        Raises:
+            JobNotPending: If the row is not PENDING (the page's guard passed on
+                an older view of the job); nothing was written.
+        """
+        if not self.update_input(*fields):
+            raise JobNotPending(self.model.job_id)
+
+    def save_input(self, *fields: str):
+        """Upload the work dir, then write the input fields while PENDING.
+
+        As ``save`` for an upload of input files (files first, row second), but
+        the row write is conditional (cosmo-ecosystem ADR 0005) and touches only
+        the named fields: no other column and no parameters.json.
+
+        Raises:
+            JobNotPending: If the row is not PENDING.
+        """
+        log.info(f"Save input {sorted(fields)} of job {self.model.job_id}")
+        job_persistence.upload_work_dir(self.model.job_id)
+        self._require_input(*fields)
+
     def dump_routing_params(self):
         """
         Dump routing parameters (Config fields) to parameters.json in working directory.
@@ -434,7 +463,7 @@ class CosmonautJob(BaseJob):
             # The upload worker records the new download's checksum.
             "download_sha256": None,
         }
-        self.save()
+        self.save_input("membership_upload", "epsg")
         log.debug("Finished uploading and processing membership file")
         return file_path, bounds, membership_df
 
@@ -475,7 +504,7 @@ class CosmonautJob(BaseJob):
             "file_name": PREDICTOR_FILENAME,
             "len": len(decoded),
         }
-        self.save()
+        self.save_input("predictor_upload")
         log.debug("Finished uploading and processing predictor file")
 
     def delete_predictor(self):
@@ -486,7 +515,7 @@ class CosmonautJob(BaseJob):
 
         default_predictor_upload = JobModel.model_fields["predictor_upload"].default
         self.model.predictor_upload = default_predictor_upload.copy()
-        self.update_columns("predictor_upload")
+        self._require_input("predictor_upload")
 
         log.info(f"Predictor data deleted for job {self.model.job_id}")
 
@@ -558,7 +587,7 @@ class CosmonautJob(BaseJob):
         # disk is adopted only into a NULL column, so it can never come back.
         self.model.street_edits = StreetEdits()
 
-        self.update_columns("membership_upload", "predictor_upload", "street_edits")
+        self._require_input("membership_upload", "predictor_upload", "street_edits")
 
         log.info(f"Membership data deleted for job {self.model.job_id}")
 
@@ -602,7 +631,9 @@ class CosmonautJob(BaseJob):
         # Force regeneration — create_gpx skips existing files.
         job_persistence.delete_files(self.model.job_id, [GPX_FILE])
         self.create_qr_code_routing()
-        self.save()
+        # Files only: the direction lives in route_options.json and the GPX, the
+        # row holds nothing of it, and the job is COMPLETED (not PENDING) here.
+        job_persistence.upload_work_dir(self.model.job_id)
 
     def get_route_polyline(self):
         """Return the route as WGS84 [[lat, lon], ...] positions, or None if unavailable.

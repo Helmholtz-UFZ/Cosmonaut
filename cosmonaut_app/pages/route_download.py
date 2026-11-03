@@ -105,12 +105,13 @@ def layout(job_id):
     # Stage 5 marks a finished job; a PENDING job at stage 5 (a reset job opened
     # by Back or a bookmark) has no page in resolve_reload_url.
     if job.get_status() == JOB_STATUS_COMPLETED:
-        job.model.stage = max(job.model.stage, 5)
-        job.update_columns("stage")
+        job.raise_stage(5)
 
     job_persistence.work_dir(job.job_id)
     job.create_qr_code_routing()
-    job.save()
+    # Files only: the QR code and GPX are outputs of this request. The row is
+    # not rewritten from this page's copy, which the slow steps above made stale.
+    job_persistence.upload_work_dir(job.job_id)
 
     # Construct full download URL
     download_url = get_download_url(job_id)

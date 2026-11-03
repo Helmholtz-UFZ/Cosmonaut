@@ -39,6 +39,7 @@ from cosmonaut_app.constants.html_ids import (
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.error_handling import JobNotPending
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
@@ -225,8 +226,9 @@ def go_to_upload_page(n_clicks: int | None, email: str | None, pathname: str | N
     job_id = pathname.split("/")[2]
     job = CosmonautJob(job_id=job_id)
     job.model.email = email
-    job.model.stage = max(job.model.stage, 1)
-    job.update_columns("email", "stage")
+    if not job.update_input("email"):
+        raise JobNotPending(job_id)
+    job.raise_stage(1)
 
     log.info(f"Storing email {email} for job {job_id}")
 

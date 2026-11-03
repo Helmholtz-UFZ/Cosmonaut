@@ -68,11 +68,14 @@ route computation's status. The job row is the only source:
   `job_run.mark_cancelled`: `FAILED` and a cancelled line in the job log, only while the row is RUNNING
   (a COMPLETED that landed first is kept). A terminated worker writes nothing.
   `reset()` goes through `job_run.mark_pending` before it deletes anything and returns False when the
-  row is RUNNING. Restart is cancel (inside `reset`), reset, submit.
+  row is RUNNING. Restart (FAILED or COMPLETED only) is reset, then submit; on a RUNNING job it is refused
+  with a hint (`JobRunning`), Cancel is its own click and also works for a queued run without a task id.
 - `status`, `submitted`, `heartbeat_at` and `run_id` are run-owned (`RUN_OWNED_COLUMNS`): the app's
   `_row()` leaves them out, so `save()` of a loaded job never writes an older state back. Street-selection
   and routing-parameter writes use `CosmonautJob.update_input`, a write `WHERE status = 'PENDING'`; a
-  refused one raises `JobNotPending` (modal).
+  refused one raises `JobNotPending` (modal). Email, uploads and routing parameters are input writes
+  too; stages only rise (`raise_stage`, SQL `GREATEST`); the end mail's `notified_end` is set only while the row
+  is COMPLETED or FAILED (`mark_end_notified`).
 - `CosmonautJob.get_street_processing_status()` still asks Celery, for the upload task only, reading
   the task ID stored in `membership_upload["street_processing"]` (see the overloaded-field note in
   [cosmonaut-job](../concepts/cosmonaut-job.md)).

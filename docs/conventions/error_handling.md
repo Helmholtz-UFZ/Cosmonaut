@@ -39,6 +39,9 @@ All error handling is centralized in `cosmonaut_app/error_handling.py`.
   callbacks let them through instead of catching them
 - `JobNotPending(job_id)` - A conditional input write (`CosmonautJob.update_input`) did not apply: the
   job started or finished after the page's PENDING guard passed. Shown in the modal
+- `JobRunning(job_id)` / `JobNotRunning(job_id)` - A Restart or Reset met a RUNNING job; a Cancel met
+  a job that is not RUNNING. Modal hints, nothing changed. Like `JobNotPending` they are in the
+  `expected_errors` of `handle_error_with_notification`: no traceback, no maintainer mail
 - `WrongCeleryTaskId(task_id)` - Invalid Celery task ID
 
 ---
