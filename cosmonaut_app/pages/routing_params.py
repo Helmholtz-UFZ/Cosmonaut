@@ -68,6 +68,7 @@ from cosmonaut_app.constants.html_ids import (
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.error_handling import JobNotPending
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
@@ -182,8 +183,7 @@ def layout(job_id):
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
-    job.model.stage = max(job.model.stage, 3)
-    job.update_columns("stage")
+    job.raise_stage(3)
 
     # Create form with FormFactory (active parameter controls disabled state and styling)
     # IDs are always preserved for callbacks regardless of active state
@@ -283,9 +283,11 @@ def update_routing_params(**inputs):
             if hasattr(job.model, key):
                 setattr(job.model, key, value)
                 changed_fields.append(key)
-        job.model.stage = max(job.model.stage, 3)
-        # Row only — submit() uploads the files before the worker starts
-        job.update_columns("stage", *changed_fields)
+        # Row only — submit() uploads the files before the worker starts. The
+        # input is conditional on PENDING; the stage only ever rises.
+        if changed_fields and not job.update_input(*changed_fields):
+            raise JobNotPending(job_id)
+        job.raise_stage(3)
         return {
             **output_dict,
             "url": build_url_step("route_computation", job_id),

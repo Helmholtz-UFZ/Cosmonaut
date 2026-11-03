@@ -56,6 +56,7 @@ from cosmonaut_app.constants.general import (
     TRACK_GRADES,
     UNGRADED_TRACK_GRADE,
 )
+from cosmonaut_app.error_handling import JobNotPending
 from cosmonaut_app.osm.projection import project_features_to_file
 from cosmonaut_app.pydantic_models import StreetEdits
 from cosmonaut_app.road_network_utils import (
@@ -292,9 +293,15 @@ class StreetSelector:
         (i.e. before routing).
 
         Returns False if the resulting feature set is empty.
+
+        Raises:
+            JobNotPending: If the job is not PENDING; nothing is written.
         """
         self.job.model.street_edits = self.edits.model_copy(deep=True)
-        self.job.update_columns("street_edits")
+        # Only a PENDING job's input may change; the page guards on its own
+        # view of the status, the row decides (cosmo-ecosystem ADR 0005).
+        if not self.job.update_input("street_edits"):
+            raise JobNotPending(self.job.job_id)
         return self._derive(
             self._pull_download_if_other(), defer_projection=defer_projection
         )

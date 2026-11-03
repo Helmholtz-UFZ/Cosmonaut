@@ -241,8 +241,7 @@ def layout(job_id: str):
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
     is_active = status == JOB_STATUS_PENDING
-    job.model.stage = max(job.model.stage, 2)
-    job.update_columns("stage")
+    job.raise_stage(2)
     # A legacy street_edits.json still on this pod's disk may be newer than the
     # stored copy (edits used to stay local until submit): adopt it before the
     # pull can overwrite it. The intent lives in the row from then on.

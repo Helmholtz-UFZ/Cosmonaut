@@ -34,7 +34,7 @@ from cosmonaut_app.constants.general import (
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.files_route import serve_files
-from test.help_functions_tests import celery_says
+from test.help_functions_tests import celery_says, remove_job, set_run_columns
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ def job():
     delete_directory_from_storage(job_id)
     shutil.rmtree(JOB_WORK_DIR_TEMPLATE.format(job_id=job_id), ignore_errors=True)
     if DataBaseManager.check_existence(job_id):
-        DataBaseManager.delete_job(job_id)
+        remove_job(job_id)
 
 
 def _remote_files(job_id):
@@ -135,10 +135,10 @@ def test_loading_a_job_makes_no_rclone_calls(job, rclone_calls):
 
 def test_the_status_pollers_make_no_rclone_calls(job, rclone_calls, pollers):
     job_id = job.model.job_id
-    job.model.status = JOB_STATUS_RUNNING
     job.model.celery_task_id = "task"
     job.model.membership_upload["street_processing"] = "task"
     job.save()
+    set_run_columns(job_id, status=JOB_STATUS_RUNNING)
     rclone_calls.clear()
 
     poll_street_processing, poll_street_processing_status, update_status = pollers

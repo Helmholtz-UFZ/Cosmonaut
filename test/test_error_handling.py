@@ -16,6 +16,9 @@ from cosmo_ecosystem.object_storage_manager import ObjectStorageError as Framewo
 from cosmonaut_app.error_handling import (
     ERROR_RESPONSES,
     FileValidationError,
+    JobNotPending,
+    JobNotRunning,
+    JobRunning,
     ObjectStorageError,
     WrongCeleryTaskId,
     handle_error_with_notification,
@@ -80,7 +83,13 @@ def test_file_validation_error_stays_local_and_carries_its_message():
 
 def test_domain_exceptions_have_response_entries():
     """The app's own exceptions carry a response entry the modal can use."""
-    for exc in (WrongCeleryTaskId, FileValidationError):
+    for exc in (
+        WrongCeleryTaskId,
+        FileValidationError,
+        JobNotPending,
+        JobRunning,
+        JobNotRunning,
+    ):
         assert exc in ERROR_RESPONSES, f"{exc.__name__} has no response entry"
     assert ObjectStorageError in error_responds_dict
 
@@ -131,3 +140,15 @@ def test_notify_maintainer_failure_does_not_escape():
             "cosmonaut_app.error_handling.send_mail", side_effect=OSError("no smtp")
         ):
             notify_maintainer(RuntimeError("boom"))
+
+
+@pytest.mark.parametrize("hint", [JobNotPending, JobRunning, JobNotRunning])
+def test_a_refused_action_shows_its_modal_and_does_not_mail_the_maintainer(hint):
+    """A hint to the user is no bug: it must not reach the maintainer."""
+    with (
+        _dash_stubbed(),
+        mock.patch("cosmonaut_app.error_handling.send_mail") as send_mail,
+    ):
+        handle_error_with_notification(hint("abc123"))
+
+    send_mail.assert_not_called()

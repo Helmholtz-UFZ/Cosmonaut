@@ -40,7 +40,7 @@ from cosmonaut_app.constants.html_ids import (
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.error_handling import JobNotFound, error_modal
+from cosmonaut_app.error_handling import JobNotFound, JobRunning, error_modal
 from cosmonaut_app.map_utils import map_layer_data
 from cosmonaut_app.street_selector import StreetSelector
 
@@ -231,7 +231,7 @@ def create_reset_banner(job_id: str, status: str) -> dbc.Alert:
 
     # Status message
     message_map = {
-        JOB_STATUS_RUNNING: "This job is currently running. Reset to cancel and restart.",
+        JOB_STATUS_RUNNING: "This job is currently running. Cancel it first to reset.",
         JOB_STATUS_COMPLETED: "This job has been completed. Reset to clear results and restart.",
         JOB_STATUS_FAILED: "This job has failed. Reset to clear results and try again.",
     }
@@ -864,6 +864,17 @@ def register_navbar_callbacks(app):
         return build_url_step("user_info", job.model.job_id)
 
 
+def reset_job(job_id: str) -> None:
+    """Reset the job, or tell the user why not.
+
+    Raises:
+        JobRunning: If the job is RUNNING: a reset never cancels a run, Cancel
+            is its own click. Nothing was deleted or cancelled; the global error handler shows the modal.
+    """
+    if not CosmonautJob(job_id=job_id).reset():
+        raise JobRunning(job_id)
+
+
 def register_reset_callbacks(app):
     """Register callbacks for job reset functionality."""
 
@@ -911,8 +922,7 @@ def register_reset_callbacks(app):
 
         # A failing load or reset reaches the global error handler, which shows
         # the user why the reset did not happen.
-        job = CosmonautJob(job_id=job_id)
-        job.reset()
+        reset_job(job_id)
         log.info(f"Job {job_id} reset successfully from {pathname}")
 
         # Return same pathname to reload page with new state

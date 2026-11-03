@@ -11,6 +11,7 @@ from datetime import date
 import pandas as pd
 from cosmo_ecosystem import job_log, job_persistence, job_run
 from cosmo_ecosystem.base_job import BaseJob
+from cosmo_ecosystem.db_manager import RUN_OWNED_COLUMNS
 from cosmo_ecosystem.job_retention import days_to_live
 from pyproj import CRS, Transformer
 from sensor_routing.constants import (
@@ -39,7 +40,7 @@ from cosmonaut_app.constants.general import (
     STREET_EDITS_FILE,
 )
 from cosmonaut_app.db_manager import DataBaseManager
-from cosmonaut_app.error_handling import FileValidationError
+from cosmonaut_app.error_handling import FileValidationError, JobNotPending
 from cosmonaut_app.navigation_routing import RouteCreator
 from cosmonaut_app.pydantic_models import FullPipelineConfig, JobModel, StreetEdits
 from cosmonaut_app.submissions import manager, submit_routing_job
@@ -227,7 +228,14 @@ class CosmonautJob(BaseJob):
 
     def _row(self) -> dict:
         """Return the model as the job table's columns, config nested."""
-        data = self.model.model_dump(mode="json")
+        # The run's columns belong to the job run's transitions, never to a
+        # save: a job object loaded earlier must not put an old state back
+        # (cosmo-ecosystem ADR 0005). A new row starts PENDING, not submitted.
+        data = {
+            column: value
+            for column, value in self.model.model_dump(mode="json").items()
+            if column not in RUN_OWNED_COLUMNS
+        }
 
         # Separate Config fields from JobModel fields
         config_field_names = set(FullPipelineConfig.model_fields.keys())
@@ -254,12 +262,10 @@ class CosmonautJob(BaseJob):
         self.dump_routing_params()
         job_persistence.save(self.model.job_id, self._row())
 
-    def update_columns(self, *fields: str):
-        """Write the named model fields to the job's row. No storage access.
+    def _columns(self, fields) -> dict:
+        """Return the named model fields as job table columns.
 
-        Args:
-            *fields: ``JobModel`` field names. Config fields land in the one
-                ``config`` column, which is written whole.
+        Config fields land in the one ``config`` column, which is whole.
         """
         row = self._row()
         config_field_names = set(FullPipelineConfig.model_fields.keys())
@@ -267,8 +273,62 @@ class CosmonautJob(BaseJob):
         for field_name in fields:
             column = "config" if field_name in config_field_names else field_name
             columns[column] = row[column]
+        return columns
+
+    def update_columns(self, *fields: str):
+        """Write the named model fields to the job's row. No storage access.
+
+        Args:
+            *fields: ``JobModel`` field names. Config fields land in the one
+                ``config`` column, which is written whole.
+        """
+        columns = self._columns(fields)
         log.info(f"Update columns {sorted(columns)} of job {self.model.job_id}")
         job_persistence.update_columns(self.model.job_id, columns)
+
+    def update_input(self, *fields: str) -> bool:
+        """Write the named input fields to the job's row, only while it is PENDING.
+
+        As ``update_columns`` (row only, config whole), but one conditional
+        update ``WHERE status = 'PENDING'`` (cosmo-ecosystem ADR 0005): a page
+        that loaded the job earlier cannot change the input of a job that
+        started, finished or was reset meanwhile.
+
+        Returns:
+            Whether the row was PENDING and the fields were written.
+        """
+        columns = self._columns(fields)
+        log.info(f"Update input {sorted(columns)} of job {self.model.job_id}")
+        return job_persistence.update_input(self.model.job_id, columns)
+
+    def raise_stage(self, stage: int):
+        """Raise the job's stage to ``stage`` in the row; never lower it."""
+        DataBaseManager.raise_stage(self.model.job_id, stage)
+        self.model.stage = max(self.model.stage, stage)
+
+    def _require_input(self, *fields: str):
+        """Write the input fields while the row is PENDING, or raise.
+
+        Raises:
+            JobNotPending: If the row is not PENDING (the page's guard passed on
+                an older view of the job); nothing was written.
+        """
+        if not self.update_input(*fields):
+            raise JobNotPending(self.model.job_id)
+
+    def save_input(self, *fields: str):
+        """Upload the work dir, then write the input fields while PENDING.
+
+        As ``save`` for an upload of input files (files first, row second), but
+        the row write is conditional (cosmo-ecosystem ADR 0005) and touches only
+        the named fields: no other column and no parameters.json.
+
+        Raises:
+            JobNotPending: If the row is not PENDING.
+        """
+        log.info(f"Save input {sorted(fields)} of job {self.model.job_id}")
+        job_persistence.upload_work_dir(self.model.job_id)
+        self._require_input(*fields)
 
     def dump_routing_params(self):
         """
@@ -334,13 +394,17 @@ class CosmonautJob(BaseJob):
 
         return position, zoom
 
-    def delete(self):
+    def delete(self) -> bool:
         """Delete the job everywhere: remote prefix, local work dir and row.
 
         Delegates to ``cosmo_ecosystem.job_persistence.delete_job``, the same
         deletion the nightly cleanup and the job management page use.
+
+        Returns:
+            Whether the job was deleted; False means it is RUNNING and nothing
+            was deleted (cosmo-ecosystem ADR 0005).
         """
-        job_persistence.delete_job(self.model.job_id)
+        return job_persistence.delete_job(self.model.job_id)
 
     def upload_membership(self, file_name, content, epsg_input):
         """Upload and process membership CSV file; written through to storage."""
@@ -399,7 +463,7 @@ class CosmonautJob(BaseJob):
             # The upload worker records the new download's checksum.
             "download_sha256": None,
         }
-        self.save()
+        self.save_input("membership_upload", "epsg")
         log.debug("Finished uploading and processing membership file")
         return file_path, bounds, membership_df
 
@@ -440,7 +504,7 @@ class CosmonautJob(BaseJob):
             "file_name": PREDICTOR_FILENAME,
             "len": len(decoded),
         }
-        self.save()
+        self.save_input("predictor_upload")
         log.debug("Finished uploading and processing predictor file")
 
     def delete_predictor(self):
@@ -451,7 +515,7 @@ class CosmonautJob(BaseJob):
 
         default_predictor_upload = JobModel.model_fields["predictor_upload"].default
         self.model.predictor_upload = default_predictor_upload.copy()
-        self.update_columns("predictor_upload")
+        self._require_input("predictor_upload")
 
         log.info(f"Predictor data deleted for job {self.model.job_id}")
 
@@ -468,15 +532,23 @@ class CosmonautJob(BaseJob):
         celery_info = manager().get_job_status(sp)
         celery_status = celery_info["status"]
         if celery_status == "SUCCESS":
-            self.model.membership_upload["street_processing"] = "COMPLETED"
-            self.model.stage = max(self.model.stage, 2)
-            self.update_columns("membership_upload", "stage")
+            self._end_street_processing(sp, "COMPLETED")
+            self.raise_stage(2)
             return "COMPLETED"
         elif celery_status in ("FAILURE", "REVOKED"):
-            self.model.membership_upload["street_processing"] = "FAILED"
-            self.update_columns("membership_upload")
+            self._end_street_processing(sp, "FAILED")
             return "FAILED"
         return "RUNNING"
+
+    def _end_street_processing(self, task_id, state):
+        """Record the upload task's end in the row: that one key, if it still owns it.
+
+        A compare-and-set on the task id, like the task's own final write: a
+        poll holding an older copy of the row neither writes the rest of the
+        column back nor ends a newer upload's task.
+        """
+        self.model.membership_upload["street_processing"] = state
+        DataBaseManager.set_street_processing_of_task(self.model.job_id, task_id, state)
 
     def delete_membership(self):
         """Delete membership, predictor, OSM files, plots everywhere; reset state.
@@ -523,7 +595,7 @@ class CosmonautJob(BaseJob):
         # disk is adopted only into a NULL column, so it can never come back.
         self.model.street_edits = StreetEdits()
 
-        self.update_columns("membership_upload", "predictor_upload", "street_edits")
+        self._require_input("membership_upload", "predictor_upload", "street_edits")
 
         log.info(f"Membership data deleted for job {self.model.job_id}")
 
@@ -567,7 +639,9 @@ class CosmonautJob(BaseJob):
         # Force regeneration — create_gpx skips existing files.
         job_persistence.delete_files(self.model.job_id, [GPX_FILE])
         self.create_qr_code_routing()
-        self.save()
+        # Files only: the direction lives in route_options.json and the GPX, the
+        # row holds nothing of it, and the job is COMPLETED (not PENDING) here.
+        job_persistence.upload_work_dir(self.model.job_id)
 
     def get_route_polyline(self):
         """Return the route as WGS84 [[lat, lon], ...] positions, or None if unavailable.
@@ -589,65 +663,82 @@ class CosmonautJob(BaseJob):
             positions.reverse()
         return positions
 
-    def submit(self):
-        """Submit the job to background worker."""
-        log.info(f"Submitting job {self.model.job_id} to background worker")
-        self.model.submitted = True
-        self.model.stage = max(self.model.stage, 4)
-        # Pull, then upload: the worker pulls from object storage, and an
-        # outdated local copy must not replace the stored one. A pull may
-        # replace derived street files that ran ahead of storage; the worker
-        # recomputes them (StreetSelector.ensure_projected). The save also
-        # writes parameters.json via dump_routing_params().
-        job_persistence.work_dir(self.model.job_id)
-        self.save()
-        # Queue the run before the enqueue, as the framework's Job.submit:
-        # RUNNING and no heartbeat in one write, the only state the run
-        # claims (ADR 0004). A fast worker may finish before the enqueue
-        # returns, and a RUNNING written after it would overwrite its status
-        # (ADR 0002).
-        # A new run owes its own end mail: the last run's notified_end must not
-        # silence it. A column write, not the save above: it is the run's state.
-        self.model.notified_end = False
-        self.update_columns("notified_end")
-        job_run.mark_queued(self.model.job_id)
-        self.model.status = JOB_STATUS_RUNNING
+    def submit(self) -> bool:
+        """Submit the job to the background worker.
 
-        # As the framework's Job.submit: a raising enqueue is re-raised after
-        # FAILED is written (it must reach the global error handler), a
-        # reported failure returns.
+        The first write is the guard, ``job_run.mark_queued`` (cosmo-ecosystem
+        ADR 0005): one conditional update from PENDING or FAILED to RUNNING. A
+        submit that loses it (a second click, a second tab, a job that runs or
+        completed) logs at DEBUG and returns False before it touches the row, the
+        work dir or the queue.
+
+        Returns:
+            Whether a run was queued and enqueued; False when the guard was
+            lost, and when the enqueue reported a failure (the job ends FAILED).
+        """
+        job_id = self.model.job_id
+        log.info(f"Submitting job {job_id} to background worker")
+        if not job_run.mark_queued(job_id):
+            log.debug(f"Job {job_id} is already submitted.")
+            return False
+        self.model.status = JOB_STATUS_RUNNING
+        self.model.submitted = True
+
+        # Everything after the guard is under the failure path: the row is a
+        # queued run now, and nothing recovers one no message will ever claim
+        # (the sweep ignores queued rows). The pull, the save and the enqueue
+        # may all raise, a storage error being routine; whatever they raise,
+        # FAILED is written while the row is still queued, and it is re-raised
+        # so it reaches the global error handler. A reported failure returns.
         try:
+            # A new run owes its own end mail: the last run's notified_end must
+            # not silence it. A column write, not the save below: it is the
+            # run's state, and only a won guard may touch it.
+            self.model.notified_end = False
+            self.update_columns("notified_end")
+            self.model.stage = max(self.model.stage, 4)
+            # Pull, then upload: the worker pulls from object storage, and an
+            # outdated local copy must not replace the stored one. A pull may
+            # replace derived street files that ran ahead of storage; the worker
+            # recomputes them (StreetSelector.ensure_projected). The save also
+            # writes parameters.json via dump_routing_params(). It writes no
+            # status: the row is RUNNING already, a fast worker may finish
+            # before the enqueue returns, and nothing is synced after it
+            # (ADR 0002).
+            job_persistence.work_dir(job_id)
+            self.save()
             celery_task_id, failed = submit_routing_job(self)
         except Exception:  # noqa: BLE001
-            # Convention exception (CLAUDE.md: specific exceptions only): whatever
-            # the enqueue raises, the RUNNING written above must not outlive it.
-            # Re-raised below.
+            # Convention exception (CLAUDE.md: specific exceptions only): the
+            # pull, the save and the enqueue are storage, database and broker
+            # code, and whatever they raise, the queued run written above must
+            # not outlive it. Re-raised below.
             self._fail_to_start()
             raise
 
         if failed:
             self._fail_to_start()
-            return None
+            return False
 
-        # Store task ID — DB update only, worker already has the files
+        # Store task ID: DB update only, the worker already has the files
         self.model.celery_task_id = celery_task_id
         self.update_columns("celery_task_id")
 
-        log.info(f"Job {self.model.job_id} submitted with task_id={celery_task_id}")
-        return celery_task_id
+        log.info(f"Job {job_id} submitted with task_id={celery_task_id}")
+        return True
 
     def _fail_to_start(self):
-        """Write FAILED and say so in the job log: the job was never enqueued.
+        """End the queued run FAILED and say so in the job log: it was never enqueued.
 
-        The RUNNING written before the enqueue must not outlive a failed
-        enqueue (cosmo-ecosystem ADR 0002); wording as the framework's
-        ``Job.submit``.
+        Only while the row is still a queued run (``job_run.mark_start_failed``):
+        a run a worker already claimed, or a row reset or cancelled meanwhile,
+        is left alone. Wording as the framework's ``Job.submit``.
         """
         message = f"Cannot start job {self.model.job_id}."
         log.error(message)
-        job_log.append(self.model.job_id, message, level=logging.ERROR)
-        self.model.status = JOB_STATUS_FAILED
-        self.update_columns("status")
+        if job_run.mark_start_failed(self.model.job_id):
+            job_log.append(self.model.job_id, message, level=logging.ERROR)
+            self.model.status = JOB_STATUS_FAILED
 
     def get_status(self) -> str:
         """Return the job's status as its row holds it.
@@ -661,19 +752,26 @@ class CosmonautJob(BaseJob):
         """
         return self.model.status
 
-    def cancel(self):
-        """Cancel the job's run: revoke its task, then record FAILED.
+    def cancel(self) -> bool:
+        """Cancel the job's run: revoke its task, then end the row FAILED.
 
-        A terminated worker writes nothing, so the canceller writes FAILED to
-        the row and a record to the job log (cosmo-ecosystem ADR 0002). A run
-        that wrote COMPLETED just before the kill is overwritten, accepted.
+        A terminated worker writes nothing, so the canceller does: the task is
+        revoked first, then ``job_run.mark_cancelled`` writes FAILED and the
+        job log line, only while the row is RUNNING (cosmo-ecosystem ADR 0005).
+        A run that wrote COMPLETED a moment earlier keeps it.
+
+        Returns:
+            Whether a run was cancelled; False means the job was not RUNNING.
         """
-        manager().revoke_job(self.model.celery_task_id, terminate=True)
-        message = f"Job {self.model.job_id}: run cancelled by user."
-        log.info(message)
-        job_log.append(self.model.job_id, message)
-        self.model.status = JOB_STATUS_FAILED
-        self.update_columns("status")
+        # A queued run whose task id was never written has no task to revoke;
+        # its row can still be cancelled.
+        if self.model.celery_task_id:
+            manager().revoke_job(self.model.celery_task_id, terminate=True)
+        cancelled = job_run.mark_cancelled(self.model.job_id)
+        if cancelled:
+            log.info(f"Job {self.model.job_id}: run cancelled by user.")
+            self.model.status = JOB_STATUS_FAILED
+        return cancelled
 
     def time_to_live(self) -> int:
         """Return number of days until this job is deleted by cleanup.
@@ -716,25 +814,32 @@ class CosmonautJob(BaseJob):
         """
         return job_log.read(self.model.job_id)
 
-    def reset(self):
+    def reset(self) -> bool:
         """Reset job to PENDING state by clearing output files and task state.
 
         This method:
-        - Cancels the run if job is currently RUNNING
+        - Sets the row PENDING (``job_run.mark_pending``), before anything is
+          deleted. A RUNNING job is refused and left alone, its run included: a
+          reset never cancels (Cancel is its own click), so a stale tab cannot
+          kill a run
         - Deletes output files (solutions, GPX, QR codes) everywhere
         - Clears the job log
         - Preserves input files (uploaded data, parameters, OSM data, plots)
-        - Sets status to PENDING
         - Clears celery_task_id and the run's heartbeat
         - Keeps the submitted flag: it picks the retention, and an unsubmitted
           job is deleted 2 days after its start date, reset or not
-        - Updates the database row
+
+        Returns:
+            Whether the job was reset; False means it is RUNNING.
         """
         log.info(f"Resetting job {self.model.job_id}")
 
-        if self.model.status == JOB_STATUS_RUNNING and self.model.celery_task_id:
-            log.info(f"Cancelling running task {self.model.celery_task_id}")
-            self.cancel()
+        # PENDING and no heartbeat in one write: the last run's heartbeat
+        # would keep the next run from claiming the row (ADR 0004).
+        if not job_run.mark_pending(self.model.job_id):
+            log.debug(f"Job {self.model.job_id} runs and is not reset.")
+            return False
+        self.model.status = JOB_STATUS_PENDING
 
         # Delete known output files
         job_persistence.delete_files(
@@ -743,13 +848,10 @@ class CosmonautJob(BaseJob):
         job_log.clear(self.model.job_id)
 
         # Reset job state
-        self.model.status = JOB_STATUS_PENDING
         self.model.celery_task_id = None
         self.model.stage = min(self.model.stage, 4)
 
         self.update_columns("celery_task_id", "stage")
-        # PENDING and no heartbeat in one write: the last run's heartbeat
-        # would keep the next run from claiming the row (ADR 0004).
-        job_run.mark_pending(self.model.job_id)
 
         log.info(f"Job {self.model.job_id} reset to PENDING")
+        return True

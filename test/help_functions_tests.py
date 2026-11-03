@@ -6,9 +6,13 @@ import time
 from unittest import mock
 
 import pytest
+from cosmo_ecosystem import job_persistence
+from cosmo_ecosystem.db_manager import DbManager
+from sqlalchemy import update
 
-from cosmonaut_app.constants.general import JOB_STATUS_COMPLETED
+from cosmonaut_app.constants.general import JOB_STATUS_COMPLETED, JOB_STATUS_PENDING
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.db_manager import JobTable
 
 
 def check_all_errors(page):
@@ -116,3 +120,26 @@ def celery_says(status):
         "cosmo_ecosystem.background_job_manager.background_job_manager.get_job_status",
         return_value={"status": status},
     )
+
+
+def set_run_columns(job_id, **columns):
+    """Write run-owned columns of a job's row directly, to arrange a test.
+
+    A save never writes ``status``, ``submitted``, ``heartbeat_at`` or
+    ``run_id`` (cosmo-ecosystem ADR 0005); this stands in for the run that would
+    have left the row in that state.
+    """
+    with DbManager.session_scope() as session:
+        session.execute(
+            update(JobTable).where(JobTable.job_id == job_id).values(**columns)
+        )
+
+
+def remove_job(job_id):
+    """Delete a test job whatever status the test left it in.
+
+    ``job_persistence.delete_job`` refuses a RUNNING job (ADR 0005), so a
+    fixture that leaves one behind puts it back to PENDING first.
+    """
+    set_run_columns(job_id, status=JOB_STATUS_PENDING)
+    job_persistence.delete_job(job_id)

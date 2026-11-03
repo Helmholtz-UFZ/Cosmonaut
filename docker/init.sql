@@ -25,7 +25,12 @@ CREATE TABLE jobs (
     -- cosmo-ecosystem): NULL while queued, now() of the database on the claim
     -- and every heartbeat. The sweep fails RUNNING rows whose heartbeat is stale.
     -- Existing databases: ALTER TABLE jobs ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ;
-    heartbeat_at TIMESTAMPTZ
+    heartbeat_at TIMESTAMPTZ,
+    -- Identity of the job run that holds the row (cosmo-ecosystem ADR 0005): a
+    -- fresh UUID on the claim, NULL while queued or reset. The run's heartbeat
+    -- and final status are written only while the row still carries it.
+    -- Existing databases: ALTER TABLE jobs ADD COLUMN IF NOT EXISTS run_id UUID;
+    run_id UUID
 );
 
 -- Application logging table

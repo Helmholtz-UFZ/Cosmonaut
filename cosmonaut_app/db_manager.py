@@ -14,16 +14,19 @@ this supersedes, and cosmo-ecosystem's docs/conventions/database_schema.md.
 
 The authoritative DDL for this table stays ``docker/init.sql``. ``JobColumns``
 carries only the columns every consumer app has (the measured six plus the
-framework's run-owned ``heartbeat_at``); the eight below are cosmonaut's own —
-extra columns are invisible to the framework's queries, missing ones would not
-be, which is why the mixin is an intersection rather than a union.
+framework's run-owned ``heartbeat_at`` and ``run_id``); the eight below are
+cosmonaut's own — extra columns are invisible to the framework's queries, missing
+ones would not be, which is why the mixin is an intersection rather than a union.
 """
 
 import logging
 
 from cosmo_ecosystem.db_manager import Base, DbManager, JobColumns, SessionScope
 from cosmo_ecosystem.error_handling import JobNotFound
-from sqlalchemy import JSON, Column, Integer, String, update
+from sqlalchemy import JSON, Column, Integer, String, cast, func, update
+from sqlalchemy.dialects.postgresql import JSONB
+
+from cosmonaut_app.constants.general import JOB_STATUS_COMPLETED, JOB_STATUS_FAILED
 
 log = logging.getLogger(__name__)
 
@@ -32,10 +35,11 @@ class JobTable(JobColumns, Base):
     """Represents the 'jobs' table in the database.
 
     job_id, start_date, submitted, notified_end, status, version and
-    heartbeat_at come from JobColumns; heartbeat_at belongs to the job run
-    (cosmo_ecosystem.job_run) and is not in JobModel, so a save never writes
-    it. Everything below is cosmonaut's own and has no meaning to framework
-    code.
+    heartbeat_at and run_id come from JobColumns. status, submitted,
+    heartbeat_at and run_id are run-owned (``RUN_OWNED_COLUMNS``): only the
+    transitions of cosmo_ecosystem.job_run write them and a save never does
+    (cosmo-ecosystem ADR 0005). Everything below is cosmonaut's own and has no
+    meaning to framework code.
     """
 
     __tablename__ = "jobs"
@@ -84,6 +88,84 @@ class DataBaseManager(DbManager):
             if job_row is None:
                 raise JobNotFound(job_id)
             return job_row.stage
+
+    @classmethod
+    def set_street_processing_of_task(cls, job_id, task_id, state):
+        """Set ``membership_upload["street_processing"]`` only while ``task_id`` owns it.
+
+        As ``update_membership_upload_of_task``, but only the one key changes
+        (``jsonb_set``): a status poll holding an older copy of the column
+        cannot write its other keys back over a newer upload.
+
+        Returns:
+            bool: True if the key was set, False if the task no longer owns the
+            upload (or the job is gone).
+        """
+        with cls.session_scope() as session:
+            result = session.execute(
+                update(JobTable)
+                .where(
+                    JobTable.job_id == job_id,
+                    JobTable.membership_upload["street_processing"].as_string()
+                    == task_id,
+                )
+                .values(
+                    membership_upload=func.jsonb_set(
+                        cast(JobTable.membership_upload, JSONB),
+                        "{street_processing}",
+                        func.to_jsonb(cast(state, String)),
+                    )
+                )
+            )
+            return result.rowcount == 1
+
+    @classmethod
+    def raise_stage(cls, job_id, stage):
+        """Raise the job's stage to ``stage``; never lower it.
+
+        One update (``GREATEST``), so a page that loaded the job earlier cannot
+        put an older, lower stage back over what another page wrote meanwhile.
+
+        Raises:
+            JobNotFound: If the job has no row.
+        """
+        with cls.session_scope() as session:
+            result = session.execute(
+                update(JobTable)
+                .where(JobTable.job_id == job_id)
+                .values(stage=func.greatest(func.coalesce(JobTable.stage, 0), stage))
+            )
+            applied = result.rowcount == 1
+        if not applied:
+            raise JobNotFound(job_id)
+
+    @classmethod
+    def mark_end_notified(cls, job_id):
+        """Set ``notified_end`` only while the row holds a finished run.
+
+        One conditional update (COMPLETED or FAILED): the end mail belongs to
+        the run that sent it. A job resubmitted meanwhile is RUNNING again and
+        owes its own mail, so the flag must not be set over it.
+
+        Returns:
+            bool: True if the flag was set, False if the job is not finished.
+
+        Raises:
+            JobNotFound: If the job has no row.
+        """
+        with cls.session_scope() as session:
+            result = session.execute(
+                update(JobTable)
+                .where(
+                    JobTable.job_id == job_id,
+                    JobTable.status.in_((JOB_STATUS_COMPLETED, JOB_STATUS_FAILED)),
+                )
+                .values(notified_end=True)
+            )
+            applied = result.rowcount == 1
+        if not applied and not cls.check_existence(job_id):
+            raise JobNotFound(job_id)
+        return applied
 
     @classmethod
     def update_membership_upload_of_task(cls, job_id, task_id, membership_upload):

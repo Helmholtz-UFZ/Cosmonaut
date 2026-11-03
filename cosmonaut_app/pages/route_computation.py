@@ -96,6 +96,7 @@ from cosmonaut_app.constants.html_ids import (
     WORKER_STATUS_SPAN_ROUTE_COMPUTATION_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.error_handling import JobNotRunning, JobRunning
 from cosmonaut_app.files_route import create_download_button
 from cosmonaut_app.layout import (
     build_url_step,
@@ -121,8 +122,7 @@ def layout(job_id):
     """Create layout for routing computation page."""
     job = CosmonautJob(job_id=job_id)
     status = job.get_status()
-    job.model.stage = max(job.model.stage, 4)
-    job.update_columns("stage")
+    job.raise_stage(4)
 
     # Status badge
     status_badge = create_status_badge(status, job_id)
@@ -542,20 +542,13 @@ def cancel_computation(n_clicks, job_id):
         raise PreventUpdate
 
     job = CosmonautJob(job_id=job_id)
-    current_status = job.get_status()
 
-    # Only cancel if actually running
-    if current_status != JOB_STATUS_RUNNING:
-        log.warning(
-            f"Job {job_id} not running (status: {current_status}), ignoring cancel request"
-        )
-        return False, no_update
+    # The job finished or was cancelled meanwhile (another tab): say so.
+    if job.get_status() != JOB_STATUS_RUNNING:
+        raise JobNotRunning(job_id)
 
-    if not job.model.celery_task_id:
-        log.warning(f"Job {job_id} has no celery_task_id to cancel")
-        return False, no_update
-
-    job.cancel()
+    if not job.cancel():
+        raise JobNotRunning(job_id)
     log.info(f"Cancelled computation for job {job_id}")
 
     # Close modal, trigger status check
@@ -580,14 +573,11 @@ def restart_computation(n_clicks, job_id):
         raise PreventUpdate
 
     job = CosmonautJob(job_id=job_id)
-    current_status = job.get_status()
 
-    # If currently running, don't restart (user should cancel first)
-    if current_status == JOB_STATUS_RUNNING:
-        log.warning(f"Job {job_id} is running, cannot restart. Cancel first.")
-        return False, no_update, no_update
-
-    job.reset()
+    # Cancel is its own click: a RUNNING job is not restarted. A reset the row
+    # refuses anyway (a run queued meanwhile) leaves the job as it is.
+    if job.get_status() == JOB_STATUS_RUNNING or not job.reset():
+        raise JobRunning(job_id)
     job.submit()
 
     log.info(f"Restarted computation for job {job_id}")
