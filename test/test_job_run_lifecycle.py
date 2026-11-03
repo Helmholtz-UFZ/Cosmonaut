@@ -256,6 +256,20 @@ def test_a_resubmit_queues_the_run_without_the_last_runs_heartbeat(running_job):
     assert row["heartbeat_at"] is None
 
 
+def test_a_resubmit_of_a_notified_job_lets_the_next_end_mail_through(running_job):
+    """notified_end belongs to the run: the end mail of the first run must not
+    silence the end mail of a restart."""
+    job_id = running_job.job_id
+    running_job.model.status = JOB_STATUS_COMPLETED
+    running_job.model.notified_end = True
+    running_job.update_columns("status", "notified_end")
+
+    with _enqueue_returns("task-of-the-restart", False):
+        CosmonautJob(job_id=job_id).submit()
+
+    assert DataBaseManager.get_job_columns(job_id)["notified_end"] is False
+
+
 def test_a_reset_leaves_the_job_pending_without_a_heartbeat(running_job):
     job_id = running_job.job_id
     _give_the_row_a_heartbeat(job_id)

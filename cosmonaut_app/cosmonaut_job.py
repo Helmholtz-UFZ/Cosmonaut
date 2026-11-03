@@ -606,6 +606,10 @@ class CosmonautJob(BaseJob):
         # claims (ADR 0004). A fast worker may finish before the enqueue
         # returns, and a RUNNING written after it would overwrite its status
         # (ADR 0002).
+        # A new run owes its own end mail: the last run's notified_end must not
+        # silence it. A column write, not the save above: it is the run's state.
+        self.model.notified_end = False
+        self.update_columns("notified_end")
         job_run.mark_queued(self.model.job_id)
         self.model.status = JOB_STATUS_RUNNING
 
