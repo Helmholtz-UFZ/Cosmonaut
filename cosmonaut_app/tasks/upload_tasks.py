@@ -120,9 +120,5 @@ def _notify_maintainer(job_id, error):
         f"for job {job_id}.\n\n"
         f"Error: {error}"
     )
-    try:
-        send_mail(MAINTAINER_EMAIL, subject, body)
-    except Exception:  # noqa - must not let email failure crash notification path
-        log.error(
-            f"Failed to send maintainer notification for job {job_id}", exc_info=True
-        )
+    # send_mail never raises; a lost maintainer mail is logged there.
+    send_mail(MAINTAINER_EMAIL, subject, body)

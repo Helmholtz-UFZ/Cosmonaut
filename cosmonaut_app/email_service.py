@@ -26,13 +26,18 @@ def send_mail(recipients, subject, body):
         recipients: List of email addresses.
         subject: Email subject line.
         body: Plain-text email body.
+
+    Returns:
+        bool: True if the mail was sent (or logged in test mode), False if the
+        SMTP exchange failed. Never raises into the caller; callers that must
+        retry a lost mail (the end mail's ``notified_end``) read the result.
     """
     if EMAIL_SERVER == "test":
         log.info(
             f"Test mode — email not sent. "
             f"To: {recipients}, Subject: {subject}, Body length: {len(body)} chars"
         )
-        return
+        return True
 
     msg = MIMEText(body)
     msg["Subject"] = subject
@@ -49,5 +54,7 @@ def send_mail(recipients, subject, body):
             server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
             server.sendmail(EMAIL_SENDER, recipients, msg.as_string())
         log.info(f"Email sent to {recipients}: {subject}")
+        return True
     except Exception:  # noqa — SMTP, socket, DNS, … — never let email crash the caller
         log.error(f"Failed to send email to {recipients}: {subject}", exc_info=True)
+        return False
