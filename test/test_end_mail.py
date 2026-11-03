@@ -8,26 +8,25 @@ Runs against real Postgres and object storage; only the SMTP connection is faked
 from unittest import mock
 
 import pytest
-from cosmo_ecosystem import job_persistence
 
 from cosmonaut_app import email_service
 from cosmonaut_app.constants.general import JOB_STATUS_RUNNING
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.tasks.routing_tasks import process_routing_job
+from test.help_functions_tests import remove_job, set_run_columns
 
 
 @pytest.fixture
 def running_job():
     """Yield a saved RUNNING job with an email; remove it afterwards."""
     job = CosmonautJob()
-    job.model.status = JOB_STATUS_RUNNING
-    job.model.submitted = True
     job.model.celery_task_id = "task-of-a-test"
     job.model.email = "test@ufz.de"
     job.save()
+    set_run_columns(job.job_id, status=JOB_STATUS_RUNNING, submitted=True)
     yield job
-    job_persistence.delete_job(job.job_id)
+    remove_job(job.job_id)
 
 
 def _smtp_server(smtp):

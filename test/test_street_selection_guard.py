@@ -9,12 +9,12 @@ import importlib
 
 import dash
 import pytest
-from cosmo_ecosystem import job_persistence
 from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.constants.general import JOB_STATUS_RUNNING
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
+from test.help_functions_tests import remove_job, set_run_columns
 
 _REMOVED_ROADS = [1, 2, 3]
 
@@ -30,11 +30,11 @@ def street_selection():
 def running_job_with_removed_roads():
     """Yield a RUNNING job whose street edits removed three roads."""
     job = CosmonautJob()
-    job.model.status = JOB_STATUS_RUNNING
     job.model.street_edits = {"removed_roads": _REMOVED_ROADS, "keep_largest": True}
     job.save()
+    set_run_columns(job.job_id, status=JOB_STATUS_RUNNING)
     yield job
-    job_persistence.delete_job(job.job_id)
+    remove_job(job.job_id)
 
 
 def _pathname(job):

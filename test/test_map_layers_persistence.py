@@ -22,7 +22,7 @@ from cosmonaut_app.constants.general import (
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.map_utils import map_layer_data
-from test.help_functions_tests import another_pod_meanwhile
+from test.help_functions_tests import another_pod_meanwhile, set_run_columns
 
 # West to east, in the job's default EPSG 25832.
 _ROUTE = [[620250, 5761250], [620500, 5761250], [620750, 5761250]]
@@ -33,11 +33,11 @@ def job():
     """Yield a completed job with a membership raster and a reversed route."""
     job = CosmonautJob()
     job.model.membership_upload["file_name"] = MEMBERSHIP_FILENAME
-    job.model.status = JOB_STATUS_COMPLETED
     _write(job, MEMBERSHIP_TIF, "raster")
     _write(job, ROUTE_FILENAME, json.dumps({"Path": _ROUTE}))
     _write(job, ROUTE_OPTIONS_FILE, json.dumps({"reversed": True}))
     job.save()
+    set_run_columns(job.job_id, status=JOB_STATUS_COMPLETED)
     yield job
     job_id = job.model.job_id
     delete_directory_from_storage(job_id)

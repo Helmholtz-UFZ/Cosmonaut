@@ -589,65 +589,81 @@ class CosmonautJob(BaseJob):
             positions.reverse()
         return positions
 
-    def submit(self):
-        """Submit the job to background worker."""
-        log.info(f"Submitting job {self.model.job_id} to background worker")
-        self.model.submitted = True
-        self.model.stage = max(self.model.stage, 4)
-        # Pull, then upload: the worker pulls from object storage, and an
-        # outdated local copy must not replace the stored one. A pull may
-        # replace derived street files that ran ahead of storage; the worker
-        # recomputes them (StreetSelector.ensure_projected). The save also
-        # writes parameters.json via dump_routing_params().
-        job_persistence.work_dir(self.model.job_id)
-        self.save()
-        # Queue the run before the enqueue, as the framework's Job.submit:
-        # RUNNING and no heartbeat in one write, the only state the run
-        # claims (ADR 0004). A fast worker may finish before the enqueue
-        # returns, and a RUNNING written after it would overwrite its status
-        # (ADR 0002).
-        # A new run owes its own end mail: the last run's notified_end must not
-        # silence it. A column write, not the save above: it is the run's state.
-        self.model.notified_end = False
-        self.update_columns("notified_end")
-        job_run.mark_queued(self.model.job_id)
-        self.model.status = JOB_STATUS_RUNNING
+    def submit(self) -> bool:
+        """Submit the job to the background worker.
 
-        # As the framework's Job.submit: a raising enqueue is re-raised after
-        # FAILED is written (it must reach the global error handler), a
-        # reported failure returns.
+        The first write is the guard, ``job_run.mark_queued`` (cosmo-ecosystem
+        ADR 0005): one conditional update from PENDING or FAILED to RUNNING. A
+        submit that loses it (a second click, a second tab, a job that runs or
+        completed) logs at DEBUG and returns False before it touches the row, the
+        work dir or the queue.
+
+        Returns:
+            Whether this call queued a run.
+        """
+        job_id = self.model.job_id
+        log.info(f"Submitting job {job_id} to background worker")
+        if not job_run.mark_queued(job_id):
+            log.debug(f"Job {job_id} is already submitted.")
+            return False
+        self.model.status = JOB_STATUS_RUNNING
+        self.model.submitted = True
+
+        # Everything after the guard is under the failure path: the row is a
+        # queued run now, and nothing recovers one no message will ever claim
+        # (the sweep ignores queued rows). The pull, the save and the enqueue
+        # may all raise, a storage error being routine; whatever they raise,
+        # FAILED is written while the row is still queued, and it is re-raised
+        # so it reaches the global error handler. A reported failure returns.
         try:
+            # A new run owes its own end mail: the last run's notified_end must
+            # not silence it. A column write, not the save below: it is the
+            # run's state, and only a won guard may touch it.
+            self.model.notified_end = False
+            self.update_columns("notified_end")
+            self.model.stage = max(self.model.stage, 4)
+            # Pull, then upload: the worker pulls from object storage, and an
+            # outdated local copy must not replace the stored one. A pull may
+            # replace derived street files that ran ahead of storage; the worker
+            # recomputes them (StreetSelector.ensure_projected). The save also
+            # writes parameters.json via dump_routing_params(). It writes no
+            # status: the row is RUNNING already, a fast worker may finish
+            # before the enqueue returns, and nothing is synced after it
+            # (ADR 0002).
+            job_persistence.work_dir(job_id)
+            self.save()
             celery_task_id, failed = submit_routing_job(self)
         except Exception:  # noqa: BLE001
-            # Convention exception (CLAUDE.md: specific exceptions only): whatever
-            # the enqueue raises, the RUNNING written above must not outlive it.
-            # Re-raised below.
+            # Convention exception (CLAUDE.md: specific exceptions only): the
+            # pull, the save and the enqueue are storage, database and broker
+            # code, and whatever they raise, the queued run written above must
+            # not outlive it. Re-raised below.
             self._fail_to_start()
             raise
 
         if failed:
             self._fail_to_start()
-            return None
+            return True
 
-        # Store task ID — DB update only, worker already has the files
+        # Store task ID: DB update only, the worker already has the files
         self.model.celery_task_id = celery_task_id
         self.update_columns("celery_task_id")
 
-        log.info(f"Job {self.model.job_id} submitted with task_id={celery_task_id}")
-        return celery_task_id
+        log.info(f"Job {job_id} submitted with task_id={celery_task_id}")
+        return True
 
     def _fail_to_start(self):
-        """Write FAILED and say so in the job log: the job was never enqueued.
+        """End the queued run FAILED and say so in the job log: it was never enqueued.
 
-        The RUNNING written before the enqueue must not outlive a failed
-        enqueue (cosmo-ecosystem ADR 0002); wording as the framework's
-        ``Job.submit``.
+        Only while the row is still a queued run (``job_run.mark_start_failed``):
+        a run a worker already claimed, or a row reset or cancelled meanwhile,
+        is left alone. Wording as the framework's ``Job.submit``.
         """
         message = f"Cannot start job {self.model.job_id}."
         log.error(message)
-        job_log.append(self.model.job_id, message, level=logging.ERROR)
-        self.model.status = JOB_STATUS_FAILED
-        self.update_columns("status")
+        if job_run.mark_start_failed(self.model.job_id):
+            job_log.append(self.model.job_id, message, level=logging.ERROR)
+            self.model.status = JOB_STATUS_FAILED
 
     def get_status(self) -> str:
         """Return the job's status as its row holds it.
