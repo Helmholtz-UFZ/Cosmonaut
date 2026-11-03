@@ -71,10 +71,11 @@ def rclone_calls(monkeypatch):
 
 @pytest.fixture
 def row_writes(monkeypatch):
-    """Count the writes to the jobs table (whole-row and column updates)."""
+    """Count the writes to the jobs table (whole-row, column and input updates)."""
     writes = []
     real_add_entry = DbManager.add_entry.__func__
     real_update_column = DbManager.update_column.__func__
+    real_update_input = DbManager.update_input.__func__
 
     def add_entry(cls, data):
         writes.append(sorted(data))
@@ -85,7 +86,13 @@ def row_writes(monkeypatch):
         return real_update_column(cls, job_id, columns)
 
     monkeypatch.setattr(DbManager, "add_entry", classmethod(add_entry))
+
+    def update_input(cls, job_id, columns):
+        writes.append(sorted(columns))
+        return real_update_input(cls, job_id, columns)
+
     monkeypatch.setattr(DbManager, "update_column", classmethod(update_column))
+    monkeypatch.setattr(DbManager, "update_input", classmethod(update_input))
     return writes
 
 
