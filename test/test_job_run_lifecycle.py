@@ -484,3 +484,44 @@ def test_a_reset_of_a_job_whose_run_was_queued_meanwhile_is_refused_and_changes_
     assert reset is False
     assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_RUNNING
     assert "a line of the live run" in job_log.read(job_id)
+
+
+def test_a_restart_of_a_running_job_cancels_it_and_ends_queued_again(
+    running_job, route_computation
+):
+    job_id = running_job.job_id
+
+    with (
+        mock.patch(
+            "cosmo_ecosystem.background_job_manager.background_job_manager.revoke_job"
+        ) as revoke,
+        _enqueue_returns("task-of-the-restart", False),
+    ):
+        route_computation.restart_computation(1, job_id)
+
+    revoke.assert_called_once_with("task-of-a-test", terminate=True)
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["status"] == JOB_STATUS_RUNNING
+    assert row["heartbeat_at"] is None
+    assert row["celery_task_id"] == "task-of-the-restart"
+
+
+def test_a_start_click_on_a_job_another_tab_queued_enqueues_nothing(
+    running_job, route_computation
+):
+    """The page's status check is stale; the guard in the row decides."""
+    job_id = running_job.job_id
+    set_run_columns(job_id, status=JOB_STATUS_PENDING)
+    stale_page = CosmonautJob(job_id=job_id)
+    with _enqueue_returns("task-of-the-other-tab", False):
+        CosmonautJob(job_id=job_id).submit()
+
+    with (
+        mock.patch.object(route_computation, "CosmonautJob", return_value=stale_page),
+        _enqueue_returns("task-of-this-tab", False) as enqueue,
+    ):
+        route_computation.start_computation(1, job_id)
+
+    enqueue.assert_not_called()
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["celery_task_id"] == "task-of-the-other-tab"

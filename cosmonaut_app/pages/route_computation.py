@@ -571,7 +571,7 @@ def cancel_computation(n_clicks, job_id):
     prevent_initial_call=True,
 )
 def restart_computation(n_clicks, job_id):
-    """Restart a computation that is not running: reset, then start.
+    """Restart a computation: cancel a running one, reset, then start.
 
     Checks current status to handle edge cases (multiple tabs).
     Closes loading modal, enables polling interval, and triggers celery info update.
@@ -580,14 +580,13 @@ def restart_computation(n_clicks, job_id):
         raise PreventUpdate
 
     job = CosmonautJob(job_id=job_id)
-    current_status = job.get_status()
 
-    # If currently running, don't restart (user should cancel first)
-    if current_status == JOB_STATUS_RUNNING:
-        log.warning(f"Job {job_id} is running, cannot restart. Cancel first.")
+    # A running job is cancelled by the reset, then reset and submitted: the
+    # restart of a stale tab replaces the run it did not know about. A reset
+    # the row refuses (a run queued meanwhile) leaves the job as it is.
+    if not job.reset():
+        log.warning(f"Job {job_id} is running, restart refused.")
         return False, no_update, no_update
-
-    job.reset()
     job.submit()
 
     log.info(f"Restarted computation for job {job_id}")

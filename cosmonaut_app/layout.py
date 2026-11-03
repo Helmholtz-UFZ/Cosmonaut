@@ -912,8 +912,12 @@ def register_reset_callbacks(app):
         # A failing load or reset reaches the global error handler, which shows
         # the user why the reset did not happen.
         job = CosmonautJob(job_id=job_id)
-        job.reset()
-        log.info(f"Job {job_id} reset successfully from {pathname}")
+        if job.reset():
+            log.info(f"Job {job_id} reset successfully from {pathname}")
+        else:
+            # A run was queued meanwhile (another tab): the row refused the
+            # reset, and the reloaded page shows the job as it really is.
+            log.warning(f"Job {job_id} is running and was not reset from {pathname}")
 
         # Return same pathname to reload page with new state
         return pathname
