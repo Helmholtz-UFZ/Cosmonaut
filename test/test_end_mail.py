@@ -50,6 +50,13 @@ def test_send_mail_reports_a_mail_that_was_sent():
         assert email_service.send_mail(["a@ufz.de"], "subject", "body") is True
 
 
+def test_send_mail_reports_a_mail_it_could_not_even_build():
+    """Header construction is part of the never-raises promise."""
+    server, smtp = _smtp_server(mock.MagicMock())
+    with server, smtp:
+        assert email_service.send_mail([None], "subject", "body") is False
+
+
 def test_a_failed_end_mail_leaves_notified_end_unset_so_it_is_retried(running_job):
     """The job has no uploads, so the routing pipeline fails; the mail is
     refused, and the next run's end mail must still be due."""

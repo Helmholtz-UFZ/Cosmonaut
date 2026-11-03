@@ -39,16 +39,18 @@ def send_mail(recipients, subject, body):
         )
         return True
 
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    # Explicit display name: EMAIL_SENDER is currently the sister project's
-    # mailbox (no cosmonaut@ufz.de exists yet) — the display name is what
-    # identifies the sending app to recipients. If a COSMONAUT alias is ever
-    # set up, only the env files need to change.
-    msg["From"] = formataddr(("COSMONAUT", EMAIL_SENDER))
-    msg["To"] = ", ".join(recipients)
-
     try:
+        # Header construction is inside the try as well: a malformed recipient
+        # must not raise into the caller any more than an SMTP failure.
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        # Explicit display name: EMAIL_SENDER is currently the sister project's
+        # mailbox (no cosmonaut@ufz.de exists yet) — the display name is what
+        # identifies the sending app to recipients. If a COSMONAUT alias is ever
+        # set up, only the env files need to change.
+        msg["From"] = formataddr(("COSMONAUT", EMAIL_SENDER))
+        msg["To"] = ", ".join(recipients)
+
         with smtplib.SMTP(EMAIL_SERVER, int(EMAIL_PORT)) as server:
             server.starttls()
             server.login(EMAIL_USERNAME, EMAIL_PASSWORD)

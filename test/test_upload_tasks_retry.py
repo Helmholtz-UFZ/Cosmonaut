@@ -10,6 +10,17 @@ from cosmo_ecosystem.object_storage_manager import ObjectStorageError
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.tasks.upload_tasks import process_upload_task
+
+TASK_ID = "task-of-the-upload"
+
+
+def _task(retries=0):
+    """Return a Celery task double with the id the job's row names."""
+    task = mock.MagicMock()
+    task.request.id = TASK_ID
+    task.request.retries = retries
+    return task
 
 
 def _create_dummy_classification_data():
@@ -37,8 +48,6 @@ def _http_error(status_code):
 
 def test_process_upload_task_retries_on_connection_error():
     """Test that process_upload_task retries on transient network errors."""
-    from cosmonaut_app.tasks.upload_tasks import process_upload_task
-
     job = CosmonautJob()
     job.save()
     job_id = job.model.job_id
@@ -66,8 +75,6 @@ def test_process_upload_task_retries_on_connection_error():
 
 def test_process_upload_task_retries_on_timeout():
     """Test that process_upload_task retries on timeout errors."""
-    from cosmonaut_app.tasks.upload_tasks import process_upload_task
-
     job = CosmonautJob()
     job.save()
     job_id = job.model.job_id
@@ -95,8 +102,6 @@ def test_process_upload_task_retries_on_timeout():
 
 def test_process_upload_task_retries_on_http_429():
     """Test that process_upload_task retries on HTTP 429 (rate limit)."""
-    from cosmonaut_app.tasks.upload_tasks import process_upload_task
-
     job = CosmonautJob()
     job.save()
     job_id = job.model.job_id
@@ -121,8 +126,6 @@ def test_process_upload_task_retries_on_http_429():
 
 def test_process_upload_task_retries_on_http_503():
     """Test that process_upload_task retries on HTTP 503 (service unavailable)."""
-    from cosmonaut_app.tasks.upload_tasks import process_upload_task
-
     job = CosmonautJob()
     job.save()
     job_id = job.model.job_id
@@ -149,14 +152,12 @@ def test_process_upload_task_retries_on_http_503():
 
 def test_process_upload_task_does_not_retry_on_non_transient_http_error():
     """Test that process_upload_task does not retry on non-transient HTTP errors."""
-    from cosmonaut_app.tasks.upload_tasks import process_upload_task
-
     job = CosmonautJob()
+    job.model.membership_upload["street_processing"] = TASK_ID
     job.save()
     job_id = job.model.job_id
 
-    task_mock = mock.MagicMock()
-    task_mock.request.retries = 0
+    task_mock = _task()
 
     with (
         mock.patch(
@@ -180,8 +181,9 @@ def test_process_upload_task_does_not_retry_on_non_transient_http_error():
 
 @pytest.fixture
 def saved_job():
-    """Yield a saved job; remove it afterwards."""
+    """Yield a saved job whose upload the task TASK_ID processes; remove it afterwards."""
     job = CosmonautJob()
+    job.model.membership_upload["street_processing"] = TASK_ID
     job.save()
     yield job
     job_persistence.delete_job(job.job_id)
@@ -200,7 +202,6 @@ def _download_succeeds():
 
 def test_a_finished_download_keeps_what_the_user_changed_meanwhile(saved_job):
     """The task owns the street processing state, not the rest of the row."""
-    from cosmonaut_app.tasks.upload_tasks import process_upload_task
 
     def user_changes_the_email_during_the_download(*_args, **_kwargs):
         other = CosmonautJob(job_id=saved_job.job_id)
@@ -216,7 +217,7 @@ def test_a_finished_download_keeps_what_the_user_changed_meanwhile(saved_job):
             side_effect=user_changes_the_email_during_the_download,
         ),
     ):
-        process_upload_task(mock.MagicMock(), saved_job.job_id, 4326)
+        process_upload_task(_task(), saved_job.job_id, 4326)
 
     row = DataBaseManager.get_job_columns(saved_job.job_id)
     assert row["email"] == "changed.meanwhile@ufz.de"
@@ -225,10 +226,7 @@ def test_a_finished_download_keeps_what_the_user_changed_meanwhile(saved_job):
 
 
 def test_exhausted_retries_end_failed_and_notify_the_maintainer(saved_job):
-    from cosmonaut_app.tasks.upload_tasks import process_upload_task
-
-    task_mock = mock.MagicMock()
-    task_mock.request.retries = 3
+    task_mock = _task(retries=3)
     # Celery's retry re-raises the exception once max_retries is exhausted.
     task_mock.retry.side_effect = requests.exceptions.ConnectionError("down")
 
@@ -250,8 +248,6 @@ def test_exhausted_retries_end_failed_and_notify_the_maintainer(saved_job):
 
 
 def test_a_failing_work_dir_pull_ends_failed_and_notifies_the_maintainer(saved_job):
-    from cosmonaut_app.tasks.upload_tasks import process_upload_task
-
     with (
         mock.patch(
             "cosmonaut_app.tasks.upload_tasks.job_persistence.work_dir",
@@ -260,7 +256,7 @@ def test_a_failing_work_dir_pull_ends_failed_and_notifies_the_maintainer(saved_j
         mock.patch("cosmonaut_app.tasks.upload_tasks.send_mail") as send_mail,
         pytest.raises(ObjectStorageError),
     ):
-        process_upload_task(mock.MagicMock(), saved_job.job_id, 4326)
+        process_upload_task(_task(), saved_job.job_id, 4326)
 
     row = DataBaseManager.get_job_columns(saved_job.job_id)
     assert row["membership_upload"]["street_processing"] == "FAILED"
@@ -270,7 +266,6 @@ def test_a_failing_work_dir_pull_ends_failed_and_notifies_the_maintainer(saved_j
 def test_a_job_deleted_during_the_download_does_not_mask_the_error(saved_job):
     """Persisting FAILED fails (no row left), the maintainer still hears of the
     original error, which is the one that reaches Celery."""
-    from cosmonaut_app.tasks.upload_tasks import process_upload_task
 
     def delete_the_job_then_fail(*_args, **_kwargs):
         job_persistence.delete_job(saved_job.job_id)
@@ -286,6 +281,55 @@ def test_a_job_deleted_during_the_download_does_not_mask_the_error(saved_job):
         mock.patch("cosmonaut_app.tasks.upload_tasks.send_mail") as send_mail,
         pytest.raises(RuntimeError, match="the original error"),
     ):
-        process_upload_task(mock.MagicMock(), saved_job.job_id, 4326)
+        process_upload_task(_task(), saved_job.job_id, 4326)
 
     send_mail.assert_called_once()
+
+
+def _a_newer_upload_replaces_the_task(job_id):
+    """Replace the task id in the row, as a re-upload does."""
+    newer = CosmonautJob(job_id=job_id)
+    newer.model.membership_upload["street_processing"] = "task-of-the-newer-upload"
+    newer.model.membership_upload["download_sha256"] = "newer"
+    newer.update_columns("membership_upload")
+
+
+def test_a_superseded_task_finishing_changes_nothing(saved_job):
+    def newer_upload_during_the_download(*_args, **_kwargs):
+        _a_newer_upload_replaces_the_task(saved_job.job_id)
+
+    transform, sha = _download_succeeds()
+    with (
+        transform,
+        sha,
+        mock.patch(
+            "cosmonaut_app.osm.OsmDownloader.run_osm_query",
+            side_effect=newer_upload_during_the_download,
+        ),
+    ):
+        process_upload_task(_task(), saved_job.job_id, 4326)
+
+    upload = DataBaseManager.get_job_columns(saved_job.job_id)["membership_upload"]
+    assert upload["street_processing"] == "task-of-the-newer-upload"
+    assert upload["download_sha256"] == "newer"
+
+
+def test_a_superseded_task_failing_changes_nothing(saved_job):
+    def newer_upload_then_failure(*_args, **_kwargs):
+        _a_newer_upload_replaces_the_task(saved_job.job_id)
+        raise RuntimeError("the old download failed")
+
+    transform, _sha = _download_succeeds()
+    with (
+        transform,
+        mock.patch(
+            "cosmonaut_app.osm.OsmDownloader.run_osm_query",
+            side_effect=newer_upload_then_failure,
+        ),
+        mock.patch("cosmonaut_app.tasks.upload_tasks.send_mail"),
+        pytest.raises(RuntimeError),
+    ):
+        process_upload_task(_task(), saved_job.job_id, 4326)
+
+    upload = DataBaseManager.get_job_columns(saved_job.job_id)["membership_upload"]
+    assert upload["street_processing"] == "task-of-the-newer-upload"

@@ -23,7 +23,7 @@ import logging
 
 from cosmo_ecosystem.db_manager import Base, DbManager, JobColumns, SessionScope
 from cosmo_ecosystem.error_handling import JobNotFound
-from sqlalchemy import JSON, Column, Integer, String
+from sqlalchemy import JSON, Column, Integer, String, update
 
 log = logging.getLogger(__name__)
 
@@ -84,3 +84,28 @@ class DataBaseManager(DbManager):
             if job_row is None:
                 raise JobNotFound(job_id)
             return job_row.stage
+
+    @classmethod
+    def update_membership_upload_of_task(cls, job_id, task_id, membership_upload):
+        """Write ``membership_upload`` only while ``task_id`` still owns the upload.
+
+        The row names the task processing the upload in
+        ``membership_upload["street_processing"]`` until it ends. One conditional
+        update, so a task that a re-upload has superseded cannot write over the
+        newer upload's state, whatever happens between its read and this write.
+
+        Returns:
+            bool: True if the row was written, False if the task no longer owns
+            the upload (or the job is gone).
+        """
+        with cls.session_scope() as session:
+            result = session.execute(
+                update(JobTable)
+                .where(
+                    JobTable.job_id == job_id,
+                    JobTable.membership_upload["street_processing"].as_string()
+                    == task_id,
+                )
+                .values(membership_upload=membership_upload)
+            )
+            return result.rowcount == 1

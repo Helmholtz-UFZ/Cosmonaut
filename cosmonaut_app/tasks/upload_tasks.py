@@ -18,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from cosmonaut_app.config import MAINTAINER_EMAIL
 from cosmonaut_app.constants.general import OSM_DATA_DOWNLOAD_FILE
 from cosmonaut_app.cosmonaut_job import CosmonautJob, _transform_csv
+from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.email_service import send_mail
 from cosmonaut_app.error_handling import JobNotFound
 from cosmonaut_app.osm import OsmDownloader
@@ -79,9 +80,8 @@ def process_upload_task(self, job_id, epsg_input):
         job = CosmonautJob(job_id=job_id)
         job.model.membership_upload["download_sha256"] = download_sha256
         job.model.membership_upload["street_processing"] = "COMPLETED"
-        job.update_columns("membership_upload")
-
-        log.info(f"Upload processing completed for job {job_id}")
+        if _write_if_owner(job, self.request.id):
+            log.info(f"Upload processing completed for job {job_id}")
 
     except (
         requests.exceptions.ConnectionError,
@@ -105,15 +105,15 @@ def process_upload_task(self, job_id, epsg_input):
             log.error(
                 f"Error processing upload for job {job_id}: {str(e)}", exc_info=True
             )
-            _fail_upload(job_id, e)
+            _fail_upload(job_id, self.request.id, e)
             raise
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # Convention exception (CLAUDE.md: specific exceptions only): whatever
         # the task raises, street_processing must not stay PENDING and the
         # maintainer must hear of it. Re-raised below.
         log.error(f"Error processing upload for job {job_id}: {str(e)}", exc_info=True)
-        _fail_upload(job_id, e)
+        _fail_upload(job_id, self.request.id, e)
         raise
 
 
@@ -130,7 +130,7 @@ def _retry_or_fail(task, job_id, error, reason):
             f"{reason} in upload processing for job {job_id}; "
             f"retries exhausted ({UPLOAD_MAX_RETRIES})."
         )
-        _fail_upload(job_id, error)
+        _fail_upload(job_id, task.request.id, error)
         raise error
     log.warning(
         f"{reason} in upload processing for job {job_id}, "
@@ -140,17 +140,34 @@ def _retry_or_fail(task, job_id, error, reason):
     task.retry(exc=error, countdown=countdown, max_retries=UPLOAD_MAX_RETRIES)
 
 
-def _fail_upload(job_id, error):
+def _write_if_owner(job, task_id):
+    """Write the job's ``membership_upload`` if ``task_id`` still owns the upload.
+
+    A re-upload replaces the task id in the row; the task it superseded then
+    finishes (or fails) without touching the newer upload's state.
+    """
+    written = DataBaseManager.update_membership_upload_of_task(
+        job.job_id, task_id, job.model.membership_upload
+    )
+    if not written:
+        log.warning(
+            f"Upload task {task_id} no longer owns the upload of job {job.job_id}; "
+            "its result is dropped."
+        )
+    return written
+
+
+def _fail_upload(job_id, task_id, error):
     """Persist street_processing=FAILED with a column write, then tell the maintainer.
 
     A failed persist (job deleted meanwhile, database trouble) is logged and
     must not keep the maintainer mail from going out or mask ``error``, the one
-    the caller re-raises.
+    the caller re-raises. A task that no longer owns the upload writes nothing.
     """
     try:
         job = CosmonautJob(job_id=job_id)
         job.model.membership_upload["street_processing"] = "FAILED"
-        job.update_columns("membership_upload")
+        _write_if_owner(job, task_id)
     except (JobNotFound, SQLAlchemyError):
         log.error(
             f"Could not persist FAILED street processing of job {job_id}",
