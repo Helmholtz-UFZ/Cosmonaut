@@ -17,7 +17,7 @@ from cosmo_ecosystem import job_log, job_persistence
 from cosmo_ecosystem.db_manager import DbManager
 from cosmo_ecosystem.job_log import JobLogHandler
 from pydantic import ValidationError
-from sqlalchemy import update
+from sqlalchemy import func, update
 
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
@@ -78,6 +78,16 @@ def _enqueue_returns(celery_task_id, failed):
         "cosmonaut_app.cosmonaut_job.submit_routing_job",
         return_value=(celery_task_id, failed),
     )
+
+
+def _give_the_row_a_heartbeat(job_id):
+    """Set the row's heartbeat, as a job run that claimed it does."""
+    with DbManager.session_scope() as session:
+        session.execute(
+            update(JobTable)
+            .where(JobTable.job_id == job_id)
+            .values(heartbeat_at=func.now())
+        )
 
 
 def _log_to_job_log(job_id, message):
@@ -228,3 +238,63 @@ def test_a_restart_of_a_finished_job_revokes_no_task(
         route_computation.restart_computation(1, job_id)
 
     assert CosmonautJob(job_id=job_id).get_status() == JOB_STATUS_RUNNING
+
+
+def test_a_resubmit_queues_the_run_without_the_last_runs_heartbeat(running_job):
+    """The run claims only a RUNNING row without a heartbeat; an old heartbeat
+    left by the last run would get the new run dropped."""
+    job_id = running_job.job_id
+    _give_the_row_a_heartbeat(job_id)
+    running_job.model.status = JOB_STATUS_FAILED
+    running_job.update_columns("status")
+
+    with _enqueue_returns("task-of-the-resubmit", False):
+        CosmonautJob(job_id=job_id).submit()
+
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["status"] == JOB_STATUS_RUNNING
+    assert row["heartbeat_at"] is None
+
+
+def test_a_reset_leaves_the_job_pending_without_a_heartbeat(running_job):
+    job_id = running_job.job_id
+    _give_the_row_a_heartbeat(job_id)
+
+    CosmonautJob(job_id=job_id).reset()
+
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["status"] == JOB_STATUS_PENDING
+    assert row["heartbeat_at"] is None
+
+
+def test_the_queued_delivery_of_a_cancelled_job_is_dropped_without_a_mail(
+    running_job,
+):
+    job_id = running_job.job_id
+    job = CosmonautJob(job_id=job_id)
+    with _enqueue_returns("task-of-the-cancelled-run", False):
+        job.submit()
+    job.cancel()
+
+    with mock.patch("cosmonaut_app.tasks.routing_tasks.send_mail") as send_mail:
+        process_routing_job(None, job_id)
+
+    send_mail.assert_not_called()
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["status"] == JOB_STATUS_FAILED
+    assert row["notified_end"] is False
+    assert "run cancelled by user" in job_log.read(job_id)
+
+
+def test_saving_a_job_loaded_before_a_heartbeat_keeps_the_runs_heartbeat(
+    running_job,
+):
+    """The heartbeat belongs to the run: a web save of a job loaded earlier
+    must not put an older (here: no) heartbeat back over it (ADR 0004)."""
+    job_id = running_job.job_id
+    loaded_before = CosmonautJob(job_id=job_id)
+    _give_the_row_a_heartbeat(job_id)
+
+    loaded_before.save()
+
+    assert DataBaseManager.get_job_columns(job_id)["heartbeat_at"] is not None

@@ -1,7 +1,9 @@
 """Test the db_manager class."""
 
+from sqlalchemy import inspect
+
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.db_manager import DataBaseManager, JobTable
 from test.help_functions_tests import job_row
 
 TEST_JOB_DATA = job_row("job12345678")
@@ -26,3 +28,19 @@ def test_cosmonaut_job_pydantic_save_load():
 
     # Load it back
     CosmonautJob(job_id=job.model.job_id)
+
+
+def test_the_jobs_table_from_init_sql_has_every_column_the_job_table_maps():
+    """docker/init.sql is the authoritative DDL; the mapping must not outgrow it.
+
+    The framework's ``JobColumns`` adds columns with its releases (e.g.
+    ``heartbeat_at``); a column mapped but missing in the table fails every
+    query on ``jobs``.
+    """
+    with DataBaseManager.session_scope() as session:
+        table_columns = {
+            column["name"] for column in inspect(session.get_bind()).get_columns("jobs")
+        }
+
+    mapped_columns = {column.name for column in JobTable.__table__.columns}
+    assert mapped_columns <= table_columns

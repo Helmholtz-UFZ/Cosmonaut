@@ -32,7 +32,8 @@ def process_routing_job(self, job_id):
 
     Runs the route computation as a job run (the submission mail included),
     then sends the end mail for either outcome, from the job's row as the run
-    left it. A job deleted meanwhile gets no end mail and fails no task
+    left it. A delivery the run drops (its row is not a queued run) does no
+    post-run work. A job deleted meanwhile gets no end mail and fails no task
     (cosmo-ecosystem ADR 0002: a run's outcome lives in the row, not in Celery).
 
     Args:
@@ -40,6 +41,11 @@ def process_routing_job(self, job_id):
     """
     log.info(f"Starting routing job task for job_id={job_id}")
     status = job_run.run(job_id, compute_route, EXCLUDED_LOG_PACKAGES)
+    if status is None:
+        # The run dropped this delivery (redelivery, stale message after a
+        # reset, cancelled job; cosmo-ecosystem ADR 0004): the row belongs to
+        # another run or to none, so no end mail and no notified_end.
+        return
     log.info(f"Routing job {job_id} finished with status {status}")
 
     try:

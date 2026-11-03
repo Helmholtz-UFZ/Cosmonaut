@@ -10,13 +10,15 @@ their status flows back to the UI.
 Web process and worker run the one Celery app the framework assembles
 (`cosmo_ecosystem.celery_app`) from [domain.py](../../../cosmonaut_app/domain.py), the module
 `COSMO_DOMAIN` names. Each of its task specs names the task's queue; routes, the worker's queues
-and the beat schedule all come from the specs. The framework adds its cleanup and test task:
+and the beat schedule all come from the specs. The framework adds its cleanup, the lost-run sweep
+and the test task:
 
 | Queue | Task | Work |
 |-------|------|------|
 | `upload` | [upload_tasks.py](../../../cosmonaut_app/tasks/upload_tasks.py) | `process_upload` — OSM download + projection for the job's area |
 | `routing` | [routing_tasks.py](../../../cosmonaut_app/tasks/routing_tasks.py) | `process_routing` — run sensor-routing, build GPX + QR, notify |
 | `maintenance` | framework `cleanup` | nightly at 03:00 UTC: logs older than 30 days, then jobs past their retention window |
+| `maintenance` | framework `sweep_lost_runs` | on the framework's beat: RUNNING rows whose heartbeat is stale become `FAILED`, with a "Worker lost" line in the job log (schedule and threshold: cosmo-ecosystem ADR 0004) |
 | `test` | framework `long_running_test` | a sleep task for worker/health testing |
 
 The worker runs `celery -A cosmo_ecosystem.celery_app.celery worker --beat` without `--queues`.
@@ -34,8 +36,10 @@ recover the name. They return `(task_id, failed)`; the caller stores `task_id` o
 **re-loads the job by id and calls `job_persistence.work_dir(job_id)`** — it never receives the job object over the wire, only
 the id, and pulls a current copy from object storage (see [cosmonaut-job](../concepts/cosmonaut-job.md)).
 
-The canonical submit path is `CosmonautJob.submit()`: set `status=RUNNING`, `save()` (so the worker
-sees current files + `parameters.json`), enqueue, then store `celery_task_id` with `update_columns`.
+The canonical submit path is `CosmonautJob.submit()`: `save()` (so the worker sees current files +
+`parameters.json`), queue the run with `job_run.mark_queued` (`RUNNING` and `heartbeat_at = NULL` in
+one write, before the enqueue), enqueue, then store `celery_task_id` with `update_columns`. Never
+write `RUNNING` yourself: the run claims only a RUNNING row without a heartbeat.
 An enqueue that reports failure writes `FAILED` and "Cannot start job <id>." to the job log.
 
 ## Status lives in the job row (cosmo-ecosystem ADR 0002)
@@ -43,13 +47,25 @@ An enqueue that reports failure writes `FAILED` and "Cannot start job <id>." to 
 Workers do **not** push status to the web pod, and the web pod does **not** ask Celery for a
 route computation's status. The job row is the only source:
 
-- `process_routing_job` runs the computation through `cosmo_ecosystem.job_run.run`, which writes
-  `RUNNING`, then `COMPLETED` (after uploading the work dir) or `FAILED`, and captures the job log in
-  the database (`cosmo_ecosystem.job_log`), readable from any pod while the run goes on. A failed run
-  ends as a *successful* Celery task; the end mail runs after `run` for both outcomes.
+- `process_routing_job` runs the computation through `cosmo_ecosystem.job_run.run`, which first
+  claims the queued row (gives it its first heartbeat), refreshes `heartbeat_at` while it
+  computes, then writes `COMPLETED` (after uploading the work dir) or `FAILED`, and captures the job
+  log in the database (`cosmo_ecosystem.job_log`), readable from any pod while the run goes on. A
+  failed run ends as a *successful* Celery task; the end mail runs after `run` for both outcomes.
+- A delivery that loses the claim (a redelivery after a pod died, a stale message after a reset until the
+  job is resubmitted, the still-queued message of a cancelled job) is dropped: `run` returns `None`, writes nothing, and the
+  task returns without end mail or `notified_end` (cosmo-ecosystem ADR 0004).
+- A run killed hard (OOM, pod restart, `terminate=True`) stops its heartbeat; the framework sweep
+  ends it as `FAILED` (interval and threshold: `job_run.HEARTBEAT_INTERVAL_SECONDS`,
+  `sweep_tasks.LOST_RUN_THRESHOLD`, cosmo-ecosystem
+  `docs/adr/0004-lost-job-runs-are-swept-not-retried.md`). Nothing is retried; the user resets and
+  resubmits.
 - `CosmonautJob.get_status()` reads the row only; `get_logs()` returns `job_log.read`.
 - `CosmonautJob.cancel()` (cancel button, and `reset()` of a RUNNING job) revokes the task, then writes
   `FAILED` and a "run cancelled by user" record via `job_log.append`: a terminated worker writes nothing.
+  `reset()` returns the row to `PENDING` with no heartbeat through `job_run.mark_pending`.
+- `heartbeat_at` belongs to the run: it is no `JobModel` field, so `save()` of a loaded job never
+  writes an older heartbeat back.
 - `CosmonautJob.get_street_processing_status()` still asks Celery, for the upload task only, reading
   the task ID stored in `membership_upload["street_processing"]` (see the overloaded-field note in
   [cosmonaut-job](../concepts/cosmonaut-job.md)).

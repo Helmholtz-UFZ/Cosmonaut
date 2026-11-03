@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 from celery.schedules import crontab
-from cosmo_ecosystem.celery_app import NAME_CLEANUP_TASK, get_app
+from cosmo_ecosystem.celery_app import NAME_CLEANUP_TASK, NAME_SWEEP_TASK, get_app
 
 from cosmonaut_app.submissions import NAME_ROUTING_TASK, NAME_UPLOAD_TASK
 
@@ -57,11 +57,15 @@ def test_web_process_holds_one_celery_app_with_the_domain_routes():
     assert report["routes"][NAME_UPLOAD_TASK] == {"queue": "upload"}
 
 
-def test_beat_runs_only_the_framework_cleanup_at_three_on_maintenance():
-    """The app's own daily cleanup is gone; the framework's takes its slot."""
+def test_beat_runs_only_the_framework_cleanup_and_sweep_on_maintenance():
+    """The app declares no beat: the framework's cleanup (03:00) and lost-run
+    sweep (every 5 minutes) are all it runs."""
     schedule = get_app().conf.beat_schedule
 
-    assert list(schedule) == [NAME_CLEANUP_TASK]
-    entry = schedule[NAME_CLEANUP_TASK]
-    assert entry["options"]["queue"] == "maintenance"
-    assert entry["schedule"] == crontab(minute=0, hour=3)
+    assert sorted(schedule) == sorted([NAME_CLEANUP_TASK, NAME_SWEEP_TASK])
+    cleanup = schedule[NAME_CLEANUP_TASK]
+    assert cleanup["options"]["queue"] == "maintenance"
+    assert cleanup["schedule"] == crontab(minute=0, hour=3)
+    sweep = schedule[NAME_SWEEP_TASK]
+    assert sweep["options"]["queue"] == "maintenance"
+    assert sweep["schedule"] == crontab(minute="*/5")
