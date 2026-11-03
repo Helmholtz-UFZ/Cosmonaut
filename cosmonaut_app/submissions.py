@@ -42,21 +42,27 @@ def submit_routing_job(job) -> tuple[str | None, bool]:
     return manager().submit_job(NAME_ROUTING_TASK, job.model.job_id)
 
 
-def submit_upload_job(job, epsg_input: int) -> tuple[str | None, bool]:
+def submit_upload_job(job, epsg_input: int, task_id: str) -> tuple[str | None, bool]:
     """Submit an upload post-processing job; the queue comes from its task spec.
 
     Args:
         job: CosmonautJob instance to submit
         epsg_input: EPSG code of the uploaded membership data
+        task_id: The Celery task id to send the task under. The caller pre-generates
+            it and writes it to ``membership_upload["street_processing"]`` first:
+            the task's final write is a compare-and-set on that id, so a task that
+            ends before the caller learns its id would find nothing to match.
 
     Returns:
         tuple: (celery_task_id, failed_boolean)
                celery_task_id is None if submission failed
     """
-    # submit_named_job, not submit_job: submit_job passes the job id as the task's
-    # *only* positional arg, and this task takes a second one. Same retry policy and
-    # the same task-name tracking underneath.
-    return manager().submit_named_job(
+    # submit_job takes the job id as the task's only positional arg; the second
+    # argument goes in as a keyword (passed through to send_task), which keeps the
+    # framework's public seam instead of its private _send_task.
+    return manager().submit_job(
         NAME_UPLOAD_TASK,
-        args=[job.model.job_id, epsg_input],
+        job.model.job_id,
+        task_id=task_id,
+        kwargs={"epsg_input": epsg_input},
     )

@@ -46,7 +46,8 @@ sensor-routing package and displayed in the UI tooltip on the upload button.
 **Road network background task flow:**
 
 After a successful membership upload, a Celery task (process_upload_task) is
-submitted to the ``upload`` queue via submissions.submit_upload_job().
+submitted to the ``upload`` queue via submissions.submit_upload_job(), under a task
+id that is written to the row first (the task's final write is a compare-and-set on it).
 The task streams the road network from Overpass (``cosmonaut_app/osm/``) and
 projects it to the user's EPSG. This runs in a worker to keep the download and
 projection work off the web process.
@@ -63,6 +64,7 @@ state to the database. Polling stops once terminal state is reached.
 """
 
 import logging
+import uuid
 
 import dash
 import dash_bootstrap_components as dbc
@@ -502,6 +504,12 @@ def _no_update_upload():
     }
 
 
+def _end_upload_failed(job):
+    """Write street_processing=FAILED to the job's row (that column only)."""
+    job.model.membership_upload["street_processing"] = "FAILED"
+    job.update_columns("membership_upload")
+
+
 def _handle_membership_upload(contents, filename, job_id, epsg_input):
     """Process membership file upload."""
     if not contents or not filename:
@@ -560,14 +568,25 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
 
     tile_url = get_tile_url(job_id, job.working_dir)
 
-    task_id, failed = submit_upload_job(job, epsg_input)
-    if not failed:
-        job.model.membership_upload["street_processing"] = task_id
-    else:
-        job.model.membership_upload["street_processing"] = "FAILED"
+    # The id goes into the row before the task exists: the task's final write is a
+    # compare-and-set on it, so a task that ends at once must find it there.
+    task_id = str(uuid.uuid4())
+    job.model.membership_upload["street_processing"] = task_id
     # Row only — the membership CSV and raster went to object storage above,
     # and the worker's save() uploads the rest when it finishes
     job.update_columns("membership_upload")
+
+    try:
+        _, failed = submit_upload_job(job, epsg_input, task_id)
+    except Exception:  # noqa: BLE001
+        # Convention exception (CLAUDE.md: specific exceptions only): whatever the
+        # submission raises, the task id written above names a task that never ran
+        # and would read RUNNING forever. Re-raised for the global error handler,
+        # as framework Job.submit does.
+        _end_upload_failed(job)
+        raise
+    if failed:
+        _end_upload_failed(job)
 
     log.debug(f"Membership file uploaded and processed for job {job_id}")
 

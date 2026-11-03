@@ -8,6 +8,7 @@ handle the heavy operations: OSM road network download and CRS projection.
 import logging
 import os
 
+import ijson
 import requests.exceptions
 import urllib3.exceptions
 from celery import Task
@@ -22,6 +23,7 @@ from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.email_service import send_mail
 from cosmonaut_app.error_handling import JobNotFound
 from cosmonaut_app.osm import OsmDownloader
+from cosmonaut_app.osm.source import OverpassRuntimeError
 from cosmonaut_app.street_selector import file_sha256
 
 log = logging.getLogger(__name__)
@@ -87,6 +89,12 @@ def process_upload_task(self, job_id, epsg_input):
         requests.exceptions.ConnectionError,
         requests.exceptions.Timeout,
         urllib3.exceptions.ReadTimeoutError,
+        # The response stream broke off mid-body (the stream is read lazily, so
+        # this surfaces as the urllib3 error or as the parser's incomplete JSON)
+        # or Overpass ended it with an in-band runtime error (partial data).
+        urllib3.exceptions.ProtocolError,
+        ijson.IncompleteJSONError,
+        OverpassRuntimeError,
     ) as e:
         _retry_or_fail(self, job_id, e, f"Transient network error: {e}")
 
