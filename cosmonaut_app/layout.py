@@ -736,8 +736,9 @@ def resolve_reload_url(job_id: str, status: str, stage: int) -> str:
     if status in (JOB_STATUS_RUNNING, JOB_STATUS_FAILED):
         return build_url_step("route_computation", job_id)
     # PENDING: use stage to determine page. A PENDING job's stage is 0–4: stage 5 is
-    # only set on a COMPLETED job, and a reset caps it at 4.
-    return build_url_step(_STAGE_TO_PAGE[stage], job_id)
+    # only set on a COMPLETED job, and a reset caps it at 4. Rows written before
+    # route_download kept to that (PENDING at stage 5) resume at the last page.
+    return build_url_step(_STAGE_TO_PAGE[min(stage, 4)], job_id)
 
 
 def progress_footer(

@@ -43,6 +43,13 @@ def route_computation():
     return importlib.import_module("cosmonaut_app.pages.route_computation")
 
 
+@pytest.fixture(scope="module")
+def route_download():
+    """Return the route download page module (imported like route_computation)."""
+    dash.Dash(__name__, use_pages=True, pages_folder="")
+    return importlib.import_module("cosmonaut_app.pages.route_download")
+
+
 @pytest.fixture
 def running_job():
     """Yield a saved RUNNING job with a Celery task id; remove it afterwards."""
@@ -312,3 +319,31 @@ def test_saving_a_job_loaded_before_a_heartbeat_keeps_the_runs_heartbeat(
     loaded_before.save()
 
     assert DataBaseManager.get_job_columns(job_id)["heartbeat_at"] is not None
+
+
+def test_opening_route_download_of_a_reset_job_does_not_move_it_to_stage_5(
+    running_job, route_download
+):
+    """Stage 5 belongs to a COMPLETED job; a PENDING job at stage 5 has no page
+    in the job management table's link."""
+    job_id = running_job.job_id
+    running_job.reset()
+
+    # The page has no route to show for a reset job; only the stage matters here.
+    with contextlib.suppress(FileNotFoundError):
+        route_download.layout(job_id)
+
+    assert DataBaseManager.get_job_columns(job_id)["stage"] <= 4
+
+
+def test_opening_route_download_of_a_completed_job_marks_stage_5(
+    running_job, route_download
+):
+    job_id = running_job.job_id
+    running_job.model.status = JOB_STATUS_COMPLETED
+    running_job.update_columns("status")
+
+    with contextlib.suppress(FileNotFoundError):
+        route_download.layout(job_id)
+
+    assert DataBaseManager.get_job_columns(job_id)["stage"] == 5
