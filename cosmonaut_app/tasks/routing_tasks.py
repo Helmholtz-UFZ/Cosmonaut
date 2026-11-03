@@ -20,6 +20,7 @@ from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.email_service import send_mail
 from cosmonaut_app.error_handling import JobNotFound
 from cosmonaut_app.street_selector import StreetSelector
@@ -124,9 +125,10 @@ def _notify_user(job, status):
 
     # Only a mail that was sent settles the end mail; a lost one stays due
     # (send_mail logs the failure and never raises).
+    # The flag is set only while the row still holds this run's end: a job
+    # resubmitted meanwhile owes its own mail.
     if send_mail([job.model.email], subject, body):
-        job.model.notified_end = True
         try:
-            job.update_columns("notified_end")
+            DataBaseManager.mark_end_notified(job_id)
         except JobNotFound:
             log.info(f"Job {job_id} was deleted after its end mail; nothing to flag.")

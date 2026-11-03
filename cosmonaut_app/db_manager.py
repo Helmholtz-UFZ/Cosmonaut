@@ -25,6 +25,8 @@ from cosmo_ecosystem.db_manager import Base, DbManager, JobColumns, SessionScope
 from cosmo_ecosystem.error_handling import JobNotFound
 from sqlalchemy import JSON, Column, Integer, String, update
 
+from cosmonaut_app.constants.general import JOB_STATUS_COMPLETED, JOB_STATUS_FAILED
+
 log = logging.getLogger(__name__)
 
 
@@ -85,6 +87,34 @@ class DataBaseManager(DbManager):
             if job_row is None:
                 raise JobNotFound(job_id)
             return job_row.stage
+
+    @classmethod
+    def mark_end_notified(cls, job_id):
+        """Set ``notified_end`` only while the row holds a finished run.
+
+        One conditional update (COMPLETED or FAILED): the end mail belongs to
+        the run that sent it. A job resubmitted meanwhile is RUNNING again and
+        owes its own mail, so the flag must not be set over it.
+
+        Returns:
+            bool: True if the flag was set, False if the job is not finished.
+
+        Raises:
+            JobNotFound: If the job has no row.
+        """
+        with cls.session_scope() as session:
+            result = session.execute(
+                update(JobTable)
+                .where(
+                    JobTable.job_id == job_id,
+                    JobTable.status.in_((JOB_STATUS_COMPLETED, JOB_STATUS_FAILED)),
+                )
+                .values(notified_end=True)
+            )
+            applied = result.rowcount == 1
+        if not applied and not cls.check_existence(job_id):
+            raise JobNotFound(job_id)
+        return applied
 
     @classmethod
     def update_membership_upload_of_task(cls, job_id, task_id, membership_upload):

@@ -66,3 +66,33 @@ def test_a_failed_end_mail_leaves_notified_end_unset_so_it_is_retried(running_jo
         process_routing_job(None, job_id)
 
     assert DataBaseManager.get_job_columns(job_id)["notified_end"] is False
+
+
+def test_a_resubmit_before_the_end_mail_is_flagged_keeps_the_next_runs_mail_due(
+    running_job,
+):
+    """The mail of run 1 is out; the user resubmits before notified_end is
+    written. The flag must not be set over the new run."""
+    job_id = running_job.job_id
+
+    def mail_goes_out_and_the_user_restarts(_to, subject, _body):
+        if "submitted" in subject:
+            return True
+        with mock.patch(
+            "cosmonaut_app.cosmonaut_job.submit_routing_job",
+            return_value=("task-of-the-restart", False),
+        ):
+            restarted = CosmonautJob(job_id=job_id)
+            restarted.reset()
+            restarted.submit()
+        return True
+
+    with mock.patch(
+        "cosmonaut_app.tasks.routing_tasks.send_mail",
+        side_effect=mail_goes_out_and_the_user_restarts,
+    ):
+        process_routing_job(None, job_id)
+
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["status"] == JOB_STATUS_RUNNING
+    assert row["notified_end"] is False
