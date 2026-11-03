@@ -254,12 +254,10 @@ class CosmonautJob(BaseJob):
         self.dump_routing_params()
         job_persistence.save(self.model.job_id, self._row())
 
-    def update_columns(self, *fields: str):
-        """Write the named model fields to the job's row. No storage access.
+    def _columns(self, fields) -> dict:
+        """Return the named model fields as job table columns.
 
-        Args:
-            *fields: ``JobModel`` field names. Config fields land in the one
-                ``config`` column, which is written whole.
+        Config fields land in the one ``config`` column, which is whole.
         """
         row = self._row()
         config_field_names = set(FullPipelineConfig.model_fields.keys())
@@ -267,8 +265,33 @@ class CosmonautJob(BaseJob):
         for field_name in fields:
             column = "config" if field_name in config_field_names else field_name
             columns[column] = row[column]
+        return columns
+
+    def update_columns(self, *fields: str):
+        """Write the named model fields to the job's row. No storage access.
+
+        Args:
+            *fields: ``JobModel`` field names. Config fields land in the one
+                ``config`` column, which is written whole.
+        """
+        columns = self._columns(fields)
         log.info(f"Update columns {sorted(columns)} of job {self.model.job_id}")
         job_persistence.update_columns(self.model.job_id, columns)
+
+    def update_input(self, *fields: str) -> bool:
+        """Write the named input fields to the job's row, only while it is PENDING.
+
+        As ``update_columns`` (row only, config whole), but one conditional
+        update ``WHERE status = 'PENDING'`` (cosmo-ecosystem ADR 0005): a page
+        that loaded the job earlier cannot change the input of a job that
+        started, finished or was reset meanwhile.
+
+        Returns:
+            Whether the row was PENDING and the fields were written.
+        """
+        columns = self._columns(fields)
+        log.info(f"Update input {sorted(columns)} of job {self.model.job_id}")
+        return job_persistence.update_input(self.model.job_id, columns)
 
     def dump_routing_params(self):
         """

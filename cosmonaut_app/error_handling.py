@@ -45,6 +45,21 @@ class WrongCeleryTaskId(Exception):
         super().__init__(f"Invalid Celery task ID format: '{task_id}'")
 
 
+class JobNotPending(Exception):
+    """Signals that a job's input was edited after its run had started.
+
+    Raised when the conditional input write (``CosmonautJob.update_input``)
+    did not apply: the page's PENDING guard passed on an older view of the job,
+    and the row is queued, running or finished by now (cosmo-ecosystem
+    ADR 0005). The write did not happen; the modal says why.
+    """
+
+    def __init__(self, job_id):
+        """Add job_id as attribute and format error message."""
+        self.job_id = job_id
+        super().__init__(f"The input of job {job_id} is locked: it is not PENDING.")
+
+
 class FileValidationError(Exception):
     """Signals that a user-uploaded input file failed validation.
 
@@ -76,6 +91,11 @@ ERROR_RESPONSES = {
     WrongCeleryTaskId: (
         "Invalid Task ID",
         "The task ID '{task_id}' is not a valid Celery task ID format. Task IDs must be UUIDs.",  # noqa
+    ),
+    JobNotPending: (
+        "Job Input Locked",
+        "The input of this job can no longer be changed because its run has "
+        "started. Reset the job first.",
     ),
     FileValidationError: (
         "File Validation Error",

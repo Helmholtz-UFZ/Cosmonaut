@@ -68,6 +68,7 @@ from cosmonaut_app.constants.html_ids import (
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
+from cosmonaut_app.error_handling import JobNotPending
 from cosmonaut_app.layout import (
     build_url_step,
     create_card_input,
@@ -285,7 +286,8 @@ def update_routing_params(**inputs):
                 changed_fields.append(key)
         job.model.stage = max(job.model.stage, 3)
         # Row only — submit() uploads the files before the worker starts
-        job.update_columns("stage", *changed_fields)
+        if not job.update_input("stage", *changed_fields):
+            raise JobNotPending(job_id)
         return {
             **output_dict,
             "url": build_url_step("route_computation", job_id),

@@ -16,6 +16,7 @@ from cosmo_ecosystem.object_storage_manager import ObjectStorageError as Framewo
 from cosmonaut_app.error_handling import (
     ERROR_RESPONSES,
     FileValidationError,
+    JobNotPending,
     ObjectStorageError,
     WrongCeleryTaskId,
     handle_error_with_notification,
@@ -80,7 +81,7 @@ def test_file_validation_error_stays_local_and_carries_its_message():
 
 def test_domain_exceptions_have_response_entries():
     """The app's own exceptions carry a response entry the modal can use."""
-    for exc in (WrongCeleryTaskId, FileValidationError):
+    for exc in (WrongCeleryTaskId, FileValidationError, JobNotPending):
         assert exc in ERROR_RESPONSES, f"{exc.__name__} has no response entry"
     assert ObjectStorageError in error_responds_dict
 
