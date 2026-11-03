@@ -17,6 +17,7 @@ import pytest
 from cosmo_ecosystem import job_log, job_persistence
 from cosmo_ecosystem.db_manager import DbManager
 from cosmo_ecosystem.job_log import JobLogHandler
+from cosmo_ecosystem.job_run import CANCELLED_MESSAGE
 from cosmo_ecosystem.object_storage_manager import ObjectStorageError
 from pydantic import ValidationError
 from sqlalchemy import func, update
@@ -147,13 +148,13 @@ def test_a_cancel_shows_failed_on_the_next_poll_with_the_cancel_in_the_job_log(
         shown = route_computation.update_status(1, "status_check", job_id)
 
     assert shown["badge_text"] == JOB_STATUS_FAILED
-    assert "run cancelled by user" in shown["log_content"]
+    assert CANCELLED_MESSAGE in shown["log_content"]
 
 
 def test_a_reset_of_a_running_job_leaves_an_empty_job_log(running_job):
     _log_to_job_log(running_job.job_id, "a line of the previous run")
 
-    running_job.reset()
+    CosmonautJob(job_id=running_job.job_id).reset()
 
     job = CosmonautJob(job_id=running_job.job_id)
     assert job.get_status() == JOB_STATUS_PENDING
@@ -276,7 +277,9 @@ def test_a_resubmit_of_a_notified_job_lets_the_next_end_mail_through(running_job
     set_run_columns(job_id, status=JOB_STATUS_COMPLETED)
 
     with _enqueue_returns("task-of-the-restart", False):
-        CosmonautJob(job_id=job_id).submit()
+        job = CosmonautJob(job_id=job_id)
+        job.reset()
+        job.submit()
 
     assert DataBaseManager.get_job_columns(job_id)["notified_end"] is False
 
@@ -318,7 +321,7 @@ def test_the_queued_delivery_of_a_cancelled_job_is_dropped_without_a_mail(
     row = DataBaseManager.get_job_columns(job_id)
     assert row["status"] == JOB_STATUS_FAILED
     assert row["notified_end"] is False
-    assert "run cancelled by user" in job_log.read(job_id)
+    assert CANCELLED_MESSAGE in job_log.read(job_id)
 
 
 def test_saving_a_job_loaded_before_a_heartbeat_keeps_the_runs_heartbeat(
@@ -435,3 +438,49 @@ def test_a_failed_enqueue_does_not_fail_a_run_a_worker_already_claimed(running_j
         CosmonautJob(job_id=job_id).submit()
 
     assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_RUNNING
+
+
+def test_a_cancel_of_a_running_job_revokes_its_task_and_ends_it_failed(running_job):
+    job_id = running_job.job_id
+
+    with mock.patch(
+        "cosmo_ecosystem.background_job_manager.background_job_manager.revoke_job"
+    ) as revoke:
+        cancelled = CosmonautJob(job_id=job_id).cancel()
+
+    assert cancelled is True
+    revoke.assert_called_once_with("task-of-a-test", terminate=True)
+    assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_FAILED
+
+
+def test_a_cancel_of_a_job_that_just_completed_keeps_it_completed(running_job):
+    """The run wrote COMPLETED a moment before the click reached the row."""
+    job_id = running_job.job_id
+    stale_view = CosmonautJob(job_id=job_id)
+    set_run_columns(job_id, status=JOB_STATUS_COMPLETED)
+
+    with mock.patch(
+        "cosmo_ecosystem.background_job_manager.background_job_manager.revoke_job"
+    ):
+        cancelled = stale_view.cancel()
+
+    assert cancelled is False
+    assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_COMPLETED
+    assert CANCELLED_MESSAGE not in job_log.read(job_id)
+
+
+def test_a_reset_of_a_job_whose_run_was_queued_meanwhile_is_refused_and_changes_nothing(
+    running_job,
+):
+    """The job object saw a finished job; another tab queued a run since."""
+    job_id = running_job.job_id
+    set_run_columns(job_id, status=JOB_STATUS_FAILED)
+    stale_view = CosmonautJob(job_id=job_id)
+    set_run_columns(job_id, status=JOB_STATUS_RUNNING)
+    _log_to_job_log(job_id, "a line of the live run")
+
+    reset = stale_view.reset()
+
+    assert reset is False
+    assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_RUNNING
+    assert "a line of the live run" in job_log.read(job_id)

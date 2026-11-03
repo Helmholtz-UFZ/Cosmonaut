@@ -677,19 +677,23 @@ class CosmonautJob(BaseJob):
         """
         return self.model.status
 
-    def cancel(self):
-        """Cancel the job's run: revoke its task, then record FAILED.
+    def cancel(self) -> bool:
+        """Cancel the job's run: revoke its task, then end the row FAILED.
 
-        A terminated worker writes nothing, so the canceller writes FAILED to
-        the row and a record to the job log (cosmo-ecosystem ADR 0002). A run
-        that wrote COMPLETED just before the kill is overwritten, accepted.
+        A terminated worker writes nothing, so the canceller does: the task is
+        revoked first, then ``job_run.mark_cancelled`` writes FAILED and the
+        job log line, only while the row is RUNNING (cosmo-ecosystem ADR 0005).
+        A run that wrote COMPLETED a moment earlier keeps it.
+
+        Returns:
+            Whether a run was cancelled; False means the job was not RUNNING.
         """
         manager().revoke_job(self.model.celery_task_id, terminate=True)
-        message = f"Job {self.model.job_id}: run cancelled by user."
-        log.info(message)
-        job_log.append(self.model.job_id, message)
-        self.model.status = JOB_STATUS_FAILED
-        self.update_columns("status")
+        cancelled = job_run.mark_cancelled(self.model.job_id)
+        if cancelled:
+            log.info(f"Job {self.model.job_id}: run cancelled by user.")
+            self.model.status = JOB_STATUS_FAILED
+        return cancelled
 
     def time_to_live(self) -> int:
         """Return number of days until this job is deleted by cleanup.
@@ -732,25 +736,36 @@ class CosmonautJob(BaseJob):
         """
         return job_log.read(self.model.job_id)
 
-    def reset(self):
+    def reset(self) -> bool:
         """Reset job to PENDING state by clearing output files and task state.
 
         This method:
         - Cancels the run if job is currently RUNNING
+        - Sets the row PENDING (``job_run.mark_pending``), before anything is
+          deleted: a job that is still RUNNING after the cancel (a run queued
+          by another tab meanwhile) is refused and left alone
         - Deletes output files (solutions, GPX, QR codes) everywhere
         - Clears the job log
         - Preserves input files (uploaded data, parameters, OSM data, plots)
-        - Sets status to PENDING
         - Clears celery_task_id and the run's heartbeat
         - Keeps the submitted flag: it picks the retention, and an unsubmitted
           job is deleted 2 days after its start date, reset or not
-        - Updates the database row
+
+        Returns:
+            Whether the job was reset; False means it is RUNNING.
         """
         log.info(f"Resetting job {self.model.job_id}")
 
         if self.model.status == JOB_STATUS_RUNNING and self.model.celery_task_id:
             log.info(f"Cancelling running task {self.model.celery_task_id}")
             self.cancel()
+
+        # PENDING and no heartbeat in one write: the last run's heartbeat
+        # would keep the next run from claiming the row (ADR 0004).
+        if not job_run.mark_pending(self.model.job_id):
+            log.debug(f"Job {self.model.job_id} runs and is not reset.")
+            return False
+        self.model.status = JOB_STATUS_PENDING
 
         # Delete known output files
         job_persistence.delete_files(
@@ -759,13 +774,10 @@ class CosmonautJob(BaseJob):
         job_log.clear(self.model.job_id)
 
         # Reset job state
-        self.model.status = JOB_STATUS_PENDING
         self.model.celery_task_id = None
         self.model.stage = min(self.model.stage, 4)
 
         self.update_columns("celery_task_id", "stage")
-        # PENDING and no heartbeat in one write: the last run's heartbeat
-        # would keep the next run from claiming the row (ADR 0004).
-        job_run.mark_pending(self.model.job_id)
 
         log.info(f"Job {self.model.job_id} reset to PENDING")
+        return True
