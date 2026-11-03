@@ -43,6 +43,13 @@ def route_computation():
     return importlib.import_module("cosmonaut_app.pages.route_computation")
 
 
+@pytest.fixture(scope="module")
+def route_download():
+    """Return the route download page module (imported like route_computation)."""
+    dash.Dash(__name__, use_pages=True, pages_folder="")
+    return importlib.import_module("cosmonaut_app.pages.route_download")
+
+
 @pytest.fixture
 def running_job():
     """Yield a saved RUNNING job with a Celery task id; remove it afterwards."""
@@ -256,6 +263,30 @@ def test_a_resubmit_queues_the_run_without_the_last_runs_heartbeat(running_job):
     assert row["heartbeat_at"] is None
 
 
+def test_a_resubmit_of_a_notified_job_lets_the_next_end_mail_through(running_job):
+    """notified_end belongs to the run: the end mail of the first run must not
+    silence the end mail of a restart."""
+    job_id = running_job.job_id
+    running_job.model.status = JOB_STATUS_COMPLETED
+    running_job.model.notified_end = True
+    running_job.update_columns("status", "notified_end")
+
+    with _enqueue_returns("task-of-the-restart", False):
+        CosmonautJob(job_id=job_id).submit()
+
+    assert DataBaseManager.get_job_columns(job_id)["notified_end"] is False
+
+
+def test_a_reset_keeps_the_job_submitted_so_cleanup_keeps_its_retention(running_job):
+    """Unsubmitted jobs are deleted 2 days after start_date: a reset must not
+    put an old job back under that rule."""
+    job_id = running_job.job_id
+
+    CosmonautJob(job_id=job_id).reset()
+
+    assert DataBaseManager.get_job_columns(job_id)["submitted"] is True
+
+
 def test_a_reset_leaves_the_job_pending_without_a_heartbeat(running_job):
     job_id = running_job.job_id
     _give_the_row_a_heartbeat(job_id)
@@ -298,3 +329,31 @@ def test_saving_a_job_loaded_before_a_heartbeat_keeps_the_runs_heartbeat(
     loaded_before.save()
 
     assert DataBaseManager.get_job_columns(job_id)["heartbeat_at"] is not None
+
+
+def test_opening_route_download_of_a_reset_job_does_not_move_it_to_stage_5(
+    running_job, route_download
+):
+    """Stage 5 belongs to a COMPLETED job; a PENDING job at stage 5 has no page
+    in the job management table's link."""
+    job_id = running_job.job_id
+    running_job.reset()
+
+    # The page has no route to show for a reset job; only the stage matters here.
+    with contextlib.suppress(FileNotFoundError):
+        route_download.layout(job_id)
+
+    assert DataBaseManager.get_job_columns(job_id)["stage"] <= 4
+
+
+def test_opening_route_download_of_a_completed_job_marks_stage_5(
+    running_job, route_download
+):
+    job_id = running_job.job_id
+    running_job.model.status = JOB_STATUS_COMPLETED
+    running_job.update_columns("status")
+
+    with contextlib.suppress(FileNotFoundError):
+        route_download.layout(job_id)
+
+    assert DataBaseManager.get_job_columns(job_id)["stage"] == 5

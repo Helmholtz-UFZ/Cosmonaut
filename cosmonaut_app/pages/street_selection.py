@@ -155,6 +155,20 @@ def _extract_job_id(pathname: str) -> str | None:
     return None
 
 
+def _load_editable_job(job_id: str) -> CosmonautJob:
+    """Load the job for an edit callback; raise PreventUpdate unless it is PENDING.
+
+    Only a PENDING job's street edits may change: they are the input of a run
+    that has been (or is being) started. The checklists are soft-disabled via CSS
+    (pe-none) for other jobs, and keyboard toggling or a stale tab still fires
+    the callbacks, so every edit callback guards here.
+    """
+    job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
+        raise PreventUpdate
+    return job
+
+
 def _build_keep_largest_hint(keep_largest: bool) -> list:
     """Build the connectivity hint content based on keep_largest state."""
     if keep_largest:
@@ -657,9 +671,7 @@ def remove_selected(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
-    if job.get_status() != JOB_STATUS_PENDING:
-        raise PreventUpdate
+    job = _load_editable_job(job_id)
 
     clicked = (hideout or {})["selected"]
     if not clicked:
@@ -696,9 +708,7 @@ def keep_largest_subnetwork(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
-    if job.get_status() != JOB_STATUS_PENDING:
-        raise PreventUpdate
+    job = _load_editable_job(job_id)
 
     sel = StreetSelector(job)
     if not sel.keep_largest():
@@ -752,11 +762,11 @@ def reset_edits(
     if not n or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
+    job = _load_editable_job(job_id)
+
     sel = StreetSelector(job)
     sel.reset()
-    is_active = job.get_status() == JOB_STATUS_PENDING
-    panel = _build_removed_roads_panel([], is_active)
+    panel = _build_removed_roads_panel([], True)
     hint = html.Small(
         _build_keep_largest_hint(False),
         className="text-warning",
@@ -860,11 +870,7 @@ def update_tags_dropdown(
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
-    if job.get_status() != JOB_STATUS_PENDING:
-        # The checklist is only soft-disabled via CSS (pe-none) for non-active
-        # jobs — keyboard toggling still fires this callback, so guard here.
-        raise PreventUpdate
+    job = _load_editable_job(job_id)
 
     log.info(f"Job {job_id} road tags updated: {tags}")
     sel = StreetSelector(job)
@@ -896,10 +902,7 @@ def update_track_grades(
     if not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
-    if job.get_status() != JOB_STATUS_PENDING:
-        # Same CSS-only soft-disable as the road-type checklist — guard here.
-        raise PreventUpdate
+    job = _load_editable_job(job_id)
 
     log.info(f"Job {job_id} track grades updated: {grades}")
     sel = StreetSelector(job)
@@ -941,14 +944,14 @@ def restore_single_road(n_clicks_list, pathname, version):
     if not any(n_clicks_list) or not job_id:
         raise PreventUpdate
 
+    job = _load_editable_job(job_id)
+
     road_id = ctx.triggered_id["index"]
-    job = CosmonautJob(job_id=job_id)
     sel = StreetSelector(job)
     sel.restore_road(road_id)
 
     removed_info = sel.get_removed_roads_info()
-    is_active = job.get_status() == JOB_STATUS_PENDING
-    panel = _build_removed_roads_panel(removed_info, is_active)
+    panel = _build_removed_roads_panel(removed_info, True)
     hint = html.Small(
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",
@@ -974,12 +977,12 @@ def clear_all_removed_roads(n_clicks, pathname, version):
     if not n_clicks or not job_id:
         raise PreventUpdate
 
-    job = CosmonautJob(job_id=job_id)
+    job = _load_editable_job(job_id)
+
     sel = StreetSelector(job)
     sel.clear_removed_roads()
 
-    is_active = job.get_status() == JOB_STATUS_PENDING
-    panel = _build_removed_roads_panel([], is_active)
+    panel = _build_removed_roads_panel([], True)
     hint = html.Small(
         _build_keep_largest_hint(sel.keep_largest_applied),
         className="text-success" if sel.keep_largest_applied else "text-warning",

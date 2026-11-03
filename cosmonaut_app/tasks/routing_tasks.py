@@ -96,10 +96,8 @@ def _notify_submission(job):
         f"Check progress: {job_url}"
     )
 
-    try:
-        send_mail([job.model.email], subject, body)
-    except Exception:  # noqa - must not let email failure crash submission path
-        log.error(f"Failed to send submission email for job {job_id}", exc_info=True)
+    # send_mail never raises; a lost submission mail is logged there.
+    send_mail([job.model.email], subject, body)
 
 
 def _notify_user(job, status):
@@ -124,9 +122,11 @@ def _notify_user(job, status):
         subject = f"COSMONAUT Job {job_id} failed"
         body = f"Your routing job {job_id} has failed. Please check the application for details."
 
-    try:
-        send_mail([job.model.email], subject, body)
+    # Only a mail that was sent settles the end mail; a lost one stays due
+    # (send_mail logs the failure and never raises).
+    if send_mail([job.model.email], subject, body):
         job.model.notified_end = True
-        job.update_columns("notified_end")
-    except Exception:  # noqa - must not let email failure crash notification path
-        log.error(f"Failed to send notification email for job {job_id}", exc_info=True)
+        try:
+            job.update_columns("notified_end")
+        except JobNotFound:
+            log.info(f"Job {job_id} was deleted after its end mail; nothing to flag.")

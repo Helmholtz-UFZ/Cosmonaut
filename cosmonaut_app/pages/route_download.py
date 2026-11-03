@@ -70,6 +70,7 @@ from dash import Input, Output, State, callback, dcc, html, register_page
 from dash.exceptions import PreventUpdate
 
 from cosmonaut_app.config import get_download_url
+from cosmonaut_app.constants.general import JOB_STATUS_COMPLETED
 from cosmonaut_app.constants.html_ids import (
     DOWNLOAD_URL_CODE_ROUTE_DOWNLOAD_ID,
     JOB_ID_STORE_SHARED_ID,
@@ -101,8 +102,11 @@ register_page(
 def layout(job_id):
     job = CosmonautJob(job_id=job_id)
     log.info(f"Route & Download layout called with job_id={job_id}")
-    job.model.stage = max(job.model.stage, 5)
-    job.update_columns("stage")
+    # Stage 5 marks a finished job; a PENDING job at stage 5 (a reset job opened
+    # by Back or a bookmark) has no page in resolve_reload_url.
+    if job.get_status() == JOB_STATUS_COMPLETED:
+        job.model.stage = max(job.model.stage, 5)
+        job.update_columns("stage")
 
     job_persistence.work_dir(job.job_id)
     job.create_qr_code_routing()

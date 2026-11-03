@@ -98,6 +98,8 @@ Service requirements vary by test:
 | `test_one_celery_app.py` | Postgres, object storage (imports `app.py`) |
 | `test_job_deletion.py` | Postgres, object storage |
 | `test_job_run_lifecycle.py` | Postgres, object storage, Redis (cancel and reset revoke) |
+| `test_end_mail.py` | Postgres, object storage |
+| `test_street_selection_guard.py` | Postgres, object storage |
 | `test_worker_management.py` | Redis, Celery worker |
 | `test_env.py` | None (reads env files only) |
 | `test_html_id_enforcement.py` | None (checks source code only) |

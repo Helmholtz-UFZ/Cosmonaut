@@ -606,6 +606,10 @@ class CosmonautJob(BaseJob):
         # claims (ADR 0004). A fast worker may finish before the enqueue
         # returns, and a RUNNING written after it would overwrite its status
         # (ADR 0002).
+        # A new run owes its own end mail: the last run's notified_end must not
+        # silence it. A column write, not the save above: it is the run's state.
+        self.model.notified_end = False
+        self.update_columns("notified_end")
         job_run.mark_queued(self.model.job_id)
         self.model.status = JOB_STATUS_RUNNING
 
@@ -721,7 +725,9 @@ class CosmonautJob(BaseJob):
         - Clears the job log
         - Preserves input files (uploaded data, parameters, OSM data, plots)
         - Sets status to PENDING
-        - Clears celery_task_id, submitted flag and the run's heartbeat
+        - Clears celery_task_id and the run's heartbeat
+        - Keeps the submitted flag: it picks the retention, and an unsubmitted
+          job is deleted 2 days after its start date, reset or not
         - Updates the database row
         """
         log.info(f"Resetting job {self.model.job_id}")
@@ -739,10 +745,9 @@ class CosmonautJob(BaseJob):
         # Reset job state
         self.model.status = JOB_STATUS_PENDING
         self.model.celery_task_id = None
-        self.model.submitted = False
         self.model.stage = min(self.model.stage, 4)
 
-        self.update_columns("celery_task_id", "submitted", "stage")
+        self.update_columns("celery_task_id", "stage")
         # PENDING and no heartbeat in one write: the last run's heartbeat
         # would keep the next run from claiming the row (ADR 0004).
         job_run.mark_pending(self.model.job_id)

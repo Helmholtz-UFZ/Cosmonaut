@@ -35,6 +35,8 @@ def test_job_management_page_is_registered_under_job_management(dash_app):
         ("PENDING", 2, "/job/abc123/street-selection"),
         ("PENDING", 3, "/job/abc123/routing-params"),
         ("PENDING", 4, "/job/abc123/route-computation"),
+        # Rows written before stage 5 was kept to COMPLETED jobs.
+        ("PENDING", 5, "/job/abc123/route-computation"),
     ],
 )
 def test_job_link_resumes_where_the_job_stands(dash_app, status, stage, expected):
