@@ -532,15 +532,23 @@ class CosmonautJob(BaseJob):
         celery_info = manager().get_job_status(sp)
         celery_status = celery_info["status"]
         if celery_status == "SUCCESS":
-            self.model.membership_upload["street_processing"] = "COMPLETED"
-            self.model.stage = max(self.model.stage, 2)
-            self.update_columns("membership_upload", "stage")
+            self._end_street_processing(sp, "COMPLETED")
+            self.raise_stage(2)
             return "COMPLETED"
         elif celery_status in ("FAILURE", "REVOKED"):
-            self.model.membership_upload["street_processing"] = "FAILED"
-            self.update_columns("membership_upload")
+            self._end_street_processing(sp, "FAILED")
             return "FAILED"
         return "RUNNING"
+
+    def _end_street_processing(self, task_id, state):
+        """Record the upload task's end in the row: that one key, if it still owns it.
+
+        A compare-and-set on the task id, like the task's own final write: a
+        poll holding an older copy of the row neither writes the rest of the
+        column back nor ends a newer upload's task.
+        """
+        self.model.membership_upload["street_processing"] = state
+        DataBaseManager.set_street_processing_of_task(self.model.job_id, task_id, state)
 
     def delete_membership(self):
         """Delete membership, predictor, OSM files, plots everywhere; reset state.
@@ -810,10 +818,10 @@ class CosmonautJob(BaseJob):
         """Reset job to PENDING state by clearing output files and task state.
 
         This method:
-        - Cancels the run if job is currently RUNNING
         - Sets the row PENDING (``job_run.mark_pending``), before anything is
-          deleted: a job that is still RUNNING after the cancel (a run queued
-          by another tab meanwhile) is refused and left alone
+          deleted. A RUNNING job is refused and left alone, its run included: a
+          reset never cancels (Cancel is its own click), so a stale tab cannot
+          kill a run
         - Deletes output files (solutions, GPX, QR codes) everywhere
         - Clears the job log
         - Preserves input files (uploaded data, parameters, OSM data, plots)
@@ -825,10 +833,6 @@ class CosmonautJob(BaseJob):
             Whether the job was reset; False means it is RUNNING.
         """
         log.info(f"Resetting job {self.model.job_id}")
-
-        if self.model.status == JOB_STATUS_RUNNING and self.model.celery_task_id:
-            log.info(f"Cancelling running task {self.model.celery_task_id}")
-            self.cancel()
 
         # PENDING and no heartbeat in one write: the last run's heartbeat
         # would keep the next run from claiming the row (ADR 0004).

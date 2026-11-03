@@ -64,7 +64,7 @@ route computation's status. The job row is the only source:
   `docs/adr/0004-lost-job-runs-are-swept-not-retried.md`). Nothing is retried; the user resets and
   resubmits.
 - `CosmonautJob.get_status()` reads the row only; `get_logs()` returns `job_log.read`.
-- `CosmonautJob.cancel()` (cancel button, and `reset()` of a RUNNING job) revokes the task, then calls
+- `CosmonautJob.cancel()` (cancel button only; a reset or restart never cancels) revokes the task, then calls
   `job_run.mark_cancelled`: `FAILED` and a cancelled line in the job log, only while the row is RUNNING
   (a COMPLETED that landed first is kept). A terminated worker writes nothing.
   `reset()` goes through `job_run.mark_pending` before it deletes anything and returns False when the

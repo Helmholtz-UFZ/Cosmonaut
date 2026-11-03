@@ -23,7 +23,8 @@ import logging
 
 from cosmo_ecosystem.db_manager import Base, DbManager, JobColumns, SessionScope
 from cosmo_ecosystem.error_handling import JobNotFound
-from sqlalchemy import JSON, Column, Integer, String, func, update
+from sqlalchemy import JSON, Column, Integer, String, cast, func, update
+from sqlalchemy.dialects.postgresql import JSONB
 
 from cosmonaut_app.constants.general import JOB_STATUS_COMPLETED, JOB_STATUS_FAILED
 
@@ -87,6 +88,36 @@ class DataBaseManager(DbManager):
             if job_row is None:
                 raise JobNotFound(job_id)
             return job_row.stage
+
+    @classmethod
+    def set_street_processing_of_task(cls, job_id, task_id, state):
+        """Set ``membership_upload["street_processing"]`` only while ``task_id`` owns it.
+
+        As ``update_membership_upload_of_task``, but only the one key changes
+        (``jsonb_set``): a status poll holding an older copy of the column
+        cannot write its other keys back over a newer upload.
+
+        Returns:
+            bool: True if the key was set, False if the task no longer owns the
+            upload (or the job is gone).
+        """
+        with cls.session_scope() as session:
+            result = session.execute(
+                update(JobTable)
+                .where(
+                    JobTable.job_id == job_id,
+                    JobTable.membership_upload["street_processing"].as_string()
+                    == task_id,
+                )
+                .values(
+                    membership_upload=func.jsonb_set(
+                        cast(JobTable.membership_upload, JSONB),
+                        "{street_processing}",
+                        func.to_jsonb(cast(state, String)),
+                    )
+                )
+            )
+            return result.rowcount == 1
 
     @classmethod
     def raise_stage(cls, job_id, stage):

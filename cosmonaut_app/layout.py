@@ -231,7 +231,7 @@ def create_reset_banner(job_id: str, status: str) -> dbc.Alert:
 
     # Status message
     message_map = {
-        JOB_STATUS_RUNNING: "This job is currently running. Reset to cancel and restart.",
+        JOB_STATUS_RUNNING: "This job is currently running. Cancel it first to reset.",
         JOB_STATUS_COMPLETED: "This job has been completed. Reset to clear results and restart.",
         JOB_STATUS_FAILED: "This job has failed. Reset to clear results and try again.",
     }
@@ -868,9 +868,8 @@ def reset_job(job_id: str) -> None:
     """Reset the job, or tell the user why not.
 
     Raises:
-        JobRunning: If the row refused the reset because a run is RUNNING and
-            could not be cancelled (a run queued by another tab meanwhile).
-            Nothing was deleted; the global error handler shows the modal.
+        JobRunning: If the job is RUNNING: a reset never cancels a run, Cancel
+            is its own click. Nothing was deleted or cancelled; the global error handler shows the modal.
     """
     if not CosmonautJob(job_id=job_id).reset():
         raise JobRunning(job_id)

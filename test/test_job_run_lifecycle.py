@@ -153,8 +153,9 @@ def test_a_cancel_shows_failed_on_the_next_poll_with_the_cancel_in_the_job_log(
     assert CANCELLED_MESSAGE in shown["log_content"]
 
 
-def test_a_reset_of_a_running_job_leaves_an_empty_job_log(running_job):
+def test_a_reset_of_a_cancelled_job_leaves_an_empty_job_log(running_job):
     _log_to_job_log(running_job.job_id, "a line of the previous run")
+    set_run_columns(running_job.job_id, status=JOB_STATUS_FAILED)
 
     CosmonautJob(job_id=running_job.job_id).reset()
 
@@ -299,6 +300,7 @@ def test_a_reset_keeps_the_job_submitted_so_cleanup_keeps_its_retention(running_
 def test_a_reset_leaves_the_job_pending_without_a_heartbeat(running_job):
     job_id = running_job.job_id
     _give_the_row_a_heartbeat(job_id)
+    set_run_columns(job_id, status=JOB_STATUS_FAILED)
 
     CosmonautJob(job_id=job_id).reset()
 
@@ -604,3 +606,29 @@ def test_a_new_row_starts_pending_whatever_the_saved_object_says():
         assert (row["status"], row["submitted"]) == (JOB_STATUS_PENDING, False)
     finally:
         job_persistence.delete_job(job.job_id)
+
+
+def test_a_reset_never_cancels_a_running_job(running_job):
+    """A stale tab must not kill a run: Cancel is its own click."""
+    job_id = running_job.job_id
+    _log_to_job_log(job_id, "a line of the live run")
+
+    with _revoking_must_not_happen():
+        reset = CosmonautJob(job_id=job_id).reset()
+
+    assert reset is False
+    row = DataBaseManager.get_job_columns(job_id)
+    assert row["status"] == JOB_STATUS_RUNNING
+    assert row["celery_task_id"] == "task-of-a-test"
+    assert "a line of the live run" in job_log.read(job_id)
+
+
+def test_the_navbar_reset_of_a_running_job_shows_a_hint_and_keeps_the_run(
+    running_job,
+):
+    job_id = running_job.job_id
+
+    with _revoking_must_not_happen(), pytest.raises(JobRunning):
+        layout.reset_job(job_id)
+
+    assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_RUNNING

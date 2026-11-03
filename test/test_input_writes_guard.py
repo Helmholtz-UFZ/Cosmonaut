@@ -26,7 +26,7 @@ from cosmonaut_app.constants.html_ids import NEXT_BUTTON_ROUTING_PARAMS_ID
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
 from cosmonaut_app.error_handling import JobNotPending
-from test.help_functions_tests import remove_job, set_run_columns
+from test.help_functions_tests import celery_says, remove_job, set_run_columns
 
 
 def _page(name):
@@ -200,3 +200,47 @@ def test_opening_route_download_does_not_write_a_stale_row_over_another_tab(job)
 
 def test_a_new_job_is_pending(job):
     assert _column(job, "status") == JOB_STATUS_PENDING
+
+
+def _street_processing_task_running(job, task_id="upload-task"):
+    """Make the row name an upload task that is still processing the streets."""
+    upload = {**_column(job, "membership_upload"), "street_processing": task_id}
+    DataBaseManager.update_column(job.job_id, {"membership_upload": upload})
+    return task_id
+
+
+def test_the_street_processing_poll_does_not_lower_a_stage_another_tab_raised(job):
+    _street_processing_task_running(job)
+    stale_view = CosmonautJob(job_id=job.job_id)
+    DataBaseManager.update_column(job.job_id, {"stage": 4})
+
+    with celery_says("SUCCESS"):
+        assert stale_view.get_street_processing_status() == "COMPLETED"
+
+    assert _column(job, "stage") == 4
+    assert _column(job, "membership_upload")["street_processing"] == "COMPLETED"
+
+
+def test_the_street_processing_poll_writes_only_the_street_processing_state(job):
+    _street_processing_task_running(job)
+    stale_view = CosmonautJob(job_id=job.job_id)
+    upload = {**_column(job, "membership_upload"), "len": 689, "zoom": 13}
+    DataBaseManager.update_column(job.job_id, {"membership_upload": upload})
+
+    with celery_says("SUCCESS"):
+        stale_view.get_street_processing_status()
+
+    row_upload = _column(job, "membership_upload")
+    assert (row_upload["len"], row_upload["zoom"]) == (689, 13)
+    assert row_upload["street_processing"] == "COMPLETED"
+
+
+def test_the_street_processing_poll_of_a_superseded_task_writes_nothing(job):
+    _street_processing_task_running(job, "old-task")
+    stale_view = CosmonautJob(job_id=job.job_id)
+    _street_processing_task_running(job, "new-task")
+
+    with celery_says("FAILURE"):
+        stale_view.get_street_processing_status()
+
+    assert _column(job, "membership_upload")["street_processing"] == "new-task"
