@@ -15,13 +15,14 @@ from unittest import mock
 import dash
 import pytest
 from cosmo_ecosystem import job_log, job_persistence
-from cosmo_ecosystem.db_manager import RUN_OWNED_COLUMNS, DbManager
+from cosmo_ecosystem.db_manager import DbManager
 from cosmo_ecosystem.job_log import JobLogHandler
 from cosmo_ecosystem.job_run import CANCELLED_MESSAGE
 from cosmo_ecosystem.object_storage_manager import ObjectStorageError
 from pydantic import ValidationError
 from sqlalchemy import func, update
 
+from cosmonaut_app import layout
 from cosmonaut_app.constants.general import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
@@ -30,6 +31,7 @@ from cosmonaut_app.constants.general import (
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager, JobTable
+from cosmonaut_app.error_handling import JobNotRunning, JobRunning
 from cosmonaut_app.tasks.routing_tasks import process_routing_job
 from test.help_functions_tests import (
     another_pod_meanwhile,
@@ -486,24 +488,23 @@ def test_a_reset_of_a_job_whose_run_was_queued_meanwhile_is_refused_and_changes_
     assert "a line of the live run" in job_log.read(job_id)
 
 
-def test_a_restart_of_a_running_job_cancels_it_and_ends_queued_again(
+def test_a_restart_of_a_running_job_is_refused_with_a_hint_and_changes_nothing(
     running_job, route_computation
 ):
+    """Cancel is its own click: Restart applies from FAILED or COMPLETED only."""
     job_id = running_job.job_id
 
     with (
-        mock.patch(
-            "cosmo_ecosystem.background_job_manager.background_job_manager.revoke_job"
-        ) as revoke,
-        _enqueue_returns("task-of-the-restart", False),
+        _revoking_must_not_happen(),
+        _enqueue_returns("never", False) as enqueue,
+        pytest.raises(JobRunning),
     ):
         route_computation.restart_computation(1, job_id)
 
-    revoke.assert_called_once_with("task-of-a-test", terminate=True)
+    enqueue.assert_not_called()
     row = DataBaseManager.get_job_columns(job_id)
     assert row["status"] == JOB_STATUS_RUNNING
-    assert row["heartbeat_at"] is None
-    assert row["celery_task_id"] == "task-of-the-restart"
+    assert row["celery_task_id"] == "task-of-a-test"
 
 
 def test_a_start_click_on_a_job_another_tab_queued_enqueues_nothing(
@@ -527,21 +528,79 @@ def test_a_start_click_on_a_job_another_tab_queued_enqueues_nothing(
     assert row["celery_task_id"] == "task-of-the-other-tab"
 
 
-def test_a_saved_row_names_none_of_the_run_owned_columns(running_job):
-    job = CosmonautJob(job_id=running_job.job_id)
-
-    with mock.patch.object(job_persistence, "save") as save:
-        job.save()
-
-    saved_row = save.call_args.args[1]
-    assert set(saved_row).isdisjoint(RUN_OWNED_COLUMNS)
-
-
 def test_a_new_job_starts_pending_and_not_submitted():
     job = CosmonautJob()
     try:
         row = DataBaseManager.get_job_columns(job.job_id)
         assert row["status"] == JOB_STATUS_PENDING
         assert row["submitted"] is False
+    finally:
+        job_persistence.delete_job(job.job_id)
+
+
+def test_a_failed_enqueue_makes_submit_return_false(running_job):
+    job_id = running_job.job_id
+    set_run_columns(job_id, status=JOB_STATUS_PENDING)
+
+    with _enqueue_returns(None, True):
+        queued = CosmonautJob(job_id=job_id).submit()
+
+    assert queued is False
+    assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_FAILED
+
+
+def test_a_cancel_of_a_queued_run_without_a_task_id_ends_it_failed(
+    running_job, route_computation
+):
+    """A run queued, whose task id was never written, can still be cancelled."""
+    job_id = running_job.job_id
+    running_job.model.celery_task_id = None
+    running_job.update_columns("celery_task_id")
+
+    with _revoking_must_not_happen():
+        route_computation.cancel_computation(1, job_id)
+
+    assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_FAILED
+
+
+def test_a_cancel_of_a_job_that_is_not_running_shows_a_hint(
+    running_job, route_computation
+):
+    job_id = running_job.job_id
+    set_run_columns(job_id, status=JOB_STATUS_COMPLETED)
+
+    with _revoking_must_not_happen(), pytest.raises(JobNotRunning):
+        route_computation.cancel_computation(1, job_id)
+
+    assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_COMPLETED
+
+
+def test_a_reset_the_row_refuses_shows_a_hint(running_job):
+    """The page's job is RUNNING and has no task id to cancel, so the reset
+    cannot make it PENDING; the user is told, nothing is deleted."""
+    job_id = running_job.job_id
+    running_job.model.celery_task_id = None
+    running_job.update_columns("celery_task_id")
+    _log_to_job_log(job_id, "a line of the live run")
+
+    with pytest.raises(JobRunning):
+        layout.reset_job(job_id)
+
+    assert DataBaseManager.get_job_columns(job_id)["status"] == JOB_STATUS_RUNNING
+    assert "a line of the live run" in job_log.read(job_id)
+
+
+def test_a_new_row_starts_pending_whatever_the_saved_object_says():
+    """A save writes no run-owned column, not even into a row it inserts."""
+    job = CosmonautJob()
+    try:
+        DataBaseManager.delete_job(job.job_id)
+        job.model.status = JOB_STATUS_RUNNING
+        job.model.submitted = True
+
+        job.save()
+
+        row = DataBaseManager.get_job_columns(job.job_id)
+        assert (row["status"], row["submitted"]) == (JOB_STATUS_PENDING, False)
     finally:
         job_persistence.delete_job(job.job_id)

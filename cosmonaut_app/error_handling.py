@@ -23,6 +23,7 @@ import logging
 from functools import partial
 
 import psycopg2
+from cosmo_ecosystem.error_handling import EXPECTED_ERRORS
 from cosmo_ecosystem.error_handling import JobNotFound as JobNotFound
 from cosmo_ecosystem.error_handling import error_modal as error_modal
 from cosmo_ecosystem.error_handling import handle_error as handle_error
@@ -58,6 +59,33 @@ class JobNotPending(Exception):
         """Add job_id as attribute and format error message."""
         self.job_id = job_id
         super().__init__(f"The input of job {job_id} is locked: it is not PENDING.")
+
+
+class JobRunning(Exception):
+    """Signals that an action needs a job that is not RUNNING, and it is.
+
+    Raised when a Restart or Reset finds the job RUNNING: the reset transition
+    is refused (cosmo-ecosystem ADR 0005) and nothing was deleted. The modal
+    tells the user to cancel first.
+    """
+
+    def __init__(self, job_id):
+        """Add job_id as attribute and format error message."""
+        self.job_id = job_id
+        super().__init__(f"Job {job_id} is running.")
+
+
+class JobNotRunning(Exception):
+    """Signals that a cancel found no run to cancel.
+
+    Raised when a Cancel reaches a job that is no longer RUNNING (it finished a
+    moment earlier, or another tab cancelled it). Nothing was changed.
+    """
+
+    def __init__(self, job_id):
+        """Add job_id as attribute and format error message."""
+        self.job_id = job_id
+        super().__init__(f"Job {job_id} is not running.")
 
 
 class FileValidationError(Exception):
@@ -97,6 +125,15 @@ ERROR_RESPONSES = {
         "The input of this job can no longer be changed because its run has "
         "started. Reset the job first.",
     ),
+    JobRunning: (
+        "Job Is Running",
+        "This job is running. Cancel it first, then try again.",
+    ),
+    JobNotRunning: (
+        "Job Is Not Running",
+        "This job is no longer running, so there is nothing to cancel. "
+        "The page shows its current status.",
+    ),
     FileValidationError: (
         "File Validation Error",
         "The uploaded file could not be validated. Please check the file format and try again.",  # noqa
@@ -120,6 +157,11 @@ def notify_maintainer(error):
 
 # Ready-made for `Dash(on_error=...)`, so the hook cannot be forgotten at the
 # call site by writing `on_error=handle_error`.
+# The three refusals are states the user caused by clicking on an older view of
+# the job: the modal, but no traceback and no maintainer mail.
 handle_error_with_notification = partial(
-    handle_error, on_unhandled=notify_maintainer, error_responses=ERROR_RESPONSES
+    handle_error,
+    on_unhandled=notify_maintainer,
+    error_responses=ERROR_RESPONSES,
+    expected_errors=(*EXPECTED_ERRORS, JobNotPending, JobRunning, JobNotRunning),
 )

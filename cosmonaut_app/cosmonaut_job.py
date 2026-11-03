@@ -634,7 +634,8 @@ class CosmonautJob(BaseJob):
         work dir or the queue.
 
         Returns:
-            Whether this call queued a run.
+            Whether a run was queued and enqueued; False when the guard was
+            lost, and when the enqueue reported a failure (the job ends FAILED).
         """
         job_id = self.model.job_id
         log.info(f"Submitting job {job_id} to background worker")
@@ -678,7 +679,7 @@ class CosmonautJob(BaseJob):
 
         if failed:
             self._fail_to_start()
-            return True
+            return False
 
         # Store task ID: DB update only, the worker already has the files
         self.model.celery_task_id = celery_task_id
@@ -723,7 +724,10 @@ class CosmonautJob(BaseJob):
         Returns:
             Whether a run was cancelled; False means the job was not RUNNING.
         """
-        manager().revoke_job(self.model.celery_task_id, terminate=True)
+        # A queued run whose task id was never written has no task to revoke;
+        # its row can still be cancelled.
+        if self.model.celery_task_id:
+            manager().revoke_job(self.model.celery_task_id, terminate=True)
         cancelled = job_run.mark_cancelled(self.model.job_id)
         if cancelled:
             log.info(f"Job {self.model.job_id}: run cancelled by user.")

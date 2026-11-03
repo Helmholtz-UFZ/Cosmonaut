@@ -40,7 +40,7 @@ from cosmonaut_app.constants.html_ids import (
     URL_SHARED_ID,
 )
 from cosmonaut_app.cosmonaut_job import CosmonautJob
-from cosmonaut_app.error_handling import JobNotFound, error_modal
+from cosmonaut_app.error_handling import JobNotFound, JobRunning, error_modal
 from cosmonaut_app.map_utils import map_layer_data
 from cosmonaut_app.street_selector import StreetSelector
 
@@ -864,6 +864,18 @@ def register_navbar_callbacks(app):
         return build_url_step("user_info", job.model.job_id)
 
 
+def reset_job(job_id: str) -> None:
+    """Reset the job, or tell the user why not.
+
+    Raises:
+        JobRunning: If the row refused the reset because a run is RUNNING and
+            could not be cancelled (a run queued by another tab meanwhile).
+            Nothing was deleted; the global error handler shows the modal.
+    """
+    if not CosmonautJob(job_id=job_id).reset():
+        raise JobRunning(job_id)
+
+
 def register_reset_callbacks(app):
     """Register callbacks for job reset functionality."""
 
@@ -911,13 +923,8 @@ def register_reset_callbacks(app):
 
         # A failing load or reset reaches the global error handler, which shows
         # the user why the reset did not happen.
-        job = CosmonautJob(job_id=job_id)
-        if job.reset():
-            log.info(f"Job {job_id} reset successfully from {pathname}")
-        else:
-            # A run was queued meanwhile (another tab): the row refused the
-            # reset, and the reloaded page shows the job as it really is.
-            log.warning(f"Job {job_id} is running and was not reset from {pathname}")
+        reset_job(job_id)
+        log.info(f"Job {job_id} reset successfully from {pathname}")
 
         # Return same pathname to reload page with new state
         return pathname
