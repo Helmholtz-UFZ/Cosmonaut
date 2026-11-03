@@ -37,6 +37,8 @@ All error handling is centralized in `cosmonaut_app/error_handling.py`.
   management Clean), the second by the framework `delete_jobs` (job management Delete).
   The framework error table shows their message (the failed ids) in the modal, so
   callbacks let them through instead of catching them
+- `JobNotPending(job_id)` - A conditional input write (`CosmonautJob.update_input`) did not apply: the
+  job started or finished after the page's PENDING guard passed. Shown in the modal
 - `WrongCeleryTaskId(task_id)` - Invalid Celery task ID
 
 ---

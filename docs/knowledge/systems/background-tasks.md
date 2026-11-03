@@ -36,11 +36,14 @@ recover the name. They return `(task_id, failed)`; the caller stores `task_id` o
 **re-loads the job by id and calls `job_persistence.work_dir(job_id)`** — it never receives the job object over the wire, only
 the id, and pulls a current copy from object storage (see [cosmonaut-job](../concepts/cosmonaut-job.md)).
 
-The canonical submit path is `CosmonautJob.submit()`: `save()` (so the worker sees current files +
-`parameters.json`), queue the run with `job_run.mark_queued` (`RUNNING` and `heartbeat_at = NULL` in
-one write, before the enqueue), enqueue, then store `celery_task_id` with `update_columns`. Never
-write `RUNNING` yourself: the run claims only a RUNNING row without a heartbeat.
-An enqueue that reports failure writes `FAILED` and "Cannot start job <id>." to the job log.
+The canonical submit path is `CosmonautJob.submit()`, which returns whether it queued a run. Its first
+write is the guard `job_run.mark_queued` (`RUNNING`, no heartbeat, no run id, `submitted` in one
+conditional update; cosmo-ecosystem ADR 0005): a second click or tab loses it and does nothing. Only a
+won guard resets `notified_end`, pulls the work dir, runs `save()` (so the worker sees current files +
+`parameters.json`), enqueues, then stores `celery_task_id` with `update_columns`. Never write `RUNNING`
+yourself: the run claims only a RUNNING row without a heartbeat. Everything after the guard sits under
+`job_run.mark_start_failed`: a pull, save or enqueue that raises, or an enqueue that reports failure,
+writes `FAILED` and "Cannot start job <id>." to the job log (a raise is re-raised).
 
 ## Status lives in the job row (cosmo-ecosystem ADR 0002)
 
@@ -61,11 +64,15 @@ route computation's status. The job row is the only source:
   `docs/adr/0004-lost-job-runs-are-swept-not-retried.md`). Nothing is retried; the user resets and
   resubmits.
 - `CosmonautJob.get_status()` reads the row only; `get_logs()` returns `job_log.read`.
-- `CosmonautJob.cancel()` (cancel button, and `reset()` of a RUNNING job) revokes the task, then writes
-  `FAILED` and a "run cancelled by user" record via `job_log.append`: a terminated worker writes nothing.
-  `reset()` returns the row to `PENDING` with no heartbeat through `job_run.mark_pending`.
-- `heartbeat_at` belongs to the run: it is no `JobModel` field, so `save()` of a loaded job never
-  writes an older heartbeat back.
+- `CosmonautJob.cancel()` (cancel button, and `reset()` of a RUNNING job) revokes the task, then calls
+  `job_run.mark_cancelled`: `FAILED` and a cancelled line in the job log, only while the row is RUNNING
+  (a COMPLETED that landed first is kept). A terminated worker writes nothing.
+  `reset()` goes through `job_run.mark_pending` before it deletes anything and returns False when the
+  row is RUNNING. Restart is cancel (inside `reset`), reset, submit.
+- `status`, `submitted`, `heartbeat_at` and `run_id` are run-owned (`RUN_OWNED_COLUMNS`): the app's
+  `_row()` leaves them out, so `save()` of a loaded job never writes an older state back. Street-selection
+  and routing-parameter writes use `CosmonautJob.update_input`, a write `WHERE status = 'PENDING'`; a
+  refused one raises `JobNotPending` (modal).
 - `CosmonautJob.get_street_processing_status()` still asks Celery, for the upload task only, reading
   the task ID stored in `membership_upload["street_processing"]` (see the overloaded-field note in
   [cosmonaut-job](../concepts/cosmonaut-job.md)).
