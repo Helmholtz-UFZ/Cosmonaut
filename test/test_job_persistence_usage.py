@@ -301,3 +301,25 @@ def test_a_failed_submission_ends_the_upload_failed(job, membership_file_path):
         )
 
     assert _street_processing(job.model.job_id) == "FAILED"
+
+
+def test_any_exception_from_the_submission_ends_the_upload_failed_and_propagates(
+    job, membership_file_path
+):
+    """The id was written before the submission: it must not outlive a submission
+    that raised, or the upload would read RUNNING forever."""
+    with (
+        mock.patch(
+            "cosmonaut_app.pages.data_upload.submit_upload_job",
+            side_effect=RuntimeError("not a Celery error"),
+        ),
+        pytest.raises(RuntimeError, match="not a Celery error"),
+    ):
+        _handle_membership_upload()(
+            _data_url(membership_file_path),
+            "memberships.csv",
+            job.model.job_id,
+            25832,
+        )
+
+    assert _street_processing(job.model.job_id) == "FAILED"

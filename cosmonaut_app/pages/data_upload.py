@@ -504,6 +504,12 @@ def _no_update_upload():
     }
 
 
+def _end_upload_failed(job):
+    """Write street_processing=FAILED to the job's row (that column only)."""
+    job.model.membership_upload["street_processing"] = "FAILED"
+    job.update_columns("membership_upload")
+
+
 def _handle_membership_upload(contents, filename, job_id, epsg_input):
     """Process membership file upload."""
     if not contents or not filename:
@@ -570,10 +576,17 @@ def _handle_membership_upload(contents, filename, job_id, epsg_input):
     # and the worker's save() uploads the rest when it finishes
     job.update_columns("membership_upload")
 
-    _, failed = submit_upload_job(job, epsg_input, task_id)
+    try:
+        _, failed = submit_upload_job(job, epsg_input, task_id)
+    except Exception:  # noqa: BLE001
+        # Convention exception (CLAUDE.md: specific exceptions only): whatever the
+        # submission raises, the task id written above names a task that never ran
+        # and would read RUNNING forever. Re-raised for the global error handler,
+        # as framework Job.submit does.
+        _end_upload_failed(job)
+        raise
     if failed:
-        job.model.membership_upload["street_processing"] = "FAILED"
-        job.update_columns("membership_upload")
+        _end_upload_failed(job)
 
     log.debug(f"Membership file uploaded and processed for job {job_id}")
 

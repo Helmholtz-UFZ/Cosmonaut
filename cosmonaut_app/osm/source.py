@@ -66,7 +66,7 @@ def _raise_on_runtime_error(tail):
     remark = json.loads(match.group(1))
     if remark.startswith("runtime error"):
         raise OverpassRuntimeError(remark)
-    log.warning("Overpass remark: %s", remark)
+    log.warning(f"Overpass remark: {remark}")
 
 
 class OsmSource:

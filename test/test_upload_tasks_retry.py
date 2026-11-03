@@ -1,5 +1,6 @@
 """Test upload task retry logic for transient Overpass errors."""
 
+import inspect
 import unittest.mock as mock
 
 import ijson
@@ -366,3 +367,12 @@ def test_a_superseded_task_failing_changes_nothing(saved_job):
 
     upload = DataBaseManager.get_job_columns(saved_job.job_id)["membership_upload"]
     assert upload["street_processing"] == "task-of-the-newer-upload"
+
+
+def test_a_message_queued_before_the_deploy_still_binds():
+    """Tasks sent as (job_id, epsg_input) positionally are still in the queue when
+    the worker is replaced; both the old and the new message shape must bind."""
+    signature = inspect.signature(process_upload_task)
+
+    signature.bind("task", "job", 4326)
+    signature.bind("task", "job", epsg_input=4326)

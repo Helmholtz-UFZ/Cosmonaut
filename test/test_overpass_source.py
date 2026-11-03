@@ -6,6 +6,7 @@ Overpass reports a server-side failure in-band: HTTP 200 and a top-level
 
 import io
 import json
+import logging
 import unittest.mock as mock
 
 import ijson
@@ -108,3 +109,13 @@ def test_a_truncated_response_raises_ijson_incomplete_json():
 
     with pytest.raises(ijson.IncompleteJSONError):
         _stream(body[: len(body) // 2])
+
+
+def test_a_remark_that_is_not_a_runtime_error_is_logged_not_raised(caplog):
+    body = _overpass_json([_way(1)], remark="runtime remark: something to note")
+
+    with caplog.at_level(logging.WARNING, logger="cosmonaut_app.osm.source"):
+        ways = _stream(body)
+
+    assert [w["id"] for w in ways] == [1]
+    assert "runtime remark: something to note" in caplog.text
