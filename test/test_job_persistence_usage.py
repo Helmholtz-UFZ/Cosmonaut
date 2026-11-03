@@ -247,3 +247,57 @@ def test_the_membership_raster_is_in_object_storage_after_the_upload(
         )
 
     assert MEMBERSHIP_TIF in _remote_files(job.model.job_id)
+
+
+def _handle_membership_upload():
+    dash.Dash(__name__, use_pages=True, pages_folder="")
+    return importlib.import_module(
+        "cosmonaut_app.pages.data_upload"
+    )._handle_membership_upload
+
+
+def _street_processing(job_id):
+    return DataBaseManager.get_job_columns(job_id)["membership_upload"][
+        "street_processing"
+    ]
+
+
+def test_the_row_names_the_upload_task_before_the_task_can_run(
+    job, membership_file_path
+):
+    """A task that ends at once must find its id in the row, or its compare-and-set
+    drops the final write."""
+    seen = {}
+
+    def submit(submitted_job, epsg_input, task_id):
+        seen["row_when_submitted"] = _street_processing(submitted_job.model.job_id)
+        seen["task_id"] = task_id
+        return task_id, False
+
+    with mock.patch(
+        "cosmonaut_app.pages.data_upload.submit_upload_job", side_effect=submit
+    ):
+        _handle_membership_upload()(
+            _data_url(membership_file_path),
+            "memberships.csv",
+            job.model.job_id,
+            25832,
+        )
+
+    assert seen["row_when_submitted"] == seen["task_id"]
+    assert _street_processing(job.model.job_id) == seen["task_id"]
+
+
+def test_a_failed_submission_ends_the_upload_failed(job, membership_file_path):
+    with mock.patch(
+        "cosmonaut_app.pages.data_upload.submit_upload_job",
+        return_value=(None, True),
+    ):
+        _handle_membership_upload()(
+            _data_url(membership_file_path),
+            "memberships.csv",
+            job.model.job_id,
+            25832,
+        )
+
+    assert _street_processing(job.model.job_id) == "FAILED"
