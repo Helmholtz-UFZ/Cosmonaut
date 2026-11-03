@@ -6,7 +6,9 @@ us swap the backend — public/self-hosted Overpass now, a local ``.osm.pbf``
 reader later — without touching the transform that builds the routing GeoJSON.
 """
 
+import json
 import logging
+import re
 
 import ijson
 import requests
@@ -24,6 +26,47 @@ OVERPASS_HTTP_TIMEOUT = 300
 # A descriptive User-Agent is Overpass etiquette and is required by the public
 # endpoint — overpass-api.de answers 406 to the default python-requests UA.
 OVERPASS_HEADERS = {"User-Agent": "cosmonaut-osm (UFZ COSMONAUT route survey)"}
+
+# Overpass ends a response that failed server-side with a top-level ``remark``
+# after the ``elements`` array, e.g. "runtime error: Query timed out in ..." or
+# "runtime error: Query ran out of memory ...", while the HTTP status stays 200
+# and ``elements`` holds whatever was collected so far. A way tag cannot imitate
+# the pattern: quotes inside a JSON string are escaped.
+_REMARK_AFTER_ELEMENTS = re.compile(r'\]\s*,\s*"remark"\s*:\s*("(?:[^"\\]|\\.)*")')
+# The remark is a short sentence at the very end; this much of the stream's end
+# is kept to find it without holding the response.
+_TAIL_BYTES = 65536
+
+
+class OverpassRuntimeError(Exception):
+    """Overpass answered 200 but reported a server-side failure; the data is partial.
+
+    Retryable: a timeout or out-of-memory depends on the server's load.
+    """
+
+
+class _TailKeepingReader:
+    """File-like wrapper that remembers the last ``_TAIL_BYTES`` bytes read."""
+
+    def __init__(self, raw):
+        self._raw = raw
+        self.tail = b""
+
+    def read(self, size=-1):
+        chunk = self._raw.read(size)
+        self.tail = (self.tail + chunk)[-_TAIL_BYTES:]
+        return chunk
+
+
+def _raise_on_runtime_error(tail):
+    """Raise OverpassRuntimeError if the end of the response carries a runtime error."""
+    match = _REMARK_AFTER_ELEMENTS.search(tail.decode("utf-8", errors="replace"))
+    if match is None:
+        return
+    remark = json.loads(match.group(1))
+    if remark.startswith("runtime error"):
+        raise OverpassRuntimeError(remark)
+    log.warning("Overpass remark: %s", remark)
 
 
 class OsmSource:
@@ -122,6 +165,10 @@ class OverpassSource(OsmSource):
         )
         response.raise_for_status()
         response.raw.decode_content = True  # transparently inflate gzip/deflate
-        for element in ijson.items(response.raw, "elements.item"):
+        reader = _TailKeepingReader(response.raw)
+        for element in ijson.items(reader, "elements.item"):
             if element["type"] == "way":
                 yield element
+        # Only now is the end of the response read: a partial result must not
+        # pass as complete (the caller discards what it wrote on the exception).
+        _raise_on_runtime_error(reader.tail)

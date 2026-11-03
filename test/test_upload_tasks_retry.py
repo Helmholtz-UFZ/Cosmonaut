@@ -2,14 +2,17 @@
 
 import unittest.mock as mock
 
+import ijson
 import pandas as pd
 import pytest
 import requests.exceptions
+import urllib3.exceptions
 from cosmo_ecosystem import job_persistence
 from cosmo_ecosystem.object_storage_manager import ObjectStorageError
 
 from cosmonaut_app.cosmonaut_job import CosmonautJob
 from cosmonaut_app.db_manager import DataBaseManager
+from cosmonaut_app.osm.source import OverpassRuntimeError
 from cosmonaut_app.tasks.upload_tasks import process_upload_task
 
 TASK_ID = "task-of-the-upload"
@@ -148,6 +151,36 @@ def test_process_upload_task_retries_on_http_503():
     task_mock.retry.assert_called_once()
     call_kwargs = task_mock.retry.call_args[1]
     assert call_kwargs["countdown"] == 20
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        OverpassRuntimeError("runtime error: Query timed out"),
+        urllib3.exceptions.ProtocolError("Connection broken: IncompleteRead"),
+        ijson.IncompleteJSONError("parse error: premature EOF"),
+    ],
+    ids=["overpass-runtime-error", "protocol-error", "incomplete-json"],
+)
+def test_process_upload_task_retries_on_a_broken_or_partial_download(error):
+    """A stream cut mid-response or ended by an Overpass runtime error is retried."""
+    job = CosmonautJob()
+    job.save()
+
+    task_mock = mock.MagicMock()
+    task_mock.request.retries = 0
+
+    with (
+        mock.patch(
+            "cosmonaut_app.tasks.upload_tasks._transform_csv",
+            return_value=_create_dummy_classification_data(),
+        ),
+        mock.patch("cosmonaut_app.osm.OsmDownloader.run_osm_query", side_effect=error),
+    ):
+        process_upload_task(task_mock, job.model.job_id, 4326)
+
+    task_mock.retry.assert_called_once()
+    assert task_mock.retry.call_args[1]["exc"] is error
 
 
 def test_process_upload_task_does_not_retry_on_non_transient_http_error():
