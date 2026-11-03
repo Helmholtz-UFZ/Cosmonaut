@@ -753,6 +753,9 @@ def reset_edits(
         raise PreventUpdate
 
     job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
+        raise PreventUpdate
+
     sel = StreetSelector(job)
     sel.reset()
     is_active = job.get_status() == JOB_STATUS_PENDING
@@ -941,8 +944,11 @@ def restore_single_road(n_clicks_list, pathname, version):
     if not any(n_clicks_list) or not job_id:
         raise PreventUpdate
 
-    road_id = ctx.triggered_id["index"]
     job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
+        raise PreventUpdate
+
+    road_id = ctx.triggered_id["index"]
     sel = StreetSelector(job)
     sel.restore_road(road_id)
 
@@ -975,6 +981,9 @@ def clear_all_removed_roads(n_clicks, pathname, version):
         raise PreventUpdate
 
     job = CosmonautJob(job_id=job_id)
+    if job.get_status() != JOB_STATUS_PENDING:
+        raise PreventUpdate
+
     sel = StreetSelector(job)
     sel.clear_removed_roads()
 
