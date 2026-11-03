@@ -277,6 +277,16 @@ def test_a_resubmit_of_a_notified_job_lets_the_next_end_mail_through(running_job
     assert DataBaseManager.get_job_columns(job_id)["notified_end"] is False
 
 
+def test_a_reset_keeps_the_job_submitted_so_cleanup_keeps_its_retention(running_job):
+    """Unsubmitted jobs are deleted 2 days after start_date: a reset must not
+    put an old job back under that rule."""
+    job_id = running_job.job_id
+
+    CosmonautJob(job_id=job_id).reset()
+
+    assert DataBaseManager.get_job_columns(job_id)["submitted"] is True
+
+
 def test_a_reset_leaves_the_job_pending_without_a_heartbeat(running_job):
     job_id = running_job.job_id
     _give_the_row_a_heartbeat(job_id)
