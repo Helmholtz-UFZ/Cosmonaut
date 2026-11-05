@@ -10,6 +10,9 @@ include:
   - project: "ufz/tb5-smm/met/wg7/cosmo-ecosystem"
     ref: "v1.0.0"
     file: "/ci/object-storage.gitlab-ci.yml"
+  # Scans each pipeline's changes for committed secrets. Report only, not blocking yet:
+  # env_prod still holds the S3 access key ID.
+  - template: "Jobs/Secret-Detection.gitlab-ci.yml"
 
 variables:
   # Postgres. POSTGRES_DB/USER/PASSWORD configure the service image; the app reads
@@ -485,3 +488,9 @@ release:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web" && $VERSION'
     - when: "never"
+
+# The report holds the matched values in plain text and the project is public:
+# only Developers may download it.
+secret_detection:
+  artifacts:
+    access: "developer"
