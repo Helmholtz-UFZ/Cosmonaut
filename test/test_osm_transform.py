@@ -13,6 +13,7 @@ schema changes.
 import json
 import os
 import tempfile
+import threading
 from decimal import Decimal
 
 import pandas as pd
@@ -21,7 +22,10 @@ from sensor_routing.point_mapping import build_node_to_roads_map
 from shapely.geometry import box
 
 from cosmonaut_app.osm.downloader import OsmDownloader
-from cosmonaut_app.osm.geojson_writer import StreamingGeoJsonWriter
+from cosmonaut_app.osm.geojson_writer import (
+    StreamingGeoJsonWriter,
+    write_bytes_atomic,
+)
 from cosmonaut_app.osm.transform import (
     PROPERTY_ORDER,
     _truncate_by_edge,
@@ -192,8 +196,54 @@ def test_streaming_writer_atomic_discard_on_error():
             raise RuntimeError("simulated stream failure")
     except RuntimeError:
         pass
-    assert not os.path.exists(path)
-    assert not os.path.exists(path + ".tmp")
+    assert os.listdir(os.path.dirname(path)) == []
+
+
+def test_streaming_writers_to_one_path_never_interleave():
+    """Two writers open on the same path at once (two callbacks rewriting one
+    derived file) each publish a complete file; the last close wins."""
+    path = os.path.join(tempfile.mkdtemp(), "shared.geojson")
+    first = StreamingGeoJsonWriter(path)
+    second = StreamingGeoJsonWriter(path)
+    for i in range(3):
+        first.write(
+            {"type": "Feature", "properties": {"w": 1, "i": i}, "geometry": None}
+        )
+        second.write(
+            {"type": "Feature", "properties": {"w": 2, "i": i}, "geometry": None}
+        )
+    first.close()
+    second.close()
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    assert [ft["properties"]["w"] for ft in data["features"]] == [2, 2, 2]
+    assert os.listdir(os.path.dirname(path)) == ["shared.geojson"]
+
+
+def test_write_bytes_atomic_reader_never_sees_partial_file():
+    """A reader polling the file while another thread rewrites it always parses
+    a complete document (the torn read of osm_data_edited.geojson, 2026-11-09)."""
+    path = os.path.join(tempfile.mkdtemp(), "edited.geojson")
+    payloads = [json.dumps({"features": [{"n": i}] * 20000}).encode() for i in range(2)]
+    write_bytes_atomic(path, payloads[0])
+    stop = threading.Event()
+
+    def rewrite():
+        i = 0
+        while not stop.is_set():
+            write_bytes_atomic(path, payloads[i % 2])
+            i += 1
+
+    writer = threading.Thread(target=rewrite)
+    writer.start()
+    try:
+        for _ in range(300):
+            with open(path, "rb") as f:
+                assert len(json.loads(f.read())["features"]) == 20000
+    finally:
+        stop.set()
+        writer.join()
+    assert os.listdir(os.path.dirname(path)) == ["edited.geojson"]
 
 
 class _FakeSource:
