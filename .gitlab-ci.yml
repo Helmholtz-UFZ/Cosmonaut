@@ -8,7 +8,7 @@ stages:
 include:
   # The S3 server for the integration jobs. Keep ref on the tag pyproject.toml pins.
   - project: "ufz/tb5-smm/met/wg7/cosmo-ecosystem"
-    ref: "v1.0.0"
+    ref: "v1.0.1"
     file: "/ci/object-storage.gitlab-ci.yml"
   # Scans each pipeline's changes for committed secrets. Report only, not blocking yet:
   # env_prod still holds the S3 access key ID.
