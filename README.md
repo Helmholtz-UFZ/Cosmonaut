@@ -33,6 +33,8 @@ cp env_dev_prod env_dev_prod_priv
 ./dev_up.sh prod
 ```
 
+Example input data for a full job (Harz region) lies in [`examples/harz/`](examples/harz/README.md).
+
 ## Technical Architecture
 
 COSMONAUT's architecture balances scientific workflow requirements with software engineering best practices, implementing a multi-tier system suitable for both single-user local deployments and multi-tenant institutional servers.
