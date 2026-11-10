@@ -32,6 +32,7 @@ cp env_test .env
 # Assure FLASK_DEBUG=0 no reload of code during test generation
 sed -i 's/^FLASK_DEBUG=.*/FLASK_DEBUG=0/' .env
 source .env
+source "$(dirname "$0")/set_docker_user.sh"
 # Stop and remove any existing containers
 docker compose down 2>/dev/null || true
 
