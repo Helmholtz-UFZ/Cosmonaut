@@ -60,6 +60,7 @@ fi
 
 # Copy env file and optionally override DEBUG variable
 cp "$env_file" .env
+source "$(dirname "$0")/set_docker_user.sh"
 
 if [ "$DEBUG_MODE" = true ]; then
     sed -i 's/^FLASK_DEBUG=.*/FLASK_DEBUG=1/' .env
