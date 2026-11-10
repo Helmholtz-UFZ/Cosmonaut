@@ -57,6 +57,7 @@ from cosmonaut_app.constants.general import (
     UNGRADED_TRACK_GRADE,
 )
 from cosmonaut_app.error_handling import JobNotPending
+from cosmonaut_app.osm.geojson_writer import write_bytes_atomic
 from cosmonaut_app.osm.projection import project_features_to_file
 from cosmonaut_app.pydantic_models import StreetEdits
 from cosmonaut_app.road_network_utils import (
@@ -551,8 +552,7 @@ class StreetSelector:
         self._write_records(records)
 
     def _write_records(self, records: dict) -> None:
-        with open(self.records_path, "wb") as f:
-            f.write(orjson.dumps(records))
+        write_bytes_atomic(self.records_path, orjson.dumps(records))
 
     def _is_current(self, file_name: str, source: str) -> bool:
         """Return whether the derived file_name exists, is built from source,
@@ -591,8 +591,8 @@ class StreetSelector:
         data = dict(feature_collection)
         data.pop("crs", None)
         target = path or self.edit_path
-        with open(target, "wb") as f:
-            f.write(orjson.dumps(data))
+        # Atomic: another callback may read this file while we rewrite it.
+        write_bytes_atomic(target, orjson.dumps(data))
         # Warm the cache so the next _load_edit_features avoids a re-read.
         _feature_cache[target] = (os.path.getmtime(target), data["features"])
 

@@ -4,15 +4,45 @@ Writes features one at a time to disk so the OSM download never holds the whole
 dataset (parsed response + all features + a GeoDataFrame) in memory at once —
 this is what keeps the streaming download's peak RAM bounded.
 
-Writes go to a ``<path>.tmp`` file and are renamed into place only on a clean
-close, so a failed or partial download (e.g. an Overpass timeout mid-stream)
-never leaves a half-written file behind. ``os.replace`` is a filesystem rename:
-it costs no extra memory. See the decision record
-docs/decisions/20260605-osm-overpass-direct-vs-osmnx.md.
+Writes go to a ``<path>.<random>.tmp`` file and are renamed into place only on
+a clean close, so a failed or partial download (e.g. an Overpass timeout
+mid-stream) never leaves a half-written file behind, and a reader never sees
+one. ``os.replace`` is a filesystem rename: it costs no extra memory. See the
+decision record docs/decisions/20260605-osm-overpass-direct-vs-osmnx.md.
+
+The temp name is unique per write because two Dash callbacks can rewrite the
+same derived file at once; with one shared ``<path>.tmp`` their bytes would
+interleave and the rename would publish a torn file.
 """
 
 import json
 import os
+import secrets
+
+
+def _open_temp_beside(path, mode):
+    """Open a new uniquely named ``<path>.<random>.tmp`` in path's directory.
+
+    Same directory, so the final ``os.replace`` is an atomic rename. Not
+    ``tempfile.mkstemp``: it creates mode 0600, and the Dash and worker
+    containers share the work dir; ``open(..., "x")`` keeps the umask mode.
+    """
+    tmp_path = f"{path}.{secrets.token_hex(4)}.tmp"
+    encoding = None if "b" in mode else "utf-8"
+    return open(tmp_path, mode.replace("w", "x"), encoding=encoding), tmp_path
+
+
+def write_bytes_atomic(path, data):
+    """Write data to path so a concurrent reader sees the old or the new file,
+    never a partial one."""
+    file, tmp_path = _open_temp_beside(path, "wb")
+    try:
+        with file:
+            file.write(data)
+        os.replace(tmp_path, path)
+    except OSError:
+        os.remove(tmp_path)
+        raise
 
 
 class StreamingGeoJsonWriter:
@@ -20,8 +50,9 @@ class StreamingGeoJsonWriter:
     atomically.
 
     Args:
-        path: final output file path. Written via ``path + ".tmp"`` and renamed
-            into place on a clean close (same directory -> atomic rename).
+        path: final output file path. Written via a unique temp file beside it
+            and renamed into place on a clean close (same directory -> atomic
+            rename).
         crs_epsg: if given, emit a named-CRS header (``EPSG::<code>``) matching the
             geopandas/GDAL output, so the projected file documents its CRS. Omit
             for plain 4326 files (the old pipeline wrote those without a header).
@@ -35,8 +66,7 @@ class StreamingGeoJsonWriter:
 
     def __init__(self, path, crs_epsg=None):
         self._final_path = path
-        self._tmp_path = path + ".tmp"
-        self._file = open(self._tmp_path, "w", encoding="utf-8")
+        self._file, self._tmp_path = _open_temp_beside(path, "w")
         self._first = True
         header = '{"type": "FeatureCollection", '
         if crs_epsg is not None:
